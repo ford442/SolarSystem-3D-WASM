@@ -9,6 +9,9 @@ void TextureImage2D::LoadTextureFromFile(const std::string& path, GLint wrapPara
     glBindTexture(GL_TEXTURE_2D, _textureID);
 
     try {
+        // [PORTING NOTE]
+        // Ensure files are preloaded (emcc --preload-file) or fetched asynchronously.
+        // For preloaded files, std::ifstream in CDDSImage will work transparently.
         CDDSImage image;
         image.load(path, false);
         image.upload_texture2D();
