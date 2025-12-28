@@ -11,6 +11,10 @@ Application::Application() : _fpsHandler(240) {
 }
 
 void Application::Exec() {
+    // [PORTING NOTE]
+    // For Emscripten, replace this while loop with emscripten_set_main_loop.
+    // The body of the loop should be extracted into a separate function.
+    // e.g. emscripten_set_main_loop_arg(MainLoopCallback, this, 0, 1);
     while (!glfwWindowShouldClose(_mainWindow)) {
         _fpsHandler.RunFrameTimer();
 
@@ -600,6 +604,10 @@ void Application::InitSystems() {
     }
     _soundEngine->setSoundVolume(0.3); // 30% by default
 
+    // [PORTING NOTE]
+    // Mixing SDL and GLFW is problematic on the web.
+    // Recommendation: Remove SDL_Init/IMG_Init if you only use GLFW for the window.
+    // If you need image loading, use stb_image or Emscripten's built-in SDL_image port WITHOUT SDL_Init(VIDEO).
     if (SDL_Init(SDL_INIT_EVERYTHING)) {
         Dispose();
         throw runtime_error("Failed to init SDL");
@@ -1089,6 +1097,10 @@ void Application::StartPlayBackgroundMusic() {
         return outMin + (outMax - outMin) * (value - inMin) / (inMax - inMin);
     };
 
+    // [PORTING NOTE]
+    // irrKlang is not supported on the web. Replace with SDL_mixer.
+    // Threads with sleep_for are not ideal for the web unless using -s PROXY_TO_PTHREAD=1
+    // Better to use non-blocking logic in the main loop or Web Audio API.
     _backgroundMusicThread = make_unique<thread>([=]() {
         for (ssize_t i = 0; i < _backgroundSongs.size() && _isBackgroundMusicPlay; i++) {
             // At the beginning of the loop so that there is no delay when exiting the program
