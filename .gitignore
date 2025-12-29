@@ -1,3 +1,7 @@
 # CLion
 .idea
 cmake-build*
+
+# Assets managed via FTP (too large for LFS)
+resource/textures/
+resource/sounds/
