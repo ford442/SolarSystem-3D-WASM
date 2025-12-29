@@ -109,7 +109,13 @@ void Shader::SetFloat(const std::string& name, float value) const {
 }
 
 void Shader::SetDouble(const std::string &name, double value) const {
+    // [PORTING NOTE] WebGL 2 does NOT support glUniform1d (double precision).
+    // Cast to float for web builds.
+    #ifdef __EMSCRIPTEN__
+    glUniform1f(glGetUniformLocation(_shaderProgramID, name.c_str()), static_cast<float>(value));
+    #else
     glUniform1d(glGetUniformLocation(_shaderProgramID, name.c_str()), value);
+    #endif
 }
 
 void Shader::SetVec2(const std::string& name, const glm::vec2& value) const {
@@ -149,39 +155,75 @@ void Shader::SetMat4(const std::string& name, const glm::mat4& mat) const {
 }
 
 void Shader::SetVec2Double(const std::string& name, const glm::dvec2& value) const {
+    #ifdef __EMSCRIPTEN__
+    glUniform2fv(glGetUniformLocation(_shaderProgramID, name.c_str()), 1, &glm::vec2(value)[0]);
+    #else
     glUniform2dv(glGetUniformLocation(_shaderProgramID, name.c_str()), 1, &value[0]);
+    #endif
 }
 
 void Shader::SetVec2Double(const std::string& name, double x, double y) const {
+    #ifdef __EMSCRIPTEN__
+    glUniform2f(glGetUniformLocation(_shaderProgramID, name.c_str()), (float)x, (float)y);
+    #else
     glUniform2d(glGetUniformLocation(_shaderProgramID, name.c_str()), x, y);
+    #endif
 }
 
 void Shader::SetVec3Double(const std::string& name, const glm::dvec3& value) const {
+    #ifdef __EMSCRIPTEN__
+    glUniform3fv(glGetUniformLocation(_shaderProgramID, name.c_str()), 1, &glm::vec3(value)[0]);
+    #else
     glUniform3dv(glGetUniformLocation(_shaderProgramID, name.c_str()), 1, &value[0]);
+    #endif
 }
 
 void Shader::SetVec3Double(const std::string& name, double x, double y, double z) const {
+    #ifdef __EMSCRIPTEN__
+    glUniform3f(glGetUniformLocation(_shaderProgramID, name.c_str()), (float)x, (float)y, (float)z);
+    #else
     glUniform3d(glGetUniformLocation(_shaderProgramID, name.c_str()), x, y, z);
+    #endif
 }
 
 void Shader::SetVec4Double(const std::string& name, const glm::dvec4& value) const {
+    #ifdef __EMSCRIPTEN__
+    glUniform4fv(glGetUniformLocation(_shaderProgramID, name.c_str()), 1, &glm::vec4(value)[0]);
+    #else
     glUniform4dv(glGetUniformLocation(_shaderProgramID, name.c_str()), 1, &value[0]);
+    #endif
 }
 
 void Shader::SetVec4Double(const std::string& name, double x, double y, double z, double w) const {
+    #ifdef __EMSCRIPTEN__
+    glUniform4f(glGetUniformLocation(_shaderProgramID, name.c_str()), (float)x, (float)y, (float)z, (float)w);
+    #else
     glUniform4d(glGetUniformLocation(_shaderProgramID, name.c_str()), x, y, z, w);
+    #endif
 }
 
 void Shader::SetMat2Double(const std::string& name, const glm::dmat2& mat) const {
+    #ifdef __EMSCRIPTEN__
+    glUniformMatrix2fv(glGetUniformLocation(_shaderProgramID, name.c_str()), 1, GL_FALSE, &glm::mat2(mat)[0][0]);
+    #else
     glUniformMatrix2dv(glGetUniformLocation(_shaderProgramID, name.c_str()), 1, GL_FALSE, &mat[0][0]);
+    #endif
 }
 
 void Shader::SetMat3Double(const std::string& name, const glm::dmat3& mat) const {
+    #ifdef __EMSCRIPTEN__
+    glUniformMatrix3fv(glGetUniformLocation(_shaderProgramID, name.c_str()), 1, GL_FALSE, &glm::mat3(mat)[0][0]);
+    #else
     glUniformMatrix3dv(glGetUniformLocation(_shaderProgramID, name.c_str()), 1, GL_FALSE, &mat[0][0]);
+    #endif
 }
 
 void Shader::SetMat4Double(const std::string& name, const glm::dmat4& mat) const {
+    #ifdef __EMSCRIPTEN__
+    glUniformMatrix4fv(glGetUniformLocation(_shaderProgramID, name.c_str()), 1, GL_FALSE, &glm::mat4(mat)[0][0]);
+    #else
     glUniformMatrix4dv(glGetUniformLocation(_shaderProgramID, name.c_str()), 1, GL_FALSE, &mat[0][0]);
+    #endif
 }
 
 size_t Shader::GetProgramId() const {

@@ -70,6 +70,10 @@ The project is an animated 3D scene with a model of the Solar System.
   control, sun parameters, etc.)
 - ⚙️ Using 3D models with `obj` extension for planets, satellites, planetary rings, etc.
 
+<h2 id="web-porting">Web Porting (Emscripten)</h2>
+
+See [PORTING_GUIDE.md](PORTING_GUIDE.md) for detailed instructions on how to convert this project to run in a web browser using WebGL 2.
+
 <h2 id="dependencies">Dependencies</h2>
 
 - [C++17](https://en.cppreference.com/w/cpp/17)
