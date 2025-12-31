@@ -1,4 +1,6 @@
-#version 460 core
+#version 300 es
+precision highp float;
+precision highp int;
 
 vec4 mod289(vec4 x) {
     return x - floor(x * (1.0 / 289.0)) * 289.0;

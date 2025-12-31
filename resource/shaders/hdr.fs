@@ -1,4 +1,6 @@
-#version 460 core
+#version 300 es
+precision highp float;
+precision highp int;
 
 in vec2 TexCoords;
 
