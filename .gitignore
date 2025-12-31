@@ -4,6 +4,9 @@ cmake-build*
 node_modules
 emsdk
 
+# Dependencies
+external/
+
 # Build directories
 build/
 build-web/
