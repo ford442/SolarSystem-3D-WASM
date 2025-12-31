@@ -4,6 +4,14 @@
 #include "Solar_System/SolarSystem.h"
 #include "SystemModules.h"
 
+#ifdef __EMSCRIPTEN__
+#include <emscripten.h>
+#include <SDL_mixer.h>
+#else
+#include <irrKlang.h>
+using namespace irrklang;
+#endif
+
 namespace {
     Camera camera(0.001f, 20000.f, 7.5f, 0.1f, glm::vec3(-134.0f, 0.0f, 0.0f));
     float lastX, lastY;
@@ -32,6 +40,7 @@ public:
     Application();
     ~Application();
     void Exec();
+    void RunOneFrame(); // For Emscripten main loop
 
 private:
     GLFWwindow* _mainWindow = nullptr;
@@ -40,10 +49,20 @@ private:
     FPS_Handler _fpsHandler;
     FT_Library _ft = nullptr;
     bool _isBackgroundMusicPlay = false, _isSearchNearestPlanet = false;
+    
+#ifdef __EMSCRIPTEN__
+    Mix_Music* _currentMusic = nullptr;
+    int _currentSongIndex = 0;
+    uint32_t _musicStartTime = 0;
+    uint32_t _musicDuration = 0;
+    int _nearestPlanetSearchFrameCounter = 0;
+#else
     ISoundEngine* _soundEngine = nullptr;
+    std::unique_ptr<std::thread> _backgroundMusicThread, _searchNearestPlanetThread;
+#endif
+    
     std::string _currentMusicTrack;
     glm::mat4 _cameraProjection = glm::mat4(), _cameraView = glm::mat4();
-    std::unique_ptr<std::thread> _backgroundMusicThread, _searchNearestPlanetThread;
     std::unique_ptr<TextRenderer> _textRenderer;
     std::unique_ptr<ShadowMapFBO> _shadowMapFBO;
     std::unique_ptr<HDR> _hdr;
@@ -71,7 +90,9 @@ private:
     void InitSongList();
     void Dispose();
     void StartSearchNearestPlanet();
+    void UpdateSearchNearestPlanet(); // For Emscripten frame-based search
     void StartPlayBackgroundMusic();
+    void UpdateBackgroundMusic(); // For Emscripten frame-based music
     void StopSearchNearestPlanet();
     void StopPlayBackgroundMusic();
     void LoadWindowIcon() const;

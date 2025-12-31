@@ -12,14 +12,6 @@ extern "C" {
 }
 #endif
 
-// [PORTING NOTE]
-// Emscripten requires a main loop callback instead of a blocking while loop.
-// Example:
-// #ifdef __EMSCRIPTEN__
-// #include <emscripten.h>
-// void main_loop(void* arg) { ((Application*)arg)->RunOneFrame(); }
-// #endif
-
 int main(int, char**) {
     setlocale(LC_ALL, "RUS");
 
@@ -29,7 +21,9 @@ int main(int, char**) {
     }
     catch (const exception& err) {
         cerr << err.what() << "\nPress enter to continue..." << endl;
+#ifndef __EMSCRIPTEN__
         getchar();
+#endif
         return 1;
     }
 

@@ -6,7 +6,7 @@
 // Copyright (c) 2004 Sean O'Neil
 //
 
-#version 460 core
+#version 300 es
 
 layout (location = 0) in vec3 aPos;
 
