@@ -1,4 +1,6 @@
-#version 460 core
+#version 300 es
+precision highp float;
+precision highp int;
 
 //
 // Description : Array and textureless GLSL 2D/3D/4D simplex
