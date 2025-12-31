@@ -3,19 +3,29 @@ project(SolarSystem)
 
 set(CMAKE_CXX_STANDARD 17)
 
+# --- FIX 1: Add Include Paths for Dependencies ---
+# Using CMAKE_SOURCE_DIR ensures paths are correct relative to the root
+include_directories(${CMAKE_SOURCE_DIR}/external/glm)
+include_directories(${CMAKE_SOURCE_DIR}/external/assimp/include)
+include_directories(${CMAKE_SOURCE_DIR}/external/assimp/build-wasm/include)
+
 # [PORTING NOTE]
 # For Emscripten build:
 # 1. Use emcmake cmake ...
 # 2. Add dependencies like: -s USE_GLFW=3 -s USE_SDL=2 -s USE_SDL_IMAGE=2 -s USE_FREETYPE=1
-# 3. irrKlang is NOT supported. Replace with SDL_mixer or OpenAL.
+# 3. irrKlang is NOT supported. Replace with SDL_mixer.
 # 4. Exclude unsupported libs (glew32, OpenGL32, mingw32) in if(EMSCRIPTEN) block.
+
 if(EMSCRIPTEN)
     add_definitions(-D__EMSCRIPTEN__)
     
     # Emscripten compiler flags for dependencies and WebGL 2 support
     set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -s USE_GLFW=3 -s USE_SDL=2 -s USE_SDL_IMAGE=2")
     set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -s USE_SDL_MIXER=2 -s USE_FREETYPE=1")
-    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -s FULL_ES3=1 -s WEBGL2_BACKEND=1")
+    
+    # --- FIX 2: Removed WEBGL2_BACKEND=1 (Deprecated/Error) ---
+    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -s FULL_ES3=1")
+    
     set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -s ALLOW_MEMORY_GROWTH=1")
     set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -s MAX_WEBGL_VERSION=2 -s MIN_WEBGL_VERSION=2")
     
@@ -46,7 +56,9 @@ if(EMSCRIPTEN)
     # Emscripten provides GLFW, SDL2, SDL_image, SDL_mixer, and FreeType via ports
     # Link assimp (needs to be built separately or available)
     target_link_libraries(${PROJECT_NAME}
-        assimp
+        # --- FIX 3: Link Static Assimp Library & Zlib ---
+        ${CMAKE_SOURCE_DIR}/external/assimp/build-wasm/lib/libassimp.a
+        z
     )
 else()
     target_link_libraries(${PROJECT_NAME}
