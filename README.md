@@ -85,11 +85,31 @@ See [PORTING_GUIDE.md](PORTING_GUIDE.md) for detailed instructions on how to con
 - [FreeType](https://gitlab.freedesktop.org/freetype/freetype)
 - [irrKlang](https://www.ambiera.com/irrklang/)
 
-<h2 id="building-windows">Building (for Windows)</h2>
+<h2 id="building-windows">Building</h2>
 
+### For Windows (Native)
 Run an auxiliary script from the command line to automatically run the necessary [cmake](https://cmake.org/install/)
 commands using the `.\build.sh` command, while in the directory with the root `CMakeLists.txt` file 
 (the root project folder). Then an exe file with all necessary dlls will appear in the `build` folder.
+
+### For Web (Emscripten)
+To build for the web using WebAssembly:
+
+1. Install the [Emscripten SDK](https://emscripten.org/docs/getting_started/downloads.html)
+2. Activate the Emscripten environment: `source /path/to/emsdk/emsdk_env.sh`
+3. Build the project:
+```bash
+emcmake cmake -B build-web .
+cd build-web
+emmake make
+```
+4. Serve the generated HTML file (due to CORS restrictions):
+```bash
+python3 -m http.server 8000
+# Then open http://localhost:8000/SolarSystem.html
+```
+
+See [PORTING_GUIDE.md](PORTING_GUIDE.md) for detailed information about the WebAssembly port.
 
 <h2 id="limitations">Limitations</h2>
 

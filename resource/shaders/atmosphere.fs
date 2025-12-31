@@ -6,7 +6,9 @@
 // Copyright (c) 2004 Sean O'Neil
 //
 
-#version 460 core
+#version 300 es
+precision highp float;
+precision highp int;
 
 in vec3 fWorldPosition;
 in vec3 fPosition;

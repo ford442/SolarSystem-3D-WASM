@@ -11,37 +11,54 @@ Application::Application() : _fpsHandler(240) {
 }
 
 void Application::Exec() {
-    // [PORTING NOTE]
-    // For Emscripten, replace this while loop with emscripten_set_main_loop.
-    // The body of the loop should be extracted into a separate function.
-    // e.g. emscripten_set_main_loop_arg(MainLoopCallback, this, 0, 1);
+#ifdef __EMSCRIPTEN__
+    // For Emscripten, use emscripten_set_main_loop_arg instead of while loop
+    emscripten_set_main_loop_arg([](void* arg) {
+        static_cast<Application*>(arg)->RunOneFrame();
+    }, this, 0, 1);
+#else
+    // Original blocking while loop for native platforms
     while (!glfwWindowShouldClose(_mainWindow)) {
-        _fpsHandler.RunFrameTimer();
-
-        const double currentFrame = glfwGetTime();
-        deltaTime = currentFrame - lastFrame;
-        lastFrame = currentFrame;
-
-        glBindFramebuffer(GL_FRAMEBUFFER, 0);
-        glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-
-        ProcessInput(_mainWindow);
-        ConfigureMainShaders();
-        _skyBox->Render(*_mainSkyBoxShader); // If rendered at the end, it overlaps atmospheres with clouds
-        RenderStarCorona();
-        ProcessSceneComponentsRendering();
-        RenderStarEffects();
-
-        if (isRenderPlanetStarDistances || isRenderSatelliteDistances)
-            RenderPlanetSatelliteStarDistances();
-        if (isRenderHints)
-            RenderHints();
-
-        glfwSwapBuffers(_mainWindow);
-        glfwPollEvents();
-
-        _fpsHandler.WaitForFrameTimer();
+        RunOneFrame();
     }
+#endif
+}
+
+void Application::RunOneFrame() {
+    _fpsHandler.RunFrameTimer();
+
+    const double currentFrame = glfwGetTime();
+    deltaTime = currentFrame - lastFrame;
+    lastFrame = currentFrame;
+
+    glBindFramebuffer(GL_FRAMEBUFFER, 0);
+    glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+
+    ProcessInput(_mainWindow);
+    ConfigureMainShaders();
+    _skyBox->Render(*_mainSkyBoxShader); // If rendered at the end, it overlaps atmospheres with clouds
+    RenderStarCorona();
+    ProcessSceneComponentsRendering();
+    RenderStarEffects();
+
+    if (isRenderPlanetStarDistances || isRenderSatelliteDistances)
+        RenderPlanetSatelliteStarDistances();
+    if (isRenderHints)
+        RenderHints();
+
+#ifdef __EMSCRIPTEN__
+    // Update nearest planet search and background music in main loop for Emscripten
+    UpdateSearchNearestPlanet();
+    UpdateBackgroundMusic();
+#endif
+
+    glfwSwapBuffers(_mainWindow);
+    glfwPollEvents();
+
+#ifndef __EMSCRIPTEN__
+    // Frame limiting only for native platforms (browser handles this)
+    _fpsHandler.WaitForFrameTimer();
+#endif
 }
 
 void Application::ProcessSceneComponentsRendering() {
@@ -569,9 +586,19 @@ void Application::InitSystems() {
     cin.tie(nullptr);
 
     glfwInit();
+    
+#ifdef __EMSCRIPTEN__
+    // WebGL 2.0 (OpenGL ES 3.0) context
+    glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 3);
+    glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 0);
+    glfwWindowHint(GLFW_CLIENT_API, GLFW_OPENGL_ES_API);
+#else
+    // Native OpenGL 4.6 context
     glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 4);
     glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 6);
     glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
+#endif
+    
     glfwWindowHint(GLFW_SAMPLES, 4 /*32*/); // Scenes with individual planets (e.g. only Earth, only Saturn, etc.) use msaa x32
     glfwWindowHint(GLFW_VISIBLE, GLFW_FALSE);
 
@@ -592,18 +619,32 @@ void Application::InitSystems() {
     glfwSetScrollCallback(_mainWindow, ScrollCallback);
     glfwSetKeyCallback(_mainWindow, KeyCallback);
 
+#ifndef __EMSCRIPTEN__
+    // GLEW is not needed for Emscripten (WebGL context provides extensions)
     glewExperimental = true;
     glewInit();
+#endif
 
     FT_Init_FreeType(&_ft);
 
+#ifdef __EMSCRIPTEN__
+    // Initialize SDL_mixer for audio
+    if (Mix_OpenAudio(44100, MIX_DEFAULT_FORMAT, 2, 2048) < 0) {
+        glfwTerminate();
+        throw runtime_error(string("Failed to init SDL_mixer: ") + Mix_GetError());
+    }
+    Mix_AllocateChannels(16);
+#else
+    // Initialize irrKlang for native platforms
     _soundEngine = createIrrKlangDevice(ESOD_AUTO_DETECT, ESEO_MULTI_THREADED | ESEO_LOAD_PLUGINS);
     if (!_soundEngine) {
         glfwTerminate();
         throw runtime_error("Failed to init sound engine");
     }
     _soundEngine->setSoundVolume(0.3); // 30% by default
+#endif
 
+#ifndef __EMSCRIPTEN__
     // [PORTING NOTE]
     // Mixing SDL and GLFW is problematic on the web.
     // Recommendation: Remove SDL_Init/IMG_Init if you only use GLFW for the window.
@@ -617,12 +658,23 @@ void Application::InitSystems() {
         Dispose();
         throw runtime_error("Failed to init SDL_Image");
     }
+#else
+    // For Emscripten, only init SDL_image (SDL is already initialized by Emscripten)
+    if (!IMG_Init(IMG_INIT_JPG | IMG_INIT_PNG)) {
+        Dispose();
+        throw runtime_error("Failed to init SDL_Image");
+    }
+#endif
 
     glEnable(GL_DEPTH_TEST);
     glEnable(GL_MULTISAMPLE);
     glEnable(GL_TEXTURE_2D);
     glEnable(GL_CULL_FACE);
-    glEnable(GL_POLYGON_SMOOTH);
+    
+#ifndef __EMSCRIPTEN__
+    glEnable(GL_POLYGON_SMOOTH); // Not supported in WebGL
+#endif
+    
     glCullFace(GL_BACK);
 
     LoadWindowIcon();
@@ -1069,6 +1121,10 @@ void Application::InitPlutoSystem(const MeshHolder& sphereModel) {
 void Application::StartSearchNearestPlanet() {
     _isSearchNearestPlanet = true;
 
+#ifdef __EMSCRIPTEN__
+    // For Emscripten, search will be done in UpdateSearchNearestPlanet() called from main loop
+    _nearestPlanetSearchFrameCounter = 0;
+#else
     auto searchNearestPlanet = [=]() {
         return min_element(_renderableSceneComponents.begin(), _renderableSceneComponents.end(),
                            [=](const RenderableSceneComponent& left, const RenderableSceneComponent& right)
@@ -1087,11 +1143,38 @@ void Application::StartSearchNearestPlanet() {
             this_thread::sleep_for(25ms); // Optimization
         }
     });
+#endif
+}
+
+void Application::UpdateSearchNearestPlanet() {
+#ifdef __EMSCRIPTEN__
+    // Run search every 60 frames (~1 second at 60fps) instead of continuously in a thread
+    if (_isSearchNearestPlanet && ++_nearestPlanetSearchFrameCounter >= 60) {
+        _nearestPlanetSearchFrameCounter = 0;
+        
+        auto nearestPlanetIt = min_element(_renderableSceneComponents.begin(), _renderableSceneComponents.end(),
+                           [this](const RenderableSceneComponent& left, const RenderableSceneComponent& right)
+        {
+            return CalculateSpaceObjectDistance(left.planet.get()) < CalculateSpaceObjectDistance(right.planet.get());
+        });
+        
+        if (nearestPlanetIt != _renderableSceneComponents.end()) {
+            _nearestPlanetIndex = distance(_renderableSceneComponents.begin(), nearestPlanetIt);
+        }
+    }
+#endif
 }
 
 void Application::StartPlayBackgroundMusic() {
     _isBackgroundMusicPlay = true;
 
+#ifdef __EMSCRIPTEN__
+    // For Emscripten, music will be managed in UpdateBackgroundMusic() called from main loop
+    _currentSongIndex = 0;
+    _musicStartTime = 0;
+    _musicDuration = 0;
+    _currentMusic = nullptr;
+#else
     // Maps the value from one range to another. For example, 10 from [0; 100] to [0; 1] will map to 0.1
     auto mapRange = [](float value, float inMin, float inMax, float outMin, float outMax) {
         return outMin + (outMax - outMin) * (value - inMin) / (inMax - inMin);
@@ -1136,6 +1219,58 @@ void Application::StartPlayBackgroundMusic() {
             song->drop();
         }
     });
+#endif
+}
+
+void Application::UpdateBackgroundMusic() {
+#ifdef __EMSCRIPTEN__
+    if (!_isBackgroundMusicPlay || _backgroundSongs.empty())
+        return;
+
+    // Check if we need to start playing music or if current track finished
+    if (!Mix_PlayingMusic()) {
+        // Load and play next song
+        if (_currentMusic) {
+            Mix_FreeMusic(_currentMusic);
+            _currentMusic = nullptr;
+        }
+
+        if (_currentSongIndex >= _backgroundSongs.size()) {
+            _currentSongIndex = 0; // Loop back to first song
+        }
+
+        _currentMusic = Mix_LoadMUS(_backgroundSongs[_currentSongIndex].data());
+        if (_currentMusic) {
+            _currentMusicTrack = _backgroundSongs[_currentSongIndex].substr(19); // Remove "../resource/sounds/"
+            Mix_PlayMusic(_currentMusic, 1);
+            Mix_VolumeMusic(MIX_MAX_VOLUME * 0.3); // 30% volume
+            _musicStartTime = SDL_GetTicks();
+            
+            // Get duration (approximate, SDL_mixer doesn't provide exact duration easily)
+            _musicDuration = 180000; // Assume ~3 minutes, adjust as needed
+            
+            _currentSongIndex++;
+        }
+    } else {
+        // Update volume for fade in/out (simplified version without threads)
+        uint32_t currentTime = SDL_GetTicks();
+        uint32_t elapsed = currentTime - _musicStartTime;
+        
+        // Fade in during first 5 seconds
+        if (elapsed < 5000) {
+            float fade = static_cast<float>(elapsed) / 5000.0f;
+            Mix_VolumeMusic(static_cast<int>(MIX_MAX_VOLUME * 0.3f * fade));
+        }
+        // Fade out during last 5 seconds (if we know duration)
+        else if (_musicDuration > 0 && elapsed > _musicDuration - 5000) {
+            float fade = static_cast<float>(_musicDuration - elapsed) / 5000.0f;
+            Mix_VolumeMusic(static_cast<int>(MIX_MAX_VOLUME * 0.3f * fade));
+        }
+        else {
+            Mix_VolumeMusic(MIX_MAX_VOLUME * 0.3); // Normal volume
+        }
+    }
+#endif
 }
 
 void Application::LoadWindowIcon() const {
@@ -1212,10 +1347,20 @@ void Application::ProcessInput(GLFWwindow* window) {
         camera.ProcessKeyboard(CameraVector::WORLD_DOWN, deltaTime * shiftIncrease);
     }
     if (glfwGetKey(window, GLFW_KEY_PAGE_UP) == GLFW_PRESS) {
+#ifdef __EMSCRIPTEN__
+        int currentVolume = Mix_VolumeMusic(-1);
+        Mix_VolumeMusic(clamp(currentVolume + 1, 0, MIX_MAX_VOLUME));
+#else
         _soundEngine->setSoundVolume(clamp(_soundEngine->getSoundVolume() + 0.01, 0.0, 1.0));
+#endif
     }
     if (glfwGetKey(window, GLFW_KEY_PAGE_DOWN) == GLFW_PRESS) {
+#ifdef __EMSCRIPTEN__
+        int currentVolume = Mix_VolumeMusic(-1);
+        Mix_VolumeMusic(clamp(currentVolume - 1, 0, MIX_MAX_VOLUME));
+#else
         _soundEngine->setSoundVolume(clamp(_soundEngine->getSoundVolume() - 0.01, 0.0, 1.0));
+#endif
     }
     if (glfwGetKey(window, GLFW_KEY_1) == GLFW_PRESS) {
         movementSpeed = glm::clamp(movementSpeed + 0.01f, 0.0f, 150.f);
@@ -1357,24 +1502,43 @@ void Application::VertSync(bool enable) {
 
 void Application::StopSearchNearestPlanet() {
     _isSearchNearestPlanet = false;
+#ifndef __EMSCRIPTEN__
     if (_searchNearestPlanetThread)
         _searchNearestPlanetThread->join();
+#endif
 }
 
 void Application::StopPlayBackgroundMusic() {
     _isBackgroundMusicPlay = false;
+#ifdef __EMSCRIPTEN__
+    if (_currentMusic) {
+        Mix_HaltMusic();
+        Mix_FreeMusic(_currentMusic);
+        _currentMusic = nullptr;
+    }
+#else
     _soundEngine->stopAllSounds();
     if (_backgroundMusicThread)
         _backgroundMusicThread->join();
+#endif
 }
 
 void Application::Dispose() {
     glfwTerminate();
+    
+#ifndef __EMSCRIPTEN__
     SDL_Quit();
+#endif
+    
     IMG_Quit();
     StopSearchNearestPlanet();
     StopPlayBackgroundMusic();
+    
+#ifdef __EMSCRIPTEN__
+    Mix_CloseAudio();
+#else
     _soundEngine->drop();
+#endif
 }
 
 Application::~Application() {

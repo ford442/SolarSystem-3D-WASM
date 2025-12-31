@@ -3,6 +3,16 @@
 cmake-build*
 node_modules
 emsdk
+
+# Build directories
+build/
+build-web/
+
+# Emscripten output
+*.wasm
+*.js.mem
+*.data
+
 # Assets managed via FTP (too large for LFS)
 resource/textures/
 resource/sounds/
