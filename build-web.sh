@@ -14,7 +14,7 @@ mkdir -p "$BUILD_DIR"
 
 # Run CMake
 echo "Running CMake configuration..."
-emcmake cmake -DCMAKE_CXX_FLAGS="-I/usr/local/include" -B "$BUILD_DIR" ../
+emcmake cmake -DCMAKE_CXX_FLAGS="-I/usr/local/include -I./web" -B "$BUILD_DIR" ../
 
 # Build
 echo "Building project..."
