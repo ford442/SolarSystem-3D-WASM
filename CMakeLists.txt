@@ -6,8 +6,6 @@ set(CMAKE_CXX_STANDARD 17)
 # --- FIX 1: Add Include Paths for Dependencies ---
 # Using CMAKE_SOURCE_DIR ensures paths are correct relative to the root
 
-find_package(glm CONFIG REQUIRED)
-target_link_libraries(main PRIVATE glm::glm)
 
 include_directories(${CMAKE_SOURCE_DIR}/external/assimp/include)
 include_directories(${CMAKE_SOURCE_DIR}/external/assimp/build-wasm/include)
