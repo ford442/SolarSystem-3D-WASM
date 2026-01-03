@@ -14,12 +14,12 @@ mkdir -p "$BUILD_DIR"
 
 # Run CMake
 echo "Running CMake configuration..."
-emcmake cmake -B "$BUILD_DIR" ../
+emcmake cmake -DCMAKE_CXX_FLAGS="-I/usr/local/include" -B "$BUILD_DIR" ../
 
 # Build
 echo "Building project..."
 cd "$BUILD_DIR"
-emmake make -j55
+emmake make -j55 
 
 # --- NEW: Deploy to Web Frontend ---
 echo ""
