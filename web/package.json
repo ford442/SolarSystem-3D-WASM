@@ -5,7 +5,8 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "tsc && vite build",
+    "build:emcc": "bash ../build-web.sh",
+    "build": "npm run build:emcc && tsc && vite build",
     "preview": "vite preview"
   },
   "devDependencies": {
