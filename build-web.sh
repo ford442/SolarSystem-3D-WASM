@@ -13,6 +13,8 @@ if ! command -v emcmake &> /dev/null; then
     exit 1
 fi
 
+source /content/build_space/emsdk/emsdk_env.sh
+
 # Create build directory
 BUILD_DIR="build-web"
 mkdir -p "$BUILD_DIR"
