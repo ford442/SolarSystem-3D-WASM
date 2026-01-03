@@ -19,7 +19,7 @@ emcmake cmake -B "$BUILD_DIR" ../
 # Build
 echo "Building project..."
 cd "$BUILD_DIR"
-emmake make -j$(nproc 2>/dev/null || echo 4)
+emmake make -j55
 
 # --- NEW: Deploy to Web Frontend ---
 echo ""
