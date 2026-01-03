@@ -6,13 +6,6 @@ echo "================================================"
 echo "  SolarSystem 3D - WebAssembly Build Script"
 echo "================================================"
 
-# Check if Emscripten is available
-if ! command -v emcmake &> /dev/null; then
-    echo "ERROR: Emscripten SDK not found!"
-    echo "Please source your emsdk_env.sh"
-    exit 1
-fi
-
 source /content/build_space/emsdk/emsdk_env.sh
 
 # Create build directory
