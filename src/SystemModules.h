@@ -1,7 +1,7 @@
 #ifndef SOLARSYSTEM_SYSTEMMODULES_H
 #define SOLARSYSTEM_SYSTEMMODULES_H
 
-#include <GL/wglext.h>
+// #include <GL/wglext.h>
 #include <GL/glew.h>
 #include <GLFW/glfw3.h>
 #include <ft2build.h>
