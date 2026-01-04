@@ -11,12 +11,15 @@ This project has been successfully ported to WebAssembly! The following changes 
 ### Prerequisites
 - Install [Emscripten SDK](https://emscripten.org/docs/getting_started/downloads.html)
 - Activate the Emscripten environment: `source /path/to/emsdk/emsdk_env.sh`
+- Setup Dependencies:
+  ```bash
+  ./setup_web_dependencies.sh
+  ```
+  This script fetches GLM and builds a static Assimp library (`libassimp.a`) optimized for the web.
 
 ### Build Commands
 ```bash
-emcmake cmake -B build-web .
-cd build-web
-emmake make
+./build-web.sh
 ```
 
 This will generate:
@@ -24,6 +27,7 @@ This will generate:
 - `SolarSystem.js` - The JavaScript glue code
 - `SolarSystem.wasm` - The WebAssembly binary
 - `SolarSystem.data` - Preloaded assets (textures, models, etc.)
+- It will also deploy artifacts to `web/src` and `web/public`.
 
 ### Running
 Open `SolarSystem.html` in a web browser. Note: Due to CORS restrictions, you may need to serve it via a local web server:
@@ -124,7 +128,7 @@ The codebase uses `#ifdef __EMSCRIPTEN__` to conditionally compile platform-spec
 | **SDL_mixer** | ❌ Not used | ✅ `-s USE_SDL_MIXER=2` | Working |
 | **GLEW** | ✅ Required | ❌ Not needed | N/A on web |
 | **irrKlang** | ✅ Audio engine | ❌ Unsupported | Replaced |
-| **Assimp** | ✅ Linked | ✅ Build from source | Required |
+| **Assimp** | ✅ Linked | ✅ Build from source | Required (`setup_web_dependencies.sh`) |
 | **FreeType** | ✅ Linked | ✅ `-s USE_FREETYPE=1` | Working |
 
 ## 6. Known Limitations
@@ -134,9 +138,35 @@ The codebase uses `#ifdef __EMSCRIPTEN__` to conditionally compile platform-spec
 - Some OpenGL features like `GL_POLYGON_SMOOTH` are not available in WebGL 2
 - Large asset files may take time to download and preload
 
-## 7. Future Improvements
+## 7. WebGPU & Future Improvements
 
-Potential enhancements for the web version:
+This section details considerations for a future migration to WebGPU.
+
+### WebGPU Transition Strategy
+Moving to WebGPU would offer lower overhead and access to modern GPU features like Compute Shaders, which could accelerate the "Nearest Planet Search" and physics simulations.
+
+1.  **Shaders (WGSL):**
+    *   WebGPU uses WGSL (WebGPU Shading Language), not GLSL.
+    *   **Migration:** All `.fs` and `.vs` files would need to be rewritten in WGSL or transpiled using a tool like [Naga](https://github.com/gfx-rs/naga).
+    *   **Uniforms:** Uniform buffers in WebGPU are stricter (requires padding/alignment). The `Shader` class would need significant refactoring to manage `wgpu::BindGroup` and `wgpu::Buffer`.
+
+2.  **Pipeline State:**
+    *   OpenGL is a state machine (e.g., `glEnable(GL_DEPTH_TEST)`).
+    *   WebGPU is pipeline-based. You create a `RenderPipeline` object that encapsulates all state (blend modes, depth stencil, vertex formats) upfront.
+    *   **Migration:** The `Application` class would need to pre-create Pipelines for different rendering passes (e.g., Planet Pass, Star Pass, Text Pass).
+
+3.  **Compute Shaders:**
+    *   The `UpdateSearchNearestPlanet` logic is currently on the CPU (threaded or framed).
+    *   **Opportunity:** This could be moved to a WebGPU Compute Shader, running efficiently on the GPU every frame without stalling the main thread.
+
+4.  **Assimp & Assets:**
+    *   Loading meshes remains the same, but uploading them to the GPU changes from `glGenBuffers`/`glBufferData` to `device.createBuffer` and `queue.writeBuffer`.
+
+5.  **Emscripten WebGPU:**
+    *   Emscripten has experimental support for WebGPU (`-s USE_WEBGPU=1`). It maps C++ `wgpu.h` calls to the JS API.
+    *   This is the recommended path for C++ projects.
+
+### Other Future Improvements
 - Add loading progress indicator during asset preloading
 - Optimize asset sizes (compress textures, reduce model complexity)
 - Add mobile touch controls
