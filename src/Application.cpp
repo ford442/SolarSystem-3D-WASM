@@ -203,6 +203,20 @@ void Application::RenderPlanetaryRing(const Shader& shader, PlanetaryRing* plane
 }
 
 void Application::ProcessStarRendering() {
+#ifdef __EMSCRIPTEN__
+    // WebGL 2 does not support GL_SAMPLES_PASSED (only boolean occlusion queries)
+    // Simplified logic: Render star without occlusion queries
+    glDepthMask(GL_FALSE);
+    glDisable(GL_DEPTH_TEST);
+    glEnable(GL_BLEND);
+    RenderStar();
+    glDisable(GL_BLEND);
+    glEnable(GL_DEPTH_TEST);
+    glDepthMask(GL_TRUE);
+
+    // Assume fully visible
+    _sun->SetVisibility(1.0f);
+#else
     glDepthMask(GL_FALSE);
     glBeginQuery(GL_SAMPLES_PASSED, _sun->GetStarOcclusionValue(0));
     glDisable(GL_DEPTH_TEST);
@@ -220,6 +234,7 @@ void Application::ProcessStarRendering() {
     glDepthFunc(GL_LESS);
 
     UpdateOcclusionQuery();
+#endif
 }
 
 void Application::RenderStarCorona() const {
@@ -347,7 +362,11 @@ void Application::RenderHints() const {
 
     deque<wstring> soundVolumeHint;
     stringstream soundVolumeStream;
+#ifdef __EMSCRIPTEN__
+    soundVolumeStream << fixed << setprecision(0) << (static_cast<float>(Mix_VolumeMusic(-1)) / MIX_MAX_VOLUME) * 100.0;
+#else
     soundVolumeStream << fixed << setprecision(0) << _soundEngine->getSoundVolume() * 100.0;
+#endif
     string soundVolume = soundVolumeStream.str();
     soundVolumeHint.emplace_back(wstring(L"Sound volume(PgUp/PgDown): ").append(soundVolume.begin(), soundVolume.end()).append(L" %"));
 
@@ -1476,6 +1495,9 @@ void Application::KeyCallback(GLFWwindow*, int key, int, int action, int) {
 }
 
 bool Application::WGLExtensionSupported(const char* extensionName) {
+#ifdef __EMSCRIPTEN__
+    return false; // WGL extensions not supported on web
+#else
     // This is pointer to function which returns pointer to string with list of all wgl extensions
     PFNWGLGETEXTENSIONSSTRINGEXTPROC wglGetExtensionsStringEXT = nullptr;
 
@@ -1483,9 +1505,13 @@ bool Application::WGLExtensionSupported(const char* extensionName) {
     wglGetExtensionsStringEXT = (PFNWGLGETEXTENSIONSSTRINGEXTPROC)wglGetProcAddress("wglGetExtensionsStringEXT");
 
     return strstr(wglGetExtensionsStringEXT(), extensionName) != nullptr;
+#endif
 }
 
 void Application::VertSync(bool enable) {
+#ifdef __EMSCRIPTEN__
+    glfwSwapInterval(enable ? 1 : 0);
+#else
     PFNWGLSWAPINTERVALEXTPROC wglSwapIntervalEXT = nullptr;
     PFNWGLGETSWAPINTERVALEXTPROC wglGetSwapIntervalEXT = nullptr;
 
@@ -1497,7 +1523,9 @@ void Application::VertSync(bool enable) {
         wglGetSwapIntervalEXT = (PFNWGLGETSWAPINTERVALEXTPROC)wglGetProcAddress("wglGetSwapIntervalEXT");
     }
 
-    wglSwapIntervalEXT(enable);
+    if (wglSwapIntervalEXT)
+        wglSwapIntervalEXT(enable);
+#endif
 }
 
 void Application::StopSearchNearestPlanet() {
