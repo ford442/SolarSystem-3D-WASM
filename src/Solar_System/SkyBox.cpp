@@ -10,7 +10,9 @@ void SkyBox::Render(const Shader& shader) const {
 
     shader.Use();
     shader.SetInt("skybox", 0);
+#ifndef __EMSCRIPTEN__
     glBindTextureUnit(0, _textureID);
+#endif
 
     glBindVertexArray(_vao);
     glActiveTexture(GL_TEXTURE0);

@@ -36,7 +36,12 @@ void ShadowMapFBO::InitFBO() {
 
     glBindFramebuffer(GL_FRAMEBUFFER, _frameBuffer);
     glFramebufferTexture2D(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_TEXTURE_2D, _shadowMap, 0);
+#ifdef __EMSCRIPTEN__
+    GLenum drawBuffers[] = { GL_NONE };
+    glDrawBuffers(1, drawBuffers);
+#else
     glDrawBuffer(GL_NONE);
+#endif
     glReadBuffer(GL_NONE);
     glBindFramebuffer(GL_FRAMEBUFFER, 0);
 }
