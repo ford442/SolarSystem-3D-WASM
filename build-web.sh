@@ -6,6 +6,10 @@ echo "================================================"
 echo "  SolarSystem 3D - WebAssembly Build Script"
 echo "================================================"
 
+# Resolve the directory where this script is located (Project Root)
+SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )"
+PROJECT_ROOT="$SCRIPT_DIR"
+
 # Default to sourcing emsdk unless skipped
 SKIP_EMSDK=false
 
@@ -30,17 +34,17 @@ else
     echo "Skipping emsdk environment setup (as requested)."
 fi
 
-# Create build directory
-BUILD_DIR="build-web"
+# Create build directory in the Project Root
+BUILD_DIR="$PROJECT_ROOT/build-web"
 mkdir -p "$BUILD_DIR"
 
 # Get absolute path to the web directory for includes
-WEB_INCLUDE_DIR="$(pwd)/web"
+WEB_INCLUDE_DIR="$PROJECT_ROOT/web"
 
 # Run CMake
 echo "Running CMake configuration..."
-# Use relative path for includes or valid absolute path derived from pwd
-emcmake cmake -DCMAKE_CXX_FLAGS="-I/usr/local/include -I$WEB_INCLUDE_DIR" -B "$BUILD_DIR" .
+# Point CMake to the PROJECT_ROOT instead of '.' (current directory)
+emcmake cmake -DCMAKE_CXX_FLAGS="-I/usr/local/include -I$WEB_INCLUDE_DIR" -B "$BUILD_DIR" "$PROJECT_ROOT"
 
 # Build
 echo "Building project..."
@@ -51,20 +55,20 @@ emmake make -j$(nproc)
 echo ""
 echo "Deploying artifacts to web frontend..."
 # Ensure directories exist
-mkdir -p ../web/src
-mkdir -p ../web/public
+mkdir -p "$PROJECT_ROOT/web/src"
+mkdir -p "$PROJECT_ROOT/web/public"
 
 # 1. Copy the Glue Code to src (so it can be imported)
 if [ -f "SolarSystem.js" ]; then
-    cp SolarSystem.js ../web/src/
+    cp SolarSystem.js "$PROJECT_ROOT/web/src/"
 fi
 
 # 2. Copy Assets to public (served at root URL)
 if [ -f "SolarSystem.wasm" ]; then
-    cp SolarSystem.wasm ../web/public/
+    cp SolarSystem.wasm "$PROJECT_ROOT/web/public/"
 fi
 if [ -f "SolarSystem.data" ]; then
-    cp SolarSystem.data ../web/public/
+    cp SolarSystem.data "$PROJECT_ROOT/web/public/"
 fi
 # -----------------------------------------------
 
