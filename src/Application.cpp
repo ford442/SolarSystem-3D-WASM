@@ -607,12 +607,12 @@ void Application::InitSystems() {
     glfwInit();
     
 #ifdef __EMSCRIPTEN__
-    // WebGL 2.0 (OpenGL ES 3.0) context
+    // WebGL 2.0 maps to OpenGL ES 3.0
     glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 3);
     glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 0);
     glfwWindowHint(GLFW_CLIENT_API, GLFW_OPENGL_ES_API);
 #else
-    // Native OpenGL 4.6 context
+    // Keep your original Desktop settings here
     glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 4);
     glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 6);
     glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
