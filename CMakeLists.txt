@@ -4,9 +4,6 @@ project(SolarSystem)
 set(CMAKE_CXX_STANDARD 17)
 
 # --- FIX 1: Add Include Paths for Dependencies ---
-# Using CMAKE_SOURCE_DIR ensures paths are correct relative to the root
-
-
 include_directories(${CMAKE_SOURCE_DIR}/external/glm)
 include_directories(${CMAKE_SOURCE_DIR}/external/assimp/include)
 include_directories(${CMAKE_SOURCE_DIR}/external/assimp/build-wasm/include)
@@ -25,7 +22,9 @@ if(EMSCRIPTEN)
     set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -s USE_GLFW=3 -s USE_SDL=2 -s USE_SDL_IMAGE=2")
     set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -s USE_SDL_MIXER=2 -s USE_FREETYPE=1")
     
-    # --- FIX 2: Removed WEBGL2_BACKEND=1 (Deprecated/Error) ---
+    # --- NEW: Enable Exception Catching to debug the crash ---
+    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -s DISABLE_EXCEPTION_CATCHING=0")
+    
     set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -s FULL_ES3=1")
     
     set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -s ALLOW_MEMORY_GROWTH=1")
@@ -37,6 +36,10 @@ if(EMSCRIPTEN)
     # Linker flags for preloading assets and output configuration
     set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} --preload-file ${CMAKE_SOURCE_DIR}/resource@/resource")
     set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -s ALLOW_MEMORY_GROWTH=1")
+    
+    # --- NEW: Enable Exception Catching in Linker too ---
+    set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -s DISABLE_EXCEPTION_CATCHING=0")
+    
     set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -s EXPORTED_RUNTIME_METHODS=['ccall','cwrap']")
     set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -s EXPORTED_FUNCTIONS=['_main']")
     # Generate modularized output for ES6 import compatibility
@@ -60,7 +63,6 @@ if(EMSCRIPTEN)
     # Emscripten provides GLFW, SDL2, SDL_image, SDL_mixer, and FreeType via ports
     # Link assimp (needs to be built separately or available)
     target_link_libraries(${PROJECT_NAME}
-        # --- FIX 3: Link Static Assimp Library & Zlib ---
         ${CMAKE_SOURCE_DIR}/external/assimp/build-wasm/lib/libassimp.a
         z
     )
