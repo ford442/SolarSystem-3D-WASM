@@ -616,18 +616,12 @@ void Application::InitSystems() {
     }
 
 #ifdef __EMSCRIPTEN__
-    // WebGL 2.0 (OpenGL ES 3.0) context
     glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 3);
     glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 0);
     glfwWindowHint(GLFW_CLIENT_API, GLFW_OPENGL_ES_API);
-
-    // Disable resizing to prevent complexity on web
     glfwWindowHint(GLFW_RESIZABLE, GLFW_FALSE);
-
-    // Optional: Reduce samples if window creation fails (Web browsers sometimes struggle with high MSAA)
     glfwWindowHint(GLFW_SAMPLES, 4);
 #else
-    // Native OpenGL 4.6 context
     glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 4);
     glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 6);
     glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
@@ -641,12 +635,9 @@ void Application::InitSystems() {
         _displayWidth = mode->width;
         _displayHeight = mode->height;
     } else {
-        // Fallback defaults if query fails
         _displayWidth = 1280;
         _displayHeight = 720;
     }
-
-    // Double check for invalid sizes (which cause creation failure)
     if (_displayWidth == 0) _displayWidth = 800;
     if (_displayHeight == 0) _displayHeight = 600;
 
@@ -657,7 +648,24 @@ void Application::InitSystems() {
         throw runtime_error("Failed to create GLFW window");
     }
 
+    // --- FIX: POINTER LOCK ---
+#ifdef __EMSCRIPTEN__
+    // Web: Start with NORMAL cursor to avoid "NotAllowedError" on startup.
+    // We will capture it later when the user clicks.
+    glfwSetInputMode(_mainWindow, GLFW_CURSOR, GLFW_CURSOR_NORMAL);
+
+    // Add a simple callback to capture mouse on click
+    glfwSetMouseButtonCallback(_mainWindow, [](GLFWwindow* window, int button, int action, int mods) {
+        if (button == GLFW_MOUSE_BUTTON_LEFT && action == GLFW_PRESS) {
+            // Lock pointer on user click
+            glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
+        }
+    });
+#else
+    // Desktop: Capture immediately
     glfwSetInputMode(_mainWindow, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
+#endif
+
     glfwMakeContextCurrent(_mainWindow);
     glfwSetFramebufferSizeCallback(_mainWindow, FramebufferSizeCallback);
     glfwSetCursorPosCallback(_mainWindow, MouseCallback);
@@ -665,7 +673,6 @@ void Application::InitSystems() {
     glfwSetKeyCallback(_mainWindow, KeyCallback);
 
 #ifndef __EMSCRIPTEN__
-    // GLEW is not needed for Emscripten (WebGL context provides extensions)
     glewExperimental = true;
     glewInit();
 #endif
@@ -673,44 +680,34 @@ void Application::InitSystems() {
     FT_Init_FreeType(&_ft);
 
 #ifdef __EMSCRIPTEN__
-    // Initialize SDL_mixer for audio
     if (Mix_OpenAudio(44100, MIX_DEFAULT_FORMAT, 2, 2048) < 0) {
-        // Log error but don't crash app if audio fails on web
         std::cerr << "Warning: Failed to init SDL_mixer: " << Mix_GetError() << std::endl;
     } else {
         Mix_AllocateChannels(16);
     }
 #else
-    // Initialize irrKlang for native platforms
     _soundEngine = createIrrKlangDevice(ESOD_AUTO_DETECT, ESEO_MULTI_THREADED | ESEO_LOAD_PLUGINS);
     if (!_soundEngine) {
-        glfwTerminate();
         throw runtime_error("Failed to init sound engine");
     }
-    _soundEngine->setSoundVolume(0.3); // 30% by default
+    _soundEngine->setSoundVolume(0.3);
 #endif
 
 #ifndef __EMSCRIPTEN__
-    // [PORTING NOTE]
-    // Mixing SDL and GLFW is problematic on the web.
-    // Recommendation: Remove SDL_Init/IMG_Init if you only use GLFW for the window.
-    // If you need image loading, use stb_image or Emscripten's built-in SDL_image port WITHOUT SDL_Init(VIDEO).
     if (SDL_Init(SDL_INIT_EVERYTHING)) {
         Dispose();
         throw runtime_error("Failed to init SDL");
     }
-
-    if (!IMG_Init(IMG_INIT_JPG | IMG_INIT_PNG)) {
-        Dispose();
-        throw runtime_error("Failed to init SDL_Image");
-    }
-#else
-    // For Emscripten, only init SDL_image (SDL is already initialized by Emscripten)
-    if (!IMG_Init(IMG_INIT_JPG | IMG_INIT_PNG)) {
-        Dispose();
-        throw runtime_error("Failed to init SDL_Image");
-    }
 #endif
+
+    // --- FIX: PRINT IMG ERROR ---
+    if (!IMG_Init(IMG_INIT_JPG | IMG_INIT_PNG)) {
+        Dispose();
+        // Print the specific SDL Image error
+        std::string msg = "Failed to init SDL_Image: ";
+        msg += IMG_GetError();
+        throw runtime_error(msg);
+    }
 
     glEnable(GL_DEPTH_TEST);
     glEnable(GL_MULTISAMPLE);
@@ -718,14 +715,11 @@ void Application::InitSystems() {
     glEnable(GL_CULL_FACE);
     
 #ifndef __EMSCRIPTEN__
-    glEnable(GL_POLYGON_SMOOTH); // Not supported in WebGL
+    glEnable(GL_POLYGON_SMOOTH);
+    LoadWindowIcon();
 #endif
     
     glCullFace(GL_BACK);
-
-#ifndef __EMSCRIPTEN__
-    LoadWindowIcon();
-#endif
     DisplaySystemInformation();
 }
 
