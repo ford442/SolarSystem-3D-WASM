@@ -1,4 +1,5 @@
 #include "Application.h"
+#include <iostream>
 
 using namespace std;
 
@@ -13,17 +14,18 @@ extern "C" {
 #endif
 
 int main(int, char**) {
+    // setlocale can sometimes cause issues in WebAssembly depending on environment,
+    // but usually fine. If text encoding is weird, try commenting this out.
     setlocale(LC_ALL, "RUS");
 
     try {
         Application application;
+        // This handles the Emscripten loop internally
         application.Exec();
     }
     catch (const exception& err) {
-        cerr << err.what() << "\nPress enter to continue..." << endl;
-#ifndef __EMSCRIPTEN__
-        getchar();
-#endif
+        cerr << "FATAL ERROR: " << err.what() << endl;
+        // Do NOT pause input here for WebAssembly
         return 1;
     }
 

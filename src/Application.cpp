@@ -2,8 +2,13 @@
 #include <SDL_image.h>
 #include <random>
 #include <iomanip>
+#include <iostream>
 
 using namespace std;
+
+void glfwErrorCallback(int error, const char* description) {
+    std::cerr << "GLFW Error (" << error << "): " << description << std::endl;
+}
 
 Application::Application() : _fpsHandler(240) {
     InitSystems();
@@ -604,25 +609,46 @@ void Application::InitSystems() {
     ios_base::sync_with_stdio(false);
     cin.tie(nullptr);
 
-    glfwInit();
-    
+    glfwSetErrorCallback(glfwErrorCallback);
+
+    if (!glfwInit()) {
+        throw runtime_error("Failed to initialize GLFW");
+    }
+
 #ifdef __EMSCRIPTEN__
-    // WebGL 2.0 maps to OpenGL ES 3.0
+    // WebGL 2.0 (OpenGL ES 3.0) context
     glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 3);
     glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 0);
     glfwWindowHint(GLFW_CLIENT_API, GLFW_OPENGL_ES_API);
+
+    // Disable resizing to prevent complexity on web
+    glfwWindowHint(GLFW_RESIZABLE, GLFW_FALSE);
+
+    // Optional: Reduce samples if window creation fails (Web browsers sometimes struggle with high MSAA)
+    glfwWindowHint(GLFW_SAMPLES, 4);
 #else
-    // Keep your original Desktop settings here
+    // Native OpenGL 4.6 context
     glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 4);
     glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 6);
     glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
+    glfwWindowHint(GLFW_SAMPLES, 4);
 #endif
-    
-    glfwWindowHint(GLFW_SAMPLES, 4 /*32*/); // Scenes with individual planets (e.g. only Earth, only Saturn, etc.) use msaa x32
+
     glfwWindowHint(GLFW_VISIBLE, GLFW_FALSE);
 
-    _displayWidth = glfwGetVideoMode(glfwGetPrimaryMonitor())->width;
-    _displayHeight = glfwGetVideoMode(glfwGetPrimaryMonitor())->height;
+    const GLFWvidmode* mode = glfwGetVideoMode(glfwGetPrimaryMonitor());
+    if (mode) {
+        _displayWidth = mode->width;
+        _displayHeight = mode->height;
+    } else {
+        // Fallback defaults if query fails
+        _displayWidth = 1280;
+        _displayHeight = 720;
+    }
+
+    // Double check for invalid sizes (which cause creation failure)
+    if (_displayWidth == 0) _displayWidth = 800;
+    if (_displayHeight == 0) _displayHeight = 600;
 
     _mainWindow = glfwCreateWindow(_displayWidth, _displayHeight, "SolarSystem", nullptr, nullptr);
 
@@ -649,10 +675,11 @@ void Application::InitSystems() {
 #ifdef __EMSCRIPTEN__
     // Initialize SDL_mixer for audio
     if (Mix_OpenAudio(44100, MIX_DEFAULT_FORMAT, 2, 2048) < 0) {
-        glfwTerminate();
-        throw runtime_error(string("Failed to init SDL_mixer: ") + Mix_GetError());
+        // Log error but don't crash app if audio fails on web
+        std::cerr << "Warning: Failed to init SDL_mixer: " << Mix_GetError() << std::endl;
+    } else {
+        Mix_AllocateChannels(16);
     }
-    Mix_AllocateChannels(16);
 #else
     // Initialize irrKlang for native platforms
     _soundEngine = createIrrKlangDevice(ESOD_AUTO_DETECT, ESEO_MULTI_THREADED | ESEO_LOAD_PLUGINS);
@@ -696,7 +723,9 @@ void Application::InitSystems() {
     
     glCullFace(GL_BACK);
 
+#ifndef __EMSCRIPTEN__
     LoadWindowIcon();
+#endif
     DisplaySystemInformation();
 }
 
