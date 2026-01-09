@@ -9,7 +9,7 @@ const moduleConfig = {
     // because we moved .wasm and .data to the 'public' folder.
     locateFile: (path: string, prefix: string) => {
         if (path.endsWith('.wasm') || path.endsWith('.data')) {
-            return '/' + path;
+            return './' + path;
         }
         return prefix + path;
     },
