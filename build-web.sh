@@ -44,7 +44,7 @@ cd "$PROJECT_ROOT"
 
 if [ -f "setup_web_dependencies.sh" ]; then
     chmod +x setup_web_dependencies.sh
-    ./setup_web_dependencies.sh
+    #./setup_web_dependencies.sh
 else
     echo "Error: setup_web_dependencies.sh not found in $PROJECT_ROOT"
     exit 1
