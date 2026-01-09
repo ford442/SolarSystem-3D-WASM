@@ -1,6 +1,17 @@
 #!/bin/bash
 set -e
 
+# --- NEW: Source Emscripten SDK Environment ---
+# Ensure emcmake is available
+if ! command -v emcmake &> /dev/null; then
+    if [ -f "/content/build_space/emsdk/emsdk_env.sh" ]; then
+        source /content/build_space/emsdk/emsdk_env.sh
+    else
+        echo "Warning: emsdk_env.sh not found and emcmake is not in PATH."
+    fi
+fi
+# ----------------------------------------------
+
 # Directory to hold external dependencies
 EXTERNAL_DIR="external"
 mkdir -p "$EXTERNAL_DIR"
