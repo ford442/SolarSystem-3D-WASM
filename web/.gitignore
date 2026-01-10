@@ -22,3 +22,8 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+
+# Emscripten Build Artifacts
+src/SolarSystem.js
+public/SolarSystem.wasm
+public/SolarSystem.data
