@@ -653,32 +653,32 @@ void Application::ConfigureMainShaders() {
 void Application::InitScene() {
     camera.SetAspect(static_cast<float>(_displayWidth) / static_cast<float>(_displayHeight));
     _shadowMapFBO = make_unique<ShadowMapFBO>(3000, 3000);
-    _hdr = make_unique<HDR>(Shader("./resource/shaders/passThrough.vs", "./resource/shaders/hdr.fs"), _displayWidth, _displayHeight);
+    _hdr = make_unique<HDR>(Shader(https://test.1ink.us/solar-system/resource/shaders/passThrough.vs", https://test.1ink.us/solar-system/resource/shaders/hdr.fs"), _displayWidth, _displayHeight);
 
     // --- FIX: UPDATED PATHS (Removed ../) ---
     const vector<string> skyBoxFaces = {
-            "./resource/textures/Main_SkyBox/PositiveX.dds",
-            "./resource/textures/Main_SkyBox/NegativeX.dds",
-            "./resource/textures/Main_SkyBox/PositiveY.dds",
-            "./resource/textures/Main_SkyBox/NegativeY.dds",
-            "./resource/textures/Main_SkyBox/PositiveZ.dds",
-            "./resource/textures/Main_SkyBox/NegativeZ.dds"
+            "https://test.1ink.us/solar-system/resource/textures/Main_SkyBox/PositiveX.dds",
+            "https://test.1ink.us/solar-system/resource/textures/Main_SkyBox/NegativeX.dds",
+            "https://test.1ink.us/solar-system/resource/textures/Main_SkyBox/PositiveY.dds",
+            "https://test.1ink.us/solar-system/resource/textures/Main_SkyBox/NegativeY.dds",
+            "https://test.1ink.us/solar-system/resource/textures/Main_SkyBox/PositiveZ.dds",
+            "https://test.1ink.us/solar-system/resource/textures/Main_SkyBox/NegativeZ.dds"
     };
 
     _skyBox = make_unique<SkyBox>(skyBoxFaces);
     // --- FIX: UPDATED PATHS BELOW ---
-    _mainTextShader = make_unique<Shader>("./resource/shaders/text.vs", "./resource/shaders/text.fs");
-    _textRenderer = make_unique<TextRenderer>(_ft, "./resource/fonts/Arial.ttf");
+    _mainTextShader = make_unique<Shader>(https://test.1ink.us/solar-system/resource/shaders/text.vs", https://test.1ink.us/solar-system/resource/shaders/text.fs");
+    _textRenderer = make_unique<TextRenderer>(_ft, https://test.1ink.us/solar-system/resource/fonts/Arial.ttf");
     FT_Done_FreeType(_ft);
-    _shadowMapShader = make_unique<Shader>("./resource/shaders/shadowMap.vs", "./resource/shaders/shadowMap.fs");
-    _mainSkyBoxShader = make_unique<Shader>("./resource/shaders/skyBox.vs", "./resource/shaders/skyBox.fs");
-    _mainStarShader = make_unique<Shader>("./resource/shaders/star.vs", "./resource/shaders/star.fs");
-    _mainCoronaStarShader = make_unique<Shader>("./resource/shaders/starCorona.vs", "./resource/shaders/starCorona.fs");
-    _mainPlanetShader = make_unique<Shader>("./resource/shaders/planetLighting.vs", "./resource/shaders/planetLighting.fs");
-    _mainAtmosphereShader = make_unique<Shader>("./resource/shaders/atmosphere.vs", "./resource/shaders/atmosphere.fs");
-    _mainCloudsShader = make_unique<Shader>("./resource/shaders/planetLighting.vs", "./resource/shaders/cloudsLighting.fs");
-    _mainRingShader = make_unique<Shader>("./resource/shaders/planetaryRingLighting.vs", "./resource/shaders/planetaryRingLighting.fs");
-    _lensFlare = make_unique<LensFlare>(Shader("./resource/shaders/lensFlare.vs", "./resource/shaders/lensFlare.fs"), TextureImage2D("./resource/textures/flares_bright.dds"),
+    _shadowMapShader = make_unique<Shader>(https://test.1ink.us/solar-system/resource/shaders/shadowMap.vs", https://test.1ink.us/solar-system/resource/shaders/shadowMap.fs");
+    _mainSkyBoxShader = make_unique<Shader>(https://test.1ink.us/solar-system/resource/shaders/skyBox.vs", https://test.1ink.us/solar-system/resource/shaders/skyBox.fs");
+    _mainStarShader = make_unique<Shader>(https://test.1ink.us/solar-system/resource/shaders/star.vs", https://test.1ink.us/solar-system/resource/shaders/star.fs");
+    _mainCoronaStarShader = make_unique<Shader>(https://test.1ink.us/solar-system/resource/shaders/starCorona.vs", https://test.1ink.us/solar-system/resource/shaders/starCorona.fs");
+    _mainPlanetShader = make_unique<Shader>(https://test.1ink.us/solar-system/resource/shaders/planetLighting.vs", https://test.1ink.us/solar-system/resource/shaders/planetLighting.fs");
+    _mainAtmosphereShader = make_unique<Shader>(https://test.1ink.us/solar-system/resource/shaders/atmosphere.vs", https://test.1ink.us/solar-system/resource/shaders/atmosphere.fs");
+    _mainCloudsShader = make_unique<Shader>(https://test.1ink.us/solar-system/resource/shaders/planetLighting.vs", https://test.1ink.us/solar-system/resource/shaders/cloudsLighting.fs");
+    _mainRingShader = make_unique<Shader>(https://test.1ink.us/solar-system/resource/shaders/planetaryRingLighting.vs", https://test.1ink.us/solar-system/resource/shaders/planetaryRingLighting.fs");
+    _lensFlare = make_unique<LensFlare>(Shader(https://test.1ink.us/solar-system/resource/shaders/lensFlare.vs", https://test.1ink.us/solar-system/resource/shaders/lensFlare.fs"), TextureImage2D(https://test.1ink.us/solar-system/resource/textures/flares_bright.dds"),
             FlaresInfo {4,
             {
                 FlareSprite{false, 1.0, 7.0, 0},
@@ -704,11 +704,11 @@ void Application::InitScene() {
 void Application::InitSongList() {
     // --- FIX: UPDATED PATHS ---
     _backgroundSongs = vector<string_view> {
-            "./resource/sounds/Stellardrone - Galaxies.mp3",
-            "./resource/sounds/Stellardrone - Mars.mp3",
-            "./resource/sounds/Stellardrone - Billions And Billions.mp3",
-            "./resource/sounds/Stellardrone - Gravitation (Remix).mp3",
-            "./resource/sounds/Stellardrone - The Edge of Forever.mp3"
+            https://test.1ink.us/solar-system/resource/sounds/Stellardrone - Galaxies.mp3",
+            https://test.1ink.us/solar-system/resource/sounds/Stellardrone - Mars.mp3",
+            https://test.1ink.us/solar-system/resource/sounds/Stellardrone - Billions And Billions.mp3",
+            https://test.1ink.us/solar-system/resource/sounds/Stellardrone - Gravitation (Remix).mp3",
+            https://test.1ink.us/solar-system/resource/sounds/Stellardrone - The Edge of Forever.mp3"
     };
 
     default_random_engine randEngine(static_cast<uint32_t>(chrono::high_resolution_clock::now().time_since_epoch().count()));
@@ -717,9 +717,9 @@ void Application::InitSongList() {
 
 void Application::InitStarSystem() {
     // --- FIX: UPDATED PATHS ---
-    MeshHolder sphereModel("./resource/models/sphere.obj");
+    MeshHolder sphereModel(https://test.1ink.us/solar-system/resource/models/sphere.obj");
 
-    StarInfo sunInfo(sphereModel, *_mainStarShader, Shader("./resource/shaders/starGlow.vs", "./resource/shaders/starGlow.fs"), TextureImage2D("./resource/textures/Star_Spectrum.dds"),
+    StarInfo sunInfo(sphereModel, *_mainStarShader, Shader(https://test.1ink.us/solar-system/resource/shaders/starGlow.vs", https://test.1ink.us/solar-system/resource/shaders/starGlow.fs"), TextureImage2D(https://test.1ink.us/solar-system/resource/textures/Star_Spectrum.dds"),
                      starTemperatureInKelvin, 696342.0, glm::vec3(0.99607843, 0.890196078, 0.725490196), L"Sun", L"Солнце");
     _sun = make_shared<Sun>(sunInfo);
 
@@ -738,8 +738,8 @@ void Application::InitMercury(const MeshHolder& sphereModel) {
     // --- FIX: UPDATED PATHS ---
     PlanetInfo mercuryInfo(sphereModel, 0.38, *_mainPlanetShader,
             {
-                TextureImage2D("./resource/textures/Mercury_Diffuse.dds"),
-            }, TextureImage2D("./resource/textures/Mercury_Normal.dds"), L"Mercury", L"Меркурий", TextureImage2D("./resource/textures/Mercury_Specular.dds"));
+                TextureImage2D(https://test.1ink.us/solar-system/resource/textures/Mercury_Diffuse.dds"),
+            }, TextureImage2D(https://test.1ink.us/solar-system/resource/textures/Mercury_Normal.dds"), L"Mercury", L"Меркурий", TextureImage2D(https://test.1ink.us/solar-system/resource/textures/Mercury_Specular.dds"));
     shared_ptr<Planet> mercury = make_shared<Mercury>(mercuryInfo, _sun);
 
     const glm::mat4 lightProjection = glm::ortho(-mercury->GetRadius() * 3.0f, mercury->GetRadius() * 3.0f, -mercury->GetRadius() * 3.0f, mercury->GetRadius() * 3.0f, camera.GetNear(), camera.GetFar());
@@ -756,8 +756,8 @@ void Application::InitVenus(const MeshHolder& sphereModel) {
     // --- FIX: UPDATED PATHS ---
     PlanetInfo venusInfo(sphereModel, 0.95, *_mainPlanetShader,
             {
-                TextureImage2D("./resource/textures/Venus_Diffuse.dds"),
-            }, TextureImage2D("./resource/textures/Venus_Normal.dds"), L"Venus", L"Венера");
+                TextureImage2D(https://test.1ink.us/solar-system/resource/textures/Venus_Diffuse.dds"),
+            }, TextureImage2D(https://test.1ink.us/solar-system/resource/textures/Venus_Normal.dds"), L"Venus", L"Венера");
     shared_ptr<Planet> venus = make_shared<Venus>(venusInfo, _sun);
 
     AtmosphereInfo venusAtmosphereInfo(sphereModel, *_mainAtmosphereShader, 1.1, glm::vec3(203/255.f, 158/255.f, 69/255.), venus->GetRadius() - 0.00007, 1.995);
@@ -783,21 +783,21 @@ void Application::InitEarthSystem(const MeshHolder& sphereModel) {
     // --- FIX: UPDATED PATHS ---
     PlanetInfo earthInfo(sphereModel, 1.0, *_mainPlanetShader,
             {
-                TextureImage2D("./resource/textures/Earth_Day_Diffuse.dds"),
-                TextureImage2D("./resource/textures/Earth_Clouds_Diffuse.dds"),
-                TextureImage2D("./resource/textures/Earth_Night_Diffuse.dds"),
-            }, TextureImage2D("./resource/textures/Earth_Normal.dds"), L"Earth", L"Земля", TextureImage2D("./resource/textures/Earth_Specular.dds"));
+                TextureImage2D(https://test.1ink.us/solar-system/resource/textures/Earth_Day_Diffuse.dds"),
+                TextureImage2D(https://test.1ink.us/solar-system/resource/textures/Earth_Clouds_Diffuse.dds"),
+                TextureImage2D(https://test.1ink.us/solar-system/resource/textures/Earth_Night_Diffuse.dds"),
+            }, TextureImage2D(https://test.1ink.us/solar-system/resource/textures/Earth_Normal.dds"), L"Earth", L"Земля", TextureImage2D(https://test.1ink.us/solar-system/resource/textures/Earth_Specular.dds"));
     shared_ptr<Planet> earth = make_shared<Earth>(earthInfo, _sun);
 
-    SatelliteInfo moonInfo(sphereModel, 0.2724, *_mainPlanetShader, {TextureImage2D("./resource/textures/Moon_Diffuse.dds")}, TextureImage2D("./resource/textures/Moon_Normal.dds"),
+    SatelliteInfo moonInfo(sphereModel, 0.2724, *_mainPlanetShader, {TextureImage2D(https://test.1ink.us/solar-system/resource/textures/Moon_Diffuse.dds")}, TextureImage2D(https://test.1ink.us/solar-system/resource/textures/Moon_Normal.dds"),
                            L"Moon", L"Луна");
     shared_ptr<Satellite> moon = make_shared<Moon>(moonInfo, earth);
 
     AtmosphereInfo earthAtmosphereInfo(sphereModel, *_mainAtmosphereShader, 1.1, glm::vec3(0.3, 0.7, 1.0), earth->GetRadius() - 0.00007, 2.1);
     unique_ptr<Atmosphere> earthAtmosphere = make_unique<Atmosphere>(earthAtmosphereInfo, earth);
 
-    CloudsInfo earthCloudsInfo(sphereModel, *_mainCloudsShader, 1.0055, TextureImage2D("./resource/textures/Earth_Clouds_Diffuse.dds"),
-                               TextureImage2D("./resource/textures/Earth_Clouds_Normal.dds"));
+    CloudsInfo earthCloudsInfo(sphereModel, *_mainCloudsShader, 1.0055, TextureImage2D(https://test.1ink.us/solar-system/resource/textures/Earth_Clouds_Diffuse.dds"),
+                               TextureImage2D(https://test.1ink.us/solar-system/resource/textures/Earth_Clouds_Normal.dds"));
     unique_ptr<Clouds> earthClouds = make_unique<EarthClouds>(earthCloudsInfo, earth);
 
     const glm::mat4 lightProjection = glm::ortho(-earth->GetRadius() * 3.0f, earth->GetRadius() * 3.0f, -earth->GetRadius() * 3.0f, earth->GetRadius() * 3.0f, camera.GetNear(), camera.GetFar());
@@ -820,17 +820,17 @@ void Application::InitEarthSystem(const MeshHolder& sphereModel) {
 
 void Application::InitMarsSystem(const MeshHolder& sphereModel) {
     // --- FIX: UPDATED PATHS ---
-    MeshHolder phobosModel("./resource/models/phobos.obj"), deimosModel("./resource/models/deimos.obj");
+    MeshHolder phobosModel(https://test.1ink.us/solar-system/resource/models/phobos.obj"), deimosModel(https://test.1ink.us/solar-system/resource/models/deimos.obj");
 
     PlanetInfo marsInfo(sphereModel, 0.53, *_mainPlanetShader,
             {
-                TextureImage2D("./resource/textures/Mars_Diffuse.dds"),
-            }, TextureImage2D("./resource/textures/Mars_Normal.dds"), L"Mars", L"Марс");
+                TextureImage2D(https://test.1ink.us/solar-system/resource/textures/Mars_Diffuse.dds"),
+            }, TextureImage2D(https://test.1ink.us/solar-system/resource/textures/Mars_Normal.dds"), L"Mars", L"Марс");
     shared_ptr<Planet> mars = make_shared<Mars>(marsInfo, _sun);
 
-    SatelliteInfo phobosInfo(phobosModel, 0.001768, *_mainPlanetShader, {TextureImage2D("./resource/textures/Phobos_Diffuse.dds")}, TextureImage2D("./resource/textures/Phobos_Normal.dds"),
+    SatelliteInfo phobosInfo(phobosModel, 0.001768, *_mainPlanetShader, {TextureImage2D(https://test.1ink.us/solar-system/resource/textures/Phobos_Diffuse.dds")}, TextureImage2D(https://test.1ink.us/solar-system/resource/textures/Phobos_Normal.dds"),
                              L"Phobos", L"Фобос");
-    SatelliteInfo deimosInfo(deimosModel, 0.00097316, *_mainPlanetShader, {TextureImage2D("./resource/textures/Deimos_Diffuse.dds")}, TextureImage2D("./resource/textures/Deimos_Normal.dds"),
+    SatelliteInfo deimosInfo(deimosModel, 0.00097316, *_mainPlanetShader, {TextureImage2D(https://test.1ink.us/solar-system/resource/textures/Deimos_Diffuse.dds")}, TextureImage2D(https://test.1ink.us/solar-system/resource/textures/Deimos_Normal.dds"),
                              L"Deimos", L"Деймос");
     shared_ptr<Satellite> phobos = make_shared<Phobos>(phobosInfo, mars);
     shared_ptr<Satellite> deimos = make_shared<Deimos>(deimosInfo, mars);
@@ -860,17 +860,17 @@ void Application::InitJupiterSystem(const MeshHolder& sphereModel) {
     // --- FIX: UPDATED PATHS ---
     PlanetInfo jupiterInfo(sphereModel, 11.2, *_mainPlanetShader,
             {
-                TextureImage2D("./resource/textures/Jupiter_Diffuse.dds"),
-            }, TextureImage2D("./resource/textures/Jupiter_Normal.dds"), L"Jupiter", L"Юпитер");
+                TextureImage2D(https://test.1ink.us/solar-system/resource/textures/Jupiter_Diffuse.dds"),
+            }, TextureImage2D(https://test.1ink.us/solar-system/resource/textures/Jupiter_Normal.dds"), L"Jupiter", L"Юпитер");
     shared_ptr<Planet> jupiter = make_shared<Jupiter>(jupiterInfo, _sun);
 
-    SatelliteInfo ioInfo(sphereModel, 0.28592, *_mainPlanetShader, {TextureImage2D("./resource/textures/Io_Diffuse.dds")}, TextureImage2D("./resource/textures/Io_Normal.dds"),
+    SatelliteInfo ioInfo(sphereModel, 0.28592, *_mainPlanetShader, {TextureImage2D(https://test.1ink.us/solar-system/resource/textures/Io_Diffuse.dds")}, TextureImage2D(https://test.1ink.us/solar-system/resource/textures/Io_Normal.dds"),
                          L"Io", L"Ио");
-    SatelliteInfo europaInfo(sphereModel, 0.244985, *_mainPlanetShader, {TextureImage2D("./resource/textures/Europa_Diffuse.dds")}, TextureImage2D("./resource/textures/Europa_Normal.dds"),
+    SatelliteInfo europaInfo(sphereModel, 0.244985, *_mainPlanetShader, {TextureImage2D(https://test.1ink.us/solar-system/resource/textures/Europa_Diffuse.dds")}, TextureImage2D(https://test.1ink.us/solar-system/resource/textures/Europa_Normal.dds"),
                              L"Europa", L"Европа");
-    SatelliteInfo ganymedeInfo(sphereModel, 0.41345, *_mainPlanetShader, {TextureImage2D("./resource/textures/Ganymede_Diffuse.dds")}, TextureImage2D("./resource/textures/Ganymede_Normal.dds"),
+    SatelliteInfo ganymedeInfo(sphereModel, 0.41345, *_mainPlanetShader, {TextureImage2D(https://test.1ink.us/solar-system/resource/textures/Ganymede_Diffuse.dds")}, TextureImage2D(https://test.1ink.us/solar-system/resource/textures/Ganymede_Normal.dds"),
                                L"Ganymede", L"Ганимед");
-    SatelliteInfo callistoInfo(sphereModel, 0.3783236, *_mainPlanetShader, {TextureImage2D("./resource/textures/Callisto_Diffuse.dds")}, TextureImage2D("./resource/textures/Callisto_Normal.dds"),
+    SatelliteInfo callistoInfo(sphereModel, 0.3783236, *_mainPlanetShader, {TextureImage2D(https://test.1ink.us/solar-system/resource/textures/Callisto_Diffuse.dds")}, TextureImage2D(https://test.1ink.us/solar-system/resource/textures/Callisto_Normal.dds"),
                                L"Callisto", L"Каллисто");
     shared_ptr<Satellite> io = make_shared<Io>(ioInfo, jupiter);
     shared_ptr<Satellite> europa = make_shared<Europa>(europaInfo, jupiter);
@@ -900,30 +900,30 @@ void Application::InitJupiterSystem(const MeshHolder& sphereModel) {
 
 void Application::InitSaturnSystem(const MeshHolder& sphereModel) {
     // --- FIX: UPDATED PATHS ---
-    MeshHolder saturnRingModel("./resource/models/saturn_ring.obj");
+    MeshHolder saturnRingModel(https://test.1ink.us/solar-system/resource/models/saturn_ring.obj");
 
     PlanetInfo saturnInfo(sphereModel, 9.14, *_mainPlanetShader,
             {
-                TextureImage2D("./resource/textures/Saturn_Diffuse.dds"),
-            }, TextureImage2D("./resource/textures/Saturn_Normal.dds"), L"Saturn", L"Сатурн");
+                TextureImage2D(https://test.1ink.us/solar-system/resource/textures/Saturn_Diffuse.dds"),
+            }, TextureImage2D(https://test.1ink.us/solar-system/resource/textures/Saturn_Normal.dds"), L"Saturn", L"Сатурн");
     shared_ptr<Planet> saturn = make_shared<Saturn>(saturnInfo, _sun);
 
-    PlanetaryRingInfo saturnRingInfo(saturnRingModel, 22.0, 43.7, *_mainPlanetShader, TextureImage2D("./resource/textures/Saturn_Rings.dds"));
+    PlanetaryRingInfo saturnRingInfo(saturnRingModel, 22.0, 43.7, *_mainPlanetShader, TextureImage2D(https://test.1ink.us/solar-system/resource/textures/Saturn_Rings.dds"));
     unique_ptr<PlanetaryRing> saturnRing = make_unique<SaturnRing>(saturnRingInfo, saturn);
 
-    SatelliteInfo mimasInfo(sphereModel, 0.03111, *_mainPlanetShader, {TextureImage2D("./resource/textures/Mimas_Diffuse.dds")}, TextureImage2D("./resource/textures/Mimas_Normal.dds"),
+    SatelliteInfo mimasInfo(sphereModel, 0.03111, *_mainPlanetShader, {TextureImage2D(https://test.1ink.us/solar-system/resource/textures/Mimas_Diffuse.dds")}, TextureImage2D(https://test.1ink.us/solar-system/resource/textures/Mimas_Normal.dds"),
                             L"Mimas", L"Мимас");
-    SatelliteInfo enceladusInfo(sphereModel, 0.03957, *_mainPlanetShader, {TextureImage2D("./resource/textures/Enceladus_Diffuse.dds")}, TextureImage2D("./resource/textures/Enceladus_Normal.dds"),
+    SatelliteInfo enceladusInfo(sphereModel, 0.03957, *_mainPlanetShader, {TextureImage2D(https://test.1ink.us/solar-system/resource/textures/Enceladus_Diffuse.dds")}, TextureImage2D(https://test.1ink.us/solar-system/resource/textures/Enceladus_Normal.dds"),
                             L"Enceladus", L"Энцелад");
-    SatelliteInfo tethysInfo(sphereModel, 0.083346, *_mainPlanetShader, {TextureImage2D("./resource/textures/Tethys_Diffuse.dds")}, TextureImage2D("./resource/textures/Tethys_Normal.dds"),
+    SatelliteInfo tethysInfo(sphereModel, 0.083346, *_mainPlanetShader, {TextureImage2D(https://test.1ink.us/solar-system/resource/textures/Tethys_Diffuse.dds")}, TextureImage2D(https://test.1ink.us/solar-system/resource/textures/Tethys_Normal.dds"),
                             L"Tethys", L"Тефия");
-    SatelliteInfo dioneInfo(sphereModel, 0.08812, *_mainPlanetShader, {TextureImage2D("./resource/textures/Dione_Diffuse.dds")}, TextureImage2D("./resource/textures/Dione_Normal.dds"),
+    SatelliteInfo dioneInfo(sphereModel, 0.08812, *_mainPlanetShader, {TextureImage2D(https://test.1ink.us/solar-system/resource/textures/Dione_Diffuse.dds")}, TextureImage2D(https://test.1ink.us/solar-system/resource/textures/Dione_Normal.dds"),
                             L"Dione", L"Диона");
-    SatelliteInfo rheaInfo(sphereModel, 0.119886, *_mainPlanetShader, {TextureImage2D("./resource/textures/Rhea_Diffuse.dds")}, TextureImage2D("./resource/textures/Rhea_Normal.dds"),
+    SatelliteInfo rheaInfo(sphereModel, 0.119886, *_mainPlanetShader, {TextureImage2D(https://test.1ink.us/solar-system/resource/textures/Rhea_Diffuse.dds")}, TextureImage2D(https://test.1ink.us/solar-system/resource/textures/Rhea_Normal.dds"),
                             L"Rhea", L"Рея");
-    SatelliteInfo titanInfo(sphereModel, 0.404136, *_mainPlanetShader, {TextureImage2D("./resource/textures/Titan_Diffuse.dds")}, TextureImage2D("./resource/textures/Titan_Normal.dds"),
+    SatelliteInfo titanInfo(sphereModel, 0.404136, *_mainPlanetShader, {TextureImage2D(https://test.1ink.us/solar-system/resource/textures/Titan_Diffuse.dds")}, TextureImage2D(https://test.1ink.us/solar-system/resource/textures/Titan_Normal.dds"),
                             L"Titan", L"Титан");
-    SatelliteInfo iapetusInfo(sphereModel, 0.115288, *_mainPlanetShader, {TextureImage2D("./resource/textures/Iapetus_Diffuse.dds")}, TextureImage2D("./resource/textures/Iapetus_Normal.dds"),
+    SatelliteInfo iapetusInfo(sphereModel, 0.115288, *_mainPlanetShader, {TextureImage2D(https://test.1ink.us/solar-system/resource/textures/Iapetus_Diffuse.dds")}, TextureImage2D(https://test.1ink.us/solar-system/resource/textures/Iapetus_Normal.dds"),
                             L"Iapetus", L"Япет");
     shared_ptr<Satellite> mimas = make_shared<Mimas>(mimasInfo, saturn);
     shared_ptr<Satellite> enceladus = make_shared<Enceladus>(enceladusInfo, saturn);
@@ -967,26 +967,26 @@ void Application::InitSaturnSystem(const MeshHolder& sphereModel) {
 
 void Application::InitUranusSystem(const MeshHolder& sphereModel) {
     // --- FIX: UPDATED PATHS ---
-    MeshHolder uranusRingModel("./resource/models/uranus_ring.obj");
+    MeshHolder uranusRingModel(https://test.1ink.us/solar-system/resource/models/uranus_ring.obj");
 
     PlanetInfo uranusInfo(sphereModel, 3.98085, *_mainPlanetShader,
             {
-                TextureImage2D("./resource/textures/Uranus_Diffuse.dds"),
-                TextureImage2D("./resource/textures/Uranus_Clouds_Diffuse.dds")
-            }, TextureImage2D("./resource/textures/Uranus_Normal.dds"), L"Uranus", L"Уран");
+                TextureImage2D(https://test.1ink.us/solar-system/resource/textures/Uranus_Diffuse.dds"),
+                TextureImage2D(https://test.1ink.us/solar-system/resource/textures/Uranus_Clouds_Diffuse.dds")
+            }, TextureImage2D(https://test.1ink.us/solar-system/resource/textures/Uranus_Normal.dds"), L"Uranus", L"Уран");
     shared_ptr<Planet> uranus = make_shared<Uranus>(uranusInfo, _sun);
-    PlanetaryRingInfo uranusRingInfo(uranusRingModel, 12.6, 16.0, *_mainPlanetShader, TextureImage2D("./resource/textures/Uranus_Rings.dds")); // Radiuses from 3D model
+    PlanetaryRingInfo uranusRingInfo(uranusRingModel, 12.6, 16.0, *_mainPlanetShader, TextureImage2D(https://test.1ink.us/solar-system/resource/textures/Uranus_Rings.dds")); // Radiuses from 3D model
     unique_ptr<PlanetaryRing> uranusRing = make_unique<UranusRing>(uranusRingInfo, uranus);
 
-    SatelliteInfo mirandaInfo(sphereModel, 0.0368858, *_mainPlanetShader, {TextureImage2D("./resource/textures/Miranda_Diffuse.dds")}, TextureImage2D("./resource/textures/Miranda_Normal.dds"),
+    SatelliteInfo mirandaInfo(sphereModel, 0.0368858, *_mainPlanetShader, {TextureImage2D(https://test.1ink.us/solar-system/resource/textures/Miranda_Diffuse.dds")}, TextureImage2D(https://test.1ink.us/solar-system/resource/textures/Miranda_Normal.dds"),
                             L"Miranda", L"Миранда");
-    SatelliteInfo arielInfo(sphereModel, 0.090865, *_mainPlanetShader, {TextureImage2D("./resource/textures/Ariel_Diffuse.dds")}, TextureImage2D("./resource/textures/Ariel_Normal.dds"),
+    SatelliteInfo arielInfo(sphereModel, 0.090865, *_mainPlanetShader, {TextureImage2D(https://test.1ink.us/solar-system/resource/textures/Ariel_Diffuse.dds")}, TextureImage2D(https://test.1ink.us/solar-system/resource/textures/Ariel_Normal.dds"),
                             L"Ariel", L"Ариэль");
-    SatelliteInfo umbrielInfo(sphereModel, 0.091775, *_mainPlanetShader, {TextureImage2D("./resource/textures/Umbriel_Diffuse.dds")}, TextureImage2D("./resource/textures/Umbriel_Normal.dds"),
+    SatelliteInfo umbrielInfo(sphereModel, 0.091775, *_mainPlanetShader, {TextureImage2D(https://test.1ink.us/solar-system/resource/textures/Umbriel_Diffuse.dds")}, TextureImage2D(https://test.1ink.us/solar-system/resource/textures/Umbriel_Normal.dds"),
                             L"Umbriel", L"Умбриэль");
-    SatelliteInfo titaniaInfo(sphereModel, 0.123748, *_mainPlanetShader, {TextureImage2D("./resource/textures/Titania_Diffuse.dds")}, TextureImage2D("./resource/textures/Titania_Normal.dds"),
+    SatelliteInfo titaniaInfo(sphereModel, 0.123748, *_mainPlanetShader, {TextureImage2D(https://test.1ink.us/solar-system/resource/textures/Titania_Diffuse.dds")}, TextureImage2D(https://test.1ink.us/solar-system/resource/textures/Titania_Normal.dds"),
                             L"Titania", L"Титания");
-    SatelliteInfo oberonInfo(sphereModel, 0.11951, *_mainPlanetShader, {TextureImage2D("./resource/textures/Oberon_Diffuse.dds")}, TextureImage2D("./resource/textures/Oberon_Normal.dds"),
+    SatelliteInfo oberonInfo(sphereModel, 0.11951, *_mainPlanetShader, {TextureImage2D(https://test.1ink.us/solar-system/resource/textures/Oberon_Diffuse.dds")}, TextureImage2D(https://test.1ink.us/solar-system/resource/textures/Oberon_Normal.dds"),
                             L"Oberon", L"Оберон");
     shared_ptr<Satellite> miranda = make_shared<Miranda>(mirandaInfo, uranus);
     shared_ptr<Satellite> ariel = make_shared<Ariel>(arielInfo, uranus);
@@ -994,8 +994,8 @@ void Application::InitUranusSystem(const MeshHolder& sphereModel) {
     shared_ptr<Satellite> titania = make_shared<Titania>(titaniaInfo, uranus);
     shared_ptr<Satellite> oberon = make_shared<Oberon>(oberonInfo, uranus);
 
-    CloudsInfo uranusCloudsInfo(sphereModel, *_mainCloudsShader, 3.98635, TextureImage2D("./resource/textures/Uranus_Clouds_Diffuse.dds"),
-                            TextureImage2D("./resource/textures/Uranus_Clouds_Normal.dds"));
+    CloudsInfo uranusCloudsInfo(sphereModel, *_mainCloudsShader, 3.98635, TextureImage2D(https://test.1ink.us/solar-system/resource/textures/Uranus_Clouds_Diffuse.dds"),
+                            TextureImage2D(https://test.1ink.us/solar-system/resource/textures/Uranus_Clouds_Normal.dds"));
     unique_ptr<Clouds> uranusClouds = make_unique<UranusClouds>(uranusCloudsInfo, uranus);
 
     AtmosphereInfo uranusAtmosphereInfo(sphereModel, *_mainAtmosphereShader, 4.0, glm::vec3(45.f/255, 101.f/255, 114.f/255), uranus->GetRadius() - 0.00007, 8.1);
@@ -1025,17 +1025,17 @@ void Application::InitNeptuneSystem(const MeshHolder& sphereModel) {
     // --- FIX: UPDATED PATHS ---
     PlanetInfo neptuneInfo(sphereModel, 3.8647, *_mainPlanetShader,
             {
-                TextureImage2D("./resource/textures/Neptune_Diffuse.dds"),
-                TextureImage2D("./resource/textures/Neptune_Clouds_Diffuse.dds")
-            }, TextureImage2D("./resource/textures/Neptune_Normal.dds"), L"Neptune", L"Нептун");
+                TextureImage2D(https://test.1ink.us/solar-system/resource/textures/Neptune_Diffuse.dds"),
+                TextureImage2D(https://test.1ink.us/solar-system/resource/textures/Neptune_Clouds_Diffuse.dds")
+            }, TextureImage2D(https://test.1ink.us/solar-system/resource/textures/Neptune_Normal.dds"), L"Neptune", L"Нептун");
     shared_ptr<Planet> neptune = make_shared<Neptune>(neptuneInfo, _sun);
 
-    SatelliteInfo tritonInfo(sphereModel, 0.2724, *_mainPlanetShader, {TextureImage2D("./resource/textures/Triton_Diffuse.dds")}, TextureImage2D("./resource/textures/Triton_Normal.dds"),
+    SatelliteInfo tritonInfo(sphereModel, 0.2724, *_mainPlanetShader, {TextureImage2D(https://test.1ink.us/solar-system/resource/textures/Triton_Diffuse.dds")}, TextureImage2D(https://test.1ink.us/solar-system/resource/textures/Triton_Normal.dds"),
                              L"Triton", L"Тритон");
     shared_ptr<Satellite> triton = make_shared<Triton>(tritonInfo, neptune);
 
-    CloudsInfo neptuneCloudsInfo(sphereModel, *_mainCloudsShader, 3.87, TextureImage2D("./resource/textures/Neptune_Clouds_Diffuse.dds"),
-                                TextureImage2D("./resource/textures/Neptune_Clouds_Normal.dds"));
+    CloudsInfo neptuneCloudsInfo(sphereModel, *_mainCloudsShader, 3.87, TextureImage2D(https://test.1ink.us/solar-system/resource/textures/Neptune_Clouds_Diffuse.dds"),
+                                TextureImage2D(https://test.1ink.us/solar-system/resource/textures/Neptune_Clouds_Normal.dds"));
     unique_ptr<Clouds> neptuneClouds = make_unique<NeptuneClouds>(neptuneCloudsInfo, neptune);
 
     AtmosphereInfo neptuneAtmosphereInfo(sphereModel, *_mainAtmosphereShader, 3.9, glm::vec3(62.f/255, 92.f/255, 169.f/255), neptune->GetRadius() - 0.00007, 7.9);
@@ -1064,12 +1064,12 @@ void Application::InitPlutoSystem(const MeshHolder& sphereModel) {
     // --- FIX: UPDATED PATHS ---
     PlanetInfo plutoInfo(sphereModel, 0.18651, *_mainPlanetShader,
             {
-                TextureImage2D("./resource/textures/Pluto_Diffuse.dds"),
-            }, TextureImage2D("./resource/textures/Pluto_Normal.dds"), L"Pluto", L"Плутон", TextureImage2D("./resource/textures/Pluto_Specular.dds"));
+                TextureImage2D(https://test.1ink.us/solar-system/resource/textures/Pluto_Diffuse.dds"),
+            }, TextureImage2D(https://test.1ink.us/solar-system/resource/textures/Pluto_Normal.dds"), L"Pluto", L"Плутон", TextureImage2D(https://test.1ink.us/solar-system/resource/textures/Pluto_Specular.dds"));
     shared_ptr<Planet> pluto = make_shared<Pluto>(plutoInfo, _sun);
 
-    SatelliteInfo charonInfo(sphereModel, 0.09512, *_mainPlanetShader, {TextureImage2D("./resource/textures/Charon_Diffuse.dds")}, TextureImage2D("./resource/textures/Charon_Normal.dds"),
-                             L"Charon", L"Харон", TextureImage2D("./resource/textures/Charon_Specular.dds"));
+    SatelliteInfo charonInfo(sphereModel, 0.09512, *_mainPlanetShader, {TextureImage2D(https://test.1ink.us/solar-system/resource/textures/Charon_Diffuse.dds")}, TextureImage2D(https://test.1ink.us/solar-system/resource/textures/Charon_Normal.dds"),
+                             L"Charon", L"Харон", TextureImage2D(https://test.1ink.us/solar-system/resource/textures/Charon_Specular.dds"));
     shared_ptr<Satellite> charon  = make_shared<Charon>(charonInfo, pluto);
 
     AtmosphereInfo plutoAtmosphereInfo(sphereModel, *_mainAtmosphereShader, 0.45, glm::vec3(92.f/255, 120.f/255, 141.f/255), pluto->GetRadius(), 1.0,
@@ -1164,7 +1164,7 @@ void Application::StartPlayBackgroundMusic() {
             auto song = _soundEngine->play2D(_backgroundSongs[i].data(), false, true, true);
             song->setVolume(0);
             song->setIsPaused(false);
-            _currentMusicTrack = _backgroundSongs[i].substr(16); // Remove "./resource/sounds/"
+            _currentMusicTrack = _backgroundSongs[i].substr(16); // Remove https://test.1ink.us/solar-system/resource/sounds/"
 
             while (!song->isFinished()) {
                 // https://www.desmos.com/calculator/kbn9mql7ay
@@ -1213,7 +1213,7 @@ void Application::UpdateBackgroundMusic() {
 
         _currentMusic = Mix_LoadMUS(_backgroundSongs[_currentSongIndex].data());
         if (_currentMusic) {
-            _currentMusicTrack = _backgroundSongs[_currentSongIndex].substr(16); // Remove "./resource/sounds/"
+            _currentMusicTrack = _backgroundSongs[_currentSongIndex].substr(16); // Remove https://test.1ink.us/solar-system/resource/sounds/"
             Mix_PlayMusic(_currentMusic, 1);
             Mix_VolumeMusic(MIX_MAX_VOLUME * 0.3); // 30% volume
             _musicStartTime = SDL_GetTicks();
@@ -1309,7 +1309,7 @@ void Application::DisplaySystemInformation() const {
 
 // ... [Keep LoadWindowIcon, ProcessInput, and Callbacks unchanged] ...
 void Application::LoadWindowIcon() const {
-    constexpr auto execIconPath = "./resource/icons/solarsystem-logo.png"; // FIX: Path
+    constexpr auto execIconPath = https://test.1ink.us/solar-system/resource/icons/solarsystem-logo.png"; // FIX: Path
     SDL_Surface* windowIcon = IMG_Load(execIconPath);
     if (windowIcon == nullptr)
         throw runtime_error(string("Cannot load exe icon ") + execIconPath);
