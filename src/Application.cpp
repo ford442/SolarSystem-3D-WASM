@@ -113,8 +113,6 @@ void Application::InitSystems() {
 
     glEnable(GL_DEPTH_TEST);
     glEnable(GL_MULTISAMPLE);
-    // --- FIX: Remove GL_TEXTURE_2D enable (Invalid in WebGL) ---
-    // glEnable(GL_TEXTURE_2D);
     glEnable(GL_CULL_FACE);
 
 #ifndef __EMSCRIPTEN__
@@ -126,16 +124,12 @@ void Application::InitSystems() {
     DisplaySystemInformation();
 }
 
-// ... [Exec, RunOneFrame, Render functions remain the same] ...
-
 void Application::Exec() {
 #ifdef __EMSCRIPTEN__
-    // For Emscripten, use emscripten_set_main_loop_arg instead of while loop
     emscripten_set_main_loop_arg([](void* arg) {
         static_cast<Application*>(arg)->RunOneFrame();
     }, this, 0, 1);
 #else
-    // Original blocking while loop for native platforms
     while (!glfwWindowShouldClose(_mainWindow)) {
         RunOneFrame();
     }
@@ -154,7 +148,7 @@ void Application::RunOneFrame() {
 
     ProcessInput(_mainWindow);
     ConfigureMainShaders();
-    _skyBox->Render(*_mainSkyBoxShader); // If rendered at the end, it overlaps atmospheres with clouds
+    _skyBox->Render(*_mainSkyBoxShader);
     RenderStarCorona();
     ProcessSceneComponentsRendering();
     RenderStarEffects();
@@ -165,7 +159,6 @@ void Application::RunOneFrame() {
         RenderHints();
 
 #ifdef __EMSCRIPTEN__
-    // Update nearest planet search and background music in main loop for Emscripten
     UpdateSearchNearestPlanet();
     UpdateBackgroundMusic();
 #endif
@@ -174,19 +167,11 @@ void Application::RunOneFrame() {
     glfwPollEvents();
 
 #ifndef __EMSCRIPTEN__
-    // Frame limiting only for native platforms (browser handles this)
     _fpsHandler.WaitForFrameTimer();
 #endif
 }
 
 void Application::ProcessSceneComponentsRendering() {
-    // The idea is to render a scene component (planet, its satellites, rings, etc.) into a shadow map,
-    // then immediately into a regular buffer, and then clear the shadow map (depth buffer) so that the planet closest
-    // to the sun does not cover all the others.
-    // Cleaning is necessary because only one shadow map is used, and without cleaning, the depth will be overlapped by objects from all over the scene
-    // Thus, by changing the lightSpaceMatrix, it can be created the impression that an omnidirectional light source is used in the scene.
-    // If desired, you can use the technique with a cube depth map, but due to the lack of precision of z-buffer, shadows are killed
-
     for (const auto& renderableSceneComponent : _renderableSceneComponents) {
         ShadowMapPass(renderableSceneComponent);
         RenderPass(renderableSceneComponent);
@@ -231,10 +216,7 @@ void Application::RenderPass(const RenderableSceneComponent& component) {
         satellite->Render();
     }
 
-    // Occlusion request will be carried out for the nearest planet, so if planet has a rings, they do not cover the sun.
-    // This is a bit of a strange technique, but necessary due to the fact that the ring itself is a solid
-    // 3D model, and not procedurally generated particles.
-    if (component.planet == _renderableSceneComponents[_nearestPlanetIndex].planet) // Render star once and update occlusion query for nearest planet
+    if (component.planet == _renderableSceneComponents[_nearestPlanetIndex].planet)
         ProcessStarRendering();
 
     RenderAtmospheres(component.atmospheres, component.lightSpaceMatrix, component.planetaryRing.get());
@@ -272,7 +254,6 @@ void Application::RenderAtmospheres(const std::vector<RenderableAtmosphere>& ren
                 glBindTextureUnit(9, ring->GetRingTexture());
             }
 
-            // Inside the atmosphere
             if (CalculateSpaceObjectDistance(renderableAtmosphere.atmosphere.get()) <= renderableAtmosphere.atmosphere->GetAtmosphereOuterBoundary())
                 glFrontFace(GL_CW);
 
@@ -322,8 +303,6 @@ void Application::RenderPlanetaryRing(const Shader& shader, PlanetaryRing* plane
 
 void Application::ProcessStarRendering() {
 #ifdef __EMSCRIPTEN__
-    // WebGL 2 does not support GL_SAMPLES_PASSED (only boolean occlusion queries)
-    // Simplified logic: Render star without occlusion queries
     glDepthMask(GL_FALSE);
     glDisable(GL_DEPTH_TEST);
     glEnable(GL_BLEND);
@@ -331,8 +310,6 @@ void Application::ProcessStarRendering() {
     glDisable(GL_BLEND);
     glEnable(GL_DEPTH_TEST);
     glDepthMask(GL_TRUE);
-
-    // Assume fully visible
     _sun->SetVisibility(1.0f);
 #else
     glDepthMask(GL_FALSE);
@@ -372,7 +349,7 @@ void Application::RenderStarCorona() const {
 
 void Application::RenderStar() const {
     glEnable(GL_BLEND);
-    glBlendFunc(GL_SRC_ALPHA, GL_ONE); // To allow make the alpha channel of the star at 0 when it is not visible due to some object
+    glBlendFunc(GL_SRC_ALPHA, GL_ONE);
 
     _mainStarShader->Use();
     _sun->TakeStarSystemCenter();
@@ -455,7 +432,7 @@ void Application::RenderSpaceObjectDistance(const SpaceObject* spaceObject) cons
     _mainTextShader->Use();
     _mainTextShader->SetVec3("particleCenterWorldSpace", spaceObject->GetPosition());
     _mainTextShader->SetBool("is3D", true);
-    _textRenderer->Render(*_mainTextShader, distanceInfo, 0.0, 0.0, 0.075, glm::vec3(0.98431, 0.80784, 0.69412)); // RGB: 251 206 177
+    _textRenderer->Render(*_mainTextShader, distanceInfo, 0.0, 0.0, 0.075, glm::vec3(0.98431, 0.80784, 0.69412));
 }
 
 void Application::RenderHints() const {
@@ -563,9 +540,8 @@ void Application::RenderHints() const {
 }
 
 void Application::ConfigureMainShaders() {
-    static const double zCoef = 2.0 / glm::log2(camera.GetFar() + 1.0); // For log z-buffer [для логарифмического z-буфера]
+    static const double zCoef = 2.0 / glm::log2(camera.GetFar() + 1.0);
 
-    // So that zoom does not work with skybox
     static const glm::mat4 skyBoxProjection = glm::perspective(glm::radians(45.0f), camera.GetAspect(), camera.GetNear(), camera.GetFar());
 
     _cameraProjection = camera.GetProjectionMatrix();
@@ -585,7 +561,7 @@ void Application::ConfigureMainShaders() {
     _mainStarShader->SetMat4("view", _cameraView);
     _mainStarShader->SetVec3("centerDir", glm::normalize(camera.GetPosition() - _sun->GetPosition()));
     _mainStarShader->SetVec3("shiftStarColor", _sun->GetShiftColor());
-    _mainStarShader->SetVec3("colorMult", glm::vec3(0.96862745, 0.58039215, 0.235294117) * _sun->GetShiftColor()); // 247, 148, 60
+    _mainStarShader->SetVec3("colorMult", glm::vec3(0.96862745, 0.58039215, 0.235294117) * _sun->GetShiftColor());
     _mainStarShader->SetFloat("sunTemperatureInKelvin", _sun->GetStarTemperatureInKelvin());
     _mainStarShader->SetFloat("starRadiusInKilometers", _sun->GetStarRadius());
     _mainStarShader->SetFloat("zCoef", zCoef);
@@ -652,33 +628,31 @@ void Application::ConfigureMainShaders() {
 
 void Application::InitScene() {
     camera.SetAspect(static_cast<float>(_displayWidth) / static_cast<float>(_displayHeight));
-    _shadowMapFBO = make_unique<ShadowMapFBO>(3000, 3000);
-    _hdr = make_unique<HDR>(Shader("https://test.1ink.us/solar-system/resource/shaders/passThrough.vs", "https://test.1ink.us/solar-system/resource/shaders/hdr.fs"), _displayWidth, _displayHeight);
+    _shadowMapFBO = make_unique<ShadowMapFBO>(3000, 3000); 
+    _hdr = make_unique<HDR>(Shader("resource/shaders/passThrough.vs", "resource/shaders/hdr.fs"), _displayWidth, _displayHeight);
 
-    // --- FIX: UPDATED PATHS (Removed ../) ---
     const vector<string> skyBoxFaces = {
-            "https://test.1ink.us/solar-system/resource/textures/Main_SkyBox/PositiveX.dds",
-            "https://test.1ink.us/solar-system/resource/textures/Main_SkyBox/NegativeX.dds",
-            "https://test.1ink.us/solar-system/resource/textures/Main_SkyBox/PositiveY.dds",
-            "https://test.1ink.us/solar-system/resource/textures/Main_SkyBox/NegativeY.dds",
-            "https://test.1ink.us/solar-system/resource/textures/Main_SkyBox/PositiveZ.dds",
-            "https://test.1ink.us/solar-system/resource/textures/Main_SkyBox/NegativeZ.dds"
+            "resource/textures/Main_SkyBox/PositiveX.dds",
+            "resource/textures/Main_SkyBox/NegativeX.dds",
+            "resource/textures/Main_SkyBox/PositiveY.dds",
+            "resource/textures/Main_SkyBox/NegativeY.dds",
+            "resource/textures/Main_SkyBox/PositiveZ.dds",
+            "resource/textures/Main_SkyBox/NegativeZ.dds"
     };
 
     _skyBox = make_unique<SkyBox>(skyBoxFaces);
-    // --- FIX: UPDATED PATHS BELOW ---
-    _mainTextShader = make_unique<Shader>("https://test.1ink.us/solar-system/resource/shaders/text.vs", "https://test.1ink.us/solar-system/resource/shaders/text.fs");
-    _textRenderer = make_unique<TextRenderer>(_ft, "https://test.1ink.us/solar-system/resource/fonts/Arial.ttf");
+    _mainTextShader = make_unique<Shader>("resource/shaders/text.vs", "resource/shaders/text.fs");
+    _textRenderer = make_unique<TextRenderer>(_ft, "resource/fonts/Arial.ttf");
     FT_Done_FreeType(_ft);
-    _shadowMapShader = make_unique<Shader>("https://test.1ink.us/solar-system/resource/shaders/shadowMap.vs", "https://test.1ink.us/solar-system/resource/shaders/shadowMap.fs");
-    _mainSkyBoxShader = make_unique<Shader>("https://test.1ink.us/solar-system/resource/shaders/skyBox.vs", "https://test.1ink.us/solar-system/resource/shaders/skyBox.fs");
-    _mainStarShader = make_unique<Shader>("https://test.1ink.us/solar-system/resource/shaders/star.vs", "https://test.1ink.us/solar-system/resource/shaders/star.fs");
-    _mainCoronaStarShader = make_unique<Shader>("https://test.1ink.us/solar-system/resource/shaders/starCorona.vs", "https://test.1ink.us/solar-system/resource/shaders/starCorona.fs");
-    _mainPlanetShader = make_unique<Shader>("https://test.1ink.us/solar-system/resource/shaders/planetLighting.vs", "https://test.1ink.us/solar-system/resource/shaders/planetLighting.fs");
-    _mainAtmosphereShader = make_unique<Shader>("https://test.1ink.us/solar-system/resource/shaders/atmosphere.vs", "https://test.1ink.us/solar-system/resource/shaders/atmosphere.fs");
-    _mainCloudsShader = make_unique<Shader>("https://test.1ink.us/solar-system/resource/shaders/planetLighting.vs", "https://test.1ink.us/solar-system/resource/shaders/cloudsLighting.fs");
-    _mainRingShader = make_unique<Shader>("https://test.1ink.us/solar-system/resource/shaders/planetaryRingLighting.vs", "https://test.1ink.us/solar-system/resource/shaders/planetaryRingLighting.fs");
-    _lensFlare = make_unique<LensFlare>(Shader("https://test.1ink.us/solar-system/resource/shaders/lensFlare.vs", "https://test.1ink.us/solar-system/resource/shaders/lensFlare.fs"), TextureImage2D("https://test.1ink.us/solar-system/resource/textures/flares_bright.dds"),
+    _shadowMapShader = make_unique<Shader>("resource/shaders/shadowMap.vs", "resource/shaders/shadowMap.fs");
+    _mainSkyBoxShader = make_unique<Shader>("resource/shaders/skyBox.vs", "resource/shaders/skyBox.fs");
+    _mainStarShader = make_unique<Shader>("resource/shaders/star.vs", "resource/shaders/star.fs");
+    _mainCoronaStarShader = make_unique<Shader>("resource/shaders/starCorona.vs", "resource/shaders/starCorona.fs");
+    _mainPlanetShader = make_unique<Shader>("resource/shaders/planetLighting.vs", "resource/shaders/planetLighting.fs");
+    _mainAtmosphereShader = make_unique<Shader>("resource/shaders/atmosphere.vs", "resource/shaders/atmosphere.fs");
+    _mainCloudsShader = make_unique<Shader>("resource/shaders/planetLighting.vs", "resource/shaders/cloudsLighting.fs");
+    _mainRingShader = make_unique<Shader>("resource/shaders/planetaryRingLighting.vs", "resource/shaders/planetaryRingLighting.fs");
+    _lensFlare = make_unique<LensFlare>(Shader("resource/shaders/lensFlare.vs", "resource/shaders/lensFlare.fs"), TextureImage2D("resource/textures/flares_bright.dds"),
             FlaresInfo {4,
             {
                 FlareSprite{false, 1.0, 7.0, 0},
@@ -702,25 +676,23 @@ void Application::InitScene() {
 }
 
 void Application::InitSongList() {
-    // --- FIX: UPDATED PATHS ---
     _backgroundSongs = vector<string_view> {
-            "https://test.1ink.us/solar-system/resource/sounds/Stellardrone - Galaxies.mp3",
-            "https://test.1ink.us/solar-system/resource/sounds/Stellardrone - Mars.mp3",
-            "https://test.1ink.us/solar-system/resource/sounds/Stellardrone - Billions And Billions.mp3",
-            "https://test.1ink.us/solar-system/resource/sounds/Stellardrone - Gravitation (Remix).mp3",
-            "https://test.1ink.us/solar-system/resource/sounds/Stellardrone - The Edge of Forever.mp3"
+            "resource/sounds/Stellardrone - Galaxies.mp3",
+            "resource/sounds/Stellardrone - Mars.mp3",
+            "resource/sounds/Stellardrone - Billions And Billions.mp3",
+            "resource/sounds/Stellardrone - Gravitation (Remix).mp3",
+            "resource/sounds/Stellardrone - The Edge of Forever.mp3"
     };
-
+    
     default_random_engine randEngine(static_cast<uint32_t>(chrono::high_resolution_clock::now().time_since_epoch().count()));
     shuffle(_backgroundSongs.begin(), _backgroundSongs.end(), randEngine);
 }
 
 void Application::InitStarSystem() {
-    // --- FIX: UPDATED PATHS ---
-    MeshHolder sphereModel("https://test.1ink.us/solar-system/resource/models/sphere.obj");
+    MeshHolder sphereModel("resource/models/sphere.obj");
 
-    StarInfo sunInfo(sphereModel, *_mainStarShader, Shader("https://test.1ink.us/solar-system/resource/shaders/starGlow.vs", "https://test.1ink.us/solar-system/resource/shaders/starGlow.fs"), TextureImage2D("https://test.1ink.us/solar-system/resource/textures/Star_Spectrum.dds"),
-                     starTemperatureInKelvin, 696342.0, glm::vec3(0.99607843, 0.890196078, 0.725490196), L"Sun", L"Солнце");
+    StarInfo sunInfo(sphereModel, *_mainStarShader, Shader("resource/shaders/starGlow.vs", "resource/shaders/starGlow.fs"), TextureImage2D("resource/textures/Star_Spectrum.dds"),
+                     starTemperatureInKelvin, 696342.0, glm::vec3(0.99607843, 0.890196078, 0.725490196), L"Sun", L"Солнце"); 
     _sun = make_shared<Sun>(sunInfo);
 
     InitNeptuneSystem(sphereModel);
@@ -735,11 +707,10 @@ void Application::InitStarSystem() {
 }
 
 void Application::InitMercury(const MeshHolder& sphereModel) {
-    // --- FIX: UPDATED PATHS ---
     PlanetInfo mercuryInfo(sphereModel, 0.38, *_mainPlanetShader,
             {
-                TextureImage2D("https://test.1ink.us/solar-system/resource/textures/Mercury_Diffuse.dds"),
-            }, TextureImage2D("https://test.1ink.us/solar-system/resource/textures/Mercury_Normal.dds"), L"Mercury", L"Меркурий", TextureImage2D("https://test.1ink.us/solar-system/resource/textures/Mercury_Specular.dds"));
+                TextureImage2D("resource/textures/Mercury_Diffuse.dds"),
+            }, TextureImage2D("resource/textures/Mercury_Normal.dds"), L"Mercury", L"Меркурий", TextureImage2D("resource/textures/Mercury_Specular.dds"));
     shared_ptr<Planet> mercury = make_shared<Mercury>(mercuryInfo, _sun);
 
     const glm::mat4 lightProjection = glm::ortho(-mercury->GetRadius() * 3.0f, mercury->GetRadius() * 3.0f, -mercury->GetRadius() * 3.0f, mercury->GetRadius() * 3.0f, camera.GetNear(), camera.GetFar());
@@ -753,11 +724,10 @@ void Application::InitMercury(const MeshHolder& sphereModel) {
 }
 
 void Application::InitVenus(const MeshHolder& sphereModel) {
-    // --- FIX: UPDATED PATHS ---
     PlanetInfo venusInfo(sphereModel, 0.95, *_mainPlanetShader,
             {
-                TextureImage2D("https://test.1ink.us/solar-system/resource/textures/Venus_Diffuse.dds"),
-            }, TextureImage2D("https://test.1ink.us/solar-system/resource/textures/Venus_Normal.dds"), L"Venus", L"Венера");
+                TextureImage2D("resource/textures/Venus_Diffuse.dds"),
+            }, TextureImage2D("resource/textures/Venus_Normal.dds"), L"Venus", L"Венера");
     shared_ptr<Planet> venus = make_shared<Venus>(venusInfo, _sun);
 
     AtmosphereInfo venusAtmosphereInfo(sphereModel, *_mainAtmosphereShader, 1.1, glm::vec3(203/255.f, 158/255.f, 69/255.), venus->GetRadius() - 0.00007, 1.995);
@@ -780,24 +750,23 @@ void Application::InitVenus(const MeshHolder& sphereModel) {
 }
 
 void Application::InitEarthSystem(const MeshHolder& sphereModel) {
-    // --- FIX: UPDATED PATHS ---
     PlanetInfo earthInfo(sphereModel, 1.0, *_mainPlanetShader,
             {
-                TextureImage2D("https://test.1ink.us/solar-system/resource/textures/Earth_Day_Diffuse.dds"),
-                TextureImage2D("https://test.1ink.us/solar-system/resource/textures/Earth_Clouds_Diffuse.dds"),
-                TextureImage2D("https://test.1ink.us/solar-system/resource/textures/Earth_Night_Diffuse.dds"),
-            }, TextureImage2D("https://test.1ink.us/solar-system/resource/textures/Earth_Normal.dds"), L"Earth", L"Земля", TextureImage2D("https://test.1ink.us/solar-system/resource/textures/Earth_Specular.dds"));
+                TextureImage2D("resource/textures/Earth_Day_Diffuse.dds"),
+                TextureImage2D("resource/textures/Earth_Clouds_Diffuse.dds"),
+                TextureImage2D("resource/textures/Earth_Night_Diffuse.dds"),
+            }, TextureImage2D("resource/textures/Earth_Normal.dds"), L"Earth", L"Земля", TextureImage2D("resource/textures/Earth_Specular.dds"));
     shared_ptr<Planet> earth = make_shared<Earth>(earthInfo, _sun);
 
-    SatelliteInfo moonInfo(sphereModel, 0.2724, *_mainPlanetShader, {TextureImage2D("https://test.1ink.us/solar-system/resource/textures/Moon_Diffuse.dds")}, TextureImage2D("https://test.1ink.us/solar-system/resource/textures/Moon_Normal.dds"),
+    SatelliteInfo moonInfo(sphereModel, 0.2724, *_mainPlanetShader, {TextureImage2D("resource/textures/Moon_Diffuse.dds")}, TextureImage2D("resource/textures/Moon_Normal.dds"),
                            L"Moon", L"Луна");
     shared_ptr<Satellite> moon = make_shared<Moon>(moonInfo, earth);
 
     AtmosphereInfo earthAtmosphereInfo(sphereModel, *_mainAtmosphereShader, 1.1, glm::vec3(0.3, 0.7, 1.0), earth->GetRadius() - 0.00007, 2.1);
     unique_ptr<Atmosphere> earthAtmosphere = make_unique<Atmosphere>(earthAtmosphereInfo, earth);
 
-    CloudsInfo earthCloudsInfo(sphereModel, *_mainCloudsShader, 1.0055, TextureImage2D("https://test.1ink.us/solar-system/resource/textures/Earth_Clouds_Diffuse.dds"),
-                               TextureImage2D("https://test.1ink.us/solar-system/resource/textures/Earth_Clouds_Normal.dds"));
+    CloudsInfo earthCloudsInfo(sphereModel, *_mainCloudsShader, 1.0055, TextureImage2D("resource/textures/Earth_Clouds_Diffuse.dds"),
+                               TextureImage2D("resource/textures/Earth_Clouds_Normal.dds"));
     unique_ptr<Clouds> earthClouds = make_unique<EarthClouds>(earthCloudsInfo, earth);
 
     const glm::mat4 lightProjection = glm::ortho(-earth->GetRadius() * 3.0f, earth->GetRadius() * 3.0f, -earth->GetRadius() * 3.0f, earth->GetRadius() * 3.0f, camera.GetNear(), camera.GetFar());
@@ -819,18 +788,17 @@ void Application::InitEarthSystem(const MeshHolder& sphereModel) {
 }
 
 void Application::InitMarsSystem(const MeshHolder& sphereModel) {
-    // --- FIX: UPDATED PATHS ---
-    MeshHolder phobosModel("https://test.1ink.us/solar-system/resource/models/phobos.obj"), deimosModel("https://test.1ink.us/solar-system/resource/models/deimos.obj");
+    MeshHolder phobosModel("resource/models/phobos.obj"), deimosModel("resource/models/deimos.obj");
 
     PlanetInfo marsInfo(sphereModel, 0.53, *_mainPlanetShader,
             {
-                TextureImage2D("https://test.1ink.us/solar-system/resource/textures/Mars_Diffuse.dds"),
-            }, TextureImage2D("https://test.1ink.us/solar-system/resource/textures/Mars_Normal.dds"), L"Mars", L"Марс");
+                TextureImage2D("resource/textures/Mars_Diffuse.dds"),
+            }, TextureImage2D("resource/textures/Mars_Normal.dds"), L"Mars", L"Марс");
     shared_ptr<Planet> mars = make_shared<Mars>(marsInfo, _sun);
 
-    SatelliteInfo phobosInfo(phobosModel, 0.001768, *_mainPlanetShader, {TextureImage2D("https://test.1ink.us/solar-system/resource/textures/Phobos_Diffuse.dds")}, TextureImage2D("https://test.1ink.us/solar-system/resource/textures/Phobos_Normal.dds"),
+    SatelliteInfo phobosInfo(phobosModel, 0.001768, *_mainPlanetShader, {TextureImage2D("resource/textures/Phobos_Diffuse.dds")}, TextureImage2D("resource/textures/Phobos_Normal.dds"),
                              L"Phobos", L"Фобос");
-    SatelliteInfo deimosInfo(deimosModel, 0.00097316, *_mainPlanetShader, {TextureImage2D("https://test.1ink.us/solar-system/resource/textures/Deimos_Diffuse.dds")}, TextureImage2D("https://test.1ink.us/solar-system/resource/textures/Deimos_Normal.dds"),
+    SatelliteInfo deimosInfo(deimosModel, 0.00097316, *_mainPlanetShader, {TextureImage2D("resource/textures/Deimos_Diffuse.dds")}, TextureImage2D("resource/textures/Deimos_Normal.dds"),
                              L"Deimos", L"Деймос");
     shared_ptr<Satellite> phobos = make_shared<Phobos>(phobosInfo, mars);
     shared_ptr<Satellite> deimos = make_shared<Deimos>(deimosInfo, mars);
@@ -857,20 +825,19 @@ void Application::InitMarsSystem(const MeshHolder& sphereModel) {
 }
 
 void Application::InitJupiterSystem(const MeshHolder& sphereModel) {
-    // --- FIX: UPDATED PATHS ---
     PlanetInfo jupiterInfo(sphereModel, 11.2, *_mainPlanetShader,
             {
-                TextureImage2D("https://test.1ink.us/solar-system/resource/textures/Jupiter_Diffuse.dds"),
-            }, TextureImage2D("https://test.1ink.us/solar-system/resource/textures/Jupiter_Normal.dds"), L"Jupiter", L"Юпитер");
+                TextureImage2D("resource/textures/Jupiter_Diffuse.dds"),
+            }, TextureImage2D("resource/textures/Jupiter_Normal.dds"), L"Jupiter", L"Юпитер");
     shared_ptr<Planet> jupiter = make_shared<Jupiter>(jupiterInfo, _sun);
 
-    SatelliteInfo ioInfo(sphereModel, 0.28592, *_mainPlanetShader, {TextureImage2D("https://test.1ink.us/solar-system/resource/textures/Io_Diffuse.dds")}, TextureImage2D("https://test.1ink.us/solar-system/resource/textures/Io_Normal.dds"),
+    SatelliteInfo ioInfo(sphereModel, 0.28592, *_mainPlanetShader, {TextureImage2D("resource/textures/Io_Diffuse.dds")}, TextureImage2D("resource/textures/Io_Normal.dds"),
                          L"Io", L"Ио");
-    SatelliteInfo europaInfo(sphereModel, 0.244985, *_mainPlanetShader, {TextureImage2D("https://test.1ink.us/solar-system/resource/textures/Europa_Diffuse.dds")}, TextureImage2D("https://test.1ink.us/solar-system/resource/textures/Europa_Normal.dds"),
+    SatelliteInfo europaInfo(sphereModel, 0.244985, *_mainPlanetShader, {TextureImage2D("resource/textures/Europa_Diffuse.dds")}, TextureImage2D("resource/textures/Europa_Normal.dds"),
                              L"Europa", L"Европа");
-    SatelliteInfo ganymedeInfo(sphereModel, 0.41345, *_mainPlanetShader, {TextureImage2D("https://test.1ink.us/solar-system/resource/textures/Ganymede_Diffuse.dds")}, TextureImage2D("https://test.1ink.us/solar-system/resource/textures/Ganymede_Normal.dds"),
+    SatelliteInfo ganymedeInfo(sphereModel, 0.41345, *_mainPlanetShader, {TextureImage2D("resource/textures/Ganymede_Diffuse.dds")}, TextureImage2D("resource/textures/Ganymede_Normal.dds"),
                                L"Ganymede", L"Ганимед");
-    SatelliteInfo callistoInfo(sphereModel, 0.3783236, *_mainPlanetShader, {TextureImage2D("https://test.1ink.us/solar-system/resource/textures/Callisto_Diffuse.dds")}, TextureImage2D("https://test.1ink.us/solar-system/resource/textures/Callisto_Normal.dds"),
+    SatelliteInfo callistoInfo(sphereModel, 0.3783236, *_mainPlanetShader, {TextureImage2D("resource/textures/Callisto_Diffuse.dds")}, TextureImage2D("resource/textures/Callisto_Normal.dds"),
                                L"Callisto", L"Каллисто");
     shared_ptr<Satellite> io = make_shared<Io>(ioInfo, jupiter);
     shared_ptr<Satellite> europa = make_shared<Europa>(europaInfo, jupiter);
@@ -899,31 +866,30 @@ void Application::InitJupiterSystem(const MeshHolder& sphereModel) {
 }
 
 void Application::InitSaturnSystem(const MeshHolder& sphereModel) {
-    // --- FIX: UPDATED PATHS ---
-    MeshHolder saturnRingModel("https://test.1ink.us/solar-system/resource/models/saturn_ring.obj");
+    MeshHolder saturnRingModel("resource/models/saturn_ring.obj");
 
     PlanetInfo saturnInfo(sphereModel, 9.14, *_mainPlanetShader,
             {
-                TextureImage2D("https://test.1ink.us/solar-system/resource/textures/Saturn_Diffuse.dds"),
-            }, TextureImage2D("https://test.1ink.us/solar-system/resource/textures/Saturn_Normal.dds"), L"Saturn", L"Сатурн");
+                TextureImage2D("resource/textures/Saturn_Diffuse.dds"),
+            }, TextureImage2D("resource/textures/Saturn_Normal.dds"), L"Saturn", L"Сатурн");
     shared_ptr<Planet> saturn = make_shared<Saturn>(saturnInfo, _sun);
 
-    PlanetaryRingInfo saturnRingInfo(saturnRingModel, 22.0, 43.7, *_mainPlanetShader, TextureImage2D("https://test.1ink.us/solar-system/resource/textures/Saturn_Rings.dds"));
+    PlanetaryRingInfo saturnRingInfo(saturnRingModel, 22.0, 43.7, *_mainPlanetShader, TextureImage2D("resource/textures/Saturn_Rings.dds")); 
     unique_ptr<PlanetaryRing> saturnRing = make_unique<SaturnRing>(saturnRingInfo, saturn);
 
-    SatelliteInfo mimasInfo(sphereModel, 0.03111, *_mainPlanetShader, {TextureImage2D("https://test.1ink.us/solar-system/resource/textures/Mimas_Diffuse.dds")}, TextureImage2D("https://test.1ink.us/solar-system/resource/textures/Mimas_Normal.dds"),
+    SatelliteInfo mimasInfo(sphereModel, 0.03111, *_mainPlanetShader, {TextureImage2D("resource/textures/Mimas_Diffuse.dds")}, TextureImage2D("resource/textures/Mimas_Normal.dds"),
                             L"Mimas", L"Мимас");
-    SatelliteInfo enceladusInfo(sphereModel, 0.03957, *_mainPlanetShader, {TextureImage2D("https://test.1ink.us/solar-system/resource/textures/Enceladus_Diffuse.dds")}, TextureImage2D("https://test.1ink.us/solar-system/resource/textures/Enceladus_Normal.dds"),
+    SatelliteInfo enceladusInfo(sphereModel, 0.03957, *_mainPlanetShader, {TextureImage2D("resource/textures/Enceladus_Diffuse.dds")}, TextureImage2D("resource/textures/Enceladus_Normal.dds"),
                             L"Enceladus", L"Энцелад");
-    SatelliteInfo tethysInfo(sphereModel, 0.083346, *_mainPlanetShader, {TextureImage2D("https://test.1ink.us/solar-system/resource/textures/Tethys_Diffuse.dds")}, TextureImage2D("https://test.1ink.us/solar-system/resource/textures/Tethys_Normal.dds"),
+    SatelliteInfo tethysInfo(sphereModel, 0.083346, *_mainPlanetShader, {TextureImage2D("resource/textures/Tethys_Diffuse.dds")}, TextureImage2D("resource/textures/Tethys_Normal.dds"),
                             L"Tethys", L"Тефия");
-    SatelliteInfo dioneInfo(sphereModel, 0.08812, *_mainPlanetShader, {TextureImage2D("https://test.1ink.us/solar-system/resource/textures/Dione_Diffuse.dds")}, TextureImage2D("https://test.1ink.us/solar-system/resource/textures/Dione_Normal.dds"),
+    SatelliteInfo dioneInfo(sphereModel, 0.08812, *_mainPlanetShader, {TextureImage2D("resource/textures/Dione_Diffuse.dds")}, TextureImage2D("resource/textures/Dione_Normal.dds"),
                             L"Dione", L"Диона");
-    SatelliteInfo rheaInfo(sphereModel, 0.119886, *_mainPlanetShader, {TextureImage2D("https://test.1ink.us/solar-system/resource/textures/Rhea_Diffuse.dds")}, TextureImage2D("https://test.1ink.us/solar-system/resource/textures/Rhea_Normal.dds"),
+    SatelliteInfo rheaInfo(sphereModel, 0.119886, *_mainPlanetShader, {TextureImage2D("resource/textures/Rhea_Diffuse.dds")}, TextureImage2D("resource/textures/Rhea_Normal.dds"),
                             L"Rhea", L"Рея");
-    SatelliteInfo titanInfo(sphereModel, 0.404136, *_mainPlanetShader, {TextureImage2D("https://test.1ink.us/solar-system/resource/textures/Titan_Diffuse.dds")}, TextureImage2D("https://test.1ink.us/solar-system/resource/textures/Titan_Normal.dds"),
+    SatelliteInfo titanInfo(sphereModel, 0.404136, *_mainPlanetShader, {TextureImage2D("resource/textures/Titan_Diffuse.dds")}, TextureImage2D("resource/textures/Titan_Normal.dds"),
                             L"Titan", L"Титан");
-    SatelliteInfo iapetusInfo(sphereModel, 0.115288, *_mainPlanetShader, {TextureImage2D("https://test.1ink.us/solar-system/resource/textures/Iapetus_Diffuse.dds")}, TextureImage2D("https://test.1ink.us/solar-system/resource/textures/Iapetus_Normal.dds"),
+    SatelliteInfo iapetusInfo(sphereModel, 0.115288, *_mainPlanetShader, {TextureImage2D("resource/textures/Iapetus_Diffuse.dds")}, TextureImage2D("resource/textures/Iapetus_Normal.dds"),
                             L"Iapetus", L"Япет");
     shared_ptr<Satellite> mimas = make_shared<Mimas>(mimasInfo, saturn);
     shared_ptr<Satellite> enceladus = make_shared<Enceladus>(enceladusInfo, saturn);
@@ -937,7 +903,7 @@ void Application::InitSaturnSystem(const MeshHolder& sphereModel) {
     unique_ptr<Atmosphere> saturnAtmosphere = make_unique<Atmosphere>(saturnAtmosphereInfo, saturn);
 
     AtmosphereInfo titanAtmosphereInfo(sphereModel, *_mainAtmosphereShader, 0.504136, glm::vec3(40.f/255, 33.f/255, 72.f/255), titan->GetRadius() - 0.00007, 0.8429210,
-                                       glm::vec3(0.36862745, 0.0666667, 0.0196078));
+                                       glm::vec3(0.36862745, 0.0666667, 0.0196078)); 
     unique_ptr<Atmosphere> titanAtmosphere = make_unique<Atmosphere>(titanAtmosphereInfo, titan);
 
     const glm::mat4 lightProjection = glm::ortho(-saturn->GetRadius() * 3.0f, saturn->GetRadius() * 3.0f, -saturn->GetRadius() * 3.0f, saturn->GetRadius() * 3.0f, camera.GetNear(), camera.GetFar());
@@ -966,27 +932,26 @@ void Application::InitSaturnSystem(const MeshHolder& sphereModel) {
 }
 
 void Application::InitUranusSystem(const MeshHolder& sphereModel) {
-    // --- FIX: UPDATED PATHS ---
-    MeshHolder uranusRingModel("https://test.1ink.us/solar-system/resource/models/uranus_ring.obj");
+    MeshHolder uranusRingModel("resource/models/uranus_ring.obj");
 
     PlanetInfo uranusInfo(sphereModel, 3.98085, *_mainPlanetShader,
             {
-                TextureImage2D("https://test.1ink.us/solar-system/resource/textures/Uranus_Diffuse.dds"),
-                TextureImage2D("https://test.1ink.us/solar-system/resource/textures/Uranus_Clouds_Diffuse.dds")
-            }, TextureImage2D("https://test.1ink.us/solar-system/resource/textures/Uranus_Normal.dds"), L"Uranus", L"Уран");
+                TextureImage2D("resource/textures/Uranus_Diffuse.dds"),
+                TextureImage2D("resource/textures/Uranus_Clouds_Diffuse.dds")
+            }, TextureImage2D("resource/textures/Uranus_Normal.dds"), L"Uranus", L"Уран");
     shared_ptr<Planet> uranus = make_shared<Uranus>(uranusInfo, _sun);
-    PlanetaryRingInfo uranusRingInfo(uranusRingModel, 12.6, 16.0, *_mainPlanetShader, TextureImage2D("https://test.1ink.us/solar-system/resource/textures/Uranus_Rings.dds")); // Radiuses from 3D model
+    PlanetaryRingInfo uranusRingInfo(uranusRingModel, 12.6, 16.0, *_mainPlanetShader, TextureImage2D("resource/textures/Uranus_Rings.dds")); // Radiuses from 3D model
     unique_ptr<PlanetaryRing> uranusRing = make_unique<UranusRing>(uranusRingInfo, uranus);
 
-    SatelliteInfo mirandaInfo(sphereModel, 0.0368858, *_mainPlanetShader, {TextureImage2D("https://test.1ink.us/solar-system/resource/textures/Miranda_Diffuse.dds")}, TextureImage2D("https://test.1ink.us/solar-system/resource/textures/Miranda_Normal.dds"),
+    SatelliteInfo mirandaInfo(sphereModel, 0.0368858, *_mainPlanetShader, {TextureImage2D("resource/textures/Miranda_Diffuse.dds")}, TextureImage2D("resource/textures/Miranda_Normal.dds"),
                             L"Miranda", L"Миранда");
-    SatelliteInfo arielInfo(sphereModel, 0.090865, *_mainPlanetShader, {TextureImage2D("https://test.1ink.us/solar-system/resource/textures/Ariel_Diffuse.dds")}, TextureImage2D("https://test.1ink.us/solar-system/resource/textures/Ariel_Normal.dds"),
+    SatelliteInfo arielInfo(sphereModel, 0.090865, *_mainPlanetShader, {TextureImage2D("resource/textures/Ariel_Diffuse.dds")}, TextureImage2D("resource/textures/Ariel_Normal.dds"),
                             L"Ariel", L"Ариэль");
-    SatelliteInfo umbrielInfo(sphereModel, 0.091775, *_mainPlanetShader, {TextureImage2D("https://test.1ink.us/solar-system/resource/textures/Umbriel_Diffuse.dds")}, TextureImage2D("https://test.1ink.us/solar-system/resource/textures/Umbriel_Normal.dds"),
+    SatelliteInfo umbrielInfo(sphereModel, 0.091775, *_mainPlanetShader, {TextureImage2D("resource/textures/Umbriel_Diffuse.dds")}, TextureImage2D("resource/textures/Umbriel_Normal.dds"),
                             L"Umbriel", L"Умбриэль");
-    SatelliteInfo titaniaInfo(sphereModel, 0.123748, *_mainPlanetShader, {TextureImage2D("https://test.1ink.us/solar-system/resource/textures/Titania_Diffuse.dds")}, TextureImage2D("https://test.1ink.us/solar-system/resource/textures/Titania_Normal.dds"),
+    SatelliteInfo titaniaInfo(sphereModel, 0.123748, *_mainPlanetShader, {TextureImage2D("resource/textures/Titania_Diffuse.dds")}, TextureImage2D("resource/textures/Titania_Normal.dds"),
                             L"Titania", L"Титания");
-    SatelliteInfo oberonInfo(sphereModel, 0.11951, *_mainPlanetShader, {TextureImage2D("https://test.1ink.us/solar-system/resource/textures/Oberon_Diffuse.dds")}, TextureImage2D("https://test.1ink.us/solar-system/resource/textures/Oberon_Normal.dds"),
+    SatelliteInfo oberonInfo(sphereModel, 0.11951, *_mainPlanetShader, {TextureImage2D("resource/textures/Oberon_Diffuse.dds")}, TextureImage2D("resource/textures/Oberon_Normal.dds"),
                             L"Oberon", L"Оберон");
     shared_ptr<Satellite> miranda = make_shared<Miranda>(mirandaInfo, uranus);
     shared_ptr<Satellite> ariel = make_shared<Ariel>(arielInfo, uranus);
@@ -994,8 +959,8 @@ void Application::InitUranusSystem(const MeshHolder& sphereModel) {
     shared_ptr<Satellite> titania = make_shared<Titania>(titaniaInfo, uranus);
     shared_ptr<Satellite> oberon = make_shared<Oberon>(oberonInfo, uranus);
 
-    CloudsInfo uranusCloudsInfo(sphereModel, *_mainCloudsShader, 3.98635, TextureImage2D("https://test.1ink.us/solar-system/resource/textures/Uranus_Clouds_Diffuse.dds"),
-                            TextureImage2D("https://test.1ink.us/solar-system/resource/textures/Uranus_Clouds_Normal.dds"));
+    CloudsInfo uranusCloudsInfo(sphereModel, *_mainCloudsShader, 3.98635, TextureImage2D("resource/textures/Uranus_Clouds_Diffuse.dds"),
+                            TextureImage2D("resource/textures/Uranus_Clouds_Normal.dds"));
     unique_ptr<Clouds> uranusClouds = make_unique<UranusClouds>(uranusCloudsInfo, uranus);
 
     AtmosphereInfo uranusAtmosphereInfo(sphereModel, *_mainAtmosphereShader, 4.0, glm::vec3(45.f/255, 101.f/255, 114.f/255), uranus->GetRadius() - 0.00007, 8.1);
@@ -1022,20 +987,19 @@ void Application::InitUranusSystem(const MeshHolder& sphereModel) {
 }
 
 void Application::InitNeptuneSystem(const MeshHolder& sphereModel) {
-    // --- FIX: UPDATED PATHS ---
     PlanetInfo neptuneInfo(sphereModel, 3.8647, *_mainPlanetShader,
             {
-                TextureImage2D("https://test.1ink.us/solar-system/resource/textures/Neptune_Diffuse.dds"),
-                TextureImage2D("https://test.1ink.us/solar-system/resource/textures/Neptune_Clouds_Diffuse.dds")
-            }, TextureImage2D("https://test.1ink.us/solar-system/resource/textures/Neptune_Normal.dds"), L"Neptune", L"Нептун");
+                TextureImage2D("resource/textures/Neptune_Diffuse.dds"),
+                TextureImage2D("resource/textures/Neptune_Clouds_Diffuse.dds")
+            }, TextureImage2D("resource/textures/Neptune_Normal.dds"), L"Neptune", L"Нептун");
     shared_ptr<Planet> neptune = make_shared<Neptune>(neptuneInfo, _sun);
 
-    SatelliteInfo tritonInfo(sphereModel, 0.2724, *_mainPlanetShader, {TextureImage2D("https://test.1ink.us/solar-system/resource/textures/Triton_Diffuse.dds")}, TextureImage2D("https://test.1ink.us/solar-system/resource/textures/Triton_Normal.dds"),
+    SatelliteInfo tritonInfo(sphereModel, 0.2724, *_mainPlanetShader, {TextureImage2D("resource/textures/Triton_Diffuse.dds")}, TextureImage2D("resource/textures/Triton_Normal.dds"),
                              L"Triton", L"Тритон");
     shared_ptr<Satellite> triton = make_shared<Triton>(tritonInfo, neptune);
 
-    CloudsInfo neptuneCloudsInfo(sphereModel, *_mainCloudsShader, 3.87, TextureImage2D("https://test.1ink.us/solar-system/resource/textures/Neptune_Clouds_Diffuse.dds"),
-                                TextureImage2D("https://test.1ink.us/solar-system/resource/textures/Neptune_Clouds_Normal.dds"));
+    CloudsInfo neptuneCloudsInfo(sphereModel, *_mainCloudsShader, 3.87, TextureImage2D("resource/textures/Neptune_Clouds_Diffuse.dds"),
+                                TextureImage2D("resource/textures/Neptune_Clouds_Normal.dds"));
     unique_ptr<Clouds> neptuneClouds = make_unique<NeptuneClouds>(neptuneCloudsInfo, neptune);
 
     AtmosphereInfo neptuneAtmosphereInfo(sphereModel, *_mainAtmosphereShader, 3.9, glm::vec3(62.f/255, 92.f/255, 169.f/255), neptune->GetRadius() - 0.00007, 7.9);
@@ -1061,15 +1025,14 @@ void Application::InitNeptuneSystem(const MeshHolder& sphereModel) {
 }
 
 void Application::InitPlutoSystem(const MeshHolder& sphereModel) {
-    // --- FIX: UPDATED PATHS ---
     PlanetInfo plutoInfo(sphereModel, 0.18651, *_mainPlanetShader,
             {
-                TextureImage2D("https://test.1ink.us/solar-system/resource/textures/Pluto_Diffuse.dds"),
-            }, TextureImage2D("https://test.1ink.us/solar-system/resource/textures/Pluto_Normal.dds"), L"Pluto", L"Плутон", TextureImage2D("https://test.1ink.us/solar-system/resource/textures/Pluto_Specular.dds"));
+                TextureImage2D("resource/textures/Pluto_Diffuse.dds"),
+            }, TextureImage2D("resource/textures/Pluto_Normal.dds"), L"Pluto", L"Плутон", TextureImage2D("resource/textures/Pluto_Specular.dds"));
     shared_ptr<Planet> pluto = make_shared<Pluto>(plutoInfo, _sun);
 
-    SatelliteInfo charonInfo(sphereModel, 0.09512, *_mainPlanetShader, {TextureImage2D("https://test.1ink.us/solar-system/resource/textures/Charon_Diffuse.dds")}, TextureImage2D("https://test.1ink.us/solar-system/resource/textures/Charon_Normal.dds"),
-                             L"Charon", L"Харон", TextureImage2D("https://test.1ink.us/solar-system/resource/textures/Charon_Specular.dds"));
+    SatelliteInfo charonInfo(sphereModel, 0.09512, *_mainPlanetShader, {TextureImage2D("resource/textures/Charon_Diffuse.dds")}, TextureImage2D("resource/textures/Charon_Normal.dds"),
+                             L"Charon", L"Харон", TextureImage2D("resource/textures/Charon_Specular.dds"));
     shared_ptr<Satellite> charon  = make_shared<Charon>(charonInfo, pluto);
 
     AtmosphereInfo plutoAtmosphereInfo(sphereModel, *_mainAtmosphereShader, 0.45, glm::vec3(92.f/255, 120.f/255, 141.f/255), pluto->GetRadius(), 1.0,
@@ -1094,194 +1057,6 @@ void Application::InitPlutoSystem(const MeshHolder& sphereModel) {
     _renderableSceneComponents.push_back(move(plutoSystemComponent));
 }
 
-void Application::StartSearchNearestPlanet() {
-    _isSearchNearestPlanet = true;
-
-#ifdef __EMSCRIPTEN__
-    // For Emscripten, search will be done in UpdateSearchNearestPlanet() called from main loop
-    _nearestPlanetSearchFrameCounter = 0;
-#else
-    auto searchNearestPlanet = [=]() {
-        return min_element(_renderableSceneComponents.begin(), _renderableSceneComponents.end(),
-                           [=](const RenderableSceneComponent& left, const RenderableSceneComponent& right)
-        {
-            return CalculateSpaceObjectDistance(left.planet.get()) < CalculateSpaceObjectDistance(right.planet.get());
-        });
-    };
-
-    _searchNearestPlanetThread = make_unique<thread>([=]() {
-        while (_isSearchNearestPlanet) {
-            auto nearestPlanetIt = searchNearestPlanet();
-            if (nearestPlanetIt != _renderableSceneComponents.end()) {
-                _nearestPlanetIndex = distance(_renderableSceneComponents.begin(), nearestPlanetIt);
-            }
-
-            this_thread::sleep_for(25ms); // Optimization
-        }
-    });
-#endif
-}
-
-void Application::UpdateSearchNearestPlanet() {
-#ifdef __EMSCRIPTEN__
-    // Run search every 60 frames (~1 second at 60fps) instead of continuously in a thread
-    if (_isSearchNearestPlanet && ++_nearestPlanetSearchFrameCounter >= 60) {
-        _nearestPlanetSearchFrameCounter = 0;
-        
-        auto nearestPlanetIt = min_element(_renderableSceneComponents.begin(), _renderableSceneComponents.end(),
-                           [this](const RenderableSceneComponent& left, const RenderableSceneComponent& right)
-        {
-            return CalculateSpaceObjectDistance(left.planet.get()) < CalculateSpaceObjectDistance(right.planet.get());
-        });
-        
-        if (nearestPlanetIt != _renderableSceneComponents.end()) {
-            _nearestPlanetIndex = distance(_renderableSceneComponents.begin(), nearestPlanetIt);
-        }
-    }
-#endif
-}
-
-void Application::StartPlayBackgroundMusic() {
-    _isBackgroundMusicPlay = true;
-
-#ifdef __EMSCRIPTEN__
-    // For Emscripten, music will be managed in UpdateBackgroundMusic() called from main loop
-    _currentSongIndex = 0;
-    _musicStartTime = 0;
-    _musicDuration = 0;
-    _currentMusic = nullptr;
-#else
-    // Maps the value from one range to another. For example, 10 from [0; 100] to [0; 1] will map to 0.1
-    auto mapRange = [](float value, float inMin, float inMax, float outMin, float outMax) {
-        return outMin + (outMax - outMin) * (value - inMin) / (inMax - inMin);
-    };
-
-    _backgroundMusicThread = make_unique<thread>([=]() {
-        for (ssize_t i = 0; i < _backgroundSongs.size() && _isBackgroundMusicPlay; i++) {
-            // At the beginning of the loop so that there is no delay when exiting the program
-            this_thread::sleep_for(1s); // A second of waiting before a new song
-
-            auto song = _soundEngine->play2D(_backgroundSongs[i].data(), false, true, true);
-            song->setVolume(0);
-            song->setIsPaused(false);
-            _currentMusicTrack = _backgroundSongs[i].substr(16); // Remove "https://test.1ink.us/solar-system/resource/sounds/"
-
-            while (!song->isFinished()) {
-                // https://www.desmos.com/calculator/kbn9mql7ay
-                if (song->getPlayPosition() < 5000) { // The first 5s (5000ms) the song volume increases smoothly to 1.0
-                    auto x = mapRange(song->getPlayPosition(), 0.0f, 5000.0f, 0.0f, 0.7f); // About 0.7 the function is already 1.0
-                    auto volume = exp(x) - 1; // Smooth increase in volume
-                    song->setVolume(clamp(volume, 0.0f, 1.0f));
-                }
-                else if (song->getPlayPosition() > song->getPlayLength() - 5000) { // The last 5s the song volume decreases smoothly to ~0.0
-                    // About 6.0 the function is already ~0.0
-                    auto x = mapRange(song->getPlayPosition(), song->getPlayLength() - 5000, song->getPlayLength(), 0.0f, 6.0f);
-                    auto volume = exp(-x); // Smooth decrease in volume
-                    // auto x = mapRange(song->getPlayPosition(), song->getPlayLength() - 5000.0f, song->getPlayLength(), 0.0f, 0.7f);
-                    // auto volume = exp(0.7f - x) - 1; // Smooth decrease in volume https://www.desmos.com/calculator/1vw3chep9a
-                    song->setVolume(clamp(volume, 0.0f, 1.0f));
-                }
-
-                this_thread::sleep_for(25ms); // Optimization
-            }
-
-            if (i == _backgroundSongs.size() - 1) // Repeat songs from the beginning
-                i = -1; // Will increment in the next iteration
-
-            song->drop();
-        }
-    });
-#endif
-}
-
-void Application::UpdateBackgroundMusic() {
-#ifdef __EMSCRIPTEN__
-    if (!_isBackgroundMusicPlay || _backgroundSongs.empty())
-        return;
-
-    // Check if we need to start playing music or if current track finished
-    if (!Mix_PlayingMusic()) {
-        // Load and play next song
-        if (_currentMusic) {
-            Mix_FreeMusic(_currentMusic);
-            _currentMusic = nullptr;
-        }
-
-        if (_currentSongIndex >= _backgroundSongs.size()) {
-            _currentSongIndex = 0; // Loop back to first song
-        }
-
-        _currentMusic = Mix_LoadMUS(_backgroundSongs[_currentSongIndex].data());
-        if (_currentMusic) {
-            _currentMusicTrack = _backgroundSongs[_currentSongIndex].substr(16); // Remove "https://test.1ink.us/solar-system/resource/sounds/"
-            Mix_PlayMusic(_currentMusic, 1);
-            Mix_VolumeMusic(MIX_MAX_VOLUME * 0.3); // 30% volume
-            _musicStartTime = SDL_GetTicks();
-            
-            // Get duration (approximate, SDL_mixer doesn't provide exact duration easily)
-            _musicDuration = 180000; // Assume ~3 minutes, adjust as needed
-            
-            _currentSongIndex++;
-        }
-    } else {
-        // Update volume for fade in/out (simplified version without threads)
-        uint32_t currentTime = SDL_GetTicks();
-        uint32_t elapsed = currentTime - _musicStartTime;
-        
-        // Fade in during first 5 seconds
-        if (elapsed < 5000) {
-            float fade = static_cast<float>(elapsed) / 5000.0f;
-            Mix_VolumeMusic(static_cast<int>(MIX_MAX_VOLUME * 0.3f * fade));
-        }
-        // Fade out during last 5 seconds (if we know duration)
-        else if (_musicDuration > 0 && elapsed > _musicDuration - 5000) {
-            float fade = static_cast<float>(_musicDuration - elapsed) / 5000.0f;
-            Mix_VolumeMusic(static_cast<int>(MIX_MAX_VOLUME * 0.3f * fade));
-        }
-        else {
-            Mix_VolumeMusic(MIX_MAX_VOLUME * 0.3); // Normal volume
-        }
-    }
-#endif
-}
-
-void Application::ConfigureMainPlanetShader(const RenderableSceneComponent& renderableComponent) {
-    _mainPlanetShader->SetMat4("lightSpaceMatrix", renderableComponent.lightSpaceMatrix);
-    _mainPlanetShader->SetBool("isNearbyPlanetaryRing", renderableComponent.planetaryRing != nullptr);
-
-    if (renderableComponent.clouds)
-        _mainPlanetShader->SetFloat("yRotation", renderableComponent.clouds->GetLastRotationAngle() - renderableComponent.planet->GetLastRotationAngle());
-
-    if (renderableComponent.planetaryRing) {
-        _mainPlanetShader->SetVec3("parentPlanetCenter", renderableComponent.planet->GetPosition());
-        _mainPlanetShader->SetFloat("parentPlanetRadiusSquared", renderableComponent.planet->GetRadius() * renderableComponent.planet->GetRadius());
-
-        _mainPlanetShader->SetVec3("ringCenter", renderableComponent.planetaryRing->GetPosition());
-        _mainPlanetShader->SetVec3("ringNormal", renderableComponent.planetaryRing->GetRingNormal());
-        _mainPlanetShader->SetVec2("ringInnerOuterRadiuses", glm::vec2(renderableComponent.planetaryRing->GetInnerRadius(),
-                                                                       renderableComponent.planetaryRing->GetOuterRadius()));
-        _mainPlanetShader->SetInt("ringDiffuse", 12);
-        glBindTextureUnit(12, renderableComponent.planetaryRing->GetRingTexture());
-    }
-}
-
-float Application::CalculateSpaceObjectDistance(const SpaceObject* spaceObject) const {
-    return glm::length(spaceObject->GetPosition() - camera.GetPosition());
-}
-
-glm::vec3 Application::CurrentFpsColor() const {
-    const auto fpsCount = _fpsHandler.GetCurrentFps();
-
-    if (fpsCount >= 59)
-        return {0, 0.694117, 0.270588};
-    else if (fpsCount >= 45 && fpsCount < 59)
-        return {1, 1, 0};
-    else if ((fpsCount >= 30 && fpsCount < 45))
-        return {0.996078, 0.760784, 0};
-    else
-        return {0.96470588, 0, 0};
-}
-
 void Application::DisplaySystemInformation() const {
     cout << "GPU Supplier: " << glGetString(GL_VENDOR) << endl;
     cout << "GPU: " << glGetString(GL_RENDERER) << endl;
@@ -1291,7 +1066,6 @@ void Application::DisplaySystemInformation() const {
     glGetIntegerv(GL_MINOR_VERSION, &minorVersion);
     cout << "OpenGL version: " << majorVersion << '.' << minorVersion << endl;
 
-    // --- FIX: Guard NVIDIA/Desktop specific Enums ---
 #ifndef __EMSCRIPTEN__
     GLint totalMemoryKb;
     glGetIntegerv(GL_GPU_MEMORY_INFO_TOTAL_AVAILABLE_MEMORY_NVX, &totalMemoryKb);
@@ -1307,9 +1081,8 @@ void Application::DisplaySystemInformation() const {
     cout << "Driver: " << glGetString(GL_VERSION) << endl;
 }
 
-// ... [Keep LoadWindowIcon, ProcessInput, and Callbacks unchanged] ...
 void Application::LoadWindowIcon() const {
-    constexpr auto execIconPath = "https://test.1ink.us/solar-system/resource/icons/solarsystem-logo.png"; // FIX: Path
+    constexpr auto execIconPath = "resource/icons/solarsystem-logo.png";
     SDL_Surface* windowIcon = IMG_Load(execIconPath);
     if (windowIcon == nullptr)
         throw runtime_error(string("Cannot load exe icon ") + execIconPath);
@@ -1321,9 +1094,7 @@ void Application::LoadWindowIcon() const {
     SDL_FreeSurface(windowIcon);
 }
 
-// ... [Paste the rest of the existing functions here: ProcessInput, FramebufferSizeCallback, etc.] ...
 void Application::ProcessInput(GLFWwindow* window) {
-    // ... [Original Implementation] ...
     static float movementSpeed = camera.GetMovementSpeed();
 
     if (isFirstMouse) {
@@ -1359,7 +1130,7 @@ void Application::ProcessInput(GLFWwindow* window) {
     if (glfwGetKey(window, GLFW_KEY_C) == GLFW_PRESS) {
         camera.ProcessKeyboard(CameraVector::WORLD_DOWN, deltaTime * shiftIncrease);
     }
-    // ... [Rest of ProcessInput] ...
+    
     if (glfwGetKey(window, GLFW_KEY_PAGE_UP) == GLFW_PRESS) {
 #ifdef __EMSCRIPTEN__
         int currentVolume = Mix_VolumeMusic(-1);
@@ -1416,13 +1187,13 @@ void Application::ProcessInput(GLFWwindow* window) {
     }
     if (glfwGetKey(window, GLFW_KEY_UP) == GLFW_PRESS) {
         yPos -= 1;
-        float yOffset = lastY - yPos;
+        float yOffset = lastY - yPos; 
         lastY = yPos;
         camera.ProcessMouseMovement(0, yOffset);
     }
     if (glfwGetKey(window, GLFW_KEY_DOWN) == GLFW_PRESS) {
         yPos += 1;
-        float yOffset = lastY - yPos;
+        float yOffset = lastY - yPos; 
         lastY = yPos;
         camera.ProcessMouseMovement(0, yOffset);
     }
@@ -1450,7 +1221,7 @@ void Application::MouseCallback(GLFWwindow*, double xPos, double yPos) {
     }
 
     float xOffset = xPos - lastX;
-    float yOffset = lastY - yPos;
+    float yOffset = lastY - yPos; 
 
     lastX = xPos;
     lastY = yPos;
@@ -1513,6 +1284,141 @@ void Application::StopSearchNearestPlanet() {
 #ifndef __EMSCRIPTEN__
     if (_searchNearestPlanetThread)
         _searchNearestPlanetThread->join();
+#endif
+}
+
+void Application::StartSearchNearestPlanet() {
+    _isSearchNearestPlanet = true;
+
+#ifdef __EMSCRIPTEN__
+    _nearestPlanetSearchFrameCounter = 0;
+#else
+    auto searchNearestPlanet = [=]() {
+        return min_element(_renderableSceneComponents.begin(), _renderableSceneComponents.end(),
+                           [=](const RenderableSceneComponent& left, const RenderableSceneComponent& right)
+        {
+            return CalculateSpaceObjectDistance(left.planet.get()) < CalculateSpaceObjectDistance(right.planet.get());
+        });
+    };
+
+    _searchNearestPlanetThread = make_unique<thread>([=]() {
+        while (_isSearchNearestPlanet) {
+            auto nearestPlanetIt = searchNearestPlanet();
+            if (nearestPlanetIt != _renderableSceneComponents.end()) {
+                _nearestPlanetIndex = distance(_renderableSceneComponents.begin(), nearestPlanetIt);
+            }
+
+            this_thread::sleep_for(25ms); 
+        }
+    });
+#endif
+}
+
+void Application::UpdateSearchNearestPlanet() {
+#ifdef __EMSCRIPTEN__
+    if (_isSearchNearestPlanet && ++_nearestPlanetSearchFrameCounter >= 60) {
+        _nearestPlanetSearchFrameCounter = 0;
+        
+        auto nearestPlanetIt = min_element(_renderableSceneComponents.begin(), _renderableSceneComponents.end(),
+                           [this](const RenderableSceneComponent& left, const RenderableSceneComponent& right)
+        {
+            return CalculateSpaceObjectDistance(left.planet.get()) < CalculateSpaceObjectDistance(right.planet.get());
+        });
+        
+        if (nearestPlanetIt != _renderableSceneComponents.end()) {
+            _nearestPlanetIndex = distance(_renderableSceneComponents.begin(), nearestPlanetIt);
+        }
+    }
+#endif
+}
+
+void Application::StartPlayBackgroundMusic() {
+    _isBackgroundMusicPlay = true;
+
+#ifdef __EMSCRIPTEN__
+    _currentSongIndex = 0;
+    _musicStartTime = 0;
+    _musicDuration = 0;
+    _currentMusic = nullptr;
+#else
+    auto mapRange = [](float value, float inMin, float inMax, float outMin, float outMax) {
+        return outMin + (outMax - outMin) * (value - inMin) / (inMax - inMin);
+    };
+
+    _backgroundMusicThread = make_unique<thread>([=]() {
+        for (ssize_t i = 0; i < _backgroundSongs.size() && _isBackgroundMusicPlay; i++) {
+            this_thread::sleep_for(1s); 
+
+            auto song = _soundEngine->play2D(_backgroundSongs[i].data(), false, true, true);
+            song->setVolume(0);
+            song->setIsPaused(false);
+            _currentMusicTrack = _backgroundSongs[i].substr(16); 
+
+            while (!song->isFinished()) {
+                if (song->getPlayPosition() < 5000) { 
+                    auto x = mapRange(song->getPlayPosition(), 0.0f, 5000.0f, 0.0f, 0.7f); 
+                    auto volume = exp(x) - 1; 
+                    song->setVolume(clamp(volume, 0.0f, 1.0f));
+                }
+                else if (song->getPlayPosition() > song->getPlayLength() - 5000) { 
+                    auto x = mapRange(song->getPlayPosition(), song->getPlayLength() - 5000, song->getPlayLength(), 0.0f, 6.0f);
+                    auto volume = exp(-x); 
+                    song->setVolume(clamp(volume, 0.0f, 1.0f));
+                }
+
+                this_thread::sleep_for(25ms); 
+            }
+
+            if (i == _backgroundSongs.size() - 1) 
+                i = -1; 
+
+            song->drop();
+        }
+    });
+#endif
+}
+
+void Application::UpdateBackgroundMusic() {
+#ifdef __EMSCRIPTEN__
+    if (!_isBackgroundMusicPlay || _backgroundSongs.empty())
+        return;
+
+    if (!Mix_PlayingMusic()) {
+        if (_currentMusic) {
+            Mix_FreeMusic(_currentMusic);
+            _currentMusic = nullptr;
+        }
+
+        if (_currentSongIndex >= _backgroundSongs.size()) {
+            _currentSongIndex = 0; 
+        }
+
+        _currentMusic = Mix_LoadMUS(_backgroundSongs[_currentSongIndex].data());
+        if (_currentMusic) {
+            _currentMusicTrack = _backgroundSongs[_currentSongIndex].substr(16); 
+            Mix_PlayMusic(_currentMusic, 1);
+            Mix_VolumeMusic(MIX_MAX_VOLUME * 0.3); 
+            _musicStartTime = SDL_GetTicks();
+            _musicDuration = 180000; 
+            
+            _currentSongIndex++;
+        }
+    } else {
+        uint32_t currentTime = SDL_GetTicks();
+        uint32_t elapsed = currentTime - _musicStartTime;
+        
+        if (elapsed < 5000) {
+            float fade = static_cast<float>(elapsed) / 5000.0f;
+            Mix_VolumeMusic(static_cast<int>(MIX_MAX_VOLUME * 0.3f * fade));
+        }
+        else if (_musicDuration > 0 && elapsed > _musicDuration - 5000) {
+            float fade = static_cast<float>(_musicDuration - elapsed) / 5000.0f;
+            Mix_VolumeMusic(static_cast<int>(MIX_MAX_VOLUME * 0.3f * fade));
+        }
+        else {
+            Mix_VolumeMusic(MIX_MAX_VOLUME * 0.3); 
+        }
+    }
 #endif
 }
 
