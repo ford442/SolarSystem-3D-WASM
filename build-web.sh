@@ -66,7 +66,7 @@ emcmake cmake -DCMAKE_CXX_FLAGS="-I/usr/local/include -I$WEB_INCLUDE_DIR" -B "$B
 # Build
 echo "Building project..."
 cd "$BUILD_DIR"
-emmake make -j$(nproc)
+emmake make -j55
 
 # 5. Deploy to Web Frontend
 echo "------------------------------------------------"
