@@ -657,12 +657,12 @@ void Application::InitScene() {
 
     // --- FIX: UPDATED PATHS (Removed ../) ---
     const vector<string> skyBoxFaces = {
-            "./resource/textures/Main SkyBox/PositiveX.dds",
-            "./resource/textures/Main SkyBox/NegativeX.dds",
-            "./resource/textures/Main SkyBox/PositiveY.dds",
-            "./resource/textures/Main SkyBox/NegativeY.dds",
-            "./resource/textures/Main SkyBox/PositiveZ.dds",
-            "./resource/textures/Main SkyBox/NegativeZ.dds"
+            "./resource/textures/Main_SkyBox/PositiveX.dds",
+            "./resource/textures/Main_SkyBox/NegativeX.dds",
+            "./resource/textures/Main_SkyBox/PositiveY.dds",
+            "./resource/textures/Main_SkyBox/NegativeY.dds",
+            "./resource/textures/Main_SkyBox/PositiveZ.dds",
+            "./resource/textures/Main_SkyBox/NegativeZ.dds"
     };
 
     _skyBox = make_unique<SkyBox>(skyBoxFaces);
