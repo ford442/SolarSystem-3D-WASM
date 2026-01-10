@@ -73,7 +73,7 @@ if [ ! -f "$ASSIMP_BUILD_DIR/lib/libassimp.a" ]; then
         -DCMAKE_INSTALL_PREFIX="$PWD/install"
 
     # Build
-    emmake make -j$(nproc)
+    emmake make -j55
 
     cd ../../..
 else
