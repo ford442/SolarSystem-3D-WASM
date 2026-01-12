@@ -1,10 +1,14 @@
 #include "TextureImage2D.h"
+#include "WebResourceFetcher.h"
 
 TextureImage2D::TextureImage2D(const std::string& path, GLint wrapParam, GLint minFilter, GLint magFilter) {
     LoadTextureFromFile(path, wrapParam, minFilter, magFilter);
 }
 
 void TextureImage2D::LoadTextureFromFile(const std::string& path, GLint wrapParam, GLint minFilter, GLint magFilter) {
+    // Fetch texture on demand
+    WebResourceFetcher::Fetch(path);
+
     glGenTextures(1, &_textureID);
     glBindTexture(GL_TEXTURE_2D, _textureID);
 

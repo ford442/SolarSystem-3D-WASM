@@ -1,7 +1,14 @@
 #include "SkyBox.h"
+#include "../Auxiliary_Modules/WebResourceFetcher.h"
 
 SkyBox::SkyBox(const std::vector<std::string>& faces) {
     InitBuffers();
+
+    // Ensure all 6 faces are available before loading
+    for (const auto& face : faces) {
+        WebResourceFetcher::Fetch(face);
+    }
+
     LoadCubeMap(faces);
 }
 
