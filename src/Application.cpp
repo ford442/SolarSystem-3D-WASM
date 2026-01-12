@@ -1455,6 +1455,34 @@ void Application::Dispose() {
 #endif
 }
 
+float Application::CalculateSpaceObjectDistance(const SpaceObject* spaceObject) const {
+    return glm::distance(camera.GetPosition(), spaceObject->GetPosition());
+}
+
+glm::vec3 Application::CurrentFpsColor() const {
+    const uint16_t fps = _fpsHandler.GetCurrentFps();
+
+    if (fps < 30)
+        return {0.949, 0.239, 0.325};
+    else if (fps >= 30 && fps < 60)
+        return {0.949, 0.85, 0.325};
+    else
+        return {0.239, 0.949, 0.45};
+}
+
+void Application::ConfigureMainPlanetShader(const RenderableSceneComponent& renderableComponent) {
+    _mainPlanetShader->SetMat4("lightSpaceMatrix", renderableComponent.lightSpaceMatrix);
+    _mainPlanetShader->SetBool("isNearbyPlanetaryRing", renderableComponent.planetaryRing != nullptr);
+
+    if (renderableComponent.planetaryRing) {
+        _mainPlanetShader->SetVec3("ringCenter", renderableComponent.planetaryRing->GetPosition());
+        _mainPlanetShader->SetVec3("ringNormal", renderableComponent.planetaryRing->GetRingNormal());
+        _mainPlanetShader->SetVec2("ringInnerOuterRadiuses", glm::vec2(renderableComponent.planetaryRing->GetInnerRadius(), renderableComponent.planetaryRing->GetOuterRadius()));
+        _mainPlanetShader->SetInt("ringDiffuse", 7);
+        glBindTextureUnit(7, renderableComponent.planetaryRing->GetRingTexture());
+    }
+}
+
 Application::~Application() {
     Dispose();
 }
