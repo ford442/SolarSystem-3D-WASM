@@ -3,6 +3,7 @@
 #include "Auxiliary_Modules/AuxiliaryModules.h"
 #include "Solar_System/SolarSystem.h"
 #include "SystemModules.h"
+#include <atomic>
 
 #ifdef __EMSCRIPTEN__
 #include <emscripten.h>
@@ -43,6 +44,11 @@ public:
     void RunOneFrame(); // For Emscripten main loop
 
 private:
+    enum class AppState { LOADING, RUNNING };
+    AppState _appState = AppState::LOADING;
+    std::atomic<int> _resourcesPending{0};
+    int _totalResources = 0;
+
     GLFWwindow* _mainWindow = nullptr;
     uint16_t _displayWidth = 0, _displayHeight = 0;
     ssize_t _nearestPlanetIndex = 0;
@@ -77,6 +83,8 @@ private:
 
     void InitSystems();
     void InitScene();
+    void LoadResources();
+    void InitSceneObjects();
     void InitStarSystem();
     void InitMercury(const MeshHolder& sphereModel);
     void InitVenus(const MeshHolder& sphereModel);
