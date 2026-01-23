@@ -164,6 +164,7 @@
 #include <fstream>
 #include <stdexcept>
 #include <iostream>
+#include <algorithm>
 
 using namespace std;
 using namespace nv_dds;
@@ -494,6 +495,9 @@ void CDDSImage::load(const string& filename, bool flipImage) {
     assert(!filename.empty());
 
     ifstream fs(filename.c_str(), ios::binary);
+    if (!fs.is_open()) {
+        throw runtime_error("Could not open file: " + filename);
+    }
     load(fs, flipImage);
 }
 
@@ -505,6 +509,8 @@ void CDDSImage::load(const string& filename, bool flipImage) {
 void CDDSImage::load(istream& is, bool flipImage) {
     // clear any previously loaded images
     clear();
+
+    bool needsSwizzle = false;
 
     // read in file marker, make sure its a DDS file
     char filecode[4];
@@ -551,7 +557,12 @@ void CDDSImage::load(istream& is, bool flipImage) {
                ddsh.ddspf.dwGBitMask == 0x0000FF00 &&
                ddsh.ddspf.dwBBitMask == 0x000000FF &&
                ddsh.ddspf.dwABitMask == 0xFF000000) {
+#ifdef __EMSCRIPTEN__
+        m_format = GL_RGBA;
+        needsSwizzle = true;
+#else
         m_format = GL_BGRA_EXT;
+#endif
         m_components = 4;
     } else if (ddsh.ddspf.dwRGBBitCount == 32 &&
                ddsh.ddspf.dwRBitMask == 0x000000FF &&
@@ -570,7 +581,12 @@ void CDDSImage::load(istream& is, bool flipImage) {
                ddsh.ddspf.dwRBitMask == 0x00FF0000 &&
                ddsh.ddspf.dwGBitMask == 0x0000FF00 &&
                ddsh.ddspf.dwBBitMask == 0x000000FF) {
+#ifdef __EMSCRIPTEN__
+        m_format = GL_RGB;
+        needsSwizzle = true;
+#else
         m_format = GL_BGR_EXT;
+#endif
         m_components = 3;
     } else if (ddsh.ddspf.dwRGBBitCount == 8) {
         m_format = GL_LUMINANCE;
@@ -605,6 +621,14 @@ void CDDSImage::load(istream& is, bool flipImage) {
         uint8_t *pixels= new uint8_t[size];
         is.read((char*)pixels, size);
 
+#ifdef __EMSCRIPTEN__
+        if (needsSwizzle) {
+            for (unsigned int i = 0; i < size; i += m_components) {
+                std::swap(pixels[i], pixels[i + 2]);
+            }
+        }
+#endif
+
         img.create(width, height, depth, size, pixels);
 
         delete[] pixels;
@@ -637,6 +661,14 @@ void CDDSImage::load(istream& is, bool flipImage) {
 
             uint8_t *pixels = new uint8_t[size];
             is.read((char*)pixels, size);
+
+#ifdef __EMSCRIPTEN__
+            if (needsSwizzle) {
+                for (unsigned int i = 0; i < size; i += m_components) {
+                    std::swap(pixels[i], pixels[i + 2]);
+                }
+            }
+#endif
 
             mipmap.create(w, h, d, size, pixels);
 
