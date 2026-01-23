@@ -1,4 +1,5 @@
 #include "Application.h"
+#include "Auxiliary_Modules/WebResourceFetcher.h"
 #include <SDL_image.h>
 #include <random>
 #include <iomanip>
@@ -112,7 +113,9 @@ void Application::InitSystems() {
     }
 
     glEnable(GL_DEPTH_TEST);
+#ifndef __EMSCRIPTEN__
     glEnable(GL_MULTISAMPLE);
+#endif
     glEnable(GL_CULL_FACE);
 
 #ifndef __EMSCRIPTEN__
@@ -138,6 +141,25 @@ void Application::Exec() {
 
 void Application::RunOneFrame() {
     _fpsHandler.RunFrameTimer();
+
+    if (_appState == AppState::LOADING) {
+        glBindFramebuffer(GL_FRAMEBUFFER, 0);
+        glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
+        glClear(GL_COLOR_BUFFER_BIT);
+
+        if (_resourcesPending <= 0) {
+             std::cout << "All resources downloaded. Initializing scene..." << std::endl;
+             InitSceneObjects();
+             _appState = AppState::RUNNING;
+        }
+
+        glfwSwapBuffers(_mainWindow);
+        glfwPollEvents();
+#ifndef __EMSCRIPTEN__
+        _fpsHandler.WaitForFrameTimer();
+#endif
+        return;
+    }
 
     const double currentFrame = glfwGetTime();
     deltaTime = currentFrame - lastFrame;
@@ -627,6 +649,81 @@ void Application::ConfigureMainShaders() {
 }
 
 void Application::InitScene() {
+#ifdef __EMSCRIPTEN__
+    LoadResources();
+#else
+    InitSceneObjects();
+    _appState = AppState::RUNNING;
+#endif
+}
+
+void Application::LoadResources() {
+    const std::vector<std::string> resources = {
+        // SkyBox
+        "resource/textures/Main_SkyBox/PositiveX.dds",
+        "resource/textures/Main_SkyBox/NegativeX.dds",
+        "resource/textures/Main_SkyBox/PositiveY.dds",
+        "resource/textures/Main_SkyBox/NegativeY.dds",
+        "resource/textures/Main_SkyBox/PositiveZ.dds",
+        "resource/textures/Main_SkyBox/NegativeZ.dds",
+        // Sun
+        "resource/textures/Star_Spectrum.dds",
+        "resource/textures/flares_bright.dds",
+        // Planets
+        "resource/textures/Mercury_Diffuse.dds", "resource/textures/Mercury_Normal.dds", "resource/textures/Mercury_Specular.dds",
+        "resource/textures/Venus_Diffuse.dds", "resource/textures/Venus_Normal.dds",
+        "resource/textures/Earth_Day_Diffuse.dds", "resource/textures/Earth_Clouds_Diffuse.dds", "resource/textures/Earth_Night_Diffuse.dds", "resource/textures/Earth_Normal.dds", "resource/textures/Earth_Specular.dds",
+        "resource/textures/Moon_Diffuse.dds", "resource/textures/Moon_Normal.dds",
+        "resource/textures/Mars_Diffuse.dds", "resource/textures/Mars_Normal.dds",
+        "resource/textures/Phobos_Diffuse.dds", "resource/textures/Phobos_Normal.dds",
+        "resource/textures/Deimos_Diffuse.dds", "resource/textures/Deimos_Normal.dds",
+        "resource/textures/Jupiter_Diffuse.dds", "resource/textures/Jupiter_Normal.dds",
+        "resource/textures/Io_Diffuse.dds", "resource/textures/Io_Normal.dds",
+        "resource/textures/Europa_Diffuse.dds", "resource/textures/Europa_Normal.dds",
+        "resource/textures/Ganymede_Diffuse.dds", "resource/textures/Ganymede_Normal.dds",
+        "resource/textures/Callisto_Diffuse.dds", "resource/textures/Callisto_Normal.dds",
+        "resource/textures/Saturn_Diffuse.dds", "resource/textures/Saturn_Normal.dds", "resource/textures/Saturn_Rings.dds",
+        "resource/textures/Mimas_Diffuse.dds", "resource/textures/Mimas_Normal.dds",
+        "resource/textures/Enceladus_Diffuse.dds", "resource/textures/Enceladus_Normal.dds",
+        "resource/textures/Tethys_Diffuse.dds", "resource/textures/Tethys_Normal.dds",
+        "resource/textures/Dione_Diffuse.dds", "resource/textures/Dione_Normal.dds",
+        "resource/textures/Rhea_Diffuse.dds", "resource/textures/Rhea_Normal.dds",
+        "resource/textures/Titan_Diffuse.dds", "resource/textures/Titan_Normal.dds",
+        "resource/textures/Iapetus_Diffuse.dds", "resource/textures/Iapetus_Normal.dds",
+        "resource/textures/Uranus_Diffuse.dds", "resource/textures/Uranus_Clouds_Diffuse.dds", "resource/textures/Uranus_Normal.dds", "resource/textures/Uranus_Rings.dds", "resource/textures/Uranus_Clouds_Normal.dds",
+        "resource/textures/Miranda_Diffuse.dds", "resource/textures/Miranda_Normal.dds",
+        "resource/textures/Ariel_Diffuse.dds", "resource/textures/Ariel_Normal.dds",
+        "resource/textures/Umbriel_Diffuse.dds", "resource/textures/Umbriel_Normal.dds",
+        "resource/textures/Titania_Diffuse.dds", "resource/textures/Titania_Normal.dds",
+        "resource/textures/Oberon_Diffuse.dds", "resource/textures/Oberon_Normal.dds",
+        "resource/textures/Neptune_Diffuse.dds", "resource/textures/Neptune_Clouds_Diffuse.dds", "resource/textures/Neptune_Normal.dds", "resource/textures/Neptune_Clouds_Normal.dds",
+        "resource/textures/Triton_Diffuse.dds", "resource/textures/Triton_Normal.dds",
+        "resource/textures/Pluto_Diffuse.dds", "resource/textures/Pluto_Normal.dds", "resource/textures/Pluto_Specular.dds",
+        "resource/textures/Charon_Diffuse.dds", "resource/textures/Charon_Normal.dds", "resource/textures/Charon_Specular.dds",
+        // Sounds
+        "resource/sounds/Stellardrone - Galaxies.mp3",
+        "resource/sounds/Stellardrone - Mars.mp3",
+        "resource/sounds/Stellardrone - Billions And Billions.mp3",
+        "resource/sounds/Stellardrone - Gravitation (Remix).mp3",
+        "resource/sounds/Stellardrone - The Edge of Forever.mp3"
+    };
+
+    _totalResources = resources.size();
+    _resourcesPending = _totalResources;
+
+    std::cout << "Loading " << _totalResources << " resources..." << std::endl;
+
+    for(const auto& res : resources) {
+        WebResourceFetcher::DownloadFile(res, res, [this](bool success) {
+            _resourcesPending--;
+            if (!success) {
+                std::cerr << "Failed to download resource!" << std::endl;
+            }
+        });
+    }
+}
+
+void Application::InitSceneObjects() {
     camera.SetAspect(static_cast<float>(_displayWidth) / static_cast<float>(_displayHeight));
     _shadowMapFBO = make_unique<ShadowMapFBO>(3000, 3000); 
     _hdr = make_unique<HDR>(Shader("resource/shaders/passThrough.vs", "resource/shaders/hdr.fs"), _displayWidth, _displayHeight);
