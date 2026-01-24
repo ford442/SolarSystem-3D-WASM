@@ -66,20 +66,22 @@ void Earth::LoadHighResIfClose(const glm::vec3& cameraPos) {
     if (distance < _lodThreshold) {
         std::cout << "[LOD] Camera distance to Earth: " << distance << " units. Loading high-res textures..." << std::endl;
         
-        // Reload diffuse texture (day texture at index 0)
-        _diffuses.at(0).ReloadTexture(_diffuseHighPath);
-        std::cout << "[LOD] Earth Day Diffuse texture upgraded to high-res" << std::endl;
-        
-        // Reload normal map
-        _normalMap.ReloadTexture(_normalHighPath);
-        std::cout << "[LOD] Earth Normal Map upgraded to high-res" << std::endl;
-        
-        // Reload specular map
-        _specular.ReloadTexture(_specularHighPath);
-        std::cout << "[LOD] Earth Specular Map upgraded to high-res" << std::endl;
-        
-        _isHighResLoaded = true;
-        std::cout << "[LOD] Earth high-res textures loaded successfully" << std::endl;
+        try {
+            // Reload diffuse texture (day texture at index 0 - guaranteed to exist from initialization)
+            _diffuses.at(0).ReloadTexture(_diffuseHighPath);
+            
+            // Reload normal map
+            _normalMap.ReloadTexture(_normalHighPath);
+            
+            // Reload specular map
+            _specular.ReloadTexture(_specularHighPath);
+            
+            _isHighResLoaded = true;
+            std::cout << "[LOD] Earth high-res textures loaded successfully (Day Diffuse, Normal, Specular)" << std::endl;
+        } catch (const std::exception& e) {
+            std::cerr << "[LOD] ERROR: Failed to load high-res textures: " << e.what() << std::endl;
+            // Keep using low-res textures on failure
+        }
     }
 #endif
 }
