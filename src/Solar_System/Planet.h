@@ -28,6 +28,7 @@ public:
     virtual void AdjustToParent(bool isRunTime) = 0;
     float GetRadius() const;
     float GetEarthSizeCoefficient() const;
+    virtual void LoadHighResIfClose(const glm::vec3& cameraPos) { } // Default: no-op
 
 protected:
     std::shared_ptr<Star> _parentStar;

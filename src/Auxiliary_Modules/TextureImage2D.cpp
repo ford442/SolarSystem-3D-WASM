@@ -46,3 +46,14 @@ GLuint TextureImage2D::GetWidth() const {
 GLuint TextureImage2D::GetHeight() const {
     return _height;
 }
+
+void TextureImage2D::ReloadTexture(const std::string& path, GLint wrapParam, GLint minFilter, GLint magFilter) {
+    // Delete the old texture if it exists
+    if (_textureID != 0) {
+        glDeleteTextures(1, &_textureID);
+        _textureID = 0;
+    }
+    
+    // Load the new texture
+    LoadTextureFromFile(path, wrapParam, minFilter, magFilter);
+}

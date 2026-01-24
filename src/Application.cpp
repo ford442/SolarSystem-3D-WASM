@@ -228,6 +228,9 @@ void Application::RenderPass(const RenderableSceneComponent& component) {
 
     ConfigureMainPlanetShader(component);
 
+    // Check if we need to load high-res textures (LOD system)
+    component.planet->LoadHighResIfClose(camera.GetPosition());
+
     component.planet->SetShader(*_mainPlanetShader);
     component.planet->AdjustToParent(isTimeRun);
     component.planet->Render();
@@ -847,12 +850,23 @@ void Application::InitVenus(const MeshHolder& sphereModel) {
 }
 
 void Application::InitEarthSystem(const MeshHolder& sphereModel) {
+#ifdef __EMSCRIPTEN__
+    // Web: Load low-res textures initially
+    PlanetInfo earthInfo(sphereModel, 1.0, *_mainPlanetShader,
+            {
+                TextureImage2D("resource/textures_low/Earth_Day_Diffuse_Low.dds"),
+                TextureImage2D("resource/textures/Earth_Clouds_Diffuse.dds"),
+                TextureImage2D("resource/textures/Earth_Night_Diffuse.dds"),
+            }, TextureImage2D("resource/textures_low/Earth_Normal_Low.dds"), L"Earth", L"Земля", TextureImage2D("resource/textures_low/Earth_Specular_Low.dds"));
+#else
+    // Desktop: Load high-res textures directly
     PlanetInfo earthInfo(sphereModel, 1.0, *_mainPlanetShader,
             {
                 TextureImage2D("resource/textures/Earth_Day_Diffuse.dds"),
                 TextureImage2D("resource/textures/Earth_Clouds_Diffuse.dds"),
                 TextureImage2D("resource/textures/Earth_Night_Diffuse.dds"),
             }, TextureImage2D("resource/textures/Earth_Normal.dds"), L"Earth", L"Земля", TextureImage2D("resource/textures/Earth_Specular.dds"));
+#endif
     shared_ptr<Planet> earth = make_shared<Earth>(earthInfo, _sun);
 
     SatelliteInfo moonInfo(sphereModel, 0.2724, *_mainPlanetShader, {TextureImage2D("resource/textures/Moon_Diffuse.dds")}, TextureImage2D("resource/textures/Moon_Normal.dds"),
