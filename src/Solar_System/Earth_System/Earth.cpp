@@ -1,9 +1,16 @@
 #include "Earth.h"
+#include <glm/glm.hpp>
+#include <iostream>
 
 Earth::Earth(const PlanetInfo& planetInfo, std::shared_ptr<Star> parentStar) : Planet(planetInfo, std::move(parentStar)), _diffuses(planetInfo.diffuseTextures),
     _normalMap(planetInfo.normalMap), _specular(planetInfo.specularTexture)
 {
     Translate(_parentStar->GetPosition() + glm::vec3(1900.0f, 0.0f, 0.0f)); // Init position for light space matrix
+#ifdef __EMSCRIPTEN__
+    _isHighResLoaded = false; // Start with low-res for web
+#else
+    _isHighResLoaded = true; // Desktop loads high-res directly
+#endif
 }
 
 void Earth::AdjustToParent(bool isRunTime) {
@@ -43,4 +50,36 @@ void Earth::Render() const {
     SpaceObject::Render();
 
     GetShader().SetBool("hasClouds", false);
+}
+
+void Earth::LoadHighResIfClose(const glm::vec3& cameraPos) {
+#ifdef __EMSCRIPTEN__
+    // Check if already high-res
+    if (_isHighResLoaded) {
+        return;
+    }
+    
+    // Calculate distance from camera to planet center
+    float distance = glm::length(cameraPos - GetPosition());
+    
+    // If camera is close enough, load high-res textures
+    if (distance < _lodThreshold) {
+        std::cout << "[LOD] Camera distance to Earth: " << distance << " units. Loading high-res textures..." << std::endl;
+        
+        // Reload diffuse texture (day texture at index 0)
+        _diffuses.at(0).ReloadTexture(_diffuseHighPath);
+        std::cout << "[LOD] Earth Day Diffuse texture upgraded to high-res" << std::endl;
+        
+        // Reload normal map
+        _normalMap.ReloadTexture(_normalHighPath);
+        std::cout << "[LOD] Earth Normal Map upgraded to high-res" << std::endl;
+        
+        // Reload specular map
+        _specular.ReloadTexture(_specularHighPath);
+        std::cout << "[LOD] Earth Specular Map upgraded to high-res" << std::endl;
+        
+        _isHighResLoaded = true;
+        std::cout << "[LOD] Earth high-res textures loaded successfully" << std::endl;
+    }
+#endif
 }
