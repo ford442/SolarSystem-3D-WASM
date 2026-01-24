@@ -81,11 +81,18 @@ if [ -f "SolarSystem.js" ]; then
     echo "Copied SolarSystem.js to web/src/"
 fi
 
+# [NEW STEP] Copy Resources to Public Folder so they can be fetched via URL
+echo "Copying resources to web/public..."
+mkdir -p "$PROJECT_ROOT/web/public/resource"
+# Recursive copy
+cp -r "$PROJECT_ROOT/resource/"* "$PROJECT_ROOT/web/public/resource/"
+
 # Copy Assets to public (served at root URL)
 if [ -f "SolarSystem.wasm" ]; then
     cp SolarSystem.wasm "$PROJECT_ROOT/web/public/"
     echo "Copied SolarSystem.wasm to web/public/"
 fi
+# Copy .data (Models, Shaders, Fonts)
 if [ -f "SolarSystem.data" ]; then
     cp SolarSystem.data "$PROJECT_ROOT/web/public/"
     echo "Copied SolarSystem.data to web/public/"
