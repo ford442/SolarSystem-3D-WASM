@@ -87,6 +87,10 @@ mkdir -p "$PROJECT_ROOT/web/public/resource"
 # Recursive copy
 cp -r "$PROJECT_ROOT/resource/"* "$PROJECT_ROOT/web/public/resource/"
 
+# Create textures_low directory if it doesn't exist
+mkdir -p "$PROJECT_ROOT/web/public/resource/textures_low"
+echo "Created textures_low directory for LOD system"
+
 # Copy Assets to public (served at root URL)
 if [ -f "SolarSystem.wasm" ]; then
     cp SolarSystem.wasm "$PROJECT_ROOT/web/public/"
