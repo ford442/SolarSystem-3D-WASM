@@ -1,9 +1,16 @@
 #include "Earth.h"
+#include <glm/glm.hpp>
+#include <iostream>
 
 Earth::Earth(const PlanetInfo& planetInfo, std::shared_ptr<Star> parentStar) : Planet(planetInfo, std::move(parentStar)), _diffuses(planetInfo.diffuseTextures),
     _normalMap(planetInfo.normalMap), _specular(planetInfo.specularTexture)
 {
     Translate(_parentStar->GetPosition() + glm::vec3(1900.0f, 0.0f, 0.0f)); // Init position for light space matrix
+#ifdef __EMSCRIPTEN__
+    _isHighResLoaded = false; // Start with low-res for web
+#else
+    _isHighResLoaded = true; // Desktop loads high-res directly
+#endif
 }
 
 void Earth::AdjustToParent(bool isRunTime) {
@@ -43,4 +50,38 @@ void Earth::Render() const {
     SpaceObject::Render();
 
     GetShader().SetBool("hasClouds", false);
+}
+
+void Earth::LoadHighResIfClose(const glm::vec3& cameraPos) {
+#ifdef __EMSCRIPTEN__
+    // Check if already high-res
+    if (_isHighResLoaded) {
+        return;
+    }
+    
+    // Calculate distance from camera to planet center
+    float distance = glm::length(cameraPos - GetPosition());
+    
+    // If camera is close enough, load high-res textures
+    if (distance < _lodThreshold) {
+        std::cout << "[LOD] Camera distance to Earth: " << distance << " units. Loading high-res textures..." << std::endl;
+        
+        try {
+            // Reload diffuse texture (day texture at index 0 - guaranteed to exist from initialization)
+            _diffuses.at(0).ReloadTexture(_diffuseHighPath);
+            
+            // Reload normal map
+            _normalMap.ReloadTexture(_normalHighPath);
+            
+            // Reload specular map
+            _specular.ReloadTexture(_specularHighPath);
+            
+            _isHighResLoaded = true;
+            std::cout << "[LOD] Earth high-res textures loaded successfully (Day Diffuse, Normal, Specular)" << std::endl;
+        } catch (const std::exception& e) {
+            std::cerr << "[LOD] ERROR: Failed to load high-res textures: " << e.what() << std::endl;
+            // Keep using low-res textures on failure
+        }
+    }
+#endif
 }

@@ -17,6 +17,7 @@ public:
     GLuint GetTexture() const;
     GLuint GetWidth() const;
     GLuint GetHeight() const;
+    void ReloadTexture(const std::string& path, GLint wrapParam = GL_REPEAT, GLint minFilter = GL_LINEAR_MIPMAP_LINEAR, GLint magFilter = GL_LINEAR_MIPMAP_LINEAR);
 
 private:
     GLuint _textureID = 0;
