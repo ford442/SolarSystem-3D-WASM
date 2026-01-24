@@ -14,6 +14,8 @@ private:
     TextureImage2D _normalMap, _specular;
     
     // LOD texture paths
+    // Note: Low-res paths are used during initialization in Application::InitEarthSystem()
+    // High-res paths are used at runtime when camera zooms close (< 50 units)
     std::string _diffuseLowPath = "resource/textures_low/Earth_Day_Diffuse_Low.dds";
     std::string _diffuseHighPath = "resource/textures/Earth_Day_Diffuse.dds";
     std::string _normalLowPath = "resource/textures_low/Earth_Normal_Low.dds";

@@ -54,6 +54,6 @@ void TextureImage2D::ReloadTexture(const std::string& path, GLint wrapParam, GLi
         _textureID = 0;
     }
     
-    // Load the new texture
+    // Load the new texture (LoadTextureFromFile throws on failure)
     LoadTextureFromFile(path, wrapParam, minFilter, magFilter);
 }
