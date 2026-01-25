@@ -167,9 +167,9 @@ void main() {
     float n = (noise(position, 4, 40.0, 0.7) + 1.0) * 0.5;
     float totalNoise = n - ss;
 
-    vec3 colorByTemperature = texture(colorMap, vec2(uColorMap, 0)).rgb;
+    vec3 colorByTemperature = texture(colorMap, vec2(uColorMap, 0.0)).rgb;
 
     float theta = 1.0 - dot(centerDir, fPosition) * 0.7;
 
-    fragColor = vec4(colorByTemperature * (shiftStarColor * colorMult + totalNoise - 0.5 - theta), isVisible);
+    fragColor = vec4(colorByTemperature * (shiftStarColor * colorMult + totalNoise - 0.5 - theta), float(isVisible));
 }
