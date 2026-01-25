@@ -206,7 +206,7 @@ void main() {
     const float frequency = 1.8;              // The frequency of the irregularities.
     const float fDetail = 0.7;                // The higher the number, the more detail the corona will have. (Might be more GPU intensive when higher, 0.7 seems fine for the normal PC)
     const int iDetail = 10;                   // The higher the number, the more detail the corona will have.
-    const float irregularityMultiplier = 4;   // The higher the number, the more irregularities and bigger ones. (Might be more GPU intensive when higher, 4 seems fine for the normal PC)
+    const float irregularityMultiplier = 4.0;   // The higher the number, the more irregularities and bigger ones. (Might be more GPU intensive when higher, 4 seems fine for the normal PC)
 
     /* Don't edit these */
     float t = deltaTime * 10.0 - length(fPosition);
@@ -232,7 +232,7 @@ void main() {
     // Calculate color
     vec3 color = starShiftColor * brightness;
 
-    fragColor = vec4(color, clamp(brightness, 0.0, 1.0) * (cos(clamp(brightness, 0.0, 0.5)) / (cos(clamp(brightness2 / ringIntesityMultiplier, 0.0, 1.5)) * 2)));
+    fragColor = vec4(color, clamp(brightness, 0.0, 1.0) * (cos(clamp(brightness, 0.0, 0.5)) / (cos(clamp(brightness2 / ringIntesityMultiplier, 0.0, 1.5)) * 2.0)));
     fragColor.rgb *= fragColor.rgb; // Reverse the gamma [Обратная гамма]
     fragColor.rgb *= fragColor.rgb; // Reverse the gamma [Обратная гамма]
 }

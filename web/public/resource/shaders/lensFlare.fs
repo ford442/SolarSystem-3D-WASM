@@ -26,7 +26,7 @@ bool intersectPlane(vec3 n, vec3 p0, vec3 l0, vec3 l, out float t) {
     if (denom > 1e-6) {
         vec3 p0l0 = p0 - l0;
         t = dot(p0l0, n) / denom;
-        return (t >= 0);
+        return (t >= 0.0);
     }
 
     return false;
@@ -34,7 +34,7 @@ bool intersectPlane(vec3 n, vec3 p0, vec3 l0, vec3 l, out float t) {
 
 // https://www.scratchapixel.com/lessons/3d-basic-rendering/minimal-ray-tracer-rendering-simple-shapes/ray-plane-and-ray-disk-intersection
 bool intersectDisk(vec3 n, vec3 p0, float radius, vec3 l0, vec3 l, out float intersectSquared) {
-    float t = 0;
+    float t = 0.0;
     if (intersectPlane(n, p0, l0, l, t)) {
         vec3 p = l0 + l * t;
         vec3 v = p - p0;
@@ -60,8 +60,8 @@ void main() {
         if (intersectDisk(correctRingNormal, ringCenter, ringInnerOuterRadiuses.y, cameraPosition, normalize(fCenter - cameraPosition), intersectSquared)) {
             if (intersectSquared > ringInnerOuterRadiuses.x) {
                 float u = (intersectSquared - ringInnerOuterRadiuses.x) / (ringInnerOuterRadiuses.y - ringInnerOuterRadiuses.x);
-                vec4 ringColor = texture(ringDiffuse, vec2(u, 0));
-                intensity *= 1 - ringColor.a * 0.65;
+                vec4 ringColor = texture(ringDiffuse, vec2(u, 0.0));
+                intensity *= 1.0 - ringColor.a * 0.65;
             }
         }
     }

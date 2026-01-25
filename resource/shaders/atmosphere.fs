@@ -159,10 +159,10 @@ void swap(out float left, out float right) {
 bool solveQuadratic(float a, float b, float c, out float x0, out float x1) {
     float discr = b * b - 4.0 * a * c;
 
-    if (discr < 0)
+    if (discr < 0.0)
     return false;
 
-    else if (discr == 0) {
+    else if (discr == 0.0) {
         x0 = x1 = - 0.5 * b / a;
     }
     else {
@@ -184,7 +184,7 @@ bool intersectSphere(vec3 dir) {
     // Analytic solution
     vec3 L = fWorldPosition - ringParentPlanetCenter;
     float a = dot(dir, dir);
-    float b = 2 * dot(dir, L);
+    float b = 2.0 * dot(dir, L);
     float c = dot(L, L) - ringParentPlanetRadiusSquared;
 
     if (!solveQuadratic(a, b, c, t0, t1))
@@ -193,9 +193,9 @@ bool intersectSphere(vec3 dir) {
     if (t0 > t1)
         swap(t0, t1);
 
-    if (t0 < 0) {
+    if (t0 < 0.0) {
         t0 = t1; // If t0 is negative, let's use t1 instead
-        if (t0 < 0) { // Both t0 and t1 are negative
+        if (t0 < 0.0) { // Both t0 and t1 are negative
             return false;
         }
     }
@@ -209,7 +209,7 @@ bool intersectPlane(vec3 n, vec3 p0, vec3 l0, vec3 l, out float t) {
     if (denom > 1e-6) {
         vec3 p0l0 = p0 - l0;
         t = dot(p0l0, n) / denom;
-        return (t >= 0);
+        return (t >= 0.0);
     }
 
     return false;
@@ -217,7 +217,7 @@ bool intersectPlane(vec3 n, vec3 p0, vec3 l0, vec3 l, out float t) {
 
 // https://www.scratchapixel.com/lessons/3d-basic-rendering/minimal-ray-tracer-rendering-simple-shapes/ray-plane-and-ray-disk-intersection
 bool intersectDisk(vec3 n, vec3 p0, float radius, vec3 l0, vec3 l, out float intersectSquared) {
-    float t = 0;
+    float t = 0.0;
     if (intersectPlane(n, p0, l0, l, t)) {
         vec3 p = l0 + l * t;
         vec3 v = p - p0;
@@ -265,7 +265,7 @@ float CalculateShadow(vec4 fragPosLightSpace) {
                 }
 
                 float u = (intersectSquared - ringInnerOuterRadiuses.x) / (ringInnerOuterRadiuses.y - ringInnerOuterRadiuses.x);
-                vec4 ringColor = texture(ringDiffuse, vec2(u, 0));
+                vec4 ringColor = texture(ringDiffuse, vec2(u, 0.0));
                 return (ringColor.r + ringColor.g + ringColor.b) * ringColor.a;
             }
         }

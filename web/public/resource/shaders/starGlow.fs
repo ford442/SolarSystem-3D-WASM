@@ -189,7 +189,7 @@ void main() {
 
     vec2 ap = abs(vec2(fPosition.x, fPosition.y));
 
-    float hRay = (1.0 - (1.0 / (1.0 + exp(-((ap.y * 35.0 + 0.2) * 4 * 3.1415926) + 2 * 3.1415926))) - max(ap.x - 0.1, 0.0));
+    float hRay = (1.0 - (1.0 / (1.0 + exp(-((ap.y * 35.0 + 0.2) * 4.0 * 3.1415926) + 2.0 * 3.1415926))) - max(ap.x - 0.1, 0.0));
     hRay = max(hRay * 0.2, 0.0) * 0.35;
 
     fragColor = vec4(color * (brightness + centerGlow + spikeBrightness + hRay + ovCol), 1.0);
