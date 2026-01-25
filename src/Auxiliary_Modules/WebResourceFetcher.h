@@ -5,6 +5,7 @@
 #include <fstream>
 #include <filesystem>
 #include <vector>
+#include <functional>
 
 #ifdef __EMSCRIPTEN__
 #include <emscripten.h>
@@ -12,6 +13,8 @@
 
 class WebResourceFetcher {
 public:
+    static void DownloadFile(const std::string& url, const std::string& virtualPath, std::function<void(bool)> callback);
+
     static void Fetch(const std::string& path) {
 #ifdef __EMSCRIPTEN__
         // 1. Check if file already exists in MEMFS (e.g. preloaded)
