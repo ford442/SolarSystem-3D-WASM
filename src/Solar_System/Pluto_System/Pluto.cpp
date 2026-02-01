@@ -4,6 +4,11 @@ Pluto::Pluto(const PlanetInfo& planetInfo, std::shared_ptr<Star> parentStar) : P
     _normalMap(planetInfo.normalMap), _specular(planetInfo.specularTexture)
 {
     Translate(_parentStar->GetPosition() + glm::vec3(2800.0f, 0.0f, 1757.73f)); // Init position for light space matrix
+#ifdef __EMSCRIPTEN__
+    _isHighResLoaded = false;
+#else
+    _isHighResLoaded = true;
+#endif
 }
 
 void Pluto::AdjustToParent(bool isRunTime) {
@@ -35,4 +40,29 @@ void Pluto::Render() const {
     glBindTextureUnit(2, _specular.GetTexture());
 
     SpaceObject::Render();
+}
+
+void Pluto::LoadHighResIfClose(const glm::vec3& cameraPos) {
+#ifdef __EMSCRIPTEN__
+    if (_isHighResLoaded) {
+        return;
+    }
+
+    float distance = glm::length(cameraPos - GetPosition());
+
+    if (distance < _lodThreshold) {
+        std::cout << "[LOD] Camera distance to Pluto: " << distance << " units. Loading high-res textures..." << std::endl;
+
+        try {
+            _diffuses.at(0).ReloadTexture(_diffuseHighPath);
+            _normalMap.ReloadTexture(_normalHighPath);
+            _specular.ReloadTexture(_specularHighPath);
+
+            _isHighResLoaded = true;
+            std::cout << "[LOD] Pluto high-res textures loaded successfully" << std::endl;
+        } catch (const std::exception& e) {
+            std::cerr << "[LOD] ERROR: Failed to load high-res textures for Pluto: " << e.what() << std::endl;
+        }
+    }
+#endif
 }

@@ -4,6 +4,11 @@ Mercury::Mercury(const PlanetInfo& planetInfo, std::shared_ptr<Star> parentStar)
     _normalMap(planetInfo.normalMap), _specular(planetInfo.specularTexture)
 {
     Translate(_parentStar->GetPosition() + glm::vec3(1500.f, 0.0f, 350.0f)); // Init position for light space matrix
+#ifdef __EMSCRIPTEN__
+    _isHighResLoaded = false;
+#else
+    _isHighResLoaded = true;
+#endif
 }
 
 void Mercury::AdjustToParent(bool isRunTime) {
@@ -37,3 +42,27 @@ void Mercury::Render() const {
     SpaceObject::Render();
 }
 
+void Mercury::LoadHighResIfClose(const glm::vec3& cameraPos) {
+#ifdef __EMSCRIPTEN__
+    if (_isHighResLoaded) {
+        return;
+    }
+
+    float distance = glm::length(cameraPos - GetPosition());
+
+    if (distance < _lodThreshold) {
+        std::cout << "[LOD] Camera distance to Mercury: " << distance << " units. Loading high-res textures..." << std::endl;
+
+        try {
+            _diffuses.at(0).ReloadTexture(_diffuseHighPath);
+            _normalMap.ReloadTexture(_normalHighPath);
+            _specular.ReloadTexture(_specularHighPath);
+
+            _isHighResLoaded = true;
+            std::cout << "[LOD] Mercury high-res textures loaded successfully" << std::endl;
+        } catch (const std::exception& e) {
+            std::cerr << "[LOD] ERROR: Failed to load high-res textures for Mercury: " << e.what() << std::endl;
+        }
+    }
+#endif
+}
