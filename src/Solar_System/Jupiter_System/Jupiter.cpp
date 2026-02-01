@@ -4,6 +4,11 @@ Jupiter::Jupiter(const PlanetInfo& planetInfo, std::shared_ptr<Star> parentStar)
     _normalMap(planetInfo.normalMap)
 {
     Translate(_parentStar->GetPosition() + glm::vec3(1350.f, 0.0f, 1737.0f)); // Init position for light space matrix
+#ifdef __EMSCRIPTEN__
+    _isHighResLoaded = false;
+#else
+    _isHighResLoaded = true;
+#endif
 }
 
 void Jupiter::AdjustToParent(bool isRunTime) {
@@ -34,4 +39,28 @@ void Jupiter::Render() const {
     glBindTextureUnit(1, _normalMap.GetTexture());
 
     SpaceObject::Render();
+}
+
+void Jupiter::LoadHighResIfClose(const glm::vec3& cameraPos) {
+#ifdef __EMSCRIPTEN__
+    if (_isHighResLoaded) {
+        return;
+    }
+
+    float distance = glm::length(cameraPos - GetPosition());
+
+    if (distance < _lodThreshold) {
+        std::cout << "[LOD] Camera distance to Jupiter: " << distance << " units. Loading high-res textures..." << std::endl;
+
+        try {
+            _diffuses.at(0).ReloadTexture(_diffuseHighPath);
+            _normalMap.ReloadTexture(_normalHighPath);
+
+            _isHighResLoaded = true;
+            std::cout << "[LOD] Jupiter high-res textures loaded successfully" << std::endl;
+        } catch (const std::exception& e) {
+            std::cerr << "[LOD] ERROR: Failed to load high-res textures for Jupiter: " << e.what() << std::endl;
+        }
+    }
+#endif
 }
