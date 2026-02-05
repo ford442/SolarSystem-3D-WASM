@@ -39,8 +39,10 @@ void OnError2(unsigned int handle, void* arg, int status) {
 }
 
 // Matching the signature from the error message: void (*)(unsigned int, void *, int)
-void OnProgress2(unsigned int handle, void* arg, int progress) {
-    // Optional progress tracking
+void OnProgress2(unsigned int handle, void* arg, int bytesLoaded) {
+    // Progress tracking - bytesLoaded is the number of bytes loaded so far
+    // Note: We could expose this for more granular progress tracking
+    // For now, we rely on the completion callbacks for progress
 }
 
 void WebResourceFetcher::DownloadFile(const std::string& url, const std::string& virtualPath, std::function<void(bool)> callback) {

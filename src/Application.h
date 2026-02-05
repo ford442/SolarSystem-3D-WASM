@@ -97,6 +97,7 @@ private:
     void InitPlutoSystem(const MeshHolder& sphereModel);
     void InitSongList();
     void Dispose();
+    void UpdateLoadingProgress(); // Update JavaScript loading progress bar
     void StartSearchNearestPlanet();
     void UpdateSearchNearestPlanet(); // For Emscripten frame-based search
     void StartPlayBackgroundMusic();

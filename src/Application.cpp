@@ -161,6 +161,9 @@ void Application::RunOneFrame() {
         glBindFramebuffer(GL_FRAMEBUFFER, 0);
         glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
         glClear(GL_COLOR_BUFFER_BIT);
+        
+        // Update progress bar
+        UpdateLoadingProgress();
 
         if (_resourcesPending <= 0) {
              std::cout << "All resources downloaded. Initializing scene..." << std::endl;
@@ -675,6 +678,18 @@ void Application::InitScene() {
 #endif
 }
 
+void Application::UpdateLoadingProgress() {
+#ifdef __EMSCRIPTEN__
+    int loaded = _totalResources - _resourcesPending;
+    // Call JavaScript function to update progress bar
+    EM_ASM({
+        if (typeof window.updateLoadingProgress === 'function') {
+            window.updateLoadingProgress($0, $1);
+        }
+    }, loaded, _totalResources);
+#endif
+}
+
 void Application::LoadResources() {
     const std::vector<std::string> resources = {
         // SkyBox
@@ -763,6 +778,9 @@ void Application::LoadResources() {
     _resourcesPending = _totalResources;
 
     std::cout << "Loading " << _totalResources << " resources..." << std::endl;
+    
+    // Initialize progress bar
+    UpdateLoadingProgress();
 
     for(const auto& res : resources) {
         WebResourceFetcher::DownloadFile(res, res, [this](bool success) {
@@ -770,6 +788,8 @@ void Application::LoadResources() {
             if (!success) {
                 std::cerr << "Failed to download resource!" << std::endl;
             }
+            // Update progress after each resource
+            UpdateLoadingProgress();
         });
     }
 }
