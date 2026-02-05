@@ -8,9 +8,67 @@
     <style>
       body { margin: 0; overflow: hidden; background-color: black; }
       canvas.emscripten { border: 0px none; background-color: black; width: 100vw; height: 100vh; display: block; }
+      
+      #loading-container {
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100vw;
+        height: 100vh;
+        background-color: rgba(0, 0, 0, 0.95);
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+        align-items: center;
+        z-index: 1000;
+        font-family: Arial, sans-serif;
+      }
+      
+      #loading-text {
+        color: #ffffff;
+        font-size: 24px;
+        margin-bottom: 30px;
+        text-shadow: 0 0 10px rgba(255, 255, 255, 0.5);
+      }
+      
+      #progress-bar-container {
+        width: 400px;
+        height: 30px;
+        background-color: #333;
+        border-radius: 15px;
+        overflow: hidden;
+        box-shadow: 0 0 20px rgba(0, 0, 0, 0.5);
+        border: 2px solid #555;
+      }
+      
+      #progress-bar {
+        height: 100%;
+        background: linear-gradient(90deg, #4CAF50, #45a049);
+        width: 0%;
+        transition: width 0.3s ease;
+        box-shadow: 0 0 10px rgba(76, 175, 80, 0.5);
+      }
+      
+      #progress-text {
+        color: #ffffff;
+        font-size: 18px;
+        margin-top: 15px;
+        font-weight: bold;
+      }
+      
+      #loading-container.hidden {
+        display: none;
+      }
     </style>
   </head>
   <body>
+    <div id="loading-container">
+      <div id="loading-text">Loading SolarSystem...</div>
+      <div id="progress-bar-container">
+        <div id="progress-bar"></div>
+      </div>
+      <div id="progress-text">0%</div>
+    </div>
     <canvas class="emscripten" id="canvas" oncontextmenu="event.preventDefault()" tabindex="-1"></canvas>
     <script type="module" src="/src/main.ts"></script>
   </body>
