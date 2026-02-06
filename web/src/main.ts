@@ -7,13 +7,9 @@ const progressBar = document.getElementById('progress-bar') as HTMLElement;
 const progressText = document.getElementById('progress-text') as HTMLElement;
 
 // Global progress tracking
-let totalResources = 0;
-let loadedResources = 0;
 
 // Function to update progress bar
 function updateProgress(loaded: number, total: number) {
-    loadedResources = loaded;
-    totalResources = total;
     
     const percentage = total > 0 ? Math.round((loaded / total) * 100) : 0;
     
