@@ -200,3 +200,4 @@ void main() {
     if (ringTint != vec3(0.0))
         fragColor.rgb *= ringTint;
 }
+

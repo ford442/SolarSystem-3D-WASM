@@ -59,6 +59,7 @@ void WebResourceFetcher::DownloadFile(const std::string& url, const std::string&
 #else
 
 void WebResourceFetcher::DownloadFile(const std::string& url, const std::string& virtualPath, std::function<void(bool)> callback) {
+    std::cout << "Downloading: " << url << " (size estimate: " << GetFileSize(url) << " bytes)" << std::endl;  // Add logging for debugging
     if (callback) callback(true);
 }
 

@@ -25,3 +25,4 @@ _codeql_detected_source_root
 # Assets managed via FTP (too large for LFS)
 resource/textures/
 resource/sounds/
+.aider*

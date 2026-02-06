@@ -317,3 +317,4 @@ void main() {
     if (isUseToneMapping)
         fragColor.rgb = acesFilm(fragColor.rgb);
 }
+

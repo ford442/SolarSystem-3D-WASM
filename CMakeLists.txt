@@ -30,7 +30,6 @@ if(EMSCRIPTEN)
     # [OPTIMIZATION] Preload only essential small files. Exclude Textures to allow lazy loading.
     set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} --preload-file ${CMAKE_SOURCE_DIR}/resource/shaders@/resource/shaders")
     set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} --preload-file ${CMAKE_SOURCE_DIR}/resource/fonts@/resource/fonts")
-    set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} --preload-file ${CMAKE_SOURCE_DIR}/resource/models@/resource/models")
     set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} --preload-file ${CMAKE_SOURCE_DIR}/resource/icons@/resource/icons")
     # [NOTE] Sounds are excluded from the repo (LFS), so do not preload them to avoid build errors in CI/Sandbox.
     # set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} --preload-file ${CMAKE_SOURCE_DIR}/resource/sounds@/resource/sounds")
