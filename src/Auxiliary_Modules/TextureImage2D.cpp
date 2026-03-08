@@ -31,7 +31,9 @@ void TextureImage2D::LoadTextureFromFile(const std::string& path, GLint wrapPara
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, wrapParam);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, minFilter);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, magFilter);
+#ifndef __EMSCRIPTEN__
     glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_MAX_ANISOTROPY_EXT, 16);
+#endif
     std::cout << path << " Loaded" << std::endl;
 }
 

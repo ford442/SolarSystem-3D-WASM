@@ -12,12 +12,12 @@ using namespace nv_dds;
 class TextureImage2D {
 public:
     TextureImage2D() = default;
-    explicit TextureImage2D(const std::string& path, GLint wrapParam = GL_REPEAT, GLint minFilter = GL_LINEAR_MIPMAP_LINEAR, GLint magFilter = GL_LINEAR_MIPMAP_LINEAR);
+    explicit TextureImage2D(const std::string& path, GLint wrapParam = GL_REPEAT, GLint minFilter = GL_LINEAR_MIPMAP_LINEAR, GLint magFilter = GL_LINEAR);
     ~TextureImage2D() = default;
     GLuint GetTexture() const;
     GLuint GetWidth() const;
     GLuint GetHeight() const;
-    void ReloadTexture(const std::string& path, GLint wrapParam = GL_REPEAT, GLint minFilter = GL_LINEAR_MIPMAP_LINEAR, GLint magFilter = GL_LINEAR_MIPMAP_LINEAR);
+    void ReloadTexture(const std::string& path, GLint wrapParam = GL_REPEAT, GLint minFilter = GL_LINEAR_MIPMAP_LINEAR, GLint magFilter = GL_LINEAR);
 
 private:
     GLuint _textureID = 0;
