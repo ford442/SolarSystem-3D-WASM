@@ -50,7 +50,7 @@ void ApplyPCF(out float shadow, vec3 projCoords, float currentDepth) {
     const float NUM_SAMPLES_SQUARED = NUM_SAMPLES * NUM_SAMPLES;
 
     shadow = 0.0;
-    vec2 texelSize = 1.0 / textureSize(shadowMap, 0);
+    vec2 texelSize = 1.0 / vec2(textureSize(shadowMap, 0));
 
     for(float y = -SAMPLES_START; y <= SAMPLES_START; y += 1.0) {
         for(float x = -SAMPLES_START; x <= SAMPLES_START; x += 1.0) {

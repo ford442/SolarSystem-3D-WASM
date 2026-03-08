@@ -2,14 +2,12 @@
 precision highp float;
 precision highp int;
 
-in VS_OUT {
-    vec3 FragPos;
-    vec2 TexCoords;
-    vec3 TangentLightPos;
-    vec3 TangentViewPos;
-    vec3 TangentFragPos;
-    vec4 FragPosLightSpace;
-} fs_in;
+in vec3 vFragPos;
+in vec2 vTexCoords;
+in vec3 vTangentLightPos;
+in vec3 vTangentViewPos;
+in vec3 vTangentFragPos;
+in vec4 vFragPosLightSpace;
 
 uniform sampler2D mainDiffuseTexture;
 uniform sampler2D cloudsNormalMap;
@@ -52,7 +50,7 @@ void ApplyPCF(out float shadow, vec3 projCoords, float currentDepth) {
     const float NUM_SAMPLES_SQUARED = NUM_SAMPLES * NUM_SAMPLES;
 
     shadow = 0.0;
-    vec2 texelSize = 1.0 / textureSize(shadowMap, 0);
+    vec2 texelSize = 1.0 / vec2(textureSize(shadowMap, 0));
 
     for(float y = -SAMPLES_START; y <= SAMPLES_START; y += 1.0) {
         for(float x = -SAMPLES_START; x <= SAMPLES_START; x += 1.0) {
@@ -82,12 +80,12 @@ float CalculateShadow(vec4 fragPosLightSpace) {
 }
 
 void main() {
-    vec3 diffuseColor = texture(mainDiffuseTexture, fs_in.TexCoords).rgb;
+    vec3 diffuseColor = texture(mainDiffuseTexture, vTexCoords).rgb;
 
-    vec3 normal = texture(cloudsNormalMap, fs_in.TexCoords).rgb;
+    vec3 normal = texture(cloudsNormalMap, vTexCoords).rgb;
     normal = normalize(normal * 2.0 - 1.0);
 
-    vec3 lightDir = normalize(fs_in.TangentLightPos - fs_in.TangentFragPos);
+    vec3 lightDir = normalize(vTangentLightPos - vTangentFragPos);
 
     float NdotL = dot(normal, lightDir);
     vec3 color = diffuseColor;
@@ -101,7 +99,7 @@ void main() {
     float diff = max(dot(lightDir, normal), 0.0);
     diffuse = diff * color;
 
-    float shadow = CalculateShadow(fs_in.FragPosLightSpace);
+    float shadow = CalculateShadow(vFragPosLightSpace);
 
     if (shadow < 0.05)
         ambient *= 0.1;
