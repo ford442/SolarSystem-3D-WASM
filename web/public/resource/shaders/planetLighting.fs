@@ -2,14 +2,12 @@
 precision highp float;
 precision highp int;
 
-in VS_OUT {
-    vec3 FragPos;
-    vec2 TexCoords;
-    vec3 TangentLightPos;
-    vec3 TangentViewPos;
-    vec3 TangentFragPos;
-    vec4 FragPosLightSpace;
-} fs_in;
+in vec3 vFragPos;
+in vec2 vTexCoords;
+in vec3 vTangentLightPos;
+in vec3 vTangentViewPos;
+in vec3 vTangentFragPos;
+in vec4 vFragPosLightSpace;
 
 uniform sampler2D mainDiffuseTexture;
 uniform sampler2D cloudTexture;
@@ -60,7 +58,7 @@ bool solveQuadratic(float a, float b, float c, out float x0, out float x1) {
         x0 = x1 = - 0.5 * b / a;
     }
     else {
-        float q = (b > 0) ? -0.5 * (b + sqrt(discr)) : -0.5 * (b - sqrt(discr));
+        float q = (b > 0.0) ? -0.5 * (b + sqrt(discr)) : -0.5 * (b - sqrt(discr));
         x0 = q / a;
         x1 = c / q;
     }
@@ -76,7 +74,7 @@ bool intersectSphere(vec3 dir) {
     float t0, t1;
 
     // Analytic solution
-    vec3 L = fs_in.FragPos - parentPlanetCenter;
+    vec3 L = vFragPos - parentPlanetCenter;
     float a = dot(dir, dir);
     float b = 2.0 * dot(dir, L);
     float c = dot(L, L) - parentPlanetRadiusSquared;
@@ -150,7 +148,7 @@ void ApplyPCF(out float shadow, vec3 projCoords, float currentDepth) {
     const float NUM_SAMPLES_SQUARED = NUM_SAMPLES * NUM_SAMPLES;
 
     shadow = 0.0;
-    vec2 texelSize = 1.0 / textureSize(shadowMap, 0);
+    vec2 texelSize = 1.0 / vec2(textureSize(shadowMap, 0));
 
     for(float y = -SAMPLES_START; y <= SAMPLES_START; y += 1.0) {
         for(float x = -SAMPLES_START; x <= SAMPLES_START; x += 1.0) {
@@ -173,13 +171,13 @@ float CalculateShadow(vec4 fragPosLightSpace) {
 
     // Get depth of current fragment from light's perspective
     float currentDepth = projCoords.z;
-    vec3 lightDir = lightPos - fs_in.FragPos;
+    vec3 lightDir = lightPos - vFragPos;
     vec3 lightDirNorm = normalize(lightDir);
 
     float shadow = currentDepth - bias > closestDepth ? 1.0 : 0.0;
 
     if (isNearbyPlanetaryRing) {
-        if (isUseSphereIntersect && intersectSphere(normalize(lightPos - fs_in.FragPos))) // Behind the parent planet with rings (to avoid shadow from the ring)
+        if (isUseSphereIntersect && intersectSphere(normalize(lightPos - vFragPos))) // Behind the parent planet with rings (to avoid shadow from the ring)
             return 0.0;
 
         float intersectSquared;
@@ -189,7 +187,7 @@ float CalculateShadow(vec4 fragPosLightSpace) {
         if (NdotL < 0.0)
             correctRingNormal = -ringNormal;
 
-        if (intersectDisk(correctRingNormal, ringCenter, ringInnerOuterRadiuses.y, fs_in.FragPos, lightDirNorm, intersectSquared)) {
+        if (intersectDisk(correctRingNormal, ringCenter, ringInnerOuterRadiuses.y, vFragPos, lightDirNorm, intersectSquared)) {
             if (intersectSquared > ringInnerOuterRadiuses.x) {
                 // If some planet obscures the ring
                 if (shadow > 0.0 && length(lightPos - ringCenter) - closestDepth * farPlane > ringInnerOuterRadiuses.y) {
@@ -213,23 +211,23 @@ float CalculateShadow(vec4 fragPosLightSpace) {
 void main() {
     vec3 diffuseColor, specular;
 
-    diffuseColor = texture(mainDiffuseTexture, fs_in.TexCoords).rgb;
+    diffuseColor = texture(mainDiffuseTexture, vTexCoords).rgb;
 
-    vec3 normal = texture(normalMap, fs_in.TexCoords).rgb;
+    vec3 normal = texture(normalMap, vTexCoords).rgb;
     normal = normalize(normal * 2.0 - 1.0);
 
-    vec3 lightDir = normalize(fs_in.TangentLightPos - fs_in.TangentFragPos);
+    vec3 lightDir = normalize(vTangentLightPos - vTangentFragPos);
 
     float NdotL = dot(normal, lightDir);
 
     if (hasClouds) {
-        vec2 cloudTexCoord = fs_in.TexCoords - vec2(yRotation / 360.0, 0.0);
+        vec2 cloudTexCoord = vTexCoords - vec2(yRotation / 360.0, 0.0);
         vec3 cloudColor = texture(cloudTexture, cloudTexCoord).rgb;
         diffuseColor -= cloudColor * 0.5;
     }
 
     if (hasNightTexture) {
-        vec3 nightColor = texture(nightTexture, fs_in.TexCoords).rgb;
+        vec3 nightColor = texture(nightTexture, vTexCoords).rgb;
         float dayNightAlpha = smoothstep(-0.15, 0.15, NdotL);
         diffuseColor = mix(nightColor, diffuseColor, dayNightAlpha);
     }
@@ -241,7 +239,7 @@ void main() {
 
     float spec;
     if (hasSpecular) {
-        vec3 viewDir = normalize(fs_in.TangentViewPos - fs_in.TangentFragPos);
+        vec3 viewDir = normalize(vTangentViewPos - vTangentFragPos);
         vec3 reflectDir = reflect(-lightDir, normal);
         vec3 halfwayDir = normalize(lightDir + viewDir);
         spec = pow(max(dot(normal, halfwayDir), 0.0), 32.0);
@@ -250,14 +248,14 @@ void main() {
     }
 
     if (hasSpecularMap) {
-        vec4 specularMapColor = texture(specularMap, fs_in.TexCoords);
+        vec4 specularMapColor = texture(specularMap, vTexCoords);
         specular = specularMapColor.rrr * specularMapColor.a * spec * starGlowTint;
     }
     else {
         specular = spec * starGlowTint;
     }
 
-    float shadow = CalculateShadow(fs_in.FragPosLightSpace);
+    float shadow = CalculateShadow(vFragPosLightSpace);
 
     if (shadow < 0.05)
         ambient *= 0.1;

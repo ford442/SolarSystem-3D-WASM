@@ -58,7 +58,7 @@ bool solveQuadratic(float a, float b, float c, out float x0, out float x1) {
         x0 = x1 = - 0.5 * b / a;
     }
     else {
-        float q = (b > 0) ? -0.5 * (b + sqrt(discr)) : -0.5 * (b - sqrt(discr));
+        float q = (b > 0.0) ? -0.5 * (b + sqrt(discr)) : -0.5 * (b - sqrt(discr));
         x0 = q / a;
         x1 = c / q;
     }
@@ -148,7 +148,7 @@ void ApplyPCF(out float shadow, vec3 projCoords, float currentDepth) {
     const float NUM_SAMPLES_SQUARED = NUM_SAMPLES * NUM_SAMPLES;
 
     shadow = 0.0;
-    vec2 texelSize = 1.0 / textureSize(shadowMap, 0);
+    vec2 texelSize = 1.0 / vec2(textureSize(shadowMap, 0));
 
     for(float y = -SAMPLES_START; y <= SAMPLES_START; y += 1.0) {
         for(float x = -SAMPLES_START; x <= SAMPLES_START; x += 1.0) {

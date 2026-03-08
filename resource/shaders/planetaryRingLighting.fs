@@ -43,7 +43,7 @@ float sphereIntersect(vec3 raydir, vec3 rayorig, vec3 pos, float rad) {
     float D = b * b + (-4.0) * a * c;
 
     // If ray can not intersect then stop
-    if (D < 0) {
+    if (D < 0.0) {
         return 0.0;
     }
 
@@ -97,7 +97,7 @@ void ApplyPCF(out float shadow, vec3 projCoords, float currentDepth) {
     const float NUM_SAMPLES_SQUARED = NUM_SAMPLES * NUM_SAMPLES;
 
     shadow = 0.0;
-    vec2 texelSize = 1.0 / textureSize(shadowMap, 0);
+    vec2 texelSize = 1.0 / vec2(textureSize(shadowMap, 0));
 
     for(float y = -SAMPLES_START; y <= SAMPLES_START; y += 1.0) {
         for(float x = -SAMPLES_START; x <= SAMPLES_START; x += 1.0) {
@@ -151,7 +151,7 @@ void main() {
     shadow = CalculateShadow(fragPosLightSpace);
     ringColor.rgb *= shadow;
 
-    if (NdotL < 0 && shadow != 0.0) {
+    if (NdotL < 0.0 && shadow != 0.0) {
         // Calculate back light function (Mie scattering)
         float light0Dist = length(vLight0Pos);
         vec3  light0Dir  = vLight0Pos / light0Dist;

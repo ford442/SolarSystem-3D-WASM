@@ -166,7 +166,7 @@ bool solveQuadratic(float a, float b, float c, out float x0, out float x1) {
         x0 = x1 = - 0.5 * b / a;
     }
     else {
-        float q = (b > 0) ? -0.5 * (b + sqrt(discr)) : -0.5 * (b - sqrt(discr));
+        float q = (b > 0.0) ? -0.5 * (b + sqrt(discr)) : -0.5 * (b - sqrt(discr));
         x0 = q / a;
         x1 = c / q;
     }
