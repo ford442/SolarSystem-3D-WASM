@@ -589,8 +589,13 @@ void CDDSImage::load(istream& is, bool flipImage) {
 #endif
         m_components = 3;
     } else if (ddsh.ddspf.dwRGBBitCount == 8) {
+#ifdef __EMSCRIPTEN__
+        m_format = GL_RED;
+        m_components = 1;
+#else
         m_format = GL_LUMINANCE;
         m_components = 1;
+#endif
     } else {
         throw runtime_error("unknow texture format");
     }
@@ -906,13 +911,25 @@ void CDDSImage::upload_texture2D(uint32_t imageIndex, uint32_t target) {
             glPixelStorei(GL_UNPACK_ALIGNMENT, 1);
         }
 
-        glTexImage2D(target, 0, m_components, image.get_width(), image.get_height(), 0, m_format, GL_UNSIGNED_BYTE, image);
+#ifdef __EMSCRIPTEN__
+        GLenum internalFormat;
+        switch (m_components) {
+            case 1: internalFormat = GL_R8; break;
+            case 3: internalFormat = GL_RGB8; break;
+            case 4: internalFormat = GL_RGBA8; break;
+            default: internalFormat = GL_RGBA8; break;
+        }
+#else
+        GLenum internalFormat = m_components;
+#endif
+
+        glTexImage2D(target, 0, internalFormat, image.get_width(), image.get_height(), 0, m_format, GL_UNSIGNED_BYTE, image);
 
         // load all mipmaps
         for (unsigned int i = 0; i < image.get_num_mipmaps(); i++) {
             const CSurface &mipmap = image.get_mipmap(i);
 
-            glTexImage2D(target, i + 1, m_components, mipmap.get_width(), mipmap.get_height(), 0, m_format, GL_UNSIGNED_BYTE, mipmap);
+            glTexImage2D(target, i + 1, internalFormat, mipmap.get_width(), mipmap.get_height(), 0, m_format, GL_UNSIGNED_BYTE, mipmap);
         }
 
         if (alignment != -1)

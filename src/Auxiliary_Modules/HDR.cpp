@@ -49,13 +49,21 @@ void HDR::InitFBO(uint16_t width, uint16_t height) {
 
     glGenTextures(1, &_colorBuffer);
     glBindTexture(GL_TEXTURE_2D, _colorBuffer);
+#ifdef __EMSCRIPTEN__
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA16F, width, height, 0, GL_RGBA, GL_HALF_FLOAT, nullptr);
+#else
     glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA32F, width, height, 0, GL_RGBA, GL_FLOAT, nullptr);
+#endif
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
 
     glGenRenderbuffers(1, &_rboDepth);
     glBindRenderbuffer(GL_RENDERBUFFER, _rboDepth);
+#ifdef __EMSCRIPTEN__
+    glRenderbufferStorage(GL_RENDERBUFFER, GL_DEPTH_COMPONENT24, width, height);
+#else
     glRenderbufferStorage(GL_RENDERBUFFER, GL_DEPTH_COMPONENT, width, height);
+#endif
 
     glBindFramebuffer(GL_FRAMEBUFFER, _hdrFrameBuffer);
     glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, _colorBuffer, 0);
