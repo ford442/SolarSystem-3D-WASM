@@ -1,3 +1,5 @@
+#version 300 es
+
 //
 // Atmospheric scattering vertex shader
 //
@@ -5,8 +7,6 @@
 //
 // Copyright (c) 2004 Sean O'Neil
 //
-
-#version 300 es
 
 layout (location = 0) in vec3 aPos;
 
