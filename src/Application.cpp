@@ -281,6 +281,7 @@ void Application::RenderAtmospheres(const std::vector<RenderableAtmosphere>& ren
             _mainAtmosphereShader->SetVec3("lightPos", _sun->GetPosition() - renderableAtmosphere.atmosphere->GetPosition());
             _mainAtmosphereShader->SetVec3("mieTint", renderableAtmosphere.atmosphere->GetMieTint());
             _mainAtmosphereShader->SetFloat("SCALE_H_FACTOR", renderableAtmosphere.hScaleFactor);
+            _mainAtmosphereShader->SetFloat("SCALE_L_FACTOR", 1.0f);
             _mainAtmosphereShader->SetFloat("earthSizeCoefficient", renderableAtmosphere.parentEarthSizeCoefficient);
             _mainAtmosphereShader->SetBool("isUseToneMapping", renderableAtmosphere.isUseToneMapping);
             _mainAtmosphereShader->SetBool("isNearbyPlanetaryRing", ring != nullptr);

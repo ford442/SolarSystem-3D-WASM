@@ -1,3 +1,5 @@
+#version 300 es
+
 //
 // Atmospheric scattering fragment shader
 //
@@ -5,8 +7,6 @@
 //
 // Copyright (c) 2004 Sean O'Neil
 //
-
-#version 300 es
 precision highp float;
 precision highp int;
 
@@ -51,10 +51,10 @@ const int numInScatter = 4;
 const float fNumInScatter = 4.0;
 
 uniform float SCALE_H_FACTOR;
-uniform float SCALE_L_FACTOR = 1.0;
+uniform float SCALE_L_FACTOR;
 
-float SCALE_H = SCALE_H_FACTOR / (outerRadius - innerRadius);
-float SCALE_L = SCALE_L_FACTOR / (outerRadius - innerRadius);
+#define SCALE_H (SCALE_H_FACTOR / (outerRadius - innerRadius))
+#define SCALE_L (SCALE_L_FACTOR / (outerRadius - innerRadius))
 
 out vec4 fragColor;
 
