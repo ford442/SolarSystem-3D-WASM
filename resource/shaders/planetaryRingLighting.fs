@@ -134,7 +134,7 @@ void main() {
 
     vec4 ringColor = texture(ringTexture, texCoords);
 
-    if (ringColor.w == 0)
+    if (ringColor.w == 0.0)
         discard;
 
     const float smoothingAmount = 0.0001;
