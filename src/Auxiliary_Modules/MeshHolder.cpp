@@ -1,6 +1,10 @@
 #include "MeshHolder.h"
+#include "WebResourceFetcher.h"
 
 MeshHolder::MeshHolder(const std::string& path) {
+    // Fetch model on demand
+    WebResourceFetcher::Fetch(path);
+
     Assimp::Importer importer;
     const aiScene* scene = importer.ReadFile(path, aiProcess_Triangulate | aiProcess_GenSmoothNormals | aiProcess_FlipUVs | aiProcess_CalcTangentSpace);
 
