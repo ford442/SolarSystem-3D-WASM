@@ -858,7 +858,7 @@ void Application::InitSongList() {
 }
 
 void Application::InitStarSystem() {
-    MeshHolder sphereModel("./resource/models/sphere.obj");
+    MeshHolder sphereModel("https://test.1ink.us/solar-system/resource/models/sphere.obj");
 
     StarInfo sunInfo(sphereModel, *_mainStarShader, Shader("resource/shaders/starGlow.vs", "resource/shaders/starGlow.fs"), TextureImage2D("resource/textures/Star_Spectrum.dds"),
                      starTemperatureInKelvin, 696342.0, glm::vec3(0.99607843, 0.890196078, 0.725490196), L"Sun", L"Солнце"); 
