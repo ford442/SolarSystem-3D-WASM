@@ -27,6 +27,13 @@ void TextureImage2D::LoadTextureFromFile(const std::string& path, GLint wrapPara
     }
 
     glGenerateMipmap(GL_TEXTURE_2D);
+    GLenum err = glGetError();
+    if (err == GL_INVALID_OPERATION) {
+        // Some texture formats don't support mipmap generation (e.g., some DDS formats)
+        // Fall back to non-mipmapped filtering
+        std::cerr << "Warning: Texture format for " << path << " does not support mipmap generation" << std::endl;
+    }
+
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, wrapParam);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, wrapParam);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, minFilter);
