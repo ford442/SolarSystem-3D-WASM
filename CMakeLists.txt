@@ -17,7 +17,7 @@ include_directories(${CMAKE_SOURCE_DIR}/external/assimp/build-wasm/include)
 
 if(EMSCRIPTEN)
     add_definitions(-D__EMSCRIPTEN__)
-    
+
     # 1. Add SDL2_IMAGE_FORMATS here so it supports PNG/JPG
     set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -s USE_GLFW=3 -s USE_SDL=2 -s USE_SDL_IMAGE=2 -s SDL2_IMAGE_FORMATS='[\"png\",\"jpg\"]'")
     set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -s USE_SDL_MIXER=2 -s USE_FREETYPE=1")
@@ -26,6 +26,8 @@ if(EMSCRIPTEN)
     set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -s ALLOW_MEMORY_GROWTH=1")
     set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -s MAX_WEBGL_VERSION=2 -s MIN_WEBGL_VERSION=2")
     set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -s GL_ENABLE_GET_PROC_ADDRESS=1")
+    # Enable async support for WebResourceFetcher (emscripten_wget_data)
+    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -s ASYNCIFY=1")
     
     # [OPTIMIZATION] Preload only essential small files. Exclude Textures to allow lazy loading.
     set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} --preload-file ${CMAKE_SOURCE_DIR}/resource/shaders@/resource/shaders")
@@ -36,7 +38,8 @@ if(EMSCRIPTEN)
 
     set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -s ALLOW_MEMORY_GROWTH=1")
     set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -s DISABLE_EXCEPTION_CATCHING=0")
-    
+    set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -s ASYNCIFY=1")
+
     # 2. Add it to Linker flags too, just to be safe
     set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -s SDL2_IMAGE_FORMATS='[\"png\",\"jpg\"]'")
 
