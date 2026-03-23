@@ -695,6 +695,10 @@ void Application::LoadResources() {
     const std::vector<std::string> resources = {
         // Models
         "resource/models/sphere.obj",
+        "resource/models/phobos.obj",
+        "resource/models/deimos.obj",
+        "resource/models/saturn_ring.obj",
+        "resource/models/uranus_ring.obj",
         // SkyBox
         "resource/textures/Main_SkyBox/PositiveX.dds",
         "resource/textures/Main_SkyBox/NegativeX.dds",
@@ -709,7 +713,7 @@ void Application::LoadResources() {
 #ifdef __EMSCRIPTEN__
         "resource/textures_low/Mercury_Diffuse_Low.dds", "resource/textures_low/Mercury_Normal_Low.dds", "resource/textures_low/Mercury_Specular_Low.dds",
         "resource/textures_low/Venus_Diffuse_Low.dds", "resource/textures_low/Venus_Normal_Low.dds",
-        "resource/textures_low/Earth_Day_Diffuse_Low.dds", "resource/textures/Earth_Clouds_Diffuse.dds", "resource/textures/Earth_Night_Diffuse.dds", "resource/textures_low/Earth_Normal_Low.dds", "resource/textures_low/Earth_Specular_Low.dds",
+        "resource/textures_low/Earth_Day_Diffuse_Low.dds", "resource/textures/Earth_Clouds_Diffuse.dds", "resource/textures/Earth_Night_Diffuse.dds", "resource/textures/Earth_Clouds_Normal.dds", "resource/textures_low/Earth_Normal_Low.dds", "resource/textures_low/Earth_Specular_Low.dds",
         "resource/textures/Moon_Diffuse.dds", "resource/textures/Moon_Normal.dds",
         "resource/textures_low/Mars_Diffuse_Low.dds", "resource/textures_low/Mars_Normal_Low.dds",
         "resource/textures/Phobos_Diffuse.dds", "resource/textures/Phobos_Normal.dds",
@@ -840,7 +844,9 @@ void Application::InitSceneObjects() {
     InitStarSystem();
 
     glfwShowWindow(_mainWindow);
+#ifndef __EMSCRIPTEN__
     glfwSetWindowMonitor(_mainWindow, glfwGetPrimaryMonitor(), 0, 0, _displayWidth, _displayHeight, GLFW_DONT_CARE);
+#endif
 
     StartSearchNearestPlanet();
     StartPlayBackgroundMusic();
