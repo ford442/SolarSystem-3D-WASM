@@ -4,6 +4,7 @@
 #include "Solar_System/SolarSystem.h"
 #include "SystemModules.h"
 #include <atomic>
+#include <functional>
 
 #ifdef __EMSCRIPTEN__
 #include <emscripten.h>
@@ -81,6 +82,16 @@ private:
     std::vector<RenderableSceneComponent> _renderableSceneComponents;
     std::vector<std::string_view> _backgroundSongs;
 
+    // Lazy-load infrastructure for outer planets (WASM only)
+    struct DeferredPlanetInit {
+        glm::vec3 proxyPosition;    // Fixed orbital position for distance check
+        float activationRadius;     // Camera must be within this distance to trigger
+        std::function<void()> initFunc;
+        bool initialized = false;
+    };
+    std::vector<DeferredPlanetInit> _deferredPlanetInits;
+    std::unique_ptr<MeshHolder> _sphereModel;
+
     void InitSystems();
     void InitScene();
     void LoadResources();
@@ -98,6 +109,7 @@ private:
     void InitSongList();
     void Dispose();
     void UpdateLoadingProgress(); // Update JavaScript loading progress bar
+    void CheckAndInitDeferredPlanets();
     void StartSearchNearestPlanet();
     void UpdateSearchNearestPlanet(); // For Emscripten frame-based search
     void StartPlayBackgroundMusic();

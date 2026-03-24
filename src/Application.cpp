@@ -187,6 +187,7 @@ void Application::RunOneFrame() {
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
     ProcessInput(_mainWindow);
+    CheckAndInitDeferredPlanets();
     ConfigureMainShaders();
     _skyBox->Render(*_mainSkyBoxShader);
     RenderStarCorona();
@@ -866,21 +867,38 @@ void Application::InitSongList() {
 }
 
 void Application::InitStarSystem() {
-    MeshHolder sphereModel("resource/models/sphere.obj");
+    _sphereModel = std::make_unique<MeshHolder>("resource/models/sphere.obj");
 
-    StarInfo sunInfo(sphereModel, *_mainStarShader, Shader("resource/shaders/starGlow.vs", "resource/shaders/starGlow.fs"), TextureImage2D("resource/textures/Star_Spectrum.dds"),
-                     starTemperatureInKelvin, 696342.0, glm::vec3(0.99607843, 0.890196078, 0.725490196), L"Sun", L"Солнце"); 
+    StarInfo sunInfo(*_sphereModel, *_mainStarShader, Shader("resource/shaders/starGlow.vs", "resource/shaders/starGlow.fs"), TextureImage2D("resource/textures/Star_Spectrum.dds"),
+                     starTemperatureInKelvin, 696342.0, glm::vec3(0.99607843, 0.890196078, 0.725490196), L"Sun", L"Солнце");
     _sun = make_shared<Sun>(sunInfo);
 
-    InitNeptuneSystem(sphereModel);
-    InitMercury(sphereModel);
-    InitVenus(sphereModel);
-    InitMarsSystem(sphereModel);
-    InitEarthSystem(sphereModel);
-    InitJupiterSystem(sphereModel);
-    InitUranusSystem(sphereModel);
-    InitSaturnSystem(sphereModel);
-    InitPlutoSystem(sphereModel);
+    // Inner planets — always initialized immediately
+    InitMercury(*_sphereModel);
+    InitVenus(*_sphereModel);
+    InitEarthSystem(*_sphereModel);
+    InitMarsSystem(*_sphereModel);
+
+#ifdef __EMSCRIPTEN__
+    // Outer planets — deferred until camera approaches their orbital zone
+    const glm::vec3 sunPos = _sun->GetPosition();
+    _deferredPlanetInits = {
+        { sunPos + glm::vec3(1350.f, 0.f, 1737.f),   1500.f, [this]{ InitJupiterSystem(*_sphereModel); }, false },
+        { sunPos + glm::vec3(0.f, -100.f, 2450.f),    1500.f, [this]{ InitSaturnSystem(*_sphereModel);  }, false },
+        { sunPos + glm::vec3(0.f, 0.f, -2650.f),      1500.f, [this]{ InitUranusSystem(*_sphereModel);  }, false },
+        { sunPos + glm::vec3(-2900.f, 0.f, 0.f),      1500.f, [this]{ InitNeptuneSystem(*_sphereModel); }, false },
+        { sunPos + glm::vec3(2800.f, 0.f, 1757.73f),  1500.f, [this]{ InitPlutoSystem(*_sphereModel);   }, false },
+    };
+    std::cout << "[LazyInit] Inner planets initialized. " << _deferredPlanetInits.size()
+              << " outer planet systems deferred until camera approaches." << std::endl;
+#else
+    // Desktop: load all immediately (no memory constraint)
+    InitJupiterSystem(*_sphereModel);
+    InitSaturnSystem(*_sphereModel);
+    InitUranusSystem(*_sphereModel);
+    InitNeptuneSystem(*_sphereModel);
+    InitPlutoSystem(*_sphereModel);
+#endif
 }
 
 void Application::InitMercury(const MeshHolder& sphereModel) {
@@ -1462,6 +1480,23 @@ void Application::StopSearchNearestPlanet() {
 #ifndef __EMSCRIPTEN__
     if (_searchNearestPlanetThread)
         _searchNearestPlanetThread->join();
+#endif
+}
+
+void Application::CheckAndInitDeferredPlanets() {
+#ifdef __EMSCRIPTEN__
+    const glm::vec3 camPos = camera.GetPosition();
+    for (auto& deferred : _deferredPlanetInits) {
+        if (deferred.initialized) continue;
+        float dist = glm::length(camPos - deferred.proxyPosition);
+        if (dist < deferred.activationRadius) {
+            std::cout << "[LazyInit] Camera within " << dist << " units — activating planet system near ("
+                      << deferred.proxyPosition.x << ", " << deferred.proxyPosition.y << ", "
+                      << deferred.proxyPosition.z << ")" << std::endl;
+            deferred.initFunc();
+            deferred.initialized = true;
+        }
+    }
 #endif
 }
 
