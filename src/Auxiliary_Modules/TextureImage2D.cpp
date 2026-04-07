@@ -12,12 +12,17 @@ void TextureImage2D::LoadTextureFromFile(const std::string& path, GLint wrapPara
     glGenTextures(1, &_textureID);
     glBindTexture(GL_TEXTURE_2D, _textureID);
 
+    bool isCompressed = false;
+    bool hasEmbeddedMipmaps = false;
+
     try {
         // [PORTING NOTE]
         // Ensure files are preloaded (emcc --preload-file) or fetched asynchronously.
         // For preloaded files, std::ifstream in CDDSImage will work transparently.
         CDDSImage image;
         image.load(path, false);
+        isCompressed = image.is_compressed();
+        hasEmbeddedMipmaps = (image.get_num_mipmaps() > 0);
         image.upload_texture2D();
         _width = image.get_width();
         _height = image.get_height();
@@ -26,12 +31,33 @@ void TextureImage2D::LoadTextureFromFile(const std::string& path, GLint wrapPara
         throw std::runtime_error("Image " + path + " cannot be loaded");
     }
 
-    glGenerateMipmap(GL_TEXTURE_2D);
-    GLenum err = glGetError();
-    if (err == GL_INVALID_OPERATION) {
-        // Some texture formats don't support mipmap generation (e.g., some DDS formats)
-        // Fall back to non-mipmapped filtering
-        std::cerr << "Warning: Texture format for " << path << " does not support mipmap generation" << std::endl;
+    // S3TC compressed textures (DXT1/3/5) do not support glGenerateMipmap in WebGL 2.
+    // Mipmaps must be pre-embedded in the DDS file. Only attempt generation for
+    // uncompressed textures that have no embedded mipmaps.
+    if (!isCompressed) {
+        glGenerateMipmap(GL_TEXTURE_2D);
+        GLenum err = glGetError();
+        if (err != GL_NO_ERROR) {
+            std::cerr << "Warning: glGenerateMipmap failed for " << path
+                      << " (error 0x" << std::hex << err << std::dec << ")" << std::endl;
+        } else {
+            hasEmbeddedMipmaps = true;
+        }
+    }
+
+    // If no mipmaps are available (neither generated nor embedded), using any
+    // mipmap min-filter makes the texture "incomplete" — degrade to GL_LINEAR.
+    if (!hasEmbeddedMipmaps) {
+        bool minFilterUsesMipmaps =
+            (minFilter == GL_NEAREST_MIPMAP_NEAREST ||
+             minFilter == GL_LINEAR_MIPMAP_NEAREST  ||
+             minFilter == GL_NEAREST_MIPMAP_LINEAR  ||
+             minFilter == GL_LINEAR_MIPMAP_LINEAR);
+        if (minFilterUsesMipmaps) {
+            std::cerr << "Warning: No mipmaps for " << path
+                      << " -- falling back min filter to GL_LINEAR" << std::endl;
+            minFilter = GL_LINEAR;
+        }
     }
 
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, wrapParam);

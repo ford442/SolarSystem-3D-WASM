@@ -896,13 +896,31 @@ void CDDSImage::upload_texture2D(uint32_t imageIndex, uint32_t target) {
             target == GL_TEXTURE_2D || (target >= GL_TEXTURE_CUBE_MAP_POSITIVE_X && target <= GL_TEXTURE_CUBE_MAP_NEGATIVE_Z));
 
     if (is_compressed()) {
+        // Clear any pending GL error before uploading so we get clean error feedback.
+        glGetError();
+
         glCompressedTexImage2D(target, 0, m_format, image.get_width(), image.get_height(), 0, image.get_size(), image);
+        {
+            GLenum err = glGetError();
+            if (err != GL_NO_ERROR) {
+                fprintf(stderr, "nv_dds: glCompressedTexImage2D level 0 failed (format 0x%X, %ux%u, size %u): GL error 0x%X\n",
+                        m_format, image.get_width(), image.get_height(), image.get_size(), err);
+            }
+        }
 
         // load all mipmaps
         for (unsigned int i = 0; i < image.get_num_mipmaps(); i++) {
             const CSurface &mipmap = image.get_mipmap(i);
 
             glCompressedTexImage2D(target, i + 1, m_format, mipmap.get_width(), mipmap.get_height(), 0, mipmap.get_size(), mipmap);
+            {
+                GLenum err = glGetError();
+                if (err != GL_NO_ERROR) {
+                    fprintf(stderr, "nv_dds: glCompressedTexImage2D mipmap level %u failed (format 0x%X, %ux%u, size %u): GL error 0x%X\n",
+                            i + 1, m_format, mipmap.get_width(), mipmap.get_height(), mipmap.get_size(), err);
+                    break;  // stop uploading further levels to prevent cascade
+                }
+            }
         }
     } else {
         GLint alignment = -1;
