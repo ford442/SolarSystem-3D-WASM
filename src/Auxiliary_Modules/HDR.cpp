@@ -5,6 +5,29 @@ HDR::HDR(const Shader& shader, uint16_t width, uint16_t height) : _hdrShader(sha
     InitFBO(width, height);
 }
 
+HDR::~HDR() {
+    if (_quadVao != 0) {
+        glDeleteVertexArrays(1, &_quadVao);
+        _quadVao = 0;
+    }
+    if (_quadVbo != 0) {
+        glDeleteBuffers(1, &_quadVbo);
+        _quadVbo = 0;
+    }
+    if (_hdrFrameBuffer != 0) {
+        glDeleteFramebuffers(1, &_hdrFrameBuffer);
+        _hdrFrameBuffer = 0;
+    }
+    if (_colorBuffer != 0) {
+        glDeleteTextures(1, &_colorBuffer);
+        _colorBuffer = 0;
+    }
+    if (_rboDepth != 0) {
+        glDeleteRenderbuffers(1, &_rboDepth);
+        _rboDepth = 0;
+    }
+}
+
 void HDR::Render(float exposure, float gamma) const {
     _hdrShader.Use();
     _hdrShader.SetInt("hdrBuffer", 0);

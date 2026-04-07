@@ -10,6 +10,16 @@
 class Shader {
 public:
     explicit Shader(const std::string& vertexPath, const std::string& fragmentPath, const std::string& geometryPath = "");
+    ~Shader();
+    
+    // Delete copy to prevent double-free
+    Shader(const Shader&) = delete;
+    Shader& operator=(const Shader&) = delete;
+    
+    // Move semantics for proper ownership transfer
+    Shader(Shader&& other) noexcept;
+    Shader& operator=(Shader&& other) noexcept;
+    
     void Use() const;
     void SetBool(const std::string& name, bool value) const;
     void SetInt(const std::string& name, int value) const;
@@ -44,6 +54,8 @@ private:
     };
 
     size_t _shaderProgramID = 0;
+    
+    void Release();
 
     static void CheckCompileErrors(size_t shader, ShaderType type, const std::string& path = "");
     static std::string ShaderTypeToString(ShaderType type);

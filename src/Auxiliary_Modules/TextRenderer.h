@@ -16,6 +16,7 @@ struct Character {
 class TextRenderer {
 public:
     explicit TextRenderer(FT_Library ft,  const std::string& fontPath);
+    ~TextRenderer();
     void Render(const Shader& shader, const std::wstring& text, float x, float y, float scale, const glm::vec3& color);
     void Render(const Shader& shader, const std::deque<wchar_t>& text, float x, float y, float scale, const glm::vec3& color);
     void Render(const Shader& shader, const std::deque<std::wstring>& text, float x, float y, float scale, const glm::vec3& color);

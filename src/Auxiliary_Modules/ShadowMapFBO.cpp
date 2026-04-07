@@ -4,6 +4,17 @@ ShadowMapFBO::ShadowMapFBO(uint16_t shadowMapWidth, uint16_t shadowMapHeight) : 
     InitFBO();
 }
 
+ShadowMapFBO::~ShadowMapFBO() {
+    if (_frameBuffer != 0) {
+        glDeleteFramebuffers(1, &_frameBuffer);
+        _frameBuffer = 0;
+    }
+    if (_shadowMap != 0) {
+        glDeleteTextures(1, &_shadowMap);
+        _shadowMap = 0;
+    }
+}
+
 uint16_t ShadowMapFBO::GetShadowMapWidth() const {
     return _shadowMapWidth;
 }

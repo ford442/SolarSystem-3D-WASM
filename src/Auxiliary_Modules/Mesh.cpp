@@ -4,6 +4,63 @@ Mesh::Mesh(std::vector<Vertex> vertices, std::vector<size_t> indices, std::vecto
     : _vao(0), _vbo(0), _ebo(0), _vertices(std::move(vertices)), _indices(std::move(indices)), _textures(std::move(textures))
 {
     SetupMesh();
+    // Free RAM copy after uploading to GPU
+    _vertices.clear();
+    _vertices.shrink_to_fit();
+    _indices.clear();
+    _indices.shrink_to_fit();
+}
+
+Mesh::~Mesh() {
+    if (_vao != 0) {
+        glDeleteVertexArrays(1, &_vao);
+        _vao = 0;
+    }
+    if (_vbo != 0) {
+        glDeleteBuffers(1, &_vbo);
+        _vbo = 0;
+    }
+    if (_ebo != 0) {
+        glDeleteBuffers(1, &_ebo);
+        _ebo = 0;
+    }
+}
+
+Mesh::Mesh(Mesh&& other) noexcept
+    : _vao(other._vao), _vbo(other._vbo), _ebo(other._ebo),
+      _vertices(std::move(other._vertices)), _indices(std::move(other._indices)), _textures(std::move(other._textures))
+{
+    other._vao = 0;
+    other._vbo = 0;
+    other._ebo = 0;
+}
+
+Mesh& Mesh::operator=(Mesh&& other) noexcept {
+    if (this != &other) {
+        // Clean up existing resources
+        if (_vao != 0) {
+            glDeleteVertexArrays(1, &_vao);
+        }
+        if (_vbo != 0) {
+            glDeleteBuffers(1, &_vbo);
+        }
+        if (_ebo != 0) {
+            glDeleteBuffers(1, &_ebo);
+        }
+        
+        // Transfer ownership
+        _vao = other._vao;
+        _vbo = other._vbo;
+        _ebo = other._ebo;
+        _vertices = std::move(other._vertices);
+        _indices = std::move(other._indices);
+        _textures = std::move(other._textures);
+        
+        other._vao = 0;
+        other._vbo = 0;
+        other._ebo = 0;
+    }
+    return *this;
 }
 
 // Отрисовка (рендеринг) меша

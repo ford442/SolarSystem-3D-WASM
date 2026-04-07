@@ -461,22 +461,24 @@ void Application::RenderPlanetSatelliteStarDistances() const {
 }
 
 void Application::RenderSpaceObjectDistance(const SpaceObject* spaceObject) const {
-    deque<wchar_t> distanceInfo(spaceObject->GetEngName().begin(), spaceObject->GetEngName().end());
+    // Reuse pre-allocated container to eliminate per-frame heap allocation
+    _distanceInfoCache.clear();
+    _distanceInfoCache.insert(_distanceInfoCache.end(), spaceObject->GetEngName().begin(), spaceObject->GetEngName().end());
 
     if (!spaceObject->GetOtherLangName().empty()) {
-        distanceInfo.push_back(L'[');
-        distanceInfo.insert(distanceInfo.end(), spaceObject->GetOtherLangName().begin(), spaceObject->GetOtherLangName().end());
-        distanceInfo.push_back(L']');
-        distanceInfo.push_back(L' ');
+        _distanceInfoCache.push_back(L'[');
+        _distanceInfoCache.insert(_distanceInfoCache.end(), spaceObject->GetOtherLangName().begin(), spaceObject->GetOtherLangName().end());
+        _distanceInfoCache.push_back(L']');
+        _distanceInfoCache.push_back(L' ');
     }
 
     wstring distance(to_wstring(static_cast<uint16_t>(CalculateSpaceObjectDistance(spaceObject))));
-    distanceInfo.insert(distanceInfo.end(), make_move_iterator(distance.begin()), make_move_iterator(distance.end()));
+    _distanceInfoCache.insert(_distanceInfoCache.end(), make_move_iterator(distance.begin()), make_move_iterator(distance.end()));
 
     _mainTextShader->Use();
     _mainTextShader->SetVec3("particleCenterWorldSpace", spaceObject->GetPosition());
     _mainTextShader->SetBool("is3D", true);
-    _textRenderer->Render(*_mainTextShader, distanceInfo, 0.0, 0.0, 0.075, glm::vec3(0.98431, 0.80784, 0.69412));
+    _textRenderer->Render(*_mainTextShader, _distanceInfoCache, 0.0, 0.0, 0.075, glm::vec3(0.98431, 0.80784, 0.69412));
 }
 
 void Application::RenderHints() const {
@@ -492,14 +494,15 @@ void Application::RenderHints() const {
     _mainTextShader->SetMat4("projection", textProjection);
     _mainTextShader->SetBool("is3D", false);
 
-    deque<wstring> fpsHint;
-    fpsHint.emplace_back(L"FPS: ");
-    fpsHint.emplace_back(to_wstring(_fpsHandler.GetCurrentFps()));
+    // Reuse pre-allocated containers to eliminate per-frame heap allocations
+    _fpsHintCache.clear();
+    _fpsHintCache.emplace_back(L"FPS: ");
+    _fpsHintCache.emplace_back(to_wstring(_fpsHandler.GetCurrentFps()));
 
-    deque<wstring> gpuHint;
-    gpuHint.emplace_back(wstring(gpuHintString.begin(), gpuHintString.end()));
+    _gpuHintCache.clear();
+    _gpuHintCache.emplace_back(wstring(gpuHintString.begin(), gpuHintString.end()));
 
-    deque<wstring> soundVolumeHint;
+    _soundVolumeHintCache.clear();
     stringstream soundVolumeStream;
 #ifdef __EMSCRIPTEN__
     soundVolumeStream << fixed << setprecision(0) << (static_cast<float>(Mix_VolumeMusic(-1)) / MIX_MAX_VOLUME) * 100.0;
@@ -507,10 +510,10 @@ void Application::RenderHints() const {
     soundVolumeStream << fixed << setprecision(0) << _soundEngine->getSoundVolume() * 100.0;
 #endif
     string soundVolume = soundVolumeStream.str();
-    soundVolumeHint.emplace_back(wstring(L"Sound volume(PgUp/PgDown): ").append(soundVolume.begin(), soundVolume.end()).append(L" %"));
+    _soundVolumeHintCache.emplace_back(wstring(L"Sound volume(PgUp/PgDown): ").append(soundVolume.begin(), soundVolume.end()).append(L" %"));
 
-    deque<wstring> currentMusicTrackHint;
-    currentMusicTrackHint.emplace_back(wstring(_currentMusicTrack.begin(), _currentMusicTrack.end()));
+    _tmpStringCache.clear();
+    _tmpStringCache.emplace_back(wstring(_currentMusicTrack.begin(), _currentMusicTrack.end()));
 
     deque<wstring> timeRunHint;
     timeRunHint.emplace_back(L"Time running(F): ");
@@ -561,10 +564,10 @@ void Application::RenderHints() const {
     deque<wstring> textHints;
     textHints.emplace_back(L"Text hints(TAB)");
 
-    _textRenderer->ReverseRender(*_mainTextShader, currentMusicTrackHint, 0.99 * _displayWidth, 0.95 * _displayHeight, 0.35, textColor);
-    _textRenderer->Render(*_mainTextShader, fpsHint, 0.01 * _displayWidth, 0.95 * _displayHeight, 0.35, CurrentFpsColor());
-    _textRenderer->Render(*_mainTextShader, gpuHint, 0.01 * _displayWidth, 0.925 * _displayHeight, 0.35, textColor);
-    _textRenderer->Render(*_mainTextShader, soundVolumeHint, 0.01 * _displayWidth, 0.9 * _displayHeight, 0.35, textColor);
+    _textRenderer->ReverseRender(*_mainTextShader, _tmpStringCache, 0.99 * _displayWidth, 0.95 * _displayHeight, 0.35, textColor);
+    _textRenderer->Render(*_mainTextShader, _fpsHintCache, 0.01 * _displayWidth, 0.95 * _displayHeight, 0.35, CurrentFpsColor());
+    _textRenderer->Render(*_mainTextShader, _gpuHintCache, 0.01 * _displayWidth, 0.925 * _displayHeight, 0.35, textColor);
+    _textRenderer->Render(*_mainTextShader, _soundVolumeHintCache, 0.01 * _displayWidth, 0.9 * _displayHeight, 0.35, textColor);
     _textRenderer->Render(*_mainTextShader, timeRunHint, 0.01 * _displayWidth, 0.875 * _displayHeight, 0.35, textColor);
     _textRenderer->Render(*_mainTextShader, planetStarHint, 0.01 * _displayWidth, 0.85 * _displayHeight, 0.35, textColor);
     _textRenderer->Render(*_mainTextShader, satelliteHint, 0.01 * _displayWidth, 0.825 * _displayHeight, 0.35, textColor);

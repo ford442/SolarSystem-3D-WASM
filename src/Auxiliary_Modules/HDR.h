@@ -5,6 +5,7 @@
 class HDR {
 public:
     explicit HDR(const Shader& shader, uint16_t width, uint16_t height);
+    ~HDR();
     void Render(float exposure, float gamma) const;
     GLuint GetHdrFBO() const;
 

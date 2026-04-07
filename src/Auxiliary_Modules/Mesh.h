@@ -25,6 +25,16 @@ struct Texture {
 class Mesh {
 public:
     explicit Mesh(std::vector<Vertex> vertices, std::vector<size_t> indices, std::vector<Texture> textures);
+    ~Mesh();
+    
+    // Delete copy to prevent double-free
+    Mesh(const Mesh&) = delete;
+    Mesh& operator=(const Mesh&) = delete;
+    
+    // Move semantics for proper ownership transfer
+    Mesh(Mesh&& other) noexcept;
+    Mesh& operator=(Mesh&& other) noexcept;
+    
     void Draw(const Shader& shader) const; // Отрисовка (рендеринг) меша
 
 private:

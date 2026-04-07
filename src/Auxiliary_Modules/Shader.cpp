@@ -1,6 +1,8 @@
 #include "Shader.h"
 
 Shader::Shader(const std::string& vertexPath, const std::string& fragmentPath, const std::string& geometryPath) {
+    _shaderProgramID = 0;
+
     std::string vertexCode;
     std::string fragmentCode;
     std::string geometryCode;
@@ -89,6 +91,30 @@ Shader::Shader(const std::string& vertexPath, const std::string& fragmentPath, c
     if (!geometryPath.empty()) {
         glDetachShader(_shaderProgramID, geometry);
         glDeleteShader(geometry);
+    }
+}
+
+Shader::~Shader() {
+    Release();
+}
+
+Shader::Shader(Shader&& other) noexcept : _shaderProgramID(other._shaderProgramID) {
+    other._shaderProgramID = 0;
+}
+
+Shader& Shader::operator=(Shader&& other) noexcept {
+    if (this != &other) {
+        Release();
+        _shaderProgramID = other._shaderProgramID;
+        other._shaderProgramID = 0;
+    }
+    return *this;
+}
+
+void Shader::Release() {
+    if (_shaderProgramID != 0) {
+        glDeleteProgram(static_cast<GLuint>(_shaderProgramID));
+        _shaderProgramID = 0;
     }
 }
 

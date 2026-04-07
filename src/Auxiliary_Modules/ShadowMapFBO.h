@@ -6,6 +6,7 @@
 class ShadowMapFBO {
 public:
     explicit ShadowMapFBO(uint16_t shadowMapWidth, uint16_t shadowMapHeight);
+    ~ShadowMapFBO();
     uint16_t GetShadowMapWidth() const;
     uint16_t GetShadowMapHeight() const;
     GLuint GetShadowMap() const;

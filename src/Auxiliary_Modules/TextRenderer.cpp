@@ -5,6 +5,27 @@ TextRenderer::TextRenderer(FT_Library ft, const std::string& fontPath) : _ft(ft)
     InitBuffers();
 }
 
+TextRenderer::~TextRenderer() {
+    // Delete all character textures
+    for (auto& pair : _characters) {
+        if (pair.second.textureID != 0) {
+            glDeleteTextures(1, &pair.second.textureID);
+            pair.second.textureID = 0;
+        }
+    }
+    _characters.clear();
+    
+    // Delete quad buffers
+    if (_vao != 0) {
+        glDeleteVertexArrays(1, &_vao);
+        _vao = 0;
+    }
+    if (_vbo != 0) {
+        glDeleteBuffers(1, &_vbo);
+        _vbo = 0;
+    }
+}
+
 void TextRenderer::Render(const Shader& shader, const std::wstring& text, float x, float y, float scale, const glm::vec3& color) {
     shader.Use();
     shader.SetVec3("textColor", color);

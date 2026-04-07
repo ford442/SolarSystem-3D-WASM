@@ -80,6 +80,13 @@ private:
     std::shared_ptr<Star> _sun;
     std::vector<RenderableSceneComponent> _renderableSceneComponents;
     std::vector<std::string_view> _backgroundSongs;
+    
+    // Pre-allocated containers for RenderHints to eliminate per-frame allocations
+    mutable std::deque<wchar_t> _distanceInfoCache;
+    mutable std::deque<std::wstring> _fpsHintCache;
+    mutable std::deque<std::wstring> _gpuHintCache;
+    mutable std::deque<std::wstring> _soundVolumeHintCache;
+    mutable std::deque<std::wstring> _tmpStringCache;
 
     void InitSystems();
     void InitScene();
