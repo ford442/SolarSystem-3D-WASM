@@ -5,7 +5,7 @@ const canvas = document.getElementById('canvas') as HTMLCanvasElement;
 const loadingContainer = document.getElementById('loading-container') as HTMLElement;
 const progressBar = document.getElementById('progress-bar') as HTMLElement;
 const progressText = document.getElementById('progress-text') as HTMLElement;
-const deployedBaseUrl = new URL(import.meta.env.BASE_URL, window.location.origin);
+const deployedBaseUrl = new URL(import.meta.env.BASE_URL, window.location.href);
 
 // Global progress tracking
 

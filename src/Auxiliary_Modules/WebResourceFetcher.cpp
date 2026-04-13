@@ -7,9 +7,11 @@
 #ifdef __EMSCRIPTEN__
 
 namespace {
+    constexpr const char* kDefaultRuntimeAssetBase = "/solar-system/";
+
     struct DownloadContext {
         std::function<void(bool)> callback;
-        std::string url;
+        std::string resolvedUrl;
         std::string virtualPath;
     };
 
@@ -31,8 +33,8 @@ namespace {
         return path;
     }
 
-    EM_JS(char*, GetRuntimeAssetBaseUrl, (), {
-        const fallbackBase = '/solar-system/';
+    EM_JS(char*, GetRuntimeAssetBaseUrl, (const char* fallbackBasePtr), {
+        const fallbackBase = UTF8ToString(fallbackBasePtr);
         const configuredBase =
             typeof window !== 'undefined' && typeof window.__solarSystemAssetBase === 'string' && window.__solarSystemAssetBase.length > 0
                 ? window.__solarSystemAssetBase
@@ -48,12 +50,12 @@ namespace {
             return path;
         }
 
-        char* runtimeBase = GetRuntimeAssetBaseUrl();
+        char* runtimeBase = GetRuntimeAssetBaseUrl(kDefaultRuntimeAssetBase);
         std::string baseUrl = runtimeBase ? runtimeBase : "";
         free(runtimeBase);
 
         if (baseUrl.empty()) {
-            baseUrl = "/solar-system/";
+            baseUrl = kDefaultRuntimeAssetBase;
         }
 
         return NormalizeBaseUrl(baseUrl) + TrimLeadingSlash(path);
@@ -77,7 +79,7 @@ void EnsureDirectoryExists(const std::string& path) {
 // Callback wrappers for emscripten_async_wget2
 void OnLoad2(unsigned int handle, void* arg, const char* file) {
     auto* context = static_cast<DownloadContext*>(arg);
-    std::cout << "Successfully downloaded: " << context->url << " -> " << context->virtualPath << std::endl;
+    std::cout << "Successfully downloaded: " << context->resolvedUrl << " -> " << context->virtualPath << std::endl;
     if (context->callback) {
         context->callback(true);
     }
@@ -86,7 +88,7 @@ void OnLoad2(unsigned int handle, void* arg, const char* file) {
 
 void OnError2(unsigned int handle, void* arg, int status) {
     auto* context = static_cast<DownloadContext*>(arg);
-    std::cerr << "Failed to download " << context->url << " -> " << context->virtualPath << ". Status: " << status << std::endl;
+    std::cerr << "Failed to download " << context->resolvedUrl << " -> " << context->virtualPath << ". Status: " << status << std::endl;
     if (context->callback) {
         context->callback(false);
     }
@@ -155,7 +157,6 @@ void WebResourceFetcher::DownloadFile(const std::string& url, const std::string&
 }
 
 void WebResourceFetcher::Fetch(const std::string& path) {
-    return;
 }
 
 #endif
