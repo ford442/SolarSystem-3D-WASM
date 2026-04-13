@@ -5,6 +5,7 @@ const canvas = document.getElementById('canvas') as HTMLCanvasElement;
 const loadingContainer = document.getElementById('loading-container') as HTMLElement;
 const progressBar = document.getElementById('progress-bar') as HTMLElement;
 const progressText = document.getElementById('progress-text') as HTMLElement;
+const deployedBaseUrl = new URL(import.meta.env.BASE_URL, window.location.origin);
 
 // Global progress tracking
 
@@ -32,14 +33,14 @@ function updateProgress(loaded: number, total: number) {
 
 // Expose progress function globally for C++ to call
 (window as any).updateLoadingProgress = updateProgress;
+(window as any).__solarSystemAssetBase = deployedBaseUrl.toString();
 
 const moduleConfig = {
     canvas: canvas,
-    // CRITICAL: Tell Emscripten to look for assets at the domain root
-    // because we moved .wasm and .data to the 'public' folder.
+    // Keep Emscripten runtime artifacts under the deployed Vite base path.
     locateFile: (path: string, prefix: string) => {
         if (path.endsWith('.wasm') || path.endsWith('.data')) {
-            return './' + path;
+            return new URL(path, deployedBaseUrl).toString();
         }
         return prefix + path;
     },

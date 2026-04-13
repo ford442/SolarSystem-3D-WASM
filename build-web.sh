@@ -81,15 +81,11 @@ if [ -f "SolarSystem.js" ]; then
     echo "Copied SolarSystem.js to web/src/"
 fi
 
-# [NEW STEP] Copy Resources to Public Folder so they can be fetched via URL
-echo "Copying resources to web/public..."
-mkdir -p "$PROJECT_ROOT/web/public/resource"
-# Recursive copy
-cp -r "$PROJECT_ROOT/resource/"* "$PROJECT_ROOT/web/public/resource/"
-
-# Create textures_low directory if it doesn't exist
-mkdir -p "$PROJECT_ROOT/web/public/resource/textures_low"
-echo "Created textures_low directory for LOD system"
+# Runtime resources are fetched from the deployed /solar-system/resource/ host path.
+# Do not mirror the local resource tree here because the repo intentionally omits
+# most DDS payloads and several large runtime assets.
+rm -rf "$PROJECT_ROOT/web/public/resource"
+echo "Skipping local resource copy; runtime assets will be fetched from /solar-system/resource/"
 
 # Copy Assets to public (served at root URL)
 if [ -f "SolarSystem.wasm" ]; then
