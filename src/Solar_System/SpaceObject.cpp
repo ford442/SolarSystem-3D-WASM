@@ -6,10 +6,10 @@ SpaceObject::SpaceObject(MeshHolder model, const Shader& shader, std::wstring en
 }
 
 void SpaceObject::Render() const {
-    _objectModel.Draw(_shader);
+    _objectModel.Draw(*_shader);
 }
 
-MeshHolder SpaceObject::GetModel() const {
+const MeshHolder& SpaceObject::GetModel() const {
     return _objectModel;
 }
 

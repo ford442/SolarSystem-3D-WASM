@@ -8,7 +8,7 @@ public:
     explicit SpaceObject(MeshHolder model, const Shader& shader, std::wstring engName = L"", std::wstring otherLangName = L"");
     virtual ~SpaceObject() = default;
     virtual void Render() const;
-    MeshHolder GetModel() const;
+    const MeshHolder& GetModel() const;
     const std::wstring& GetEngName() const;
     const std::wstring& GetOtherLangName() const;
 
