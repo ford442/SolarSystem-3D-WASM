@@ -4,11 +4,6 @@ Mesh::Mesh(std::vector<Vertex> vertices, std::vector<size_t> indices, std::vecto
     : _vao(0), _vbo(0), _ebo(0), _vertices(std::move(vertices)), _indices(std::move(indices)), _textures(std::move(textures))
 {
     SetupMesh();
-    // Free RAM copy after uploading to GPU
-    _vertices.clear();
-    _vertices.shrink_to_fit();
-    _indices.clear();
-    _indices.shrink_to_fit();
 }
 
 Mesh::~Mesh() {
@@ -24,6 +19,34 @@ Mesh::~Mesh() {
         glDeleteBuffers(1, &_ebo);
         _ebo = 0;
     }
+}
+
+Mesh::Mesh(const Mesh& other)
+    : _vertices(other._vertices), _indices(other._indices), _textures(other._textures), _vao(0), _vbo(0), _ebo(0)
+{
+    SetupMesh();
+}
+
+Mesh& Mesh::operator=(const Mesh& other) {
+    if (this != &other) {
+        if (_vao != 0) {
+            glDeleteVertexArrays(1, &_vao);
+        }
+        if (_vbo != 0) {
+            glDeleteBuffers(1, &_vbo);
+        }
+        if (_ebo != 0) {
+            glDeleteBuffers(1, &_ebo);
+        }
+        _vertices = other._vertices;
+        _indices = other._indices;
+        _textures = other._textures;
+        _vao = 0;
+        _vbo = 0;
+        _ebo = 0;
+        SetupMesh();
+    }
+    return *this;
 }
 
 Mesh::Mesh(Mesh&& other) noexcept

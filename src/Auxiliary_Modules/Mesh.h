@@ -27,9 +27,9 @@ public:
     explicit Mesh(std::vector<Vertex> vertices, std::vector<size_t> indices, std::vector<Texture> textures);
     ~Mesh();
     
-    // Delete copy to prevent double-free
-    Mesh(const Mesh&) = delete;
-    Mesh& operator=(const Mesh&) = delete;
+    // Deep copy (creates new GL buffers)
+    Mesh(const Mesh& other);
+    Mesh& operator=(const Mesh& other);
     
     // Move semantics for proper ownership transfer
     Mesh(Mesh&& other) noexcept;
