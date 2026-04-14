@@ -899,16 +899,28 @@ void CDDSImage::upload_texture2D(uint32_t imageIndex, uint32_t target) {
         // Clear any pending GL error before uploading so we get clean error feedback.
         glGetError();
 
+#ifdef __EMSCRIPTEN__
+        // WebGL2 requires level 0 compressed texture dimensions to be multiples of 4.
+        // S3TC blocks are 4x4. A 1024x1 texture takes the exact same 4096 bytes
+        // as a 1024x4 texture. We pad the dimension arguments to satisfy WebGL.
+        unsigned int base_w = image.get_width();
+        unsigned int base_h = image.get_height();
+        if (base_w > 0 && base_w < 4) base_w = 4;
+        if (base_h > 0 && base_h < 4) base_h = 4;
+
+        glCompressedTexImage2D(target, 0, m_format, base_w, base_h, 0, image.get_size(), image);
+#else
         glCompressedTexImage2D(target, 0, m_format, image.get_width(), image.get_height(), 0, image.get_size(), image);
+#endif
         {
             GLenum err = glGetError();
             if (err != GL_NO_ERROR) {
-                fprintf(stderr, "nv_dds: glCompressedTexImage2D level 0 failed (format 0x%X, %ux%u, size %u): GL error 0x%X\n",
-                        m_format, image.get_width(), image.get_height(), image.get_size(), err);
+                fprintf(stderr, "nv_dds: glCompressedTexImage2D level 0 failed (format 0x%X, size %u): GL error 0x%X\n",
+                        m_format, image.get_size(), err);
             }
         }
 
-        // load all mipmaps
+        // load all mipmaps (Mipmaps are legally allowed to be < 4 in WebGL)
         for (unsigned int i = 0; i < image.get_num_mipmaps(); i++) {
             const CSurface &mipmap = image.get_mipmap(i);
 

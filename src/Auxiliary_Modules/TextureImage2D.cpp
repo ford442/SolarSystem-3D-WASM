@@ -35,6 +35,9 @@ void TextureImage2D::LoadTextureFromFile(const std::string& path, GLint wrapPara
     // Mipmaps must be pre-embedded in the DDS file. Only attempt generation for
     // uncompressed textures that have no embedded mipmaps.
     if (!isCompressed) {
+        // Clear GL error queue to prevent old errors from triggering false positives here
+        while (glGetError() != GL_NO_ERROR);
+
         glGenerateMipmap(GL_TEXTURE_2D);
         GLenum err = glGetError();
         if (err != GL_NO_ERROR) {
@@ -54,8 +57,11 @@ void TextureImage2D::LoadTextureFromFile(const std::string& path, GLint wrapPara
              minFilter == GL_NEAREST_MIPMAP_LINEAR  ||
              minFilter == GL_LINEAR_MIPMAP_LINEAR);
         if (minFilterUsesMipmaps) {
+            // Mute this expected fallback warning for web builds to clean up the console
+#ifndef __EMSCRIPTEN__
             std::cerr << "Warning: No mipmaps for " << path
                       << " -- falling back min filter to GL_LINEAR" << std::endl;
+#endif
             minFilter = GL_LINEAR;
         }
     }
