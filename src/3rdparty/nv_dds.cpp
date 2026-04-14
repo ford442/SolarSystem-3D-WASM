@@ -931,24 +931,65 @@ void CDDSImage::upload_texture2D(uint32_t imageIndex, uint32_t target) {
 
 #ifdef __EMSCRIPTEN__
         GLenum internalFormat;
+        bool convertRGBtoRGBA = false;
+        
         switch (m_components) {
             case 1: internalFormat = GL_R8; break;
-            case 3: internalFormat = GL_RGB8; break;
+            case 3: 
+                internalFormat = GL_RGBA8; 
+                convertRGBtoRGBA = true; // WebGL 2 requires RGBA for glGenerateMipmap
+                break;
             case 4: internalFormat = GL_RGBA8; break;
             default: internalFormat = GL_RGBA8; break;
         }
+
+        if (convertRGBtoRGBA) {
+            // Convert Base Image from RGB to RGBA
+            unsigned int numPixels = image.get_width() * image.get_height();
+            uint8_t* rgbaPixels = new uint8_t[numPixels * 4];
+            const uint8_t* rgb = image;
+            for (unsigned int i = 0, j = 0; j < numPixels * 4; i += 3, j += 4) {
+                rgbaPixels[j]     = rgb[i];
+                rgbaPixels[j + 1] = rgb[i + 1];
+                rgbaPixels[j + 2] = rgb[i + 2];
+                rgbaPixels[j + 3] = 255;
+            }
+            glTexImage2D(target, 0, internalFormat, image.get_width(), image.get_height(), 0, GL_RGBA, GL_UNSIGNED_BYTE, rgbaPixels);
+            delete[] rgbaPixels;
+
+            // Convert all Mipmaps from RGB to RGBA
+            for (unsigned int m = 0; m < image.get_num_mipmaps(); m++) {
+                const CSurface &mipmap = image.get_mipmap(m);
+                unsigned int mipPixels = mipmap.get_width() * mipmap.get_height();
+                uint8_t* rgbaMip = new uint8_t[mipPixels * 4];
+                const uint8_t* rgbMip = mipmap;
+                for (unsigned int i = 0, j = 0; j < mipPixels * 4; i += 3, j += 4) {
+                    rgbaMip[j]     = rgbMip[i];
+                    rgbaMip[j + 1] = rgbMip[i + 1];
+                    rgbaMip[j + 2] = rgbMip[i + 2];
+                    rgbaMip[j + 3] = 255;
+                }
+                glTexImage2D(target, m + 1, internalFormat, mipmap.get_width(), mipmap.get_height(), 0, GL_RGBA, GL_UNSIGNED_BYTE, rgbaMip);
+                delete[] rgbaMip;
+            }
+        } else {
+            // Standard upload for R8 or RGBA8
+            glTexImage2D(target, 0, internalFormat, image.get_width(), image.get_height(), 0, m_format, GL_UNSIGNED_BYTE, image);
+            for (unsigned int i = 0; i < image.get_num_mipmaps(); i++) {
+                const CSurface &mipmap = image.get_mipmap(i);
+                glTexImage2D(target, i + 1, internalFormat, mipmap.get_width(), mipmap.get_height(), 0, m_format, GL_UNSIGNED_BYTE, mipmap);
+            }
+        }
 #else
         GLenum internalFormat = m_components;
-#endif
-
         glTexImage2D(target, 0, internalFormat, image.get_width(), image.get_height(), 0, m_format, GL_UNSIGNED_BYTE, image);
 
         // load all mipmaps
         for (unsigned int i = 0; i < image.get_num_mipmaps(); i++) {
             const CSurface &mipmap = image.get_mipmap(i);
-
             glTexImage2D(target, i + 1, internalFormat, mipmap.get_width(), mipmap.get_height(), 0, m_format, GL_UNSIGNED_BYTE, mipmap);
         }
+#endif
 
         if (alignment != -1)
             glPixelStorei(GL_UNPACK_ALIGNMENT, alignment);
