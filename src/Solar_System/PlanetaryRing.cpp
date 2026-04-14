@@ -1,7 +1,7 @@
 #include "PlanetaryRing.h"
 
 PlanetaryRing::PlanetaryRing(const PlanetaryRingInfo& planetaryRingInfo, std::shared_ptr<Planet> parentPlanet) :
-    SpaceObject(planetaryRingInfo.ringModel, planetaryRingInfo.ringShader), _ringTexture(planetaryRingInfo.ringDiffuse),
+    SpaceObject(planetaryRingInfo.ringModel, *planetaryRingInfo.ringShader), _ringTexture(planetaryRingInfo.ringDiffuse),
     _parentPlanet(std::move(parentPlanet)), _ringInnerRadius(planetaryRingInfo.ringInnerRadius), _ringOuterRadius(planetaryRingInfo.ringOuterRadius), _ringNormal(_upVector)
 {
 }

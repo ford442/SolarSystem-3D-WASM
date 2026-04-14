@@ -1,7 +1,7 @@
 #include "Satellite.h"
 
 Satellite::Satellite(const SatelliteInfo& satelliteInfo, std::shared_ptr<SpaceObject> parent) :
-    SpaceObject(satelliteInfo.satelliteModel, satelliteInfo.satelliteShader, satelliteInfo.engName, satelliteInfo.otherLangName), _parent(std::move(parent)),
+    SpaceObject(satelliteInfo.satelliteModel, *satelliteInfo.satelliteShader, satelliteInfo.engName, satelliteInfo.otherLangName), _parent(std::move(parent)),
     _earthSizeCoefficient(satelliteInfo.earthSizeCoefficient)
 {
     _radius *= _earthSizeCoefficient;

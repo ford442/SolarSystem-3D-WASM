@@ -7,8 +7,8 @@
 
 struct StarInfo {
     MeshHolder starModel;
-    Shader starShader;
-    Shader glowStarShader;
+    const Shader* starShader;
+    const Shader* glowStarShader;
     TextureImage2D starSpectrum;
     float starTemperature;
     float starRadius;
@@ -18,7 +18,7 @@ struct StarInfo {
 
     explicit StarInfo(MeshHolder model, const Shader& shader, const Shader& glowShader, const TextureImage2D& spectrum, float temperature,
                       float radius, const glm::vec3& glowTintMult, std::wstring engName = L"", std::wstring otherLangName = L"") :
-                      starModel(std::move(model)), starShader(shader), glowStarShader(glowShader), starSpectrum(spectrum),
+                      starModel(std::move(model)), starShader(&shader), glowStarShader(&glowShader), starSpectrum(spectrum),
                       starTemperature(temperature), starRadius(radius), engName(std::move(engName)), otherLangName(std::move(otherLangName)),
                       glowTintMult(glowTintMult) {}
 };
@@ -60,7 +60,7 @@ private:
     std::array<GLuint, 2> _starOcclusion;
     GLuint _glowVao = 0, _glowVbo = 0, _glowEbo = 0;
     GLuint _coronaVao = 0, _coronaVbo = 0, _coronaEbo = 0;
-    Shader _glowShader;
+    const Shader* _glowShader;
 
     void InitBuffers();
     void CalculateShiftColor();

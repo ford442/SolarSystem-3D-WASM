@@ -4,13 +4,13 @@
 
 struct AtmosphereInfo {
     MeshHolder atmosphereModel;
-    Shader atmosphereShader;
+    const Shader* atmosphereShader;
     glm::vec3 atmosphereColor, mieTint;
     float scaleFactor, innerRadius, outerRadius;
 
     explicit AtmosphereInfo(MeshHolder model, const Shader& shader, float earthScaleFactor, const glm::vec3& atmosphereColor,
                             float innerRadius, float outerRadius, const glm::vec3& mieTint = glm::vec3(1.0)) : atmosphereModel(std::move(model)),
-                            atmosphereShader(shader), scaleFactor(earthScaleFactor), atmosphereColor(atmosphereColor), mieTint(mieTint), innerRadius(innerRadius),
+                            atmosphereShader(&shader), scaleFactor(earthScaleFactor), atmosphereColor(atmosphereColor), mieTint(mieTint), innerRadius(innerRadius),
                             outerRadius(outerRadius) {}
 };
 

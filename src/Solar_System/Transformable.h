@@ -13,13 +13,13 @@ public:
     void LoadIdentityModelMatrix();
     void UpdateModelMatrix();
     void SetShader(const Shader& shader);
-    Shader GetShader() const;
+    const Shader& GetShader() const;
     glm::mat4 GetRotationMatrix() const;
     glm::vec3 GetPosition() const;
     float GetLastRotationAngle() const;
 
 protected:
-    Shader _shader;
+    const Shader* _shader;
 
 private:
     glm::mat4 _matrixModel = glm::mat4(1.0f), _rotationMatrix = glm::mat4(1.0f); // rotationMatrix is separately needed for the correct ring normal for ray casting

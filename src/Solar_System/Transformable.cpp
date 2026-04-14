@@ -1,6 +1,6 @@
 #include "Transformable.h"
 
-Transformable::Transformable(const Shader& shader) : _shader(shader)
+Transformable::Transformable(const Shader& shader) : _shader(&shader)
 {
 }
 
@@ -25,15 +25,15 @@ void Transformable::LoadIdentityModelMatrix() {
 }
 
 void Transformable::UpdateModelMatrix() {
-    _shader.SetMat4("model", _matrixModel);
+    _shader->SetMat4("model", _matrixModel);
 }
 
 void Transformable::SetShader(const Shader& shader) {
-    _shader = shader;
+    _shader = &shader;
 }
 
-Shader Transformable::GetShader() const {
-    return _shader;
+const Shader& Transformable::GetShader() const {
+    return *_shader;
 }
 
 glm::mat4 Transformable::GetRotationMatrix() const {

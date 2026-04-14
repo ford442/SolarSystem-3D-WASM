@@ -33,7 +33,7 @@ public:
                 const std::optional<RingCameraInfo>& ringCameraInfo) const;
 
 private:
-    Shader _lensFlareShader;
+    const Shader* _lensFlareShader;
     TextureImage2D _lensTexture;
     size_t _numSprites;
     GLuint _vao = 0; // Объект вершинного массива (VAO)

@@ -10,7 +10,7 @@ public:
     GLuint GetHdrFBO() const;
 
 private:
-    Shader _hdrShader;
+    const Shader* _hdrShader;
     GLuint _quadVao = 0, _quadVbo = 0, _hdrFrameBuffer = 0, _colorBuffer = 0, _rboDepth = 0;
 
     void InitQuadBuffers();

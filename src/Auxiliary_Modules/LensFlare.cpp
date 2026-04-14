@@ -1,6 +1,6 @@
 #include "LensFlare.h"
 
-LensFlare::LensFlare(const Shader& shader, const TextureImage2D& lensTexture, const FlaresInfo& properties) : _lensFlareShader(shader), _lensTexture(lensTexture) {
+LensFlare::LensFlare(const Shader& shader, const TextureImage2D& lensTexture, const FlaresInfo& properties) : _lensFlareShader(&shader), _lensTexture(lensTexture) {
     _numSprites = properties.sprites.size();
 
     constexpr glm::vec2 positions[4] = {
@@ -88,23 +88,23 @@ void LensFlare::Render(const glm::mat4& projection, const glm::mat4& view, const
 
     glm::vec2 dims(size, size * aspectRatio);
 
-    _lensFlareShader.Use();
-    _lensFlareShader.SetMat4("projection", projection);
-    _lensFlareShader.SetMat4("view", view);
-    _lensFlareShader.SetVec3("center", center);
-    _lensFlareShader.SetVec3("color", color);
-    _lensFlareShader.SetVec2("dims", dims);
-    _lensFlareShader.SetFloat("intensity", intensity);
-    _lensFlareShader.SetInt("lensTexture", 0);
-    _lensFlareShader.SetInt("ringDiffuse", 1);
+    _lensFlareShader->Use();
+    _lensFlareShader->SetMat4("projection", projection);
+    _lensFlareShader->SetMat4("view", view);
+    _lensFlareShader->SetVec3("center", center);
+    _lensFlareShader->SetVec3("color", color);
+    _lensFlareShader->SetVec2("dims", dims);
+    _lensFlareShader->SetFloat("intensity", intensity);
+    _lensFlareShader->SetInt("lensTexture", 0);
+    _lensFlareShader->SetInt("ringDiffuse", 1);
     glBindTextureUnit(0, _lensTexture.GetTexture());
 
-    _lensFlareShader.SetBool("isPlanetaryRingInView", ringCameraInfo.has_value());
+    _lensFlareShader->SetBool("isPlanetaryRingInView", ringCameraInfo.has_value());
     if (ringCameraInfo) {
-        _lensFlareShader.SetVec3("cameraPosition", ringCameraInfo->cameraPosition);
-        _lensFlareShader.SetVec3("ringCenter", ringCameraInfo->ringCenter);
-        _lensFlareShader.SetVec3("ringNormal", ringCameraInfo->ringNormal);
-        _lensFlareShader.SetVec2("ringInnerOuterRadiuses", ringCameraInfo->ringInnerOuterRadiuses);
+        _lensFlareShader->SetVec3("cameraPosition", ringCameraInfo->cameraPosition);
+        _lensFlareShader->SetVec3("ringCenter", ringCameraInfo->ringCenter);
+        _lensFlareShader->SetVec3("ringNormal", ringCameraInfo->ringNormal);
+        _lensFlareShader->SetVec2("ringInnerOuterRadiuses", ringCameraInfo->ringInnerOuterRadiuses);
         glBindTextureUnit(1, ringCameraInfo->ringDiffuse);
     }
 

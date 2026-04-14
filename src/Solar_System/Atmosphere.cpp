@@ -1,7 +1,7 @@
 #include "Atmosphere.h"
 
 Atmosphere::Atmosphere(const AtmosphereInfo& atmosphereInfo, std::shared_ptr<SpaceObject> parent)
-    : OuterShell(atmosphereInfo.atmosphereModel, atmosphereInfo.atmosphereShader, std::move(parent), atmosphereInfo.scaleFactor),
+    : OuterShell(atmosphereInfo.atmosphereModel, *atmosphereInfo.atmosphereShader, std::move(parent), atmosphereInfo.scaleFactor),
       _atmosphereColor(atmosphereInfo.atmosphereColor), _mieTint(atmosphereInfo.mieTint), _innerRadius(atmosphereInfo.innerRadius), _outerRadius(atmosphereInfo.outerRadius)
 {
     _atmosphereOuterBoundary *= atmosphereInfo.scaleFactor;

@@ -5,12 +5,12 @@
 
 struct CloudsInfo {
     MeshHolder cloudsModel;
-    Shader cloudsShader;
+    const Shader* cloudsShader;
     float scaleFactor;
     TextureImage2D diffuseMap, normalMap;
 
     explicit CloudsInfo(MeshHolder model, const Shader& shader, float earthScaleFactor, const TextureImage2D& diffuse, const TextureImage2D& normal)
-        : cloudsModel(std::move(model)), cloudsShader(shader), scaleFactor(earthScaleFactor), diffuseMap(diffuse), normalMap(normal) {}
+        : cloudsModel(std::move(model)), cloudsShader(&shader), scaleFactor(earthScaleFactor), diffuseMap(diffuse), normalMap(normal) {}
 };
 
 class Clouds : public OuterShell {

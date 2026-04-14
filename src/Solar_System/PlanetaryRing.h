@@ -5,11 +5,11 @@
 struct PlanetaryRingInfo {
     MeshHolder ringModel;
     float ringInnerRadius, ringOuterRadius;
-    Shader ringShader;
+    const Shader* ringShader;
     TextureImage2D ringDiffuse;
 
     explicit PlanetaryRingInfo(MeshHolder model, float innerRadius, float outerRadius, const Shader& shader, const TextureImage2D& diffuse) :
-                               ringModel(std::move(model)), ringInnerRadius(innerRadius), ringOuterRadius(outerRadius), ringShader(shader),
+                               ringModel(std::move(model)), ringInnerRadius(innerRadius), ringOuterRadius(outerRadius), ringShader(&shader),
                                ringDiffuse(diffuse) {}
 };
 

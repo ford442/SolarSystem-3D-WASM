@@ -1,6 +1,6 @@
 #include "HDR.h"
 
-HDR::HDR(const Shader& shader, uint16_t width, uint16_t height) : _hdrShader(shader) {
+HDR::HDR(const Shader& shader, uint16_t width, uint16_t height) : _hdrShader(&shader) {
     InitQuadBuffers();
     InitFBO(width, height);
 }
@@ -29,12 +29,12 @@ HDR::~HDR() {
 }
 
 void HDR::Render(float exposure, float gamma) const {
-    _hdrShader.Use();
-    _hdrShader.SetInt("hdrBuffer", 0);
+    _hdrShader->Use();
+    _hdrShader->SetInt("hdrBuffer", 0);
     glBindTextureUnit(0, _colorBuffer);
-    _hdrShader.SetBool("hdr", true);
-    _hdrShader.SetFloat("exposure", exposure);
-    _hdrShader.SetFloat("gamma", gamma);
+    _hdrShader->SetBool("hdr", true);
+    _hdrShader->SetFloat("exposure", exposure);
+    _hdrShader->SetFloat("gamma", gamma);
 
     glBindVertexArray(_quadVao);
     glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
