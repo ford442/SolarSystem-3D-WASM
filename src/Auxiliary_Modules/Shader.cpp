@@ -263,6 +263,8 @@ void Shader::CheckCompileErrors(size_t shader, ShaderType type, const std::strin
         glGetShaderiv(shader, GL_COMPILE_STATUS, &success);
         if (!success) {
             glGetShaderInfoLog(shader, 1024, nullptr, infoLog);
+            std::cerr << "ERROR::SHADER::COMPILATION_FAILED\nType: " << ShaderTypeToString(type)
+                      << "\nPath: " << path << "\n" << infoLog << "\n -- --------------------------------------------------- -- " << std::endl;
             throw std::runtime_error("ERROR::SHADER_COMPILATION_ERROR of type: " + ShaderTypeToString(type) + " " + path + "\n" + std::string(infoLog) + "\n -- --------------------------------------------------- -- ");
         }
     }
@@ -270,6 +272,8 @@ void Shader::CheckCompileErrors(size_t shader, ShaderType type, const std::strin
         glGetProgramiv(shader, GL_LINK_STATUS, &success);
         if (!success) {
             glGetProgramInfoLog(shader, 1024, nullptr, infoLog);
+            std::cerr << "ERROR::SHADER::PROGRAM_LINKING_FAILED\nType: " << ShaderTypeToString(type)
+                      << "\nPath: " << path << "\n" << infoLog << "\n -- --------------------------------------------------- -- " << std::endl;
             throw std::runtime_error("ERROR::PROGRAM_LINKING_ERROR of type: " + ShaderTypeToString(type) + "\n" + std::string(infoLog) + path + "\n -- --------------------------------------------------- --");
         }
     }

@@ -77,6 +77,7 @@ private:
     std::unique_ptr<Shader> _shadowMapShader;
     std::unique_ptr<Shader> _mainSkyBoxShader, _mainTextShader, _mainStarShader, _mainCoronaStarShader, _mainPlanetShader, _mainAtmosphereShader, _mainCloudsShader,
         _mainRingShader;
+    std::unique_ptr<Shader> _hdrShader, _lensFlareShader, _starGlowShader;
     std::unique_ptr<LensFlare> _lensFlare;
     std::shared_ptr<Star> _sun;
     std::vector<RenderableSceneComponent> _renderableSceneComponents;

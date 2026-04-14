@@ -808,7 +808,8 @@ void Application::LoadResources() {
 void Application::InitSceneObjects() {
     camera.SetAspect(static_cast<float>(_displayWidth) / static_cast<float>(_displayHeight));
     _shadowMapFBO = make_unique<ShadowMapFBO>(3000, 3000); 
-    _hdr = make_unique<HDR>(Shader("resource/shaders/passThrough.vs", "resource/shaders/hdr.fs"), _displayWidth, _displayHeight);
+    _hdrShader = make_unique<Shader>("resource/shaders/passThrough.vs", "resource/shaders/hdr.fs");
+    _hdr = make_unique<HDR>(*_hdrShader, _displayWidth, _displayHeight);
 
     const vector<string> skyBoxFaces = {
             "resource/textures/Main_SkyBox/PositiveX.dds",
@@ -831,7 +832,8 @@ void Application::InitSceneObjects() {
     _mainAtmosphereShader = make_unique<Shader>("resource/shaders/atmosphere.vs", "resource/shaders/atmosphere.fs");
     _mainCloudsShader = make_unique<Shader>("resource/shaders/planetLighting.vs", "resource/shaders/cloudsLighting.fs");
     _mainRingShader = make_unique<Shader>("resource/shaders/planetaryRingLighting.vs", "resource/shaders/planetaryRingLighting.fs");
-    _lensFlare = make_unique<LensFlare>(Shader("resource/shaders/lensFlare.vs", "resource/shaders/lensFlare.fs"), TextureImage2D("resource/textures/flares_bright.dds"),
+    _lensFlareShader = make_unique<Shader>("resource/shaders/lensFlare.vs", "resource/shaders/lensFlare.fs");
+    _lensFlare = make_unique<LensFlare>(*_lensFlareShader, TextureImage2D("resource/textures/flares_bright.dds"),
             FlaresInfo {4,
             {
                 FlareSprite{false, 1.0, 7.0, 0},
@@ -872,7 +874,8 @@ void Application::InitSongList() {
 void Application::InitStarSystem() {
     _sphereModel = std::make_unique<MeshHolder>("resource/models/sphere.obj");
 
-    StarInfo sunInfo(*_sphereModel, *_mainStarShader, Shader("resource/shaders/starGlow.vs", "resource/shaders/starGlow.fs"), TextureImage2D("resource/textures/Star_Spectrum.dds"),
+    _starGlowShader = make_unique<Shader>("resource/shaders/starGlow.vs", "resource/shaders/starGlow.fs");
+    StarInfo sunInfo(*_sphereModel, *_mainStarShader, *_starGlowShader, TextureImage2D("resource/textures/Star_Spectrum.dds"),
                      starTemperatureInKelvin, 696342.0, glm::vec3(0.99607843, 0.890196078, 0.725490196), L"Sun", L"Солнце");
     _sun = make_shared<Sun>(sunInfo);
 
