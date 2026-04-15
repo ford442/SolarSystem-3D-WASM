@@ -47,7 +47,7 @@ void Neptune::Render() const {
 }
 
 void Neptune::LoadHighResIfClose(const glm::vec3& cameraPos) {
-#ifdef __EMSCRIPTEN__
+#ifndef __EMSCRIPTEN__
     if (_isHighResLoaded) {
         return;
     }

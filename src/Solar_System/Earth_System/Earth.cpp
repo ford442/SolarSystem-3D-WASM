@@ -53,7 +53,7 @@ void Earth::Render() const {
 }
 
 void Earth::LoadHighResIfClose(const glm::vec3& cameraPos) {
-#ifdef __EMSCRIPTEN__
+#ifndef __EMSCRIPTEN__
     // Check if already high-res
     if (_isHighResLoaded) {
         return;

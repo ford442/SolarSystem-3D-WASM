@@ -1006,6 +1006,13 @@ void CDDSImage::upload_texture2D(uint32_t imageIndex, uint32_t target) {
         if (alignment != -1)
             glPixelStorei(GL_UNPACK_ALIGNMENT, alignment);
     }
+
+#ifdef __EMSCRIPTEN__
+    // WebGL 2 Strictness Fix: Prevent "incomplete" black textures by capping the mipmap level.
+    // If WebGL expects a 1x1 mipmap and the DDS stops at 4x4, it renders the entire texture solid black.
+    GLenum paramTarget = (target == GL_TEXTURE_2D) ? GL_TEXTURE_2D : GL_TEXTURE_CUBE_MAP;
+    glTexParameteri(paramTarget, GL_TEXTURE_MAX_LEVEL, image.get_num_mipmaps());
+#endif
 }
 
 #ifndef GL_ES_VERSION_2_0
