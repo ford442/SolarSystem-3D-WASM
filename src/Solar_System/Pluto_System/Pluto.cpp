@@ -1,11 +1,13 @@
 #include "Pluto.h"
+#include "../../Auxiliary_Modules/TextureLoadingQueue.h"
 
 Pluto::Pluto(const PlanetInfo& planetInfo, std::shared_ptr<Star> parentStar) : Planet(planetInfo, std::move(parentStar)), _diffuses(planetInfo.diffuseTextures),
     _normalMap(planetInfo.normalMap), _specular(planetInfo.specularTexture)
 {
-    Translate(_parentStar->GetPosition() + glm::vec3(2800.0f, 0.0f, 1757.73f)); // Init position for light space matrix
+    Translate(_parentStar->GetPosition() + glm::vec3(2800.0f, 0.0f, 1757.73f));
 #ifdef __EMSCRIPTEN__
     _isHighResLoaded = false;
+    _isHighResLoading = false;
 #else
     _isHighResLoaded = true;
 #endif
@@ -43,26 +45,31 @@ void Pluto::Render() const {
 }
 
 void Pluto::LoadHighResIfClose(const glm::vec3& cameraPos) {
-#ifndef __EMSCRIPTEN__
-    if (_isHighResLoaded) {
+    if (_isHighResLoaded || _isHighResLoading) {
         return;
     }
 
     float distance = glm::length(cameraPos - GetPosition());
 
     if (distance < _lodThreshold) {
-        std::cout << "[LOD] Camera distance to Pluto: " << distance << " units. Loading high-res textures..." << std::endl;
+        std::cout << "[LOD] Camera distance to Pluto: " << distance << " units. Queueing high-res textures..." << std::endl;
+        _isHighResLoading = true;
+        _highResTexturesLoaded = 0;
+        _highResLoadProgress = 0.0f;
 
-        try {
-            _diffuses.at(0).ReloadTexture(_diffuseHighPath);
-            _normalMap.ReloadTexture(_normalHighPath);
-            _specular.ReloadTexture(_specularHighPath);
+        auto& queue = TextureLoadingQueue::GetInstance();
+        auto onLoaded = [this](bool success) {
+            if (success) _highResTexturesLoaded++;
+            _highResLoadProgress = _highResTexturesLoaded / (float)_highResTextureCount;
+            if (_highResTexturesLoaded == _highResTextureCount) {
+                _isHighResLoaded = true;
+                _isHighResLoading = false;
+                std::cout << "[LOD] Pluto high-res textures loaded successfully" << std::endl;
+            }
+        };
 
-            _isHighResLoaded = true;
-            std::cout << "[LOD] Pluto high-res textures loaded successfully" << std::endl;
-        } catch (const std::exception& e) {
-            std::cerr << "[LOD] ERROR: Failed to load high-res textures for Pluto: " << e.what() << std::endl;
-        }
+        queue.QueueTextureLoad(_diffuseHighPath, "Pluto_Diffuse_High", &_diffuses.at(0), onLoaded);
+        queue.QueueTextureLoad(_normalHighPath, "Pluto_Normal_High", &_normalMap, onLoaded);
+        queue.QueueTextureLoad(_specularHighPath, "Pluto_Specular_High", &_specular, onLoaded);
     }
-#endif
 }
