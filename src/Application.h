@@ -139,6 +139,7 @@ private:
     void RenderPlanetSatelliteStarDistances() const;
     void RenderSpaceObjectDistance(const SpaceObject* spaceObject) const;
     void RenderHints() const;
+    void RenderTextureLoadingProgress() const;
     void ConfigureMainShaders();
     void ConfigureMainPlanetShader(const RenderableSceneComponent& renderableComponent);
     void UpdateOcclusionQuery();
