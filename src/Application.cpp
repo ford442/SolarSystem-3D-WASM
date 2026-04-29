@@ -1,5 +1,6 @@
 #include "Application.h"
 #include "Auxiliary_Modules/WebResourceFetcher.h"
+#include "Auxiliary_Modules/TextureLoadingQueue.h"
 #include <SDL_image.h>
 #include <random>
 #include <iomanip>
@@ -198,6 +199,10 @@ void Application::RunOneFrame() {
         RenderPlanetSatelliteStarDistances();
     if (isRenderHints)
         RenderHints();
+
+    // Process texture loading queue
+    TextureLoadingQueue::GetInstance().ProcessQueue();
+    RenderTextureLoadingProgress();
 
 #ifdef __EMSCRIPTEN__
     UpdateSearchNearestPlanet();
@@ -582,6 +587,31 @@ void Application::RenderHints() const {
     _textRenderer->Render(*_mainTextShader, starTemperatureHint, 0.01 * _displayWidth, 0.625 * _displayHeight, 0.35, textColor);
     _textRenderer->Render(*_mainTextShader, vertSyncHint, 0.01 * _displayWidth, 0.6 * _displayHeight, 0.35, textColor);
     _textRenderer->Render(*_mainTextShader, textHints, 0.01 * _displayWidth, 0.575 * _displayHeight, 0.35, textColor);
+
+    glDisable(GL_BLEND);
+    glEnable(GL_DEPTH_TEST);
+}
+
+void Application::RenderTextureLoadingProgress() const {
+    auto& queue = TextureLoadingQueue::GetInstance();
+    if (queue.GetQueuedCount() == 0) {
+        return;
+    }
+
+    glDisable(GL_DEPTH_TEST);
+    glEnable(GL_BLEND);
+    glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+
+    static const glm::mat4 textProjection = glm::ortho(0.0f, static_cast<float>(_displayWidth), 0.0f, static_cast<float>(_displayHeight));
+    static constexpr glm::vec3 textColor = glm::vec3(0.3f, 0.8f, 1.0f);
+
+    _mainTextShader->Use();
+    _mainTextShader->SetMat4("projection", textProjection);
+    _mainTextShader->SetBool("is3D", false);
+
+    deque<wstring> loadingHint;
+    loadingHint.emplace_back(L"Loading high-res textures...");
+    _textRenderer->Render(*_mainTextShader, loadingHint, 0.5f * _displayWidth - 150, 0.1f * _displayHeight, 0.25, textColor);
 
     glDisable(GL_BLEND);
     glEnable(GL_DEPTH_TEST);
