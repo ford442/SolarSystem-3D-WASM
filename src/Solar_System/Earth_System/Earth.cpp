@@ -1,15 +1,17 @@
 #include "Earth.h"
+#include "../../Auxiliary_Modules/TextureLoadingQueue.h"
 #include <glm/glm.hpp>
 #include <iostream>
 
 Earth::Earth(const PlanetInfo& planetInfo, std::shared_ptr<Star> parentStar) : Planet(planetInfo, std::move(parentStar)), _diffuses(planetInfo.diffuseTextures),
     _normalMap(planetInfo.normalMap), _specular(planetInfo.specularTexture)
 {
-    Translate(_parentStar->GetPosition() + glm::vec3(1900.0f, 0.0f, 0.0f)); // Init position for light space matrix
+    Translate(_parentStar->GetPosition() + glm::vec3(1900.0f, 0.0f, 0.0f));
 #ifdef __EMSCRIPTEN__
-    _isHighResLoaded = false; // Start with low-res for web
+    _isHighResLoaded = false;
+    _isHighResLoading = false;
 #else
-    _isHighResLoaded = true; // Desktop loads high-res directly
+    _isHighResLoaded = true;
 #endif
 }
 
@@ -53,42 +55,51 @@ void Earth::Render() const {
 }
 
 void Earth::LoadHighResIfClose(const glm::vec3& cameraPos) {
-    // Check if already high-res
-    if (_isHighResLoaded) {
+    if (_isHighResLoaded || _isHighResLoading) {
         return;
     }
 
-    // Calculate distance from camera to planet center
     float distance = glm::length(cameraPos - GetPosition());
 
-    // If camera is close enough, load high-res textures
     if (distance < _lodThreshold) {
-        std::cout << "[LOD] Camera distance to Earth: " << distance << " units. Loading high-res textures..." << std::endl;
+        std::cout << "[LOD] Camera distance to Earth: " << distance << " units. Queueing high-res textures..." << std::endl;
+        _isHighResLoading = true;
+        _highResTexturesLoaded = 0;
+        _highResLoadProgress = 0.0f;
 
-#ifdef __EMSCRIPTEN__
-        // Notify frontend to show a per-planet loader (JS should implement window.showPlanetLoader/hidePlanetLoader)
-        EM_ASM({ if (typeof window !== 'undefined' && typeof window.showPlanetLoader === 'function') window.showPlanetLoader(UTF8ToString($0)); }, "Earth");
-#endif
-        try {
-            // Reload diffuse texture (day texture at index 0 - guaranteed to exist from initialization)
-            _diffuses.at(0).ReloadTexture(_diffuseHighPath);
+        auto& queue = TextureLoadingQueue::GetInstance();
 
-            // Reload normal map
-            _normalMap.ReloadTexture(_normalHighPath);
+        queue.QueueTextureLoad(_diffuseHighPath, "Earth_Day_Diffuse_High", &_diffuses.at(0),
+            [this](bool success) {
+                if (success) _highResTexturesLoaded++;
+                _highResLoadProgress = _highResTexturesLoaded / (float)_highResTextureCount;
+                if (_highResTexturesLoaded == _highResTextureCount) {
+                    _isHighResLoaded = true;
+                    _isHighResLoading = false;
+                    std::cout << "[LOD] Earth high-res textures loaded successfully" << std::endl;
+                }
+            });
 
-            // Reload specular map
-            _specular.ReloadTexture(_specularHighPath);
+        queue.QueueTextureLoad(_normalHighPath, "Earth_Normal_High", &_normalMap,
+            [this](bool success) {
+                if (success) _highResTexturesLoaded++;
+                _highResLoadProgress = _highResTexturesLoaded / (float)_highResTextureCount;
+                if (_highResTexturesLoaded == _highResTextureCount) {
+                    _isHighResLoaded = true;
+                    _isHighResLoading = false;
+                    std::cout << "[LOD] Earth high-res textures loaded successfully" << std::endl;
+                }
+            });
 
-            _isHighResLoaded = true;
-            std::cout << "[LOD] Earth high-res textures loaded successfully (Day Diffuse, Normal, Specular)" << std::endl;
-        } catch (const std::exception& e) {
-            std::cerr << "[LOD] ERROR: Failed to load high-res textures: " << e.what() << std::endl;
-            // Keep using low-res textures on failure
-        }
-
-#ifdef __EMSCRIPTEN__
-        // Hide frontend loader
-        EM_ASM({ if (typeof window !== 'undefined' && typeof window.hidePlanetLoader === 'function') window.hidePlanetLoader(UTF8ToString($0)); }, "Earth");
-#endif
+        queue.QueueTextureLoad(_specularHighPath, "Earth_Specular_High", &_specular,
+            [this](bool success) {
+                if (success) _highResTexturesLoaded++;
+                _highResLoadProgress = _highResTexturesLoaded / (float)_highResTextureCount;
+                if (_highResTexturesLoaded == _highResTextureCount) {
+                    _isHighResLoaded = true;
+                    _isHighResLoading = false;
+                    std::cout << "[LOD] Earth high-res textures loaded successfully" << std::endl;
+                }
+            });
     }
 }

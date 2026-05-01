@@ -18,6 +18,10 @@ private:
     std::string _specularHighPath = "resource/textures/Pluto_Specular.dds";
 
     bool _isHighResLoaded = false;
+    bool _isHighResLoading = false;
+    float _highResLoadProgress = 0.0f;
+    int _highResTexturesLoaded = 0;
+    const int _highResTextureCount = 3;
     const float _lodThreshold = 50.0f;
 };
 

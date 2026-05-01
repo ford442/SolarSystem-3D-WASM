@@ -1,11 +1,13 @@
 #include "Mars.h"
+#include "../../Auxiliary_Modules/TextureLoadingQueue.h"
 
 Mars::Mars(const PlanetInfo& planetInfo, std::shared_ptr<Star> parentStar) : Planet(planetInfo, std::move(parentStar)), _diffuses(planetInfo.diffuseTextures),
     _normalMap(planetInfo.normalMap)
 {
-    Translate(_parentStar->GetPosition() + glm::vec3(-1732.0f, 0.0f, 1000.0f)); // Init position for light space matrix
+    Translate(_parentStar->GetPosition() + glm::vec3(-1732.0f, 0.0f, 1000.0f));
 #ifdef __EMSCRIPTEN__
     _isHighResLoaded = false;
+    _isHighResLoading = false;
 #else
     _isHighResLoaded = true;
 #endif
@@ -42,23 +44,30 @@ void Mars::Render() const {
 }
 
 void Mars::LoadHighResIfClose(const glm::vec3& cameraPos) {
-    if (_isHighResLoaded) {
+    if (_isHighResLoaded || _isHighResLoading) {
         return;
     }
 
     float distance = glm::length(cameraPos - GetPosition());
 
     if (distance < _lodThreshold) {
-        std::cout << "[LOD] Camera distance to Mars: " << distance << " units. Loading high-res textures..." << std::endl;
+        std::cout << "[LOD] Camera distance to Mars: " << distance << " units. Queueing high-res textures..." << std::endl;
+        _isHighResLoading = true;
+        _highResTexturesLoaded = 0;
+        _highResLoadProgress = 0.0f;
 
-        try {
-            _diffuses.at(0).ReloadTexture(_diffuseHighPath);
-            _normalMap.ReloadTexture(_normalHighPath);
+        auto& queue = TextureLoadingQueue::GetInstance();
+        auto onLoaded = [this](bool success) {
+            if (success) _highResTexturesLoaded++;
+            _highResLoadProgress = _highResTexturesLoaded / (float)_highResTextureCount;
+            if (_highResTexturesLoaded == _highResTextureCount) {
+                _isHighResLoaded = true;
+                _isHighResLoading = false;
+                std::cout << "[LOD] Mars high-res textures loaded successfully" << std::endl;
+            }
+        };
 
-            _isHighResLoaded = true;
-            std::cout << "[LOD] Mars high-res textures loaded successfully" << std::endl;
-        } catch (const std::exception& e) {
-            std::cerr << "[LOD] ERROR: Failed to load high-res textures for Mars: " << e.what() << std::endl;
-        }
+        queue.QueueTextureLoad(_diffuseHighPath, "Mars_Diffuse_High", &_diffuses.at(0), onLoaded);
+        queue.QueueTextureLoad(_normalHighPath, "Mars_Normal_High", &_normalMap, onLoaded);
     }
 }
