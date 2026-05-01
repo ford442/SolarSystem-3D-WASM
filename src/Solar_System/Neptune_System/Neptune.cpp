@@ -47,7 +47,6 @@ void Neptune::Render() const {
 }
 
 void Neptune::LoadHighResIfClose(const glm::vec3& cameraPos) {
-#ifndef __EMSCRIPTEN__
     if (_isHighResLoaded) {
         return;
     }
@@ -67,5 +66,4 @@ void Neptune::LoadHighResIfClose(const glm::vec3& cameraPos) {
             std::cerr << "[LOD] ERROR: Failed to load high-res textures for Neptune: " << e.what() << std::endl;
         }
     }
-#endif
 }

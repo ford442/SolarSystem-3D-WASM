@@ -47,7 +47,6 @@ void Uranus::Render() const {
 }
 
 void Uranus::LoadHighResIfClose(const glm::vec3& cameraPos) {
-#ifndef __EMSCRIPTEN__
     if (_isHighResLoaded) {
         return;
     }
@@ -67,5 +66,4 @@ void Uranus::LoadHighResIfClose(const glm::vec3& cameraPos) {
             std::cerr << "[LOD] ERROR: Failed to load high-res textures for Uranus: " << e.what() << std::endl;
         }
     }
-#endif
 }

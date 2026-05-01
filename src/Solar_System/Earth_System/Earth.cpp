@@ -53,35 +53,42 @@ void Earth::Render() const {
 }
 
 void Earth::LoadHighResIfClose(const glm::vec3& cameraPos) {
-#ifndef __EMSCRIPTEN__
     // Check if already high-res
     if (_isHighResLoaded) {
         return;
     }
-    
+
     // Calculate distance from camera to planet center
     float distance = glm::length(cameraPos - GetPosition());
-    
+
     // If camera is close enough, load high-res textures
     if (distance < _lodThreshold) {
         std::cout << "[LOD] Camera distance to Earth: " << distance << " units. Loading high-res textures..." << std::endl;
-        
+
+#ifdef __EMSCRIPTEN__
+        // Notify frontend to show a per-planet loader (JS should implement window.showPlanetLoader/hidePlanetLoader)
+        EM_ASM({ if (typeof window !== 'undefined' && typeof window.showPlanetLoader === 'function') window.showPlanetLoader(UTF8ToString($0)); }, "Earth");
+#endif
         try {
             // Reload diffuse texture (day texture at index 0 - guaranteed to exist from initialization)
             _diffuses.at(0).ReloadTexture(_diffuseHighPath);
-            
+
             // Reload normal map
             _normalMap.ReloadTexture(_normalHighPath);
-            
+
             // Reload specular map
             _specular.ReloadTexture(_specularHighPath);
-            
+
             _isHighResLoaded = true;
             std::cout << "[LOD] Earth high-res textures loaded successfully (Day Diffuse, Normal, Specular)" << std::endl;
         } catch (const std::exception& e) {
             std::cerr << "[LOD] ERROR: Failed to load high-res textures: " << e.what() << std::endl;
             // Keep using low-res textures on failure
         }
-    }
+
+#ifdef __EMSCRIPTEN__
+        // Hide frontend loader
+        EM_ASM({ if (typeof window !== 'undefined' && typeof window.hidePlanetLoader === 'function') window.hidePlanetLoader(UTF8ToString($0)); }, "Earth");
 #endif
+    }
 }

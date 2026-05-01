@@ -43,7 +43,6 @@ void Saturn::Render() const {
 }
 
 void Saturn::LoadHighResIfClose(const glm::vec3& cameraPos) {
-#ifndef __EMSCRIPTEN__
     if (_isHighResLoaded) {
         return;
     }
@@ -63,5 +62,4 @@ void Saturn::LoadHighResIfClose(const glm::vec3& cameraPos) {
             std::cerr << "[LOD] ERROR: Failed to load high-res textures for Saturn: " << e.what() << std::endl;
         }
     }
-#endif
 }

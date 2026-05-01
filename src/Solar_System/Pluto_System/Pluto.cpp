@@ -43,7 +43,6 @@ void Pluto::Render() const {
 }
 
 void Pluto::LoadHighResIfClose(const glm::vec3& cameraPos) {
-#ifndef __EMSCRIPTEN__
     if (_isHighResLoaded) {
         return;
     }
@@ -64,5 +63,4 @@ void Pluto::LoadHighResIfClose(const glm::vec3& cameraPos) {
             std::cerr << "[LOD] ERROR: Failed to load high-res textures for Pluto: " << e.what() << std::endl;
         }
     }
-#endif
 }
