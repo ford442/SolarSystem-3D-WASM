@@ -37,6 +37,19 @@ struct RenderableSceneComponent {
     std::unique_ptr<PlanetaryRing> planetaryRing;
 };
 
+// Staged-loading manifest for a planet system (WASM only)
+struct PlanetSystemManifest {
+    std::string name;                       // e.g. "Jupiter"
+    glm::vec3 proxyPosition;                // Fixed orbital position for distance check
+    float activationRadius;                 // Camera must be within this distance to trigger
+    std::vector<std::string> assetPaths;    // Assets to download before initialization
+    std::function<void()> initFunc;         // Calls InitXxxSystem()
+
+    enum class State { NOT_LOADED, DOWNLOADING, READY } state = State::NOT_LOADED;
+    std::atomic<int> pendingDownloads{0};
+    int totalDownloads{0};
+};
+
 class Application {
 public:
     Application();
@@ -52,7 +65,7 @@ private:
 
     GLFWwindow* _mainWindow = nullptr;
     uint16_t _displayWidth = 0, _displayHeight = 0;
-    ssize_t _nearestPlanetIndex = 0;
+    ssize_t _nearestPlanetIndex = -1;  // -1 when no planets are loaded yet
     FPS_Handler _fpsHandler;
     FT_Library _ft = nullptr;
     bool _isBackgroundMusicPlay = false, _isSearchNearestPlanet = false;
@@ -90,19 +103,14 @@ private:
     mutable std::deque<std::wstring> _soundVolumeHintCache;
     mutable std::deque<std::wstring> _tmpStringCache;
 
-    // Lazy-load infrastructure for outer planets (WASM only)
-    struct DeferredPlanetInit {
-        glm::vec3 proxyPosition;    // Fixed orbital position for distance check
-        float activationRadius;     // Camera must be within this distance to trigger
-        std::function<void()> initFunc;
-        bool initialized = false;
-    };
-    std::vector<DeferredPlanetInit> _deferredPlanetInits;
+    // Staged-loading infrastructure for all planet systems (WASM only)
+    std::vector<PlanetSystemManifest> _planetSystemManifests;
     std::unique_ptr<MeshHolder> _sphereModel;
 
     void InitSystems();
     void InitScene();
     void LoadResources();
+    void LoadCoreResources(); // Download only core assets (skybox, sun, models, sounds)
     void InitSceneObjects();
     void InitStarSystem();
     void InitMercury(const MeshHolder& sphereModel);
@@ -117,7 +125,8 @@ private:
     void InitSongList();
     void Dispose();
     void UpdateLoadingProgress(); // Update JavaScript loading progress bar
-    void CheckAndInitDeferredPlanets();
+    void UpdatePlanetSystemLoading(); // Staged download + init of planet systems (WASM)
+    void RenderPlanetProxyMarkers() const; // Show orbital markers for unloaded planets (WASM)
     void StartSearchNearestPlanet();
     void UpdateSearchNearestPlanet(); // For Emscripten frame-based search
     void StartPlayBackgroundMusic();

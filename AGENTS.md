@@ -376,11 +376,23 @@ set(CMAKE_EXE_LINKER_FLAGS "... --preload-file ${CMAKE_SOURCE_DIR}/resource/icon
 
 **Implemented for:** Mercury, Venus, Earth, Mars, Jupiter, Saturn, Uranus, Neptune, Pluto.
 
-### 9.5 Deferred Planet Initialization (Web Only)
+### 9.5 Staged Planet Loading (Web Only)
 
-To stay within WASM memory limits, outer planet systems (Jupiter, Saturn, Uranus, Neptune, Pluto) are **not** initialized at startup. Instead, proxy positions and activation radii are stored in `_deferredPlanetInits`. Each frame, `CheckAndInitDeferredPlanets()` measures camera distance and triggers `initFunc()` when the player approaches.
+To minimize initial download size and WASM memory usage, **no planet systems are initialized at startup**. Instead, each planet system has a `PlanetSystemManifest` that stores:
+- A proxy orbital position for distance checks
+- An activation radius (typically 800 for inner planets, 1500 for outer planets)
+- A list of assets (textures, models) to download before initialization
+- An `initFunc` callback that calls the existing `InitXxxSystem()` method
 
-Inner planets (Mercury, Venus, Earth, Mars) are always loaded immediately.
+Each frame, `UpdatePlanetSystemLoading()` measures camera distance against all `NOT_LOADED` manifests. When the camera enters the activation radius:
+1. The manifest transitions to `DOWNLOADING`
+2. `WebResourceFetcher::DownloadFile()` fires async downloads for all assets in the manifest
+3. Once all downloads complete, `initFunc()` is invoked, creating the planet and its moons
+4. The manifest transitions to `READY`
+
+While a planet is `NOT_LOADED` or `DOWNLOADING`, a 3D proxy marker is rendered at its proxy position using `RenderPlanetProxyMarkers()`, showing the planet name and load status.
+
+**Desktop:** All planets are initialized immediately, as before.
 
 ---
 
@@ -506,8 +518,8 @@ Runtime assets (textures, sounds) are expected to be served from the same origin
    - Use `GetTexturePath("resource/textures_low/...", "resource/textures/...")` for DDS textures.
    - Push a `RenderableSceneComponent` into `_renderableSceneComponents`.
 6. Call the init method from `InitStarSystem()`:
-   - Immediately for inner planets.
-   - Via `_deferredPlanetInits` for outer planets (WASM only).
+   - Immediately for desktop.
+   - Via `_planetSystemManifests` for all planets on WASM (assets are downloaded on demand).
 7. If implementing LOD, override `LoadHighResIfClose()` in the planet class.
 
 ---

@@ -188,11 +188,14 @@ void Application::RunOneFrame() {
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
     ProcessInput(_mainWindow);
-    CheckAndInitDeferredPlanets();
+    UpdatePlanetSystemLoading();
     ConfigureMainShaders();
     _skyBox->Render(*_mainSkyBoxShader);
     RenderStarCorona();
     ProcessSceneComponentsRendering();
+#ifdef __EMSCRIPTEN__
+    RenderPlanetProxyMarkers();
+#endif
     RenderStarEffects();
 
     if (isRenderPlanetStarDistances || isRenderSatelliteDistances)
@@ -410,7 +413,7 @@ void Application::RenderStar() const {
 
 void Application::RenderStarEffects() const {
     const PlanetaryRing* nearestPlanetaryRing = nullptr;
-    if (!_renderableSceneComponents.empty())
+    if (!_renderableSceneComponents.empty() && _nearestPlanetIndex >= 0)
         nearestPlanetaryRing = _renderableSceneComponents[_nearestPlanetIndex].planetaryRing.get();
 
     optional<RingCameraInfo> ringCameraInfo;
@@ -706,7 +709,7 @@ void Application::ConfigureMainShaders() {
 
 void Application::InitScene() {
 #ifdef __EMSCRIPTEN__
-    LoadResources();
+    LoadCoreResources();
 #else
     InitSceneObjects();
     _appState = AppState::RUNNING;
@@ -725,8 +728,8 @@ void Application::UpdateLoadingProgress() {
 #endif
 }
 
-void Application::LoadResources() {
-    const std::vector<std::string> resources = {
+void Application::LoadCoreResources() {
+    const std::vector<std::string> coreResources = {
         // Models
         "resource/models/sphere.obj",
         "resource/models/phobos.obj",
@@ -743,70 +746,6 @@ void Application::LoadResources() {
         // Sun
         "resource/textures/Star_Spectrum.dds",
         "resource/textures/flares_bright.dds",
-        // Planets
-#ifdef __EMSCRIPTEN__
-        "resource/textures_low/Mercury_Diffuse_Low.dds", "resource/textures_low/Mercury_Normal_Low.dds", "resource/textures_low/Mercury_Specular_Low.dds",
-        "resource/textures_low/Venus_Diffuse_Low.dds", "resource/textures_low/Venus_Normal_Low.dds",
-        "resource/textures_low/Earth_Day_Diffuse_Low.dds", "resource/textures/Earth_Clouds_Diffuse.dds", "resource/textures/Earth_Night_Diffuse.dds", "resource/textures/Earth_Clouds_Normal.dds", "resource/textures_low/Earth_Normal_Low.dds", "resource/textures_low/Earth_Specular_Low.dds",
-        "resource/textures/Moon_Diffuse.dds", "resource/textures/Moon_Normal.dds",
-        "resource/textures_low/Mars_Diffuse_Low.dds", "resource/textures_low/Mars_Normal_Low.dds",
-        "resource/textures/Phobos_Diffuse.dds", "resource/textures/Phobos_Normal.dds",
-        "resource/textures/Deimos_Diffuse.dds", "resource/textures/Deimos_Normal.dds",
-        "resource/textures_low/Jupiter_Diffuse_Low.dds", "resource/textures_low/Jupiter_Normal_Low.dds",
-        "resource/textures/Io_Diffuse.dds", "resource/textures/Io_Normal.dds",
-        "resource/textures/Europa_Diffuse.dds", "resource/textures/Europa_Normal.dds",
-        "resource/textures/Ganymede_Diffuse.dds", "resource/textures/Ganymede_Normal.dds",
-        "resource/textures/Callisto_Diffuse.dds", "resource/textures/Callisto_Normal.dds",
-        "resource/textures_low/Saturn_Diffuse_Low.dds", "resource/textures_low/Saturn_Normal_Low.dds", "resource/textures/Saturn_Rings.dds",
-        "resource/textures/Mimas_Diffuse.dds", "resource/textures/Mimas_Normal.dds",
-        "resource/textures/Enceladus_Diffuse.dds", "resource/textures/Enceladus_Normal.dds",
-        "resource/textures/Tethys_Diffuse.dds", "resource/textures/Tethys_Normal.dds",
-        "resource/textures/Dione_Diffuse.dds", "resource/textures/Dione_Normal.dds",
-        "resource/textures/Rhea_Diffuse.dds", "resource/textures/Rhea_Normal.dds",
-        "resource/textures/Titan_Diffuse.dds", "resource/textures/Titan_Normal.dds",
-        "resource/textures/Iapetus_Diffuse.dds", "resource/textures/Iapetus_Normal.dds",
-        "resource/textures_low/Uranus_Diffuse_Low.dds", "resource/textures/Uranus_Clouds_Diffuse.dds", "resource/textures_low/Uranus_Normal_Low.dds", "resource/textures/Uranus_Rings.dds", "resource/textures/Uranus_Clouds_Normal.dds",
-        "resource/textures/Miranda_Diffuse.dds", "resource/textures/Miranda_Normal.dds",
-        "resource/textures/Ariel_Diffuse.dds", "resource/textures/Ariel_Normal.dds",
-        "resource/textures/Umbriel_Diffuse.dds", "resource/textures/Umbriel_Normal.dds",
-        "resource/textures/Titania_Diffuse.dds", "resource/textures/Titania_Normal.dds",
-        "resource/textures/Oberon_Diffuse.dds", "resource/textures/Oberon_Normal.dds",
-        "resource/textures_low/Neptune_Diffuse_Low.dds", "resource/textures/Neptune_Clouds_Diffuse.dds", "resource/textures_low/Neptune_Normal_Low.dds", "resource/textures/Neptune_Clouds_Normal.dds",
-        "resource/textures/Triton_Diffuse.dds", "resource/textures/Triton_Normal.dds",
-        "resource/textures_low/Pluto_Diffuse_Low.dds", "resource/textures_low/Pluto_Normal_Low.dds", "resource/textures_low/Pluto_Specular_Low.dds",
-        "resource/textures/Charon_Diffuse.dds", "resource/textures/Charon_Normal.dds", "resource/textures/Charon_Specular.dds",
-#else
-        "resource/textures/Mercury_Diffuse.dds", "resource/textures/Mercury_Normal.dds", "resource/textures/Mercury_Specular.dds",
-        "resource/textures/Venus_Diffuse.dds", "resource/textures/Venus_Normal.dds",
-        "resource/textures/Earth_Day_Diffuse.dds", "resource/textures/Earth_Clouds_Diffuse.dds", "resource/textures/Earth_Night_Diffuse.dds", "resource/textures/Earth_Normal.dds", "resource/textures/Earth_Specular.dds",
-        "resource/textures/Moon_Diffuse.dds", "resource/textures/Moon_Normal.dds",
-        "resource/textures/Mars_Diffuse.dds", "resource/textures/Mars_Normal.dds",
-        "resource/textures/Phobos_Diffuse.dds", "resource/textures/Phobos_Normal.dds",
-        "resource/textures/Deimos_Diffuse.dds", "resource/textures/Deimos_Normal.dds",
-        "resource/textures/Jupiter_Diffuse.dds", "resource/textures/Jupiter_Normal.dds",
-        "resource/textures/Io_Diffuse.dds", "resource/textures/Io_Normal.dds",
-        "resource/textures/Europa_Diffuse.dds", "resource/textures/Europa_Normal.dds",
-        "resource/textures/Ganymede_Diffuse.dds", "resource/textures/Ganymede_Normal.dds",
-        "resource/textures/Callisto_Diffuse.dds", "resource/textures/Callisto_Normal.dds",
-        "resource/textures/Saturn_Diffuse.dds", "resource/textures/Saturn_Normal.dds", "resource/textures/Saturn_Rings.dds",
-        "resource/textures/Mimas_Diffuse.dds", "resource/textures/Mimas_Normal.dds",
-        "resource/textures/Enceladus_Diffuse.dds", "resource/textures/Enceladus_Normal.dds",
-        "resource/textures/Tethys_Diffuse.dds", "resource/textures/Tethys_Normal.dds",
-        "resource/textures/Dione_Diffuse.dds", "resource/textures/Dione_Normal.dds",
-        "resource/textures/Rhea_Diffuse.dds", "resource/textures/Rhea_Normal.dds",
-        "resource/textures/Titan_Diffuse.dds", "resource/textures/Titan_Normal.dds",
-        "resource/textures/Iapetus_Diffuse.dds", "resource/textures/Iapetus_Normal.dds",
-        "resource/textures/Uranus_Diffuse.dds", "resource/textures/Uranus_Clouds_Diffuse.dds", "resource/textures/Uranus_Normal.dds", "resource/textures/Uranus_Rings.dds", "resource/textures/Uranus_Clouds_Normal.dds",
-        "resource/textures/Miranda_Diffuse.dds", "resource/textures/Miranda_Normal.dds",
-        "resource/textures/Ariel_Diffuse.dds", "resource/textures/Ariel_Normal.dds",
-        "resource/textures/Umbriel_Diffuse.dds", "resource/textures/Umbriel_Normal.dds",
-        "resource/textures/Titania_Diffuse.dds", "resource/textures/Titania_Normal.dds",
-        "resource/textures/Oberon_Diffuse.dds", "resource/textures/Oberon_Normal.dds",
-        "resource/textures/Neptune_Diffuse.dds", "resource/textures/Neptune_Clouds_Diffuse.dds", "resource/textures/Neptune_Normal.dds", "resource/textures/Neptune_Clouds_Normal.dds",
-        "resource/textures/Triton_Diffuse.dds", "resource/textures/Triton_Normal.dds",
-        "resource/textures/Pluto_Diffuse.dds", "resource/textures/Pluto_Normal.dds", "resource/textures/Pluto_Specular.dds",
-        "resource/textures/Charon_Diffuse.dds", "resource/textures/Charon_Normal.dds", "resource/textures/Charon_Specular.dds",
-#endif
         // Sounds
         "resource/sounds/Stellardrone - Galaxies.mp3",
         "resource/sounds/Stellardrone - Mars.mp3",
@@ -815,19 +754,19 @@ void Application::LoadResources() {
         "resource/sounds/Stellardrone - The Edge of Forever.mp3"
     };
 
-    _totalResources = resources.size();
+    _totalResources = static_cast<int>(coreResources.size());
     _resourcesPending = _totalResources;
 
-    std::cout << "Loading " << _totalResources << " resources..." << std::endl;
+    std::cout << "Loading " << _totalResources << " core resources..." << std::endl;
     
     // Initialize progress bar
     UpdateLoadingProgress();
 
-    for(const auto& res : resources) {
+    for(const auto& res : coreResources) {
         WebResourceFetcher::DownloadFile(res, res, [this](bool success) {
             _resourcesPending--;
             if (!success) {
-                std::cerr << "Failed to download resource!" << std::endl;
+                std::cerr << "Failed to download core resource!" << std::endl;
             }
             // Update progress after each resource
             UpdateLoadingProgress();
@@ -909,26 +848,146 @@ void Application::InitStarSystem() {
                      starTemperatureInKelvin, 696342.0, glm::vec3(0.99607843, 0.890196078, 0.725490196), L"Sun", L"Солнце");
     _sun = make_shared<Sun>(sunInfo);
 
-    // Inner planets — always initialized immediately
+#ifdef __EMSCRIPTEN__
+    // All planet systems are deferred on web — assets are downloaded on demand
+    const glm::vec3 sunPos = _sun->GetPosition();
+    _planetSystemManifests = {
+        {
+            "Mercury", sunPos + glm::vec3(1500.f, 0.f, 350.f), 800.f,
+            {
+                "resource/textures_low/Mercury_Diffuse_Low.dds",
+                "resource/textures_low/Mercury_Normal_Low.dds",
+                "resource/textures_low/Mercury_Specular_Low.dds"
+            },
+            [this]{ InitMercury(*_sphereModel); }
+        },
+        {
+            "Venus", sunPos + glm::vec3(1125.f, 0.f, -1340.f), 800.f,
+            {
+                "resource/textures_low/Venus_Diffuse_Low.dds",
+                "resource/textures_low/Venus_Normal_Low.dds"
+            },
+            [this]{ InitVenus(*_sphereModel); }
+        },
+        {
+            "Earth", sunPos + glm::vec3(1900.f, 0.f, 0.f), 800.f,
+            {
+                "resource/textures_low/Earth_Day_Diffuse_Low.dds",
+                "resource/textures/Earth_Clouds_Diffuse.dds",
+                "resource/textures/Earth_Night_Diffuse.dds",
+                "resource/textures_low/Earth_Normal_Low.dds",
+                "resource/textures_low/Earth_Specular_Low.dds",
+                "resource/textures/Earth_Clouds_Normal.dds",
+                "resource/textures/Moon_Diffuse.dds",
+                "resource/textures/Moon_Normal.dds"
+            },
+            [this]{ InitEarthSystem(*_sphereModel); }
+        },
+        {
+            "Mars", sunPos + glm::vec3(-1732.f, 0.f, 1000.f), 800.f,
+            {
+                "resource/textures_low/Mars_Diffuse_Low.dds",
+                "resource/textures_low/Mars_Normal_Low.dds",
+                "resource/textures/Phobos_Diffuse.dds",
+                "resource/textures/Phobos_Normal.dds",
+                "resource/textures/Deimos_Diffuse.dds",
+                "resource/textures/Deimos_Normal.dds"
+            },
+            [this]{ InitMarsSystem(*_sphereModel); }
+        },
+        {
+            "Jupiter", sunPos + glm::vec3(1350.f, 0.f, 1737.f), 1500.f,
+            {
+                "resource/textures_low/Jupiter_Diffuse_Low.dds",
+                "resource/textures_low/Jupiter_Normal_Low.dds",
+                "resource/textures/Io_Diffuse.dds",
+                "resource/textures/Io_Normal.dds",
+                "resource/textures/Europa_Diffuse.dds",
+                "resource/textures/Europa_Normal.dds",
+                "resource/textures/Ganymede_Diffuse.dds",
+                "resource/textures/Ganymede_Normal.dds",
+                "resource/textures/Callisto_Diffuse.dds",
+                "resource/textures/Callisto_Normal.dds"
+            },
+            [this]{ InitJupiterSystem(*_sphereModel); }
+        },
+        {
+            "Saturn", sunPos + glm::vec3(0.f, -100.f, 2450.f), 1500.f,
+            {
+                "resource/textures_low/Saturn_Diffuse_Low.dds",
+                "resource/textures_low/Saturn_Normal_Low.dds",
+                "resource/textures/Saturn_Rings.dds",
+                "resource/textures/Mimas_Diffuse.dds",
+                "resource/textures/Mimas_Normal.dds",
+                "resource/textures/Enceladus_Diffuse.dds",
+                "resource/textures/Enceladus_Normal.dds",
+                "resource/textures/Tethys_Diffuse.dds",
+                "resource/textures/Tethys_Normal.dds",
+                "resource/textures/Dione_Diffuse.dds",
+                "resource/textures/Dione_Normal.dds",
+                "resource/textures/Rhea_Diffuse.dds",
+                "resource/textures/Rhea_Normal.dds",
+                "resource/textures/Titan_Diffuse.dds",
+                "resource/textures/Titan_Normal.dds",
+                "resource/textures/Iapetus_Diffuse.dds",
+                "resource/textures/Iapetus_Normal.dds"
+            },
+            [this]{ InitSaturnSystem(*_sphereModel); }
+        },
+        {
+            "Uranus", sunPos + glm::vec3(0.f, 0.f, -2650.f), 1500.f,
+            {
+                "resource/textures_low/Uranus_Diffuse_Low.dds",
+                "resource/textures/Uranus_Clouds_Diffuse.dds",
+                "resource/textures_low/Uranus_Normal_Low.dds",
+                "resource/textures/Uranus_Rings.dds",
+                "resource/textures/Uranus_Clouds_Normal.dds",
+                "resource/textures/Miranda_Diffuse.dds",
+                "resource/textures/Miranda_Normal.dds",
+                "resource/textures/Ariel_Diffuse.dds",
+                "resource/textures/Ariel_Normal.dds",
+                "resource/textures/Umbriel_Diffuse.dds",
+                "resource/textures/Umbriel_Normal.dds",
+                "resource/textures/Titania_Diffuse.dds",
+                "resource/textures/Titania_Normal.dds",
+                "resource/textures/Oberon_Diffuse.dds",
+                "resource/textures/Oberon_Normal.dds"
+            },
+            [this]{ InitUranusSystem(*_sphereModel); }
+        },
+        {
+            "Neptune", sunPos + glm::vec3(-2900.f, 0.f, 0.f), 1500.f,
+            {
+                "resource/textures_low/Neptune_Diffuse_Low.dds",
+                "resource/textures/Neptune_Clouds_Diffuse.dds",
+                "resource/textures_low/Neptune_Normal_Low.dds",
+                "resource/textures/Neptune_Clouds_Normal.dds",
+                "resource/textures/Triton_Diffuse.dds",
+                "resource/textures/Triton_Normal.dds"
+            },
+            [this]{ InitNeptuneSystem(*_sphereModel); }
+        },
+        {
+            "Pluto", sunPos + glm::vec3(2800.f, 0.f, 1757.73f), 1500.f,
+            {
+                "resource/textures_low/Pluto_Diffuse_Low.dds",
+                "resource/textures_low/Pluto_Normal_Low.dds",
+                "resource/textures_low/Pluto_Specular_Low.dds",
+                "resource/textures/Charon_Diffuse.dds",
+                "resource/textures/Charon_Normal.dds",
+                "resource/textures/Charon_Specular.dds"
+            },
+            [this]{ InitPlutoSystem(*_sphereModel); }
+        },
+    };
+    std::cout << "[StagedLoading] " << _planetSystemManifests.size()
+              << " planet systems deferred until camera approaches." << std::endl;
+#else
+    // Desktop: load all immediately (no memory constraint)
     InitMercury(*_sphereModel);
     InitVenus(*_sphereModel);
     InitEarthSystem(*_sphereModel);
     InitMarsSystem(*_sphereModel);
-
-#ifdef __EMSCRIPTEN__
-    // Outer planets — deferred until camera approaches their orbital zone
-    const glm::vec3 sunPos = _sun->GetPosition();
-    _deferredPlanetInits = {
-        { sunPos + glm::vec3(1350.f, 0.f, 1737.f),   1500.f, [this]{ InitJupiterSystem(*_sphereModel); }, false },
-        { sunPos + glm::vec3(0.f, -100.f, 2450.f),    1500.f, [this]{ InitSaturnSystem(*_sphereModel);  }, false },
-        { sunPos + glm::vec3(0.f, 0.f, -2650.f),      1500.f, [this]{ InitUranusSystem(*_sphereModel);  }, false },
-        { sunPos + glm::vec3(-2900.f, 0.f, 0.f),      1500.f, [this]{ InitNeptuneSystem(*_sphereModel); }, false },
-        { sunPos + glm::vec3(2800.f, 0.f, 1757.73f),  1500.f, [this]{ InitPlutoSystem(*_sphereModel);   }, false },
-    };
-    std::cout << "[LazyInit] Inner planets initialized. " << _deferredPlanetInits.size()
-              << " outer planet systems deferred until camera approaches." << std::endl;
-#else
-    // Desktop: load all immediately (no memory constraint)
     InitJupiterSystem(*_sphereModel);
     InitSaturnSystem(*_sphereModel);
     InitUranusSystem(*_sphereModel);
@@ -1519,20 +1578,73 @@ void Application::StopSearchNearestPlanet() {
 #endif
 }
 
-void Application::CheckAndInitDeferredPlanets() {
+void Application::UpdatePlanetSystemLoading() {
 #ifdef __EMSCRIPTEN__
     const glm::vec3 camPos = camera.GetPosition();
-    for (auto& deferred : _deferredPlanetInits) {
-        if (deferred.initialized) continue;
-        float dist = glm::length(camPos - deferred.proxyPosition);
-        if (dist < deferred.activationRadius) {
-            std::cout << "[LazyInit] Camera within " << dist << " units — activating planet system near ("
-                      << deferred.proxyPosition.x << ", " << deferred.proxyPosition.y << ", "
-                      << deferred.proxyPosition.z << ")" << std::endl;
-            deferred.initFunc();
-            deferred.initialized = true;
+    for (auto& manifest : _planetSystemManifests) {
+        if (manifest.state == PlanetSystemManifest::State::READY) continue;
+
+        if (manifest.state == PlanetSystemManifest::State::NOT_LOADED) {
+            float dist = glm::length(camPos - manifest.proxyPosition);
+            if (dist < manifest.activationRadius) {
+                std::cout << "[StagedLoading] Camera within " << dist
+                          << " units — starting download for " << manifest.name << std::endl;
+                manifest.state = PlanetSystemManifest::State::DOWNLOADING;
+                manifest.totalDownloads = static_cast<int>(manifest.assetPaths.size());
+                manifest.pendingDownloads = manifest.totalDownloads;
+
+                for (const auto& path : manifest.assetPaths) {
+                    WebResourceFetcher::DownloadFile(path, path, [&manifest](bool success) {
+                        manifest.pendingDownloads--;
+                        if (!success) {
+                            std::cerr << "[StagedLoading] Failed to download asset for "
+                                      << manifest.name << std::endl;
+                        }
+                    });
+                }
+            }
+        }
+
+        if (manifest.state == PlanetSystemManifest::State::DOWNLOADING) {
+            if (manifest.pendingDownloads <= 0) {
+                std::cout << "[StagedLoading] All assets ready for " << manifest.name
+                          << " — initializing system." << std::endl;
+                manifest.initFunc();
+                manifest.state = PlanetSystemManifest::State::READY;
+            }
         }
     }
+#endif
+}
+
+void Application::RenderPlanetProxyMarkers() const {
+#ifdef __EMSCRIPTEN__
+    if (_planetSystemManifests.empty()) return;
+
+    glDisable(GL_DEPTH_TEST);
+    glEnable(GL_BLEND);
+    glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+
+    _mainTextShader->Use();
+    _mainTextShader->SetMat4("projection", _cameraProjection);
+    _mainTextShader->SetMat4("view", _cameraView);
+    _mainTextShader->SetBool("is3D", true);
+
+    for (const auto& manifest : _planetSystemManifests) {
+        if (manifest.state == PlanetSystemManifest::State::READY) continue;
+
+        std::wstring label(manifest.name.begin(), manifest.name.end());
+        if (manifest.state == PlanetSystemManifest::State::DOWNLOADING) {
+            label += L" [loading...]";
+        }
+
+        std::deque<wchar_t> chars(label.begin(), label.end());
+        _mainTextShader->SetVec3("particleCenterWorldSpace", manifest.proxyPosition);
+        _textRenderer->Render(*_mainTextShader, chars, 0.0, 0.0, 0.075, glm::vec3(0.5f, 0.7f, 1.0f));
+    }
+
+    glDisable(GL_BLEND);
+    glEnable(GL_DEPTH_TEST);
 #endif
 }
 
