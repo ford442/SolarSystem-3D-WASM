@@ -109,7 +109,6 @@ private:
 
     void InitSystems();
     void InitScene();
-    void LoadResources();
     void LoadCoreResources(); // Download only core assets (skybox, sun, models, sounds)
     void InitSceneObjects();
     void InitStarSystem();

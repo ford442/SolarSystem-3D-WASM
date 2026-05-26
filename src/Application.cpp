@@ -268,7 +268,9 @@ void Application::RenderPass(const RenderableSceneComponent& component) {
         satellite->Render();
     }
 
-    if (component.planet == _renderableSceneComponents[_nearestPlanetIndex].planet)
+    if (_nearestPlanetIndex >= 0
+        && static_cast<size_t>(_nearestPlanetIndex) < _renderableSceneComponents.size()
+        && component.planet == _renderableSceneComponents[static_cast<size_t>(_nearestPlanetIndex)].planet)
         ProcessStarRendering();
 
     RenderAtmospheres(component.atmospheres, component.lightSpaceMatrix, component.planetaryRing.get());
@@ -413,8 +415,11 @@ void Application::RenderStar() const {
 
 void Application::RenderStarEffects() const {
     const PlanetaryRing* nearestPlanetaryRing = nullptr;
-    if (!_renderableSceneComponents.empty() && _nearestPlanetIndex >= 0)
-        nearestPlanetaryRing = _renderableSceneComponents[_nearestPlanetIndex].planetaryRing.get();
+    if (!_renderableSceneComponents.empty()
+        && _nearestPlanetIndex >= 0
+        && static_cast<size_t>(_nearestPlanetIndex) < _renderableSceneComponents.size()) {
+        nearestPlanetaryRing = _renderableSceneComponents[static_cast<size_t>(_nearestPlanetIndex)].planetaryRing.get();
+    }
 
     optional<RingCameraInfo> ringCameraInfo;
     if (nearestPlanetaryRing) {
@@ -1667,6 +1672,8 @@ void Application::StartSearchNearestPlanet() {
             auto nearestPlanetIt = searchNearestPlanet();
             if (nearestPlanetIt != _renderableSceneComponents.end()) {
                 _nearestPlanetIndex = distance(_renderableSceneComponents.begin(), nearestPlanetIt);
+            } else {
+                _nearestPlanetIndex = -1;
             }
 
             this_thread::sleep_for(25ms); 
@@ -1688,6 +1695,8 @@ void Application::UpdateSearchNearestPlanet() {
         
         if (nearestPlanetIt != _renderableSceneComponents.end()) {
             _nearestPlanetIndex = distance(_renderableSceneComponents.begin(), nearestPlanetIt);
+        } else {
+            _nearestPlanetIndex = -1;
         }
     }
 #endif
