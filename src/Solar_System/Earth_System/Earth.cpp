@@ -59,47 +59,48 @@ void Earth::LoadHighResIfClose(const glm::vec3& cameraPos) {
         return;
     }
 
+#ifdef __EMSCRIPTEN__
+    // TEMPORARY STABILITY FIX: High-res swapping disabled by default on WebAssembly.
+    // The low-res textures (from textures_low/) are now reliably used thanks to:
+    //  - GL_TEXTURE_MAX_LEVEL + BASE_LEVEL fix in nv_dds.cpp
+    //  - Fallback texture generation in TextureImage2D for any missing moon/ring/high-res assets
+    // The async infrastructure (TextureLoadingQueue + WebResourceFetcher::DownloadFile using
+    // emscripten_async_wget2 + ReloadTexture) remains in place as v1 of background streaming.
+    // Re-enable per-planet when the deployment server hosts the full high-res DDS set under
+    // /solar-system/resource/textures/*.dds (or set window.__solarSystemAssetBase).
+    // To force one-time attempt for a specific planet, comment the early return below.
+    _isHighResLoaded = true;   // Mark done so we don't spam the queue with doomed requests
+    return;
+#endif
+
     float distance = glm::length(cameraPos - GetPosition());
 
     if (distance < _lodThreshold) {
         std::cout << "[LOD] Camera distance to Earth: " << distance << " units. Queueing high-res textures..." << std::endl;
         _isHighResLoading = true;
         _highResTexturesLoaded = 0;
+        _highResTexturesProcessed = 0;
         _highResLoadProgress = 0.0f;
 
         auto& queue = TextureLoadingQueue::GetInstance();
 
-        queue.QueueTextureLoad(_diffuseHighPath, "Earth_Day_Diffuse_High", &_diffuses.at(0),
-            [this](bool success) {
-                if (success) _highResTexturesLoaded++;
-                _highResLoadProgress = _highResTexturesLoaded / (float)_highResTextureCount;
-                if (_highResTexturesLoaded == _highResTextureCount) {
-                    _isHighResLoaded = true;
-                    _isHighResLoading = false;
+        auto onLoaded = [this](bool success) {
+            _highResTexturesProcessed++;
+            if (success) _highResTexturesLoaded++;
+            _highResLoadProgress = _highResTexturesLoaded / (float)_highResTextureCount;
+            if (_highResTexturesProcessed == _highResTextureCount) {
+                _isHighResLoaded = (_highResTexturesLoaded == _highResTextureCount);
+                _isHighResLoading = false;
+                if (_isHighResLoaded) {
                     std::cout << "[LOD] Earth high-res textures loaded successfully" << std::endl;
+                } else {
+                    std::cout << "[LOD] Earth high-res attempt finished (some or all failed, keeping low-res)" << std::endl;
                 }
-            });
+            }
+        };
 
-        queue.QueueTextureLoad(_normalHighPath, "Earth_Normal_High", &_normalMap,
-            [this](bool success) {
-                if (success) _highResTexturesLoaded++;
-                _highResLoadProgress = _highResTexturesLoaded / (float)_highResTextureCount;
-                if (_highResTexturesLoaded == _highResTextureCount) {
-                    _isHighResLoaded = true;
-                    _isHighResLoading = false;
-                    std::cout << "[LOD] Earth high-res textures loaded successfully" << std::endl;
-                }
-            });
-
-        queue.QueueTextureLoad(_specularHighPath, "Earth_Specular_High", &_specular,
-            [this](bool success) {
-                if (success) _highResTexturesLoaded++;
-                _highResLoadProgress = _highResTexturesLoaded / (float)_highResTextureCount;
-                if (_highResTexturesLoaded == _highResTextureCount) {
-                    _isHighResLoaded = true;
-                    _isHighResLoading = false;
-                    std::cout << "[LOD] Earth high-res textures loaded successfully" << std::endl;
-                }
-            });
+        queue.QueueTextureLoad(_diffuseHighPath, "Earth_Day_Diffuse_High", &_diffuses.at(0), onLoaded);
+        queue.QueueTextureLoad(_normalHighPath, "Earth_Normal_High", &_normalMap, onLoaded);
+        queue.QueueTextureLoad(_specularHighPath, "Earth_Specular_High", &_specular, onLoaded);
     }
 }

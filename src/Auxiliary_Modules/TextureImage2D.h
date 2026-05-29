@@ -24,6 +24,7 @@ private:
     GLuint _width = 0, _height = 0;
 
     void LoadTextureFromFile(const std::string& path, GLint wrapParam, GLint minFilter, GLint magFilter);
+    void CreateFallbackTexture(GLint wrapParam, GLint minFilter, GLint magFilter);
 };
 
 #endif //SOLARSYSTEM_TEXTUREIMAGE2D_H

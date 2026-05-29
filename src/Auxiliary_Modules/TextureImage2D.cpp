@@ -1,12 +1,13 @@
 #include "TextureImage2D.h"
 #include "WebResourceFetcher.h"
+#include <cstdint>
 
 TextureImage2D::TextureImage2D(const std::string& path, GLint wrapParam, GLint minFilter, GLint magFilter) {
     LoadTextureFromFile(path, wrapParam, minFilter, magFilter);
 }
 
 void TextureImage2D::LoadTextureFromFile(const std::string& path, GLint wrapParam, GLint minFilter, GLint magFilter) {
-    // Fetch texture on demand
+    // Fetch texture on demand (no-op on native; async/sync download on web into MEMFS)
     WebResourceFetcher::Fetch(path);
 
     glGenTextures(1, &_textureID);
@@ -28,7 +29,20 @@ void TextureImage2D::LoadTextureFromFile(const std::string& path, GLint wrapPara
         _height = image.get_height();
     }
     catch (const std::runtime_error& error) {
+#ifdef __EMSCRIPTEN__
+        // On web, many moon/ring/high-res textures are intentionally omitted from the
+        // repository and deployment. Use a visible fallback so planets/moons never
+        // appear solid black and the scene remains stable.
+        std::cerr << "[Texture] Warning: Failed to load " << path << " (" << error.what()
+                  << "). Creating fallback texture." << std::endl;
+        // Delete the incomplete texture object before creating fallback
+        glDeleteTextures(1, &_textureID);
+        _textureID = 0;
+        CreateFallbackTexture(wrapParam, minFilter, magFilter);
+        return;
+#else
         throw std::runtime_error("Image " + path + " cannot be loaded");
+#endif
     }
 
     // S3TC compressed textures (DXT1/3/5) do not support glGenerateMipmap in WebGL 2.
@@ -89,12 +103,55 @@ GLuint TextureImage2D::GetHeight() const {
 }
 
 void TextureImage2D::ReloadTexture(const std::string& path, GLint wrapParam, GLint minFilter, GLint magFilter) {
-    // Delete the old texture if it exists
-    if (_textureID != 0) {
-        glDeleteTextures(1, &_textureID);
-        _textureID = 0;
+    GLuint oldTextureID = _textureID;
+    _textureID = 0;
+
+    try {
+        LoadTextureFromFile(path, wrapParam, minFilter, magFilter);
+        // Success: safe to delete the old one now (new one is bound and ready)
+        if (oldTextureID != 0) {
+            glDeleteTextures(1, &oldTextureID);
+        }
+    } catch (...) {
+        // On any failure during reload (rare on web now that Load catches), restore old texture
+        _textureID = oldTextureID;
+        if (_textureID == 0) {
+            // Last resort: at least have *something* so we don't bind 0
+            CreateFallbackTexture(wrapParam, minFilter, magFilter);
+        }
     }
-    
-    // Load the new texture (LoadTextureFromFile throws on failure)
-    LoadTextureFromFile(path, wrapParam, minFilter, magFilter);
+}
+
+void TextureImage2D::CreateFallbackTexture(GLint wrapParam, GLint minFilter, GLint magFilter) {
+    glGenTextures(1, &_textureID);
+    glBindTexture(GL_TEXTURE_2D, _textureID);
+
+    // 4x4 high-contrast checker (gray / dark) so missing textures are obvious but
+    // the object still renders and receives lighting instead of solid black.
+    uint8_t pixels[4 * 4 * 4];
+    for (int y = 0; y < 4; ++y) {
+        for (int x = 0; x < 4; ++x) {
+            int i = (y * 4 + x) * 4;
+            bool checker = ((x + y) % 2) == 0;
+            uint8_t v = checker ? 200u : 60u;
+            pixels[i + 0] = v;
+            pixels[i + 1] = v;
+            pixels[i + 2] = v;
+            pixels[i + 3] = 255u;
+        }
+    }
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA8, 4, 4, 0, GL_RGBA, GL_UNSIGNED_BYTE, pixels);
+
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, wrapParam);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, wrapParam);
+    // Force non-mip filters to avoid "incomplete texture" on WebGL even for tiny fallback
+    GLint safeMin = (minFilter == GL_LINEAR_MIPMAP_LINEAR || minFilter == GL_LINEAR_MIPMAP_NEAREST ||
+                     minFilter == GL_NEAREST_MIPMAP_LINEAR || minFilter == GL_NEAREST_MIPMAP_NEAREST)
+                        ? GL_LINEAR : minFilter;
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, safeMin);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, magFilter);
+
+    _width = 4;
+    _height = 4;
+    std::cout << "Created 4x4 fallback texture" << std::endl;
 }

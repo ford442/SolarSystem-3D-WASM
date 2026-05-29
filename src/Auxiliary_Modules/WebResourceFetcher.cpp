@@ -149,14 +149,22 @@ void WebResourceFetcher::Fetch(const std::string& path) {
     std::cout << "[WebResourceFetcher] Downloaded and written to MEMFS: " << resolvedUrl << " -> " << path << std::endl;
 }
 
+bool WebResourceFetcher::ResourceExists(const std::string& virtualPath) {
+    return std::filesystem::exists(virtualPath);
+}
+
 #else
 
 void WebResourceFetcher::DownloadFile(const std::string& url, const std::string& virtualPath, std::function<void(bool)> callback) {
-    std::cout << "Downloading: " << url << " (size estimate: " << GetFileSize(url) << " bytes)" << std::endl;  // Add logging for debugging
+    std::cout << "Downloading (native stub): " << url << std::endl;
     if (callback) callback(true);
 }
 
 void WebResourceFetcher::Fetch(const std::string& path) {
+}
+
+bool WebResourceFetcher::ResourceExists(const std::string& virtualPath) {
+    return std::filesystem::exists(virtualPath);
 }
 
 #endif

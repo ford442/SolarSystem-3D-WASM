@@ -45,7 +45,7 @@ void TextureLoadingQueue::ProcessQueue() {
                 }
             }
         } else {
-            std::cerr << "[TextureLoadingQueue] Failed to download " << job.textureId << std::endl;
+            std::cerr << "[TextureLoadingQueue] Failed to download " << job.textureId << " (will keep previous texture)" << std::endl;
             if (job.retries < job.maxRetries) {
                 job.retries++;
                 _queue.push(job);

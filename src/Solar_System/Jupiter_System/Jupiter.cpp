@@ -48,6 +48,10 @@ void Jupiter::LoadHighResIfClose(const glm::vec3& cameraPos) {
         return;
     }
 
+#ifdef __EMSCRIPTEN__
+    _isHighResLoaded = true; return; // High-res temporarily disabled on WASM (stability)
+#endif
+
     float distance = glm::length(cameraPos - GetPosition());
 
     if (distance < _lodThreshold) {
