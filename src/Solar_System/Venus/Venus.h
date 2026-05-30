@@ -20,6 +20,7 @@ private:
     bool _isHighResLoading = false;
     float _highResLoadProgress = 0.0f;
     int _highResTexturesLoaded = 0;
+    int _highResTexturesProcessed = 0;
     const int _highResTextureCount = 2;
     const float _lodThreshold = 50.0f;
 };

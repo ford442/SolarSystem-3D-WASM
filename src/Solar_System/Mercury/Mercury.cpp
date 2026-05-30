@@ -62,16 +62,22 @@ void Mercury::LoadHighResIfClose(const glm::vec3& cameraPos) {
         std::cout << "[LOD] Camera distance to Mercury: " << distance << " units. Queueing high-res textures..." << std::endl;
         _isHighResLoading = true;
         _highResTexturesLoaded = 0;
+        _highResTexturesProcessed = 0;
         _highResLoadProgress = 0.0f;
 
         auto& queue = TextureLoadingQueue::GetInstance();
         auto onLoaded = [this](bool success) {
+            _highResTexturesProcessed++;
             if (success) _highResTexturesLoaded++;
             _highResLoadProgress = _highResTexturesLoaded / (float)_highResTextureCount;
-            if (_highResTexturesLoaded == _highResTextureCount) {
-                _isHighResLoaded = true;
+            if (_highResTexturesProcessed == _highResTextureCount) {
+                _isHighResLoaded = (_highResTexturesLoaded == _highResTextureCount);
                 _isHighResLoading = false;
-                std::cout << "[LOD] Mercury high-res textures loaded successfully" << std::endl;
+                if (_isHighResLoaded) {
+                    std::cout << "[LOD] Mercury high-res textures loaded successfully" << std::endl;
+                } else {
+                    std::cout << "[LOD] Mercury high-res attempt finished (some or all failed, keeping low-res)" << std::endl;
+                }
             }
         };
 
