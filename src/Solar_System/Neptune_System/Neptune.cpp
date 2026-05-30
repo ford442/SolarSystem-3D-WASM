@@ -54,7 +54,10 @@ void Neptune::LoadHighResIfClose(const glm::vec3& cameraPos) {
     }
 
 #ifdef __EMSCRIPTEN__
-    _isHighResLoaded = true; return; // High-res temporarily disabled on WASM (stability)
+    // High-res LOD temporarily disabled on WASM for stability (see Earth.cpp for rationale).
+    // Low-res + fallback textures guarantee no solid black planets/moons.
+    _isHighResLoaded = true;
+    return;
 #endif
 
     float distance = glm::length(cameraPos - GetPosition());
@@ -63,16 +66,22 @@ void Neptune::LoadHighResIfClose(const glm::vec3& cameraPos) {
         std::cout << "[LOD] Camera distance to Neptune: " << distance << " units. Queueing high-res textures..." << std::endl;
         _isHighResLoading = true;
         _highResTexturesLoaded = 0;
+        _highResTexturesProcessed = 0;
         _highResLoadProgress = 0.0f;
 
         auto& queue = TextureLoadingQueue::GetInstance();
         auto onLoaded = [this](bool success) {
+            _highResTexturesProcessed++;
             if (success) _highResTexturesLoaded++;
             _highResLoadProgress = _highResTexturesLoaded / (float)_highResTextureCount;
-            if (_highResTexturesLoaded == _highResTextureCount) {
-                _isHighResLoaded = true;
+            if (_highResTexturesProcessed == _highResTextureCount) {
+                _isHighResLoaded = (_highResTexturesLoaded == _highResTextureCount);
                 _isHighResLoading = false;
-                std::cout << "[LOD] Neptune high-res textures loaded successfully" << std::endl;
+                if (_isHighResLoaded) {
+                    std::cout << "[LOD] Neptune high-res textures loaded successfully" << std::endl;
+                } else {
+                    std::cout << "[LOD] Neptune high-res attempt finished (some or all failed, keeping low-res)" << std::endl;
+                }
             }
         };
 
