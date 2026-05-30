@@ -143,6 +143,17 @@ LOD problems — High-res textures are not preloaded. The current LoadHighResIfC
 Direct mutation of geometry/vertices after loading can cause major scaling issues. Prefer using transformation groups/wrappers.
 WebGL has limitations compared to desktop OpenGL — always test changes in the WebAssembly build.
 
+## DDS Texture Requirements (WebGL 2 / WASM builds)
+
+The following constraints apply to DDS assets served to the WASM/WebGL 2 target:
+
+- **Format**: DXT1 (`GL_COMPRESSED_RGBA_S3TC_DXT1_EXT`), DXT3, or DXT5.  Uncompressed RGB/RGBA DDS are also supported (RGB is auto-converted to RGBA on upload).
+- **Dimensions**: Base level must be a multiple of 4 in each dimension (S3TC block size). Textures smaller than 4px are padded automatically during upload.
+- **Mipmap chain**: For DXT textures the mip chain can stop at 4×4 (one block) instead of 1×1. `GL_TEXTURE_MAX_LEVEL` is set explicitly to the last uploaded level so WebGL 2 does not consider the texture incomplete.
+- **`GL_TEXTURE_MAX_LEVEL` rule**: Every 2D texture and cubemap face must have `BASE_LEVEL` and `MAX_LEVEL` declared to match the levels that were actually uploaded.  `nv_dds` does this automatically in `upload_texture2D()`.  After `glGenerateMipmap` (uncompressed textures with no embedded mips), `TextureImage2D` recalculates and re-declares MAX_LEVEL.
+- **Cubemap / skybox**: The skybox uses `GL_LINEAR` (no mipmaps). `GL_TEXTURE_MAX_LEVEL = 0` is set after all six faces are uploaded to prevent any per-face residual from making the cubemap incomplete.
+- **Missing assets**: `TextureImage2D` generates a 4×4 grey checker fallback so the scene never renders a black or unbound texture when a DDS file is absent.
+
 Collaboration Guidelines
 
 Always test in WebAssembly when working on textures, shaders, or rendering. Desktop builds often hide WebGL-specific bugs.

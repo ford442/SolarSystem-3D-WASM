@@ -91,6 +91,14 @@ void SkyBox::LoadCubeMap(const std::vector<std::string>& faces) {
     glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_R, GL_CLAMP_TO_EDGE);
     glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
     glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+#ifdef __EMSCRIPTEN__
+    // WebGL 2: GL_LINEAR does not use mipmaps.  Explicitly cap MAX_LEVEL to 0
+    // so the cubemap is always considered complete regardless of what
+    // upload_texture2D() declared per-face (last face wins, and may have been
+    // a different value if the DDS file embedded mip levels).
+    glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_BASE_LEVEL, 0);
+    glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_MAX_LEVEL, 0);
+#endif
 }
 
 void SkyBox::InitBuffers() {
