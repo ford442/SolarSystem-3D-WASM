@@ -5,6 +5,7 @@ const canvas = document.getElementById('canvas') as HTMLCanvasElement;
 const loadingContainer = document.getElementById('loading-container') as HTMLElement;
 const progressBar = document.getElementById('progress-bar') as HTMLElement;
 const progressText = document.getElementById('progress-text') as HTMLElement;
+const streamingProgress = document.getElementById('streaming-progress') as HTMLElement;
 const deployedBaseUrl = new URL(import.meta.env.BASE_URL, window.location.href);
 
 // Global progress tracking
@@ -31,8 +32,27 @@ function updateProgress(loaded: number, total: number) {
     }
 }
 
-// Expose progress function globally for C++ to call
+// Called by C++ (via EM_ASM) to show high-res texture streaming progress.
+// completed = number of textures fully streamed; total = total queued for streaming.
+function updateStreamingProgress(completed: number, total: number) {
+    if (!streamingProgress) return;
+    if (total <= 0) {
+        streamingProgress.style.display = 'none';
+        return;
+    }
+    streamingProgress.style.display = 'block';
+    streamingProgress.textContent = `Streaming high-res… (${completed}/${total})`;
+    if (completed >= total) {
+        // Auto-hide after streaming is done
+        setTimeout(() => {
+            streamingProgress.style.display = 'none';
+        }, 2000);
+    }
+}
+
+// Expose progress functions globally for C++ to call
 (window as any).updateLoadingProgress = updateProgress;
+(window as any).updateStreamingProgress = updateStreamingProgress;
 (window as any).__solarSystemAssetBase = deployedBaseUrl.toString();
 
 const moduleConfig = {

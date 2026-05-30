@@ -2,6 +2,7 @@
 #include "Auxiliary_Modules/WebResourceFetcher.h"
 #include "Auxiliary_Modules/TextureLoadingQueue.h"
 #include <SDL_image.h>
+#include <algorithm>
 #include <random>
 #include <iomanip>
 #include <iostream>
@@ -189,6 +190,7 @@ void Application::RunOneFrame() {
 
     ProcessInput(_mainWindow);
     UpdatePlanetSystemLoading();
+    UpdateLOD();
     ConfigureMainShaders();
     _skyBox->Render(*_mainSkyBoxShader);
     RenderStarCorona();
@@ -254,9 +256,6 @@ void Application::RenderPass(const RenderableSceneComponent& component) {
     _mainPlanetShader->Use();
 
     ConfigureMainPlanetShader(component);
-
-    // Check if we need to load high-res textures (LOD system)
-    component.planet->LoadHighResIfClose(camera.GetPosition());
 
     component.planet->SetShader(*_mainPlanetShader);
     component.planet->AdjustToParent(isTimeRun);
@@ -602,7 +601,21 @@ void Application::RenderHints() const {
 
 void Application::RenderTextureLoadingProgress() const {
     auto& queue = TextureLoadingQueue::GetInstance();
-    if (queue.GetQueuedCount() == 0) {
+    const int queued    = queue.GetQueuedCount();
+    const int completed = queue.GetTotalCompleted();
+    const int total     = queue.GetTotalQueued();
+
+#ifdef __EMSCRIPTEN__
+    // Expose streaming stats to JavaScript so the frontend can show a proper
+    // "Streaming high-res... (2/5)" progress element.
+    EM_ASM({
+        if (typeof window.updateStreamingProgress === 'function') {
+            window.updateStreamingProgress($0, $1);
+        }
+    }, completed, total);
+#endif
+
+    if (queued == 0) {
         return;
     }
 
@@ -617,8 +630,10 @@ void Application::RenderTextureLoadingProgress() const {
     _mainTextShader->SetMat4("projection", textProjection);
     _mainTextShader->SetBool("is3D", false);
 
+    // Build hint string with progress counters, e.g. "Streaming high-res... (2/5)"
+    std::wstring hint = L"Streaming high-res... (" + std::to_wstring(completed) + L"/" + std::to_wstring(total) + L")";
     deque<wstring> loadingHint;
-    loadingHint.emplace_back(L"Loading high-res textures...");
+    loadingHint.emplace_back(hint);
     _textRenderer->Render(*_mainTextShader, loadingHint, 0.5f * _displayWidth - 150, 0.1f * _displayHeight, 0.25, textColor);
 
     glDisable(GL_BLEND);
@@ -859,29 +874,39 @@ void Application::InitStarSystem() {
     _planetSystemManifests = {
         {
             "Mercury", sunPos + glm::vec3(1500.f, 0.f, 350.f), 800.f,
+            // Required: low-res planet textures (must be ready before init)
             {
                 "resource/textures_low/Mercury_Diffuse_Low.dds",
                 "resource/textures_low/Mercury_Normal_Low.dds",
                 "resource/textures_low/Mercury_Specular_Low.dds"
             },
+            // Optional: no moons or rings for Mercury
+            {},
             [this]{ InitMercury(*_sphereModel); }
         },
         {
             "Venus", sunPos + glm::vec3(1125.f, 0.f, -1340.f), 800.f,
+            // Required: low-res planet textures
             {
                 "resource/textures_low/Venus_Diffuse_Low.dds",
                 "resource/textures_low/Venus_Normal_Low.dds"
             },
+            // Optional: no moons or rings for Venus
+            {},
             [this]{ InitVenus(*_sphereModel); }
         },
         {
             "Earth", sunPos + glm::vec3(1900.f, 0.f, 0.f), 800.f,
+            // Required: low-res planet textures
             {
                 "resource/textures_low/Earth_Day_Diffuse_Low.dds",
+                "resource/textures_low/Earth_Normal_Low.dds",
+                "resource/textures_low/Earth_Specular_Low.dds"
+            },
+            // Optional: cloud layers and moon textures (fallback if unavailable)
+            {
                 "resource/textures/Earth_Clouds_Diffuse.dds",
                 "resource/textures/Earth_Night_Diffuse.dds",
-                "resource/textures_low/Earth_Normal_Low.dds",
-                "resource/textures_low/Earth_Specular_Low.dds",
                 "resource/textures/Earth_Clouds_Normal.dds",
                 "resource/textures/Moon_Diffuse.dds",
                 "resource/textures/Moon_Normal.dds"
@@ -890,9 +915,13 @@ void Application::InitStarSystem() {
         },
         {
             "Mars", sunPos + glm::vec3(-1732.f, 0.f, 1000.f), 800.f,
+            // Required: low-res planet textures
             {
                 "resource/textures_low/Mars_Diffuse_Low.dds",
-                "resource/textures_low/Mars_Normal_Low.dds",
+                "resource/textures_low/Mars_Normal_Low.dds"
+            },
+            // Optional: moon textures (fallback if unavailable)
+            {
                 "resource/textures/Phobos_Diffuse.dds",
                 "resource/textures/Phobos_Normal.dds",
                 "resource/textures/Deimos_Diffuse.dds",
@@ -902,9 +931,13 @@ void Application::InitStarSystem() {
         },
         {
             "Jupiter", sunPos + glm::vec3(1350.f, 0.f, 1737.f), 1500.f,
+            // Required: low-res planet textures
             {
                 "resource/textures_low/Jupiter_Diffuse_Low.dds",
-                "resource/textures_low/Jupiter_Normal_Low.dds",
+                "resource/textures_low/Jupiter_Normal_Low.dds"
+            },
+            // Optional: Galilean moon textures (fallback if unavailable)
+            {
                 "resource/textures/Io_Diffuse.dds",
                 "resource/textures/Io_Normal.dds",
                 "resource/textures/Europa_Diffuse.dds",
@@ -918,9 +951,13 @@ void Application::InitStarSystem() {
         },
         {
             "Saturn", sunPos + glm::vec3(0.f, -100.f, 2450.f), 1500.f,
+            // Required: low-res planet textures
             {
                 "resource/textures_low/Saturn_Diffuse_Low.dds",
-                "resource/textures_low/Saturn_Normal_Low.dds",
+                "resource/textures_low/Saturn_Normal_Low.dds"
+            },
+            // Optional: ring and moon textures (fallback if unavailable)
+            {
                 "resource/textures/Saturn_Rings.dds",
                 "resource/textures/Mimas_Diffuse.dds",
                 "resource/textures/Mimas_Normal.dds",
@@ -941,10 +978,14 @@ void Application::InitStarSystem() {
         },
         {
             "Uranus", sunPos + glm::vec3(0.f, 0.f, -2650.f), 1500.f,
+            // Required: low-res planet textures
             {
                 "resource/textures_low/Uranus_Diffuse_Low.dds",
+                "resource/textures_low/Uranus_Normal_Low.dds"
+            },
+            // Optional: cloud layers, ring, and moon textures (fallback if unavailable)
+            {
                 "resource/textures/Uranus_Clouds_Diffuse.dds",
-                "resource/textures_low/Uranus_Normal_Low.dds",
                 "resource/textures/Uranus_Rings.dds",
                 "resource/textures/Uranus_Clouds_Normal.dds",
                 "resource/textures/Miranda_Diffuse.dds",
@@ -962,10 +1003,14 @@ void Application::InitStarSystem() {
         },
         {
             "Neptune", sunPos + glm::vec3(-2900.f, 0.f, 0.f), 1500.f,
+            // Required: low-res planet textures
             {
                 "resource/textures_low/Neptune_Diffuse_Low.dds",
+                "resource/textures_low/Neptune_Normal_Low.dds"
+            },
+            // Optional: cloud layer and moon textures (fallback if unavailable)
+            {
                 "resource/textures/Neptune_Clouds_Diffuse.dds",
-                "resource/textures_low/Neptune_Normal_Low.dds",
                 "resource/textures/Neptune_Clouds_Normal.dds",
                 "resource/textures/Triton_Diffuse.dds",
                 "resource/textures/Triton_Normal.dds"
@@ -974,10 +1019,14 @@ void Application::InitStarSystem() {
         },
         {
             "Pluto", sunPos + glm::vec3(2800.f, 0.f, 1757.73f), 1500.f,
+            // Required: low-res planet textures
             {
                 "resource/textures_low/Pluto_Diffuse_Low.dds",
                 "resource/textures_low/Pluto_Normal_Low.dds",
-                "resource/textures_low/Pluto_Specular_Low.dds",
+                "resource/textures_low/Pluto_Specular_Low.dds"
+            },
+            // Optional: moon textures (fallback if unavailable)
+            {
                 "resource/textures/Charon_Diffuse.dds",
                 "resource/textures/Charon_Normal.dds",
                 "resource/textures/Charon_Specular.dds"
@@ -1598,12 +1647,24 @@ void Application::UpdatePlanetSystemLoading() {
                 manifest.totalDownloads = static_cast<int>(manifest.assetPaths.size());
                 manifest.pendingDownloads = manifest.totalDownloads;
 
+                // Download required assets — decrement pendingDownloads on completion (success or failure)
                 for (const auto& path : manifest.assetPaths) {
                     WebResourceFetcher::DownloadFile(path, path, [&manifest](bool success) {
                         manifest.pendingDownloads--;
                         if (!success) {
-                            std::cerr << "[StagedLoading] Failed to download asset for "
+                            std::cerr << "[StagedLoading] Required asset failed for "
                                       << manifest.name << std::endl;
+                        }
+                    });
+                }
+
+                // Download optional assets (moons, rings, clouds) — fire-and-forget.
+                // These do NOT block init; failure is expected when textures are not yet deployed.
+                for (const auto& path : manifest.optionalAssetPaths) {
+                    WebResourceFetcher::DownloadFile(path, path, [name = manifest.name](bool success) {
+                        if (!success) {
+                            std::cout << "[StagedLoading] Optional asset unavailable for "
+                                      << name << " — fallback texture will be used." << std::endl;
                         }
                     });
                 }
@@ -1612,12 +1673,37 @@ void Application::UpdatePlanetSystemLoading() {
 
         if (manifest.state == PlanetSystemManifest::State::DOWNLOADING) {
             if (manifest.pendingDownloads <= 0) {
-                std::cout << "[StagedLoading] All assets ready for " << manifest.name
+                std::cout << "[StagedLoading] Required assets ready for " << manifest.name
                           << " — initializing system." << std::endl;
                 manifest.initFunc();
                 manifest.state = PlanetSystemManifest::State::READY;
             }
         }
+    }
+#endif
+}
+
+void Application::UpdateLOD() {
+#ifdef __EMSCRIPTEN__
+    // Central LOD manager: only attempt high-res upgrades for the nearest 1-2 planets
+    // to avoid bursty queuing when the camera flies through the inner system.
+    if (_renderableSceneComponents.empty()) return;
+
+    const glm::vec3 camPos = camera.GetPosition();
+
+    // Collect (distance, index) pairs and sort ascending
+    std::vector<std::pair<float, size_t>> distances;
+    distances.reserve(_renderableSceneComponents.size());
+    for (size_t i = 0; i < _renderableSceneComponents.size(); ++i) {
+        float d = glm::length(camPos - _renderableSceneComponents[i].planet->GetPosition());
+        distances.emplace_back(d, i);
+    }
+    std::sort(distances.begin(), distances.end());
+
+    // Only trigger high-res loading for the 2 closest planets
+    constexpr size_t kMaxLODCandidates = 2;
+    for (size_t k = 0; k < distances.size() && k < kMaxLODCandidates; ++k) {
+        _renderableSceneComponents[distances[k].second].planet->LoadHighResIfClose(camPos);
     }
 #endif
 }
