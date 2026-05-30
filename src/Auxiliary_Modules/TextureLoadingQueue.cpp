@@ -10,6 +10,7 @@ TextureLoadingQueue& TextureLoadingQueue::GetInstance() {
 
 void TextureLoadingQueue::QueueTextureLoad(const std::string& path, const std::string& id, TextureImage2D* texture, std::function<void(bool)> callback) {
     _queue.push({path, id, texture, callback, 0});
+    _totalQueued++;
 }
 
 void TextureLoadingQueue::ProcessQueue() {
@@ -32,6 +33,7 @@ void TextureLoadingQueue::ProcessQueue() {
                 if (job.targetTexture) {
                     job.targetTexture->ReloadTexture(job.path);
                     std::cout << "[TextureLoadingQueue] Successfully loaded: " << job.textureId << std::endl;
+                    _totalCompleted++;
                     if (job.callback) job.callback(true);
                 }
             } catch (const std::exception& e) {
@@ -41,6 +43,7 @@ void TextureLoadingQueue::ProcessQueue() {
                     _queue.push(job);
                     std::cout << "[TextureLoadingQueue] Queued retry " << job.retries << "/" << job.maxRetries << " for " << job.textureId << std::endl;
                 } else {
+                    _totalFailed++;
                     if (job.callback) job.callback(false);
                 }
             }
@@ -50,6 +53,7 @@ void TextureLoadingQueue::ProcessQueue() {
                 job.retries++;
                 _queue.push(job);
             } else {
+                _totalFailed++;
                 if (job.callback) job.callback(false);
             }
         }

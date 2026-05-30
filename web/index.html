@@ -56,6 +56,21 @@
         font-weight: bold;
       }
       
+      #streaming-progress {
+        display: none;
+        position: fixed;
+        bottom: 20px;
+        right: 20px;
+        background: rgba(0, 0, 0, 0.7);
+        color: #4dd9f0;
+        font-family: Arial, sans-serif;
+        font-size: 14px;
+        padding: 8px 14px;
+        border-radius: 8px;
+        border: 1px solid rgba(77, 217, 240, 0.4);
+        z-index: 999;
+      }
+      
       #loading-container.hidden {
         display: none;
       }
@@ -69,6 +84,7 @@
       </div>
       <div id="progress-text">0%</div>
     </div>
+    <div id="streaming-progress"></div>
     <canvas class="emscripten" id="canvas" oncontextmenu="event.preventDefault()" tabindex="-1"></canvas>
     <script type="module" src="/src/main.ts"></script>
   </body>

@@ -42,11 +42,12 @@ struct PlanetSystemManifest {
     std::string name;                       // e.g. "Jupiter"
     glm::vec3 proxyPosition;                // Fixed orbital position for distance check
     float activationRadius;                 // Camera must be within this distance to trigger
-    std::vector<std::string> assetPaths;    // Assets to download before initialization
+    std::vector<std::string> assetPaths;    // Required assets (low-res planet textures); block init until ready
+    std::vector<std::string> optionalAssetPaths; // Optional assets (moons, rings, clouds); fire-and-forget
     std::function<void()> initFunc;         // Calls InitXxxSystem()
 
     enum class State { NOT_LOADED, DOWNLOADING, READY } state = State::NOT_LOADED;
-    std::atomic<int> pendingDownloads{0};
+    std::atomic<int> pendingDownloads{0};   // Counts only required assets
     int totalDownloads{0};
 };
 
@@ -125,6 +126,7 @@ private:
     void Dispose();
     void UpdateLoadingProgress(); // Update JavaScript loading progress bar
     void UpdatePlanetSystemLoading(); // Staged download + init of planet systems (WASM)
+    void UpdateLOD();             // Central LOD manager: upgrade textures for nearest planets (WASM)
     void RenderPlanetProxyMarkers() const; // Show orbital markers for unloaded planets (WASM)
     void StartSearchNearestPlanet();
     void UpdateSearchNearestPlanet(); // For Emscripten frame-based search

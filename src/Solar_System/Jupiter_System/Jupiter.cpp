@@ -70,12 +70,12 @@ void Jupiter::LoadHighResIfClose(const glm::vec3& cameraPos) {
             if (success) _highResTexturesLoaded++;
             _highResLoadProgress = _highResTexturesLoaded / (float)_highResTextureCount;
             if (_highResTexturesProcessed == _highResTextureCount) {
-                _isHighResLoaded = (_highResTexturesLoaded == _highResTextureCount);
+                _isHighResLoaded = true;  // Permanently finalized: prevents re-queuing regardless of outcome
                 _isHighResLoading = false;
-                if (_isHighResLoaded) {
+                if (_highResTexturesLoaded == _highResTextureCount) {
                     std::cout << "[LOD] Jupiter high-res textures loaded successfully" << std::endl;
                 } else {
-                    std::cout << "[LOD] Jupiter high-res attempt finished (some or all failed, keeping low-res)" << std::endl;
+                    std::cout << "[LOD] Jupiter high-res attempt finished (some or all failed, keeping low-res permanently)" << std::endl;
                 }
             }
         };

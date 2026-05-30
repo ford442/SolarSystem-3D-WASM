@@ -128,7 +128,8 @@ void WebResourceFetcher::Fetch(const std::string& path) {
     emscripten_wget_data(resolvedUrl.c_str(), &buffer, &numBytes, &error);
 
     if (error || !buffer || numBytes == 0) {
-        std::cerr << "[WebResourceFetcher] FATAL: Failed to download " << resolvedUrl << " into " << path << std::endl;
+        std::cerr << "[WebResourceFetcher] Warning: Failed to download " << resolvedUrl
+                  << " (fallback texture will be used if applicable)" << std::endl;
         if (buffer) {
             free(buffer);
         }
