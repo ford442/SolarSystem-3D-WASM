@@ -1,6 +1,7 @@
 #include "TextureImage2D.h"
 #include "WebResourceFetcher.h"
 #include <cstdint>
+#include <algorithm>
 
 TextureImage2D::TextureImage2D(const std::string& path, GLint wrapParam, GLint minFilter, GLint magFilter) {
     LoadTextureFromFile(path, wrapParam, minFilter, magFilter);
@@ -59,6 +60,20 @@ void TextureImage2D::LoadTextureFromFile(const std::string& path, GLint wrapPara
                       << " (error 0x" << std::hex << err << std::dec << ")" << std::endl;
         } else {
             hasEmbeddedMipmaps = true;
+#ifdef __EMSCRIPTEN__
+            // After glGenerateMipmap the full mip chain is now resident on the GPU.
+            // upload_texture2D() set MAX_LEVEL = 0 (no embedded mips in DDS), so we
+            // must re-declare the range to include the newly generated levels.
+            // Without this, WebGL 2 sees MAX_LEVEL=0 with a mip-filter and returns
+            // only black (texture incomplete).
+            {
+                int maxDim = static_cast<int>(std::max(_width, _height));
+                int numMipLevels = 0;
+                while (maxDim > 1) { maxDim >>= 1; ++numMipLevels; }
+                glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_BASE_LEVEL, 0);
+                glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAX_LEVEL, numMipLevels);
+            }
+#endif
         }
     }
 
@@ -87,6 +102,28 @@ void TextureImage2D::LoadTextureFromFile(const std::string& path, GLint wrapPara
 #ifndef __EMSCRIPTEN__
     glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_MAX_ANISOTROPY_EXT, 16);
 #endif
+
+#ifdef __EMSCRIPTEN__
+    // Runtime sanity check: if a mip filter is active and MAX_LEVEL is still 0,
+    // the texture will render black in WebGL 2 (incomplete mip chain).
+    {
+        bool minFilterUsesMipmaps =
+            (minFilter == GL_NEAREST_MIPMAP_NEAREST ||
+             minFilter == GL_LINEAR_MIPMAP_NEAREST  ||
+             minFilter == GL_NEAREST_MIPMAP_LINEAR  ||
+             minFilter == GL_LINEAR_MIPMAP_LINEAR);
+        if (minFilterUsesMipmaps) {
+            GLint maxLevel = 0;
+            glGetTexParameteriv(GL_TEXTURE_2D, GL_TEXTURE_MAX_LEVEL, &maxLevel);
+            if (maxLevel == 0) {
+                std::cerr << "[Texture] WARNING: " << path
+                          << " uses a mip filter but GL_TEXTURE_MAX_LEVEL=0 — "
+                             "texture will be incomplete (black) in WebGL 2!" << std::endl;
+            }
+        }
+    }
+#endif
+
     std::cout << path << " Loaded" << std::endl;
 }
 
