@@ -47,7 +47,12 @@ struct PlanetSystemManifest {
     std::function<void()> initFunc;         // Calls InitXxxSystem()
 
     enum class State { NOT_LOADED, DOWNLOADING, READY } state = State::NOT_LOADED;
-    std::atomic<int> pendingDownloads{0};   // Counts only required assets
+    // Counts only required assets. Decremented in download completion callbacks,
+    // which run on the main thread (emscripten_async_wget2 onload/onerror and the
+    // native synchronous stub), so no atomic/locking is needed. Keeping this a
+    // plain int also keeps PlanetSystemManifest copyable, which is required for
+    // the brace-initializer-list assignment of _planetSystemManifests.
+    int pendingDownloads{0};
     int totalDownloads{0};
 };
 
