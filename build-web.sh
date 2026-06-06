@@ -81,11 +81,15 @@ if [ -f "SolarSystem.js" ]; then
     echo "Copied SolarSystem.js to web/src/"
 fi
 
-# Runtime resources are fetched from the deployed /solar-system/resource/ host path.
-# Do not mirror the local resource tree here because the repo intentionally omits
-# most DDS payloads and several large runtime assets.
-rm -rf "$PROJECT_ROOT/web/public/resource"
-echo "Skipping local resource copy; runtime assets will be fetched from /solar-system/resource/"
+# Copy low-res textures to public/ so the Vite dev server can serve them when
+# WebResourceFetcher tries to fetch from /solar-system/resource/textures_low/.
+# These are also preloaded into the .data file (CMakeLists.txt), so they are
+# available in MEMFS even without the dev server.
+mkdir -p "$PROJECT_ROOT/web/public/resource/textures_low"
+if [ -d "$PROJECT_ROOT/resource/textures_low" ]; then
+    cp -r "$PROJECT_ROOT/resource/textures_low/." "$PROJECT_ROOT/web/public/resource/textures_low/"
+    echo "Copied resource/textures_low to web/public/resource/textures_low/"
+fi
 
 # Copy Assets to public (served at root URL)
 if [ -f "SolarSystem.wasm" ]; then

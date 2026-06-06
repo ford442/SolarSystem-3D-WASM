@@ -29,12 +29,12 @@ if(EMSCRIPTEN)
     # Enable async support for WebResourceFetcher (emscripten_wget_data)
     set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -s ASYNCIFY=1")
     
-    # [OPTIMIZATION] Preload only essential small files. Exclude ALL textures to allow staged planet loading.
+    # Preload essential files. textures_low (~124 KB total) are small enough to embed so
+    # planets always have a visible texture even without a live asset server.
     set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} --preload-file ${CMAKE_SOURCE_DIR}/resource/shaders@/resource/shaders")
     set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} --preload-file ${CMAKE_SOURCE_DIR}/resource/fonts@/resource/fonts")
     set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} --preload-file ${CMAKE_SOURCE_DIR}/resource/icons@/resource/icons")
-    # [STAGED LOADING] Planet textures (including low-res) are fetched on-demand when the camera
-    # approaches each planet system. See docs/plans/staged_loading_plan.md for details.
+    set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} --preload-file ${CMAKE_SOURCE_DIR}/resource/textures_low@/resource/textures_low")
     # [NOTE] Sounds are excluded from the repo (LFS), so do not preload them to avoid build errors in CI/Sandbox.
     # set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} --preload-file ${CMAKE_SOURCE_DIR}/resource/sounds@/resource/sounds")
 
