@@ -49,13 +49,6 @@ void Pluto::LoadHighResIfClose(const glm::vec3& cameraPos) {
         return;
     }
 
-#ifdef __EMSCRIPTEN__
-    // High-res LOD temporarily disabled on WASM for stability (see Earth.cpp for rationale).
-    // Low-res + fallback textures guarantee no solid black planets/moons.
-    _isHighResLoaded = true;
-    return;
-#endif
-
     float distance = glm::length(cameraPos - GetPosition());
 
     if (distance < _lodThreshold) {

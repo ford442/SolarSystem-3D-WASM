@@ -59,20 +59,6 @@ void Earth::LoadHighResIfClose(const glm::vec3& cameraPos) {
         return;
     }
 
-#ifdef __EMSCRIPTEN__
-    // TEMPORARY STABILITY FIX: High-res swapping disabled by default on WebAssembly.
-    // The low-res textures (from textures_low/) are now reliably used thanks to:
-    //  - GL_TEXTURE_MAX_LEVEL + BASE_LEVEL fix in nv_dds.cpp
-    //  - Fallback texture generation in TextureImage2D for any missing moon/ring/high-res assets
-    // The async infrastructure (TextureLoadingQueue + WebResourceFetcher::DownloadFile using
-    // emscripten_async_wget2 + ReloadTexture) remains in place as v1 of background streaming.
-    // Re-enable per-planet when the deployment server hosts the full high-res DDS set under
-    // /solar-system/resource/textures/*.dds (or set window.__solarSystemAssetBase).
-    // To force one-time attempt for a specific planet, comment the early return below.
-    _isHighResLoaded = true;   // Mark done so we don't spam the queue with doomed requests
-    return;
-#endif
-
     float distance = glm::length(cameraPos - GetPosition());
 
     if (distance < _lodThreshold) {
