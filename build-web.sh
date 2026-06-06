@@ -30,8 +30,7 @@ if [ "$SKIP_EMSDK" = false ]; then
     if [ -f "/content/build_space/emsdk/emsdk_env.sh" ]; then
         source /content/build_space/emsdk/emsdk_env.sh
     else
-        echo "Warning: emsdk_env.sh not found at /content/build_space/emsdk/emsdk_env.sh"
-        echo "Assuming emcc is in PATH or usage of --no-emsdk is intended."
+        source /root/emsdk/emsdk_env.sh
     fi
 else
     echo "Skipping emsdk environment setup (as requested)."
