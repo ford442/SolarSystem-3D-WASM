@@ -35,6 +35,9 @@ public:
     glm::vec3 GetUpVector() const;
     glm::vec3 GetWorldUpVector() const;
 
+    void SetPosition(const glm::vec3& position) { _position = position; }
+    void SetYawPitch(float yaw, float pitch) { _yaw = yaw; _pitch = pitch; UpdateCameraVectors(); }
+
     // Processes input received from any keyboard-like input system. Accepts input parameter in the form of camera defined ENUM (to abstract it from windowing systems)
     void ProcessKeyboard(CameraVector direction, float deltaTime);
 

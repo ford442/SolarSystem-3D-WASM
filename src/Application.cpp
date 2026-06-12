@@ -10,6 +10,15 @@
 
 using namespace std;
 
+#ifdef __EMSCRIPTEN__
+extern "C" {
+    EMSCRIPTEN_KEEPALIVE void SetCameraPose(float x, float y, float z, float yaw, float pitch) {
+        camera.SetPosition(glm::vec3(x, y, z));
+        camera.SetYawPitch(yaw, pitch);
+    }
+}
+#endif
+
 // Helper function to get texture path with fallback for WebAssembly
 std::string GetTexturePath(const std::string& lowRes, const std::string& highRes) {
 #ifdef __EMSCRIPTEN__
@@ -757,15 +766,15 @@ void Application::LoadCoreResources() {
         "resource/models/saturn_ring.obj",
         "resource/models/uranus_ring.obj",
         // SkyBox
-        "resource/textures/Main_SkyBox/PositiveX.dds",
-        "resource/textures/Main_SkyBox/NegativeX.dds",
-        "resource/textures/Main_SkyBox/PositiveY.dds",
-        "resource/textures/Main_SkyBox/NegativeY.dds",
-        "resource/textures/Main_SkyBox/PositiveZ.dds",
-        "resource/textures/Main_SkyBox/NegativeZ.dds",
+        "resource/textures_low/Main_SkyBox/PositiveX.dds",
+        "resource/textures_low/Main_SkyBox/NegativeX.dds",
+        "resource/textures_low/Main_SkyBox/PositiveY.dds",
+        "resource/textures_low/Main_SkyBox/NegativeY.dds",
+        "resource/textures_low/Main_SkyBox/PositiveZ.dds",
+        "resource/textures_low/Main_SkyBox/NegativeZ.dds",
         // Sun
-        "resource/textures/Star_Spectrum.dds",
-        "resource/textures/flares_bright.dds",
+        "resource/textures_low/Star_Spectrum_Low.dds",
+        "resource/textures_low/flares_bright_Low.dds",
         // Sounds
         "resource/sounds/Stellardrone - Galaxies.mp3",
         "resource/sounds/Stellardrone - Mars.mp3",
@@ -801,12 +810,12 @@ void Application::InitSceneObjects() {
     _hdr = make_unique<HDR>(*_hdrShader, _displayWidth, _displayHeight);
 
     const vector<string> skyBoxFaces = {
-            "resource/textures/Main_SkyBox/PositiveX.dds",
-            "resource/textures/Main_SkyBox/NegativeX.dds",
-            "resource/textures/Main_SkyBox/PositiveY.dds",
-            "resource/textures/Main_SkyBox/NegativeY.dds",
-            "resource/textures/Main_SkyBox/PositiveZ.dds",
-            "resource/textures/Main_SkyBox/NegativeZ.dds"
+            "resource/textures_low/Main_SkyBox/PositiveX.dds",
+            "resource/textures_low/Main_SkyBox/NegativeX.dds",
+            "resource/textures_low/Main_SkyBox/PositiveY.dds",
+            "resource/textures_low/Main_SkyBox/NegativeY.dds",
+            "resource/textures_low/Main_SkyBox/PositiveZ.dds",
+            "resource/textures_low/Main_SkyBox/NegativeZ.dds"
     };
 
     _skyBox = make_unique<SkyBox>(skyBoxFaces);
@@ -822,7 +831,7 @@ void Application::InitSceneObjects() {
     _mainCloudsShader = make_unique<Shader>("resource/shaders/planetLighting.vs", "resource/shaders/cloudsLighting.fs");
     _mainRingShader = make_unique<Shader>("resource/shaders/planetaryRingLighting.vs", "resource/shaders/planetaryRingLighting.fs");
     _lensFlareShader = make_unique<Shader>("resource/shaders/lensFlare.vs", "resource/shaders/lensFlare.fs");
-    _lensFlare = make_unique<LensFlare>(*_lensFlareShader, TextureImage2D("resource/textures/flares_bright.dds"),
+    _lensFlare = make_unique<LensFlare>(*_lensFlareShader, TextureImage2D("resource/textures_low/flares_bright_Low.dds"),
             FlaresInfo {4,
             {
                 FlareSprite{false, 1.0, 7.0, 0},
@@ -864,7 +873,7 @@ void Application::InitStarSystem() {
     _sphereModel = std::make_unique<MeshHolder>("resource/models/sphere.obj");
 
     _starGlowShader = make_unique<Shader>("resource/shaders/starGlow.vs", "resource/shaders/starGlow.fs");
-    StarInfo sunInfo(*_sphereModel, *_mainStarShader, *_starGlowShader, TextureImage2D("resource/textures/Star_Spectrum.dds"),
+    StarInfo sunInfo(*_sphereModel, *_mainStarShader, *_starGlowShader, TextureImage2D("resource/textures_low/Star_Spectrum_Low.dds"),
                      starTemperatureInKelvin, 696342.0, glm::vec3(0.99607843, 0.890196078, 0.725490196), L"Sun", L"Солнце");
     _sun = make_shared<Sun>(sunInfo);
 
@@ -905,11 +914,11 @@ void Application::InitStarSystem() {
             },
             // Optional: cloud layers and moon textures (fallback if unavailable)
             {
-                "resource/textures/Earth_Clouds_Diffuse.dds",
-                "resource/textures/Earth_Night_Diffuse.dds",
-                "resource/textures/Earth_Clouds_Normal.dds",
-                "resource/textures/Moon_Diffuse.dds",
-                "resource/textures/Moon_Normal.dds"
+                "resource/textures_low/Earth_Clouds_Diffuse_Low.dds",
+                "resource/textures_low/Earth_Night_Diffuse_Low.dds",
+                "resource/textures_low/Earth_Clouds_Normal_Low.dds",
+                "resource/textures_low/Moon_Diffuse_Low.dds",
+                "resource/textures_low/Moon_Normal_Low.dds"
             },
             [this]{ InitEarthSystem(*_sphereModel); }
         },
@@ -922,10 +931,10 @@ void Application::InitStarSystem() {
             },
             // Optional: moon textures (fallback if unavailable)
             {
-                "resource/textures/Phobos_Diffuse.dds",
-                "resource/textures/Phobos_Normal.dds",
-                "resource/textures/Deimos_Diffuse.dds",
-                "resource/textures/Deimos_Normal.dds"
+                "resource/textures_low/Phobos_Diffuse_Low.dds",
+                "resource/textures_low/Phobos_Normal_Low.dds",
+                "resource/textures_low/Deimos_Diffuse_Low.dds",
+                "resource/textures_low/Deimos_Normal_Low.dds"
             },
             [this]{ InitMarsSystem(*_sphereModel); }
         },
@@ -938,14 +947,14 @@ void Application::InitStarSystem() {
             },
             // Optional: Galilean moon textures (fallback if unavailable)
             {
-                "resource/textures/Io_Diffuse.dds",
-                "resource/textures/Io_Normal.dds",
-                "resource/textures/Europa_Diffuse.dds",
-                "resource/textures/Europa_Normal.dds",
-                "resource/textures/Ganymede_Diffuse.dds",
-                "resource/textures/Ganymede_Normal.dds",
-                "resource/textures/Callisto_Diffuse.dds",
-                "resource/textures/Callisto_Normal.dds"
+                "resource/textures_low/Io_Diffuse_Low.dds",
+                "resource/textures_low/Io_Normal_Low.dds",
+                "resource/textures_low/Europa_Diffuse_Low.dds",
+                "resource/textures_low/Europa_Normal_Low.dds",
+                "resource/textures_low/Ganymede_Diffuse_Low.dds",
+                "resource/textures_low/Ganymede_Normal_Low.dds",
+                "resource/textures_low/Callisto_Diffuse_Low.dds",
+                "resource/textures_low/Callisto_Normal_Low.dds"
             },
             [this]{ InitJupiterSystem(*_sphereModel); }
         },
@@ -958,21 +967,21 @@ void Application::InitStarSystem() {
             },
             // Optional: ring and moon textures (fallback if unavailable)
             {
-                "resource/textures/Saturn_Rings.dds",
-                "resource/textures/Mimas_Diffuse.dds",
-                "resource/textures/Mimas_Normal.dds",
-                "resource/textures/Enceladus_Diffuse.dds",
-                "resource/textures/Enceladus_Normal.dds",
-                "resource/textures/Tethys_Diffuse.dds",
-                "resource/textures/Tethys_Normal.dds",
-                "resource/textures/Dione_Diffuse.dds",
-                "resource/textures/Dione_Normal.dds",
-                "resource/textures/Rhea_Diffuse.dds",
-                "resource/textures/Rhea_Normal.dds",
-                "resource/textures/Titan_Diffuse.dds",
-                "resource/textures/Titan_Normal.dds",
-                "resource/textures/Iapetus_Diffuse.dds",
-                "resource/textures/Iapetus_Normal.dds"
+                "resource/textures_low/Saturn_Rings_Low.dds",
+                "resource/textures_low/Mimas_Diffuse_Low.dds",
+                "resource/textures_low/Mimas_Normal_Low.dds",
+                "resource/textures_low/Enceladus_Diffuse_Low.dds",
+                "resource/textures_low/Enceladus_Normal_Low.dds",
+                "resource/textures_low/Tethys_Diffuse_Low.dds",
+                "resource/textures_low/Tethys_Normal_Low.dds",
+                "resource/textures_low/Dione_Diffuse_Low.dds",
+                "resource/textures_low/Dione_Normal_Low.dds",
+                "resource/textures_low/Rhea_Diffuse_Low.dds",
+                "resource/textures_low/Rhea_Normal_Low.dds",
+                "resource/textures_low/Titan_Diffuse_Low.dds",
+                "resource/textures_low/Titan_Normal_Low.dds",
+                "resource/textures_low/Iapetus_Diffuse_Low.dds",
+                "resource/textures_low/Iapetus_Normal_Low.dds"
             },
             [this]{ InitSaturnSystem(*_sphereModel); }
         },
@@ -985,19 +994,19 @@ void Application::InitStarSystem() {
             },
             // Optional: cloud layers, ring, and moon textures (fallback if unavailable)
             {
-                "resource/textures/Uranus_Clouds_Diffuse.dds",
-                "resource/textures/Uranus_Rings.dds",
-                "resource/textures/Uranus_Clouds_Normal.dds",
-                "resource/textures/Miranda_Diffuse.dds",
-                "resource/textures/Miranda_Normal.dds",
-                "resource/textures/Ariel_Diffuse.dds",
-                "resource/textures/Ariel_Normal.dds",
-                "resource/textures/Umbriel_Diffuse.dds",
-                "resource/textures/Umbriel_Normal.dds",
-                "resource/textures/Titania_Diffuse.dds",
-                "resource/textures/Titania_Normal.dds",
-                "resource/textures/Oberon_Diffuse.dds",
-                "resource/textures/Oberon_Normal.dds"
+                "resource/textures_low/Uranus_Clouds_Diffuse_Low.dds",
+                "resource/textures_low/Uranus_Rings_Low.dds",
+                "resource/textures_low/Uranus_Clouds_Normal_Low.dds",
+                "resource/textures_low/Miranda_Diffuse_Low.dds",
+                "resource/textures_low/Miranda_Normal_Low.dds",
+                "resource/textures_low/Ariel_Diffuse_Low.dds",
+                "resource/textures_low/Ariel_Normal_Low.dds",
+                "resource/textures_low/Umbriel_Diffuse_Low.dds",
+                "resource/textures_low/Umbriel_Normal_Low.dds",
+                "resource/textures_low/Titania_Diffuse_Low.dds",
+                "resource/textures_low/Titania_Normal_Low.dds",
+                "resource/textures_low/Oberon_Diffuse_Low.dds",
+                "resource/textures_low/Oberon_Normal_Low.dds"
             },
             [this]{ InitUranusSystem(*_sphereModel); }
         },
@@ -1010,10 +1019,10 @@ void Application::InitStarSystem() {
             },
             // Optional: cloud layer and moon textures (fallback if unavailable)
             {
-                "resource/textures/Neptune_Clouds_Diffuse.dds",
-                "resource/textures/Neptune_Clouds_Normal.dds",
-                "resource/textures/Triton_Diffuse.dds",
-                "resource/textures/Triton_Normal.dds"
+                "resource/textures_low/Neptune_Clouds_Diffuse_Low.dds",
+                "resource/textures_low/Neptune_Clouds_Normal_Low.dds",
+                "resource/textures_low/Triton_Diffuse_Low.dds",
+                "resource/textures_low/Triton_Normal_Low.dds"
             },
             [this]{ InitNeptuneSystem(*_sphereModel); }
         },
@@ -1027,9 +1036,9 @@ void Application::InitStarSystem() {
             },
             // Optional: moon textures (fallback if unavailable)
             {
-                "resource/textures/Charon_Diffuse.dds",
-                "resource/textures/Charon_Normal.dds",
-                "resource/textures/Charon_Specular.dds"
+                "resource/textures_low/Charon_Diffuse_Low.dds",
+                "resource/textures_low/Charon_Normal_Low.dds",
+                "resource/textures_low/Charon_Specular_Low.dds"
             },
             [this]{ InitPlutoSystem(*_sphereModel); }
         },
@@ -1053,8 +1062,8 @@ void Application::InitStarSystem() {
 void Application::InitMercury(const MeshHolder& sphereModel) {
     PlanetInfo mercuryInfo(sphereModel, 0.38, *_mainPlanetShader,
             {
-                TextureImage2D(GetTexturePath("resource/textures_low/Mercury_Diffuse_Low.dds", "resource/textures/Mercury_Diffuse.dds")),
-            }, TextureImage2D(GetTexturePath("resource/textures_low/Mercury_Normal_Low.dds", "resource/textures/Mercury_Normal.dds")), L"Mercury", L"Меркурий", TextureImage2D(GetTexturePath("resource/textures_low/Mercury_Specular_Low.dds", "resource/textures/Mercury_Specular.dds")));
+                TextureImage2D(GetTexturePath("resource/textures_low/Mercury_Diffuse_Low.dds", "resource/textures_low/Mercury_Diffuse_Low.dds")),
+            }, TextureImage2D(GetTexturePath("resource/textures_low/Mercury_Normal_Low.dds", "resource/textures_low/Mercury_Normal_Low.dds")), L"Mercury", L"Меркурий", TextureImage2D(GetTexturePath("resource/textures_low/Mercury_Specular_Low.dds", "resource/textures_low/Mercury_Specular_Low.dds")));
     shared_ptr<Planet> mercury = make_shared<Mercury>(mercuryInfo, _sun);
 
     const glm::mat4 lightProjection = glm::ortho(-mercury->GetRadius() * 3.0f, mercury->GetRadius() * 3.0f, -mercury->GetRadius() * 3.0f, mercury->GetRadius() * 3.0f, camera.GetNear(), camera.GetFar());
@@ -1070,8 +1079,8 @@ void Application::InitMercury(const MeshHolder& sphereModel) {
 void Application::InitVenus(const MeshHolder& sphereModel) {
     PlanetInfo venusInfo(sphereModel, 0.95, *_mainPlanetShader,
             {
-                TextureImage2D(GetTexturePath("resource/textures_low/Venus_Diffuse_Low.dds", "resource/textures/Venus_Diffuse.dds")),
-            }, TextureImage2D(GetTexturePath("resource/textures_low/Venus_Normal_Low.dds", "resource/textures/Venus_Normal.dds")), L"Venus", L"Венера");
+                TextureImage2D(GetTexturePath("resource/textures_low/Venus_Diffuse_Low.dds", "resource/textures_low/Venus_Diffuse_Low.dds")),
+            }, TextureImage2D(GetTexturePath("resource/textures_low/Venus_Normal_Low.dds", "resource/textures_low/Venus_Normal_Low.dds")), L"Venus", L"Венера");
     shared_ptr<Planet> venus = make_shared<Venus>(venusInfo, _sun);
 
     AtmosphereInfo venusAtmosphereInfo(sphereModel, *_mainAtmosphereShader, 1.1, glm::vec3(203/255.f, 158/255.f, 69/255.), venus->GetRadius() - 0.00007, 1.995);
@@ -1097,21 +1106,21 @@ void Application::InitEarthSystem(const MeshHolder& sphereModel) {
     // Load textures with low-res fallback for Web
     PlanetInfo earthInfo(sphereModel, 1.0, *_mainPlanetShader,
             {
-                TextureImage2D(GetTexturePath("resource/textures_low/Earth_Day_Diffuse_Low.dds", "resource/textures/Earth_Day_Diffuse.dds")),
-                TextureImage2D("resource/textures/Earth_Clouds_Diffuse.dds"),
-                TextureImage2D("resource/textures/Earth_Night_Diffuse.dds"),
-            }, TextureImage2D(GetTexturePath("resource/textures_low/Earth_Normal_Low.dds", "resource/textures/Earth_Normal.dds")), L"Earth", L"Земля", TextureImage2D(GetTexturePath("resource/textures_low/Earth_Specular_Low.dds", "resource/textures/Earth_Specular.dds")));
+                TextureImage2D(GetTexturePath("resource/textures_low/Earth_Day_Diffuse_Low.dds", "resource/textures_low/Earth_Day_Diffuse_Low.dds")),
+                TextureImage2D("resource/textures_low/Earth_Clouds_Diffuse_Low.dds"),
+                TextureImage2D("resource/textures_low/Earth_Night_Diffuse_Low.dds"),
+            }, TextureImage2D(GetTexturePath("resource/textures_low/Earth_Normal_Low.dds", "resource/textures_low/Earth_Normal_Low.dds")), L"Earth", L"Земля", TextureImage2D(GetTexturePath("resource/textures_low/Earth_Specular_Low.dds", "resource/textures_low/Earth_Specular_Low.dds")));
     shared_ptr<Planet> earth = make_shared<Earth>(earthInfo, _sun);
 
-    SatelliteInfo moonInfo(sphereModel, 0.2724, *_mainPlanetShader, {TextureImage2D("resource/textures/Moon_Diffuse.dds")}, TextureImage2D("resource/textures/Moon_Normal.dds"),
+    SatelliteInfo moonInfo(sphereModel, 0.2724, *_mainPlanetShader, {TextureImage2D("resource/textures_low/Moon_Diffuse_Low.dds")}, TextureImage2D("resource/textures_low/Moon_Normal_Low.dds"),
                            L"Moon", L"Луна");
     shared_ptr<Satellite> moon = make_shared<Moon>(moonInfo, earth);
 
     AtmosphereInfo earthAtmosphereInfo(sphereModel, *_mainAtmosphereShader, 1.1, glm::vec3(0.3, 0.7, 1.0), earth->GetRadius() - 0.00007, 2.1);
     unique_ptr<Atmosphere> earthAtmosphere = make_unique<Atmosphere>(earthAtmosphereInfo, earth);
 
-    CloudsInfo earthCloudsInfo(sphereModel, *_mainCloudsShader, 1.0055, TextureImage2D("resource/textures/Earth_Clouds_Diffuse.dds"),
-                               TextureImage2D("resource/textures/Earth_Clouds_Normal.dds"));
+    CloudsInfo earthCloudsInfo(sphereModel, *_mainCloudsShader, 1.0055, TextureImage2D("resource/textures_low/Earth_Clouds_Diffuse_Low.dds"),
+                               TextureImage2D("resource/textures_low/Earth_Clouds_Normal_Low.dds"));
     unique_ptr<Clouds> earthClouds = make_unique<EarthClouds>(earthCloudsInfo, earth);
 
     const glm::mat4 lightProjection = glm::ortho(-earth->GetRadius() * 3.0f, earth->GetRadius() * 3.0f, -earth->GetRadius() * 3.0f, earth->GetRadius() * 3.0f, camera.GetNear(), camera.GetFar());
@@ -1137,13 +1146,13 @@ void Application::InitMarsSystem(const MeshHolder& sphereModel) {
 
     PlanetInfo marsInfo(sphereModel, 0.53, *_mainPlanetShader,
             {
-                TextureImage2D(GetTexturePath("resource/textures_low/Mars_Diffuse_Low.dds", "resource/textures/Mars_Diffuse.dds")),
-            }, TextureImage2D(GetTexturePath("resource/textures_low/Mars_Normal_Low.dds", "resource/textures/Mars_Normal.dds")), L"Mars", L"Марс");
+                TextureImage2D(GetTexturePath("resource/textures_low/Mars_Diffuse_Low.dds", "resource/textures_low/Mars_Diffuse_Low.dds")),
+            }, TextureImage2D(GetTexturePath("resource/textures_low/Mars_Normal_Low.dds", "resource/textures_low/Mars_Normal_Low.dds")), L"Mars", L"Марс");
     shared_ptr<Planet> mars = make_shared<Mars>(marsInfo, _sun);
 
-    SatelliteInfo phobosInfo(phobosModel, 0.001768, *_mainPlanetShader, {TextureImage2D("resource/textures/Phobos_Diffuse.dds")}, TextureImage2D("resource/textures/Phobos_Normal.dds"),
+    SatelliteInfo phobosInfo(phobosModel, 0.001768, *_mainPlanetShader, {TextureImage2D("resource/textures_low/Phobos_Diffuse_Low.dds")}, TextureImage2D("resource/textures_low/Phobos_Normal_Low.dds"),
                              L"Phobos", L"Фобос");
-    SatelliteInfo deimosInfo(deimosModel, 0.00097316, *_mainPlanetShader, {TextureImage2D("resource/textures/Deimos_Diffuse.dds")}, TextureImage2D("resource/textures/Deimos_Normal.dds"),
+    SatelliteInfo deimosInfo(deimosModel, 0.00097316, *_mainPlanetShader, {TextureImage2D("resource/textures_low/Deimos_Diffuse_Low.dds")}, TextureImage2D("resource/textures_low/Deimos_Normal_Low.dds"),
                              L"Deimos", L"Деймос");
     shared_ptr<Satellite> phobos = make_shared<Phobos>(phobosInfo, mars);
     shared_ptr<Satellite> deimos = make_shared<Deimos>(deimosInfo, mars);
@@ -1172,17 +1181,17 @@ void Application::InitMarsSystem(const MeshHolder& sphereModel) {
 void Application::InitJupiterSystem(const MeshHolder& sphereModel) {
     PlanetInfo jupiterInfo(sphereModel, 11.2, *_mainPlanetShader,
             {
-                TextureImage2D(GetTexturePath("resource/textures_low/Jupiter_Diffuse_Low.dds", "resource/textures/Jupiter_Diffuse.dds")),
-            }, TextureImage2D(GetTexturePath("resource/textures_low/Jupiter_Normal_Low.dds", "resource/textures/Jupiter_Normal.dds")), L"Jupiter", L"Юпитер");
+                TextureImage2D(GetTexturePath("resource/textures_low/Jupiter_Diffuse_Low.dds", "resource/textures_low/Jupiter_Diffuse_Low.dds")),
+            }, TextureImage2D(GetTexturePath("resource/textures_low/Jupiter_Normal_Low.dds", "resource/textures_low/Jupiter_Normal_Low.dds")), L"Jupiter", L"Юпитер");
     shared_ptr<Planet> jupiter = make_shared<Jupiter>(jupiterInfo, _sun);
 
-    SatelliteInfo ioInfo(sphereModel, 0.28592, *_mainPlanetShader, {TextureImage2D("resource/textures/Io_Diffuse.dds")}, TextureImage2D("resource/textures/Io_Normal.dds"),
+    SatelliteInfo ioInfo(sphereModel, 0.28592, *_mainPlanetShader, {TextureImage2D("resource/textures_low/Io_Diffuse_Low.dds")}, TextureImage2D("resource/textures_low/Io_Normal_Low.dds"),
                          L"Io", L"Ио");
-    SatelliteInfo europaInfo(sphereModel, 0.244985, *_mainPlanetShader, {TextureImage2D("resource/textures/Europa_Diffuse.dds")}, TextureImage2D("resource/textures/Europa_Normal.dds"),
+    SatelliteInfo europaInfo(sphereModel, 0.244985, *_mainPlanetShader, {TextureImage2D("resource/textures_low/Europa_Diffuse_Low.dds")}, TextureImage2D("resource/textures_low/Europa_Normal_Low.dds"),
                              L"Europa", L"Европа");
-    SatelliteInfo ganymedeInfo(sphereModel, 0.41345, *_mainPlanetShader, {TextureImage2D("resource/textures/Ganymede_Diffuse.dds")}, TextureImage2D("resource/textures/Ganymede_Normal.dds"),
+    SatelliteInfo ganymedeInfo(sphereModel, 0.41345, *_mainPlanetShader, {TextureImage2D("resource/textures_low/Ganymede_Diffuse_Low.dds")}, TextureImage2D("resource/textures_low/Ganymede_Normal_Low.dds"),
                                L"Ganymede", L"Ганимед");
-    SatelliteInfo callistoInfo(sphereModel, 0.3783236, *_mainPlanetShader, {TextureImage2D("resource/textures/Callisto_Diffuse.dds")}, TextureImage2D("resource/textures/Callisto_Normal.dds"),
+    SatelliteInfo callistoInfo(sphereModel, 0.3783236, *_mainPlanetShader, {TextureImage2D("resource/textures_low/Callisto_Diffuse_Low.dds")}, TextureImage2D("resource/textures_low/Callisto_Normal_Low.dds"),
                                L"Callisto", L"Каллисто");
     shared_ptr<Satellite> io = make_shared<Io>(ioInfo, jupiter);
     shared_ptr<Satellite> europa = make_shared<Europa>(europaInfo, jupiter);
@@ -1215,26 +1224,26 @@ void Application::InitSaturnSystem(const MeshHolder& sphereModel) {
 
     PlanetInfo saturnInfo(sphereModel, 9.14, *_mainPlanetShader,
             {
-                TextureImage2D(GetTexturePath("resource/textures_low/Saturn_Diffuse_Low.dds", "resource/textures/Saturn_Diffuse.dds")),
-            }, TextureImage2D(GetTexturePath("resource/textures_low/Saturn_Normal_Low.dds", "resource/textures/Saturn_Normal.dds")), L"Saturn", L"Сатурн");
+                TextureImage2D(GetTexturePath("resource/textures_low/Saturn_Diffuse_Low.dds", "resource/textures_low/Saturn_Diffuse_Low.dds")),
+            }, TextureImage2D(GetTexturePath("resource/textures_low/Saturn_Normal_Low.dds", "resource/textures_low/Saturn_Normal_Low.dds")), L"Saturn", L"Сатурн");
     shared_ptr<Planet> saturn = make_shared<Saturn>(saturnInfo, _sun);
 
-    PlanetaryRingInfo saturnRingInfo(saturnRingModel, 22.0, 43.7, *_mainPlanetShader, TextureImage2D("resource/textures/Saturn_Rings.dds")); 
+    PlanetaryRingInfo saturnRingInfo(saturnRingModel, 22.0, 43.7, *_mainPlanetShader, TextureImage2D("resource/textures_low/Saturn_Rings_Low.dds")); 
     unique_ptr<PlanetaryRing> saturnRing = make_unique<SaturnRing>(saturnRingInfo, saturn);
 
-    SatelliteInfo mimasInfo(sphereModel, 0.03111, *_mainPlanetShader, {TextureImage2D("resource/textures/Mimas_Diffuse.dds")}, TextureImage2D("resource/textures/Mimas_Normal.dds"),
+    SatelliteInfo mimasInfo(sphereModel, 0.03111, *_mainPlanetShader, {TextureImage2D("resource/textures_low/Mimas_Diffuse_Low.dds")}, TextureImage2D("resource/textures_low/Mimas_Normal_Low.dds"),
                             L"Mimas", L"Мимас");
-    SatelliteInfo enceladusInfo(sphereModel, 0.03957, *_mainPlanetShader, {TextureImage2D("resource/textures/Enceladus_Diffuse.dds")}, TextureImage2D("resource/textures/Enceladus_Normal.dds"),
+    SatelliteInfo enceladusInfo(sphereModel, 0.03957, *_mainPlanetShader, {TextureImage2D("resource/textures_low/Enceladus_Diffuse_Low.dds")}, TextureImage2D("resource/textures_low/Enceladus_Normal_Low.dds"),
                             L"Enceladus", L"Энцелад");
-    SatelliteInfo tethysInfo(sphereModel, 0.083346, *_mainPlanetShader, {TextureImage2D("resource/textures/Tethys_Diffuse.dds")}, TextureImage2D("resource/textures/Tethys_Normal.dds"),
+    SatelliteInfo tethysInfo(sphereModel, 0.083346, *_mainPlanetShader, {TextureImage2D("resource/textures_low/Tethys_Diffuse_Low.dds")}, TextureImage2D("resource/textures_low/Tethys_Normal_Low.dds"),
                             L"Tethys", L"Тефия");
-    SatelliteInfo dioneInfo(sphereModel, 0.08812, *_mainPlanetShader, {TextureImage2D("resource/textures/Dione_Diffuse.dds")}, TextureImage2D("resource/textures/Dione_Normal.dds"),
+    SatelliteInfo dioneInfo(sphereModel, 0.08812, *_mainPlanetShader, {TextureImage2D("resource/textures_low/Dione_Diffuse_Low.dds")}, TextureImage2D("resource/textures_low/Dione_Normal_Low.dds"),
                             L"Dione", L"Диона");
-    SatelliteInfo rheaInfo(sphereModel, 0.119886, *_mainPlanetShader, {TextureImage2D("resource/textures/Rhea_Diffuse.dds")}, TextureImage2D("resource/textures/Rhea_Normal.dds"),
+    SatelliteInfo rheaInfo(sphereModel, 0.119886, *_mainPlanetShader, {TextureImage2D("resource/textures_low/Rhea_Diffuse_Low.dds")}, TextureImage2D("resource/textures_low/Rhea_Normal_Low.dds"),
                             L"Rhea", L"Рея");
-    SatelliteInfo titanInfo(sphereModel, 0.404136, *_mainPlanetShader, {TextureImage2D("resource/textures/Titan_Diffuse.dds")}, TextureImage2D("resource/textures/Titan_Normal.dds"),
+    SatelliteInfo titanInfo(sphereModel, 0.404136, *_mainPlanetShader, {TextureImage2D("resource/textures_low/Titan_Diffuse_Low.dds")}, TextureImage2D("resource/textures_low/Titan_Normal_Low.dds"),
                             L"Titan", L"Титан");
-    SatelliteInfo iapetusInfo(sphereModel, 0.115288, *_mainPlanetShader, {TextureImage2D("resource/textures/Iapetus_Diffuse.dds")}, TextureImage2D("resource/textures/Iapetus_Normal.dds"),
+    SatelliteInfo iapetusInfo(sphereModel, 0.115288, *_mainPlanetShader, {TextureImage2D("resource/textures_low/Iapetus_Diffuse_Low.dds")}, TextureImage2D("resource/textures_low/Iapetus_Normal_Low.dds"),
                             L"Iapetus", L"Япет");
     shared_ptr<Satellite> mimas = make_shared<Mimas>(mimasInfo, saturn);
     shared_ptr<Satellite> enceladus = make_shared<Enceladus>(enceladusInfo, saturn);
@@ -1281,22 +1290,22 @@ void Application::InitUranusSystem(const MeshHolder& sphereModel) {
 
     PlanetInfo uranusInfo(sphereModel, 3.98085, *_mainPlanetShader,
             {
-                TextureImage2D(GetTexturePath("resource/textures_low/Uranus_Diffuse_Low.dds", "resource/textures/Uranus_Diffuse.dds")),
-                TextureImage2D("resource/textures/Uranus_Clouds_Diffuse.dds")
-            }, TextureImage2D(GetTexturePath("resource/textures_low/Uranus_Normal_Low.dds", "resource/textures/Uranus_Normal.dds")), L"Uranus", L"Уран");
+                TextureImage2D(GetTexturePath("resource/textures_low/Uranus_Diffuse_Low.dds", "resource/textures_low/Uranus_Diffuse_Low.dds")),
+                TextureImage2D("resource/textures_low/Uranus_Clouds_Diffuse_Low.dds")
+            }, TextureImage2D(GetTexturePath("resource/textures_low/Uranus_Normal_Low.dds", "resource/textures_low/Uranus_Normal_Low.dds")), L"Uranus", L"Уран");
     shared_ptr<Planet> uranus = make_shared<Uranus>(uranusInfo, _sun);
-    PlanetaryRingInfo uranusRingInfo(uranusRingModel, 12.6, 16.0, *_mainPlanetShader, TextureImage2D("resource/textures/Uranus_Rings.dds")); // Radiuses from 3D model
+    PlanetaryRingInfo uranusRingInfo(uranusRingModel, 12.6, 16.0, *_mainPlanetShader, TextureImage2D("resource/textures_low/Uranus_Rings_Low.dds")); // Radiuses from 3D model
     unique_ptr<PlanetaryRing> uranusRing = make_unique<UranusRing>(uranusRingInfo, uranus);
 
-    SatelliteInfo mirandaInfo(sphereModel, 0.0368858, *_mainPlanetShader, {TextureImage2D("resource/textures/Miranda_Diffuse.dds")}, TextureImage2D("resource/textures/Miranda_Normal.dds"),
+    SatelliteInfo mirandaInfo(sphereModel, 0.0368858, *_mainPlanetShader, {TextureImage2D("resource/textures_low/Miranda_Diffuse_Low.dds")}, TextureImage2D("resource/textures_low/Miranda_Normal_Low.dds"),
                             L"Miranda", L"Миранда");
-    SatelliteInfo arielInfo(sphereModel, 0.090865, *_mainPlanetShader, {TextureImage2D("resource/textures/Ariel_Diffuse.dds")}, TextureImage2D("resource/textures/Ariel_Normal.dds"),
+    SatelliteInfo arielInfo(sphereModel, 0.090865, *_mainPlanetShader, {TextureImage2D("resource/textures_low/Ariel_Diffuse_Low.dds")}, TextureImage2D("resource/textures_low/Ariel_Normal_Low.dds"),
                             L"Ariel", L"Ариэль");
-    SatelliteInfo umbrielInfo(sphereModel, 0.091775, *_mainPlanetShader, {TextureImage2D("resource/textures/Umbriel_Diffuse.dds")}, TextureImage2D("resource/textures/Umbriel_Normal.dds"),
+    SatelliteInfo umbrielInfo(sphereModel, 0.091775, *_mainPlanetShader, {TextureImage2D("resource/textures_low/Umbriel_Diffuse_Low.dds")}, TextureImage2D("resource/textures_low/Umbriel_Normal_Low.dds"),
                             L"Umbriel", L"Умбриэль");
-    SatelliteInfo titaniaInfo(sphereModel, 0.123748, *_mainPlanetShader, {TextureImage2D("resource/textures/Titania_Diffuse.dds")}, TextureImage2D("resource/textures/Titania_Normal.dds"),
+    SatelliteInfo titaniaInfo(sphereModel, 0.123748, *_mainPlanetShader, {TextureImage2D("resource/textures_low/Titania_Diffuse_Low.dds")}, TextureImage2D("resource/textures_low/Titania_Normal_Low.dds"),
                             L"Titania", L"Титания");
-    SatelliteInfo oberonInfo(sphereModel, 0.11951, *_mainPlanetShader, {TextureImage2D("resource/textures/Oberon_Diffuse.dds")}, TextureImage2D("resource/textures/Oberon_Normal.dds"),
+    SatelliteInfo oberonInfo(sphereModel, 0.11951, *_mainPlanetShader, {TextureImage2D("resource/textures_low/Oberon_Diffuse_Low.dds")}, TextureImage2D("resource/textures_low/Oberon_Normal_Low.dds"),
                             L"Oberon", L"Оберон");
     shared_ptr<Satellite> miranda = make_shared<Miranda>(mirandaInfo, uranus);
     shared_ptr<Satellite> ariel = make_shared<Ariel>(arielInfo, uranus);
@@ -1304,8 +1313,8 @@ void Application::InitUranusSystem(const MeshHolder& sphereModel) {
     shared_ptr<Satellite> titania = make_shared<Titania>(titaniaInfo, uranus);
     shared_ptr<Satellite> oberon = make_shared<Oberon>(oberonInfo, uranus);
 
-    CloudsInfo uranusCloudsInfo(sphereModel, *_mainCloudsShader, 3.98635, TextureImage2D("resource/textures/Uranus_Clouds_Diffuse.dds"),
-                            TextureImage2D("resource/textures/Uranus_Clouds_Normal.dds"));
+    CloudsInfo uranusCloudsInfo(sphereModel, *_mainCloudsShader, 3.98635, TextureImage2D("resource/textures_low/Uranus_Clouds_Diffuse_Low.dds"),
+                            TextureImage2D("resource/textures_low/Uranus_Clouds_Normal_Low.dds"));
     unique_ptr<Clouds> uranusClouds = make_unique<UranusClouds>(uranusCloudsInfo, uranus);
 
     AtmosphereInfo uranusAtmosphereInfo(sphereModel, *_mainAtmosphereShader, 4.0, glm::vec3(45.f/255, 101.f/255, 114.f/255), uranus->GetRadius() - 0.00007, 8.1);
@@ -1334,17 +1343,17 @@ void Application::InitUranusSystem(const MeshHolder& sphereModel) {
 void Application::InitNeptuneSystem(const MeshHolder& sphereModel) {
     PlanetInfo neptuneInfo(sphereModel, 3.8647, *_mainPlanetShader,
             {
-                TextureImage2D(GetTexturePath("resource/textures_low/Neptune_Diffuse_Low.dds", "resource/textures/Neptune_Diffuse.dds")),
-                TextureImage2D("resource/textures/Neptune_Clouds_Diffuse.dds")
-            }, TextureImage2D(GetTexturePath("resource/textures_low/Neptune_Normal_Low.dds", "resource/textures/Neptune_Normal.dds")), L"Neptune", L"Нептун");
+                TextureImage2D(GetTexturePath("resource/textures_low/Neptune_Diffuse_Low.dds", "resource/textures_low/Neptune_Diffuse_Low.dds")),
+                TextureImage2D("resource/textures_low/Neptune_Clouds_Diffuse_Low.dds")
+            }, TextureImage2D(GetTexturePath("resource/textures_low/Neptune_Normal_Low.dds", "resource/textures_low/Neptune_Normal_Low.dds")), L"Neptune", L"Нептун");
     shared_ptr<Planet> neptune = make_shared<Neptune>(neptuneInfo, _sun);
 
-    SatelliteInfo tritonInfo(sphereModel, 0.2724, *_mainPlanetShader, {TextureImage2D("resource/textures/Triton_Diffuse.dds")}, TextureImage2D("resource/textures/Triton_Normal.dds"),
+    SatelliteInfo tritonInfo(sphereModel, 0.2724, *_mainPlanetShader, {TextureImage2D("resource/textures_low/Triton_Diffuse_Low.dds")}, TextureImage2D("resource/textures_low/Triton_Normal_Low.dds"),
                              L"Triton", L"Тритон");
     shared_ptr<Satellite> triton = make_shared<Triton>(tritonInfo, neptune);
 
-    CloudsInfo neptuneCloudsInfo(sphereModel, *_mainCloudsShader, 3.87, TextureImage2D("resource/textures/Neptune_Clouds_Diffuse.dds"),
-                                TextureImage2D("resource/textures/Neptune_Clouds_Normal.dds"));
+    CloudsInfo neptuneCloudsInfo(sphereModel, *_mainCloudsShader, 3.87, TextureImage2D("resource/textures_low/Neptune_Clouds_Diffuse_Low.dds"),
+                                TextureImage2D("resource/textures_low/Neptune_Clouds_Normal_Low.dds"));
     unique_ptr<Clouds> neptuneClouds = make_unique<NeptuneClouds>(neptuneCloudsInfo, neptune);
 
     AtmosphereInfo neptuneAtmosphereInfo(sphereModel, *_mainAtmosphereShader, 3.9, glm::vec3(62.f/255, 92.f/255, 169.f/255), neptune->GetRadius() - 0.00007, 7.9);
@@ -1372,12 +1381,12 @@ void Application::InitNeptuneSystem(const MeshHolder& sphereModel) {
 void Application::InitPlutoSystem(const MeshHolder& sphereModel) {
     PlanetInfo plutoInfo(sphereModel, 0.18651, *_mainPlanetShader,
             {
-                TextureImage2D(GetTexturePath("resource/textures_low/Pluto_Diffuse_Low.dds", "resource/textures/Pluto_Diffuse.dds")),
-            }, TextureImage2D(GetTexturePath("resource/textures_low/Pluto_Normal_Low.dds", "resource/textures/Pluto_Normal.dds")), L"Pluto", L"Плутон", TextureImage2D(GetTexturePath("resource/textures_low/Pluto_Specular_Low.dds", "resource/textures/Pluto_Specular.dds")));
+                TextureImage2D(GetTexturePath("resource/textures_low/Pluto_Diffuse_Low.dds", "resource/textures_low/Pluto_Diffuse_Low.dds")),
+            }, TextureImage2D(GetTexturePath("resource/textures_low/Pluto_Normal_Low.dds", "resource/textures_low/Pluto_Normal_Low.dds")), L"Pluto", L"Плутон", TextureImage2D(GetTexturePath("resource/textures_low/Pluto_Specular_Low.dds", "resource/textures_low/Pluto_Specular_Low.dds")));
     shared_ptr<Planet> pluto = make_shared<Pluto>(plutoInfo, _sun);
 
-    SatelliteInfo charonInfo(sphereModel, 0.09512, *_mainPlanetShader, {TextureImage2D("resource/textures/Charon_Diffuse.dds")}, TextureImage2D("resource/textures/Charon_Normal.dds"),
-                             L"Charon", L"Харон", TextureImage2D("resource/textures/Charon_Specular.dds"));
+    SatelliteInfo charonInfo(sphereModel, 0.09512, *_mainPlanetShader, {TextureImage2D("resource/textures_low/Charon_Diffuse_Low.dds")}, TextureImage2D("resource/textures_low/Charon_Normal_Low.dds"),
+                             L"Charon", L"Харон", TextureImage2D("resource/textures_low/Charon_Specular_Low.dds"));
     shared_ptr<Satellite> charon  = make_shared<Charon>(charonInfo, pluto);
 
     AtmosphereInfo plutoAtmosphereInfo(sphereModel, *_mainAtmosphereShader, 0.45, glm::vec3(92.f/255, 120.f/255, 141.f/255), pluto->GetRadius(), 1.0,
@@ -1685,26 +1694,28 @@ void Application::UpdatePlanetSystemLoading() {
 
 void Application::UpdateLOD() {
 #ifdef __EMSCRIPTEN__
+    // WebGL max texture size is often 8192, but the high-res planet textures are
+    // 16384x8192 DXT5 DDS files. Uploading them fails on those contexts and can
+    // leave planets rendering as black orbs. Keep the web build on textures_low
+    // only and skip the high-res LOD upgrades entirely.
+    return;
+
+    // Original LOD logic (disabled for web):
     // Central LOD manager: only attempt high-res upgrades for the nearest 1-2 planets
     // to avoid bursty queuing when the camera flies through the inner system.
-    if (_renderableSceneComponents.empty()) return;
-
-    const glm::vec3 camPos = camera.GetPosition();
-
-    // Collect (distance, index) pairs and sort ascending
-    std::vector<std::pair<float, size_t>> distances;
-    distances.reserve(_renderableSceneComponents.size());
-    for (size_t i = 0; i < _renderableSceneComponents.size(); ++i) {
-        float d = glm::length(camPos - _renderableSceneComponents[i].planet->GetPosition());
-        distances.emplace_back(d, i);
-    }
-    std::sort(distances.begin(), distances.end());
-
-    // Only trigger high-res loading for the 2 closest planets
-    constexpr size_t kMaxLODCandidates = 2;
-    for (size_t k = 0; k < distances.size() && k < kMaxLODCandidates; ++k) {
-        _renderableSceneComponents[distances[k].second].planet->LoadHighResIfClose(camPos);
-    }
+    // if (_renderableSceneComponents.empty()) return;
+    // const glm::vec3 camPos = camera.GetPosition();
+    // std::vector<std::pair<float, size_t>> distances;
+    // distances.reserve(_renderableSceneComponents.size());
+    // for (size_t i = 0; i < _renderableSceneComponents.size(); ++i) {
+    //     float d = glm::length(camPos - _renderableSceneComponents[i].planet->GetPosition());
+    //     distances.emplace_back(d, i);
+    // }
+    // std::sort(distances.begin(), distances.end());
+    // constexpr size_t kMaxLODCandidates = 2;
+    // for (size_t k = 0; k < distances.size() && k < kMaxLODCandidates; ++k) {
+    //     _renderableSceneComponents[distances[k].second].planet->LoadHighResIfClose(camPos);
+    // }
 #endif
 }
 

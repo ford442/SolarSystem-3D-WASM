@@ -72,6 +72,7 @@ const moduleConfig = {
 };
 
 // Initialize
-Module(moduleConfig).then((instance) => {
+Module(moduleConfig).then((instance: any) => {
     console.log("Module loaded successfully", instance);
+    (window as any).setCameraPose = instance.cwrap('SetCameraPose', null, ['number', 'number', 'number', 'number', 'number']);
 });

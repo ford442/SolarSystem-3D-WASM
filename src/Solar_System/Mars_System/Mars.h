@@ -13,8 +13,8 @@ private:
     std::vector<TextureImage2D> _diffuses;
     TextureImage2D _normalMap;
 
-    std::string _diffuseHighPath = "resource/textures/Mars_Diffuse.dds";
-    std::string _normalHighPath = "resource/textures/Mars_Normal.dds";
+    std::string _diffuseHighPath = "resource/textures_low/Mars_Diffuse_Low.dds";
+    std::string _normalHighPath = "resource/textures_low/Mars_Normal_Low.dds";
 
     bool _isHighResLoaded = false;
     bool _isHighResLoading = false;
