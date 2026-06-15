@@ -2,12 +2,43 @@
 #include "WebResourceFetcher.h"
 #include <cstdint>
 #include <algorithm>
+#include <stdexcept>
 
-TextureImage2D::TextureImage2D(const std::string& path, GLint wrapParam, GLint minFilter, GLint magFilter) {
-    LoadTextureFromFile(path, wrapParam, minFilter, magFilter);
+namespace {
+    bool IsGpuTextureValid(GLuint textureId) {
+        if (textureId == 0) {
+            return false;
+        }
+
+        GLint width = 0;
+        glBindTexture(GL_TEXTURE_2D, textureId);
+        glGetTexLevelParameteriv(GL_TEXTURE_2D, 0, GL_TEXTURE_WIDTH, &width);
+        return width > 0;
+    }
+
+#ifdef __EMSCRIPTEN__
+    void ValidateTextureDimensions(const std::string& path, unsigned int width, unsigned int height) {
+        GLint maxTextureSize = 0;
+        glGetIntegerv(GL_MAX_TEXTURE_SIZE, &maxTextureSize);
+        if (maxTextureSize <= 0) {
+            return;
+        }
+
+        if (width > static_cast<unsigned int>(maxTextureSize) ||
+            height > static_cast<unsigned int>(maxTextureSize)) {
+            throw std::runtime_error(
+                "Texture dimensions " + std::to_string(width) + "x" + std::to_string(height) +
+                " exceed GL_MAX_TEXTURE_SIZE (" + std::to_string(maxTextureSize) + ")");
+        }
+    }
+#endif
 }
 
-void TextureImage2D::LoadTextureFromFile(const std::string& path, GLint wrapParam, GLint minFilter, GLint magFilter) {
+TextureImage2D::TextureImage2D(const std::string& path, GLint wrapParam, GLint minFilter, GLint magFilter) {
+    LoadTextureFromFile(path, wrapParam, minFilter, magFilter, true);
+}
+
+void TextureImage2D::LoadTextureFromFile(const std::string& path, GLint wrapParam, GLint minFilter, GLint magFilter, bool allowFallback) {
     // Fetch texture on demand (no-op on native; async/sync download on web into MEMFS)
     WebResourceFetcher::Fetch(path);
 
@@ -25,20 +56,27 @@ void TextureImage2D::LoadTextureFromFile(const std::string& path, GLint wrapPara
         image.load(path, false);
         isCompressed = image.is_compressed();
         hasEmbeddedMipmaps = (image.get_num_mipmaps() > 0);
-        image.upload_texture2D();
         _width = image.get_width();
         _height = image.get_height();
+#ifdef __EMSCRIPTEN__
+        ValidateTextureDimensions(path, _width, _height);
+#endif
+        image.upload_texture2D();
     }
     catch (const std::runtime_error& error) {
 #ifdef __EMSCRIPTEN__
+        if (_textureID != 0) {
+            glDeleteTextures(1, &_textureID);
+            _textureID = 0;
+        }
+        if (!allowFallback) {
+            throw;
+        }
         // On web, many moon/ring/high-res textures are intentionally omitted from the
         // repository and deployment. Use a visible fallback so planets/moons never
         // appear solid black and the scene remains stable.
         std::cerr << "[Texture] Warning: Failed to load " << path << " (" << error.what()
                   << "). Creating fallback texture." << std::endl;
-        // Delete the incomplete texture object before creating fallback
-        glDeleteTextures(1, &_textureID);
-        _textureID = 0;
         CreateFallbackTexture(wrapParam, minFilter, magFilter);
         return;
 #else
@@ -124,6 +162,18 @@ void TextureImage2D::LoadTextureFromFile(const std::string& path, GLint wrapPara
     }
 #endif
 
+    if (!IsGpuTextureValid(_textureID)) {
+        glDeleteTextures(1, &_textureID);
+        _textureID = 0;
+        if (!allowFallback) {
+            throw std::runtime_error("GPU upload produced an incomplete texture (check GL errors / MAX_TEXTURE_SIZE)");
+        }
+        std::cerr << "[Texture] Warning: GPU upload incomplete for " << path
+                  << ". Creating fallback texture." << std::endl;
+        CreateFallbackTexture(wrapParam, minFilter, magFilter);
+        return;
+    }
+
     std::cout << path << " Loaded" << std::endl;
 }
 
@@ -144,7 +194,7 @@ void TextureImage2D::ReloadTexture(const std::string& path, GLint wrapParam, GLi
     _textureID = 0;
 
     try {
-        LoadTextureFromFile(path, wrapParam, minFilter, magFilter);
+        LoadTextureFromFile(path, wrapParam, minFilter, magFilter, false);
         // Success: safe to delete the old one now (new one is bound and ready)
         if (oldTextureID != 0) {
             glDeleteTextures(1, &oldTextureID);

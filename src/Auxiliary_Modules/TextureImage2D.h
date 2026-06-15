@@ -23,7 +23,7 @@ private:
     GLuint _textureID = 0;
     GLuint _width = 0, _height = 0;
 
-    void LoadTextureFromFile(const std::string& path, GLint wrapParam, GLint minFilter, GLint magFilter);
+    void LoadTextureFromFile(const std::string& path, GLint wrapParam, GLint minFilter, GLint magFilter, bool allowFallback = true);
     void CreateFallbackTexture(GLint wrapParam, GLint minFilter, GLint magFilter);
 };
 

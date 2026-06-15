@@ -7,6 +7,10 @@ const progressBar = document.getElementById('progress-bar') as HTMLElement;
 const progressText = document.getElementById('progress-text') as HTMLElement;
 const streamingProgress = document.getElementById('streaming-progress') as HTMLElement;
 const deployedBaseUrl = new URL(import.meta.env.BASE_URL, window.location.href);
+// Runtime DDS assets (textures/, textures_low/) are hosted on the deployment server,
+// not in the Vite bundle. In dev, point fetches at production so LOD streaming works.
+const REMOTE_ASSET_BASE = 'https://test.1ink.us/solar-system/';
+const runtimeAssetBase = import.meta.env.DEV ? REMOTE_ASSET_BASE : deployedBaseUrl.toString();
 
 // Global progress tracking
 
@@ -53,7 +57,7 @@ function updateStreamingProgress(completed: number, total: number) {
 // Expose progress functions globally for C++ to call
 (window as any).updateLoadingProgress = updateProgress;
 (window as any).updateStreamingProgress = updateStreamingProgress;
-(window as any).__solarSystemAssetBase = deployedBaseUrl.toString();
+(window as any).__solarSystemAssetBase = runtimeAssetBase;
 
 const moduleConfig = {
     canvas: canvas,
