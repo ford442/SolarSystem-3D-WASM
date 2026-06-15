@@ -17,11 +17,11 @@ private:
 
     // LOD texture paths
     std::string _diffuseLowPath = "resource/textures_low/Earth_Day_Diffuse_Low.dds";
-    std::string _diffuseHighPath = "resource/textures/Earth_Day_Diffuse.dds";
+    std::string _diffuseHighPath = "resource/textures_low/Earth_Day_Diffuse_Low.dds";
     std::string _normalLowPath = "resource/textures_low/Earth_Normal_Low.dds";
-    std::string _normalHighPath = "resource/textures/Earth_Normal.dds";
+    std::string _normalHighPath = "resource/textures_low/Earth_Normal_Low.dds";
     std::string _specularLowPath = "resource/textures_low/Earth_Specular_Low.dds";
-    std::string _specularHighPath = "resource/textures/Earth_Specular.dds";
+    std::string _specularHighPath = "resource/textures_low/Earth_Specular_Low.dds";
 
     bool _isHighResLoaded = false;
     bool _isHighResLoading = false;

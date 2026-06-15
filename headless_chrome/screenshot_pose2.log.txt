@@ -1,0 +1,244 @@
+[console] SolarSystem WASM initialized
+[console] The ScriptProcessorNode is deprecated. Use AudioWorkletNode instead. (https://bit.ly/audio-worklet)
+[console] GPU Supplier: WebKit
+[console] GPU: WebKit WebGL
+[console] OpenGL version: 3.0
+[console] Max texture size in the system: 8192x8192
+[console] Driver: OpenGL ES 3.0 (WebGL 2.0 (OpenGL ES 3.0 Chromium))
+[console] Loading 18 core resources...
+[console] Loading progress: 0/18 (0%)
+[console] Starting download: https://test.1ink.us/solar-system/resource/models/sphere.obj to resource/models/sphere.obj
+[console] Starting download: https://test.1ink.us/solar-system/resource/models/phobos.obj to resource/models/phobos.obj
+[console] Starting download: https://test.1ink.us/solar-system/resource/models/deimos.obj to resource/models/deimos.obj
+[console] Starting download: https://test.1ink.us/solar-system/resource/models/saturn_ring.obj to resource/models/saturn_ring.obj
+[console] Starting download: https://test.1ink.us/solar-system/resource/models/uranus_ring.obj to resource/models/uranus_ring.obj
+[console] Starting download: https://test.1ink.us/solar-system/resource/textures_low/Main_SkyBox/PositiveX.dds to resource/textures_low/Main_SkyBox/PositiveX.dds
+[console] Starting download: https://test.1ink.us/solar-system/resource/textures_low/Main_SkyBox/NegativeX.dds to resource/textures_low/Main_SkyBox/NegativeX.dds
+[console] Starting download: https://test.1ink.us/solar-system/resource/textures_low/Main_SkyBox/PositiveY.dds to resource/textures_low/Main_SkyBox/PositiveY.dds
+[console] Starting download: https://test.1ink.us/solar-system/resource/textures_low/Main_SkyBox/NegativeY.dds to resource/textures_low/Main_SkyBox/NegativeY.dds
+[console] Starting download: https://test.1ink.us/solar-system/resource/textures_low/Main_SkyBox/PositiveZ.dds to resource/textures_low/Main_SkyBox/PositiveZ.dds
+[console] Starting download: https://test.1ink.us/solar-system/resource/textures_low/Main_SkyBox/NegativeZ.dds to resource/textures_low/Main_SkyBox/NegativeZ.dds
+[console] Starting download: https://test.1ink.us/solar-system/resource/textures_low/Star_Spectrum_Low.dds to resource/textures_low/Star_Spectrum_Low.dds
+[console] Starting download: https://test.1ink.us/solar-system/resource/textures_low/flares_bright_Low.dds to resource/textures_low/flares_bright_Low.dds
+[console] Starting download: https://test.1ink.us/solar-system/resource/sounds/Stellardrone - Galaxies.mp3 to resource/sounds/Stellardrone - Galaxies.mp3
+[console] Starting download: https://test.1ink.us/solar-system/resource/sounds/Stellardrone - Mars.mp3 to resource/sounds/Stellardrone - Mars.mp3
+[console] Starting download: https://test.1ink.us/solar-system/resource/sounds/Stellardrone - Billions And Billions.mp3 to resource/sounds/Stellardrone - Billions And Billions.mp3
+[console] Starting download: https://test.1ink.us/solar-system/resource/sounds/Stellardrone - Gravitation (Remix).mp3 to resource/sounds/Stellardrone - Gravitation (Remix).mp3
+[console] Starting download: https://test.1ink.us/solar-system/resource/sounds/Stellardrone - The Edge of Forever.mp3 to resource/sounds/Stellardrone - The Edge of Forever.mp3
+[console] Module loaded successfully [object Object]
+[console] Loading progress: 0/18 (0%)
+[console] Successfully downloaded: https://test.1ink.us/solar-system/resource/models/sphere.obj -> resource/models/sphere.obj
+[console] Loading progress: 1/18 (6%)
+[console] [.WebGL-0x1fb400109600]GL Driver Message (OpenGL, Performance, GL_CLOSE_PATH_NV, High): GPU stall due to ReadPixels
+[console] Loading progress: 1/18 (6%)
+[console] Successfully downloaded: https://test.1ink.us/solar-system/resource/models/phobos.obj -> resource/models/phobos.obj
+[console] Loading progress: 2/18 (11%)
+[console] [.WebGL-0x1fb400109600]GL Driver Message (OpenGL, Performance, GL_CLOSE_PATH_NV, High): GPU stall due to ReadPixels
+[console] Loading progress: 2/18 (11%)
+[console] Successfully downloaded: https://test.1ink.us/solar-system/resource/models/saturn_ring.obj -> resource/models/saturn_ring.obj
+[console] Loading progress: 3/18 (17%)
+[console] Successfully downloaded: https://test.1ink.us/solar-system/resource/models/uranus_ring.obj -> resource/models/uranus_ring.obj
+[console] Loading progress: 4/18 (22%)
+[console] Failed to load resource: the server responded with a status of 404 ()
+[console] Failed to download https://test.1ink.us/solar-system/resource/textures_low/Main_SkyBox/PositiveX.dds -> resource/textures_low/Main_SkyBox/PositiveX.dds. Status: 404
+[console] Failed to download core resource!
+[console] Loading progress: 5/18 (28%)
+[console] Failed to load resource: the server responded with a status of 404 ()
+[console] Failed to download https://test.1ink.us/solar-system/resource/textures_low/Main_SkyBox/NegativeX.dds -> resource/textures_low/Main_SkyBox/NegativeX.dds. Status: 404
+[console] Failed to download core resource!
+[console] Loading progress: 6/18 (33%)
+[console] Failed to load resource: the server responded with a status of 404 ()
+[console] Failed to download https://test.1ink.us/solar-system/resource/textures_low/Main_SkyBox/NegativeY.dds -> resource/textures_low/Main_SkyBox/NegativeY.dds. Status: 404
+[console] Failed to download core resource!
+[console] Loading progress: 7/18 (39%)
+[console] Failed to load resource: the server responded with a status of 404 ()
+[console] Failed to download https://test.1ink.us/solar-system/resource/textures_low/Main_SkyBox/PositiveZ.dds -> resource/textures_low/Main_SkyBox/PositiveZ.dds. Status: 404
+[console] Failed to download core resource!
+[console] Loading progress: 8/18 (44%)
+[console] Failed to load resource: the server responded with a status of 404 ()
+[console] Failed to download https://test.1ink.us/solar-system/resource/textures_low/Main_SkyBox/PositiveY.dds -> resource/textures_low/Main_SkyBox/PositiveY.dds. Status: 404
+[console] Failed to download core resource!
+[console] Loading progress: 9/18 (50%)
+[console] Successfully downloaded: https://test.1ink.us/solar-system/resource/textures_low/Star_Spectrum_Low.dds -> resource/textures_low/Star_Spectrum_Low.dds
+[console] Loading progress: 10/18 (56%)
+[console] Successfully downloaded: https://test.1ink.us/solar-system/resource/models/deimos.obj -> resource/models/deimos.obj
+[console] Loading progress: 11/18 (61%)
+[console] Failed to load resource: the server responded with a status of 404 ()
+[console] Failed to download https://test.1ink.us/solar-system/resource/textures_low/Main_SkyBox/NegativeZ.dds -> resource/textures_low/Main_SkyBox/NegativeZ.dds. Status: 404
+[console] Failed to download core resource!
+[console] Loading progress: 12/18 (67%)
+[console] [.WebGL-0x1fb400109600]GL Driver Message (OpenGL, Performance, GL_CLOSE_PATH_NV, High): GPU stall due to ReadPixels
+[console] Loading progress: 12/18 (67%)
+[console] [.WebGL-0x1fb400109600]GL Driver Message (OpenGL, Performance, GL_CLOSE_PATH_NV, High): GPU stall due to ReadPixels (this message will no longer repeat)
+[console] Loading progress: 12/18 (67%)
+[console] Successfully downloaded: https://test.1ink.us/solar-system/resource/textures_low/flares_bright_Low.dds -> resource/textures_low/flares_bright_Low.dds
+[console] Loading progress: 13/18 (72%)
+[console] Loading progress: 13/18 (72%)
+[console] Loading progress: 13/18 (72%)
+[console] Loading progress: 13/18 (72%)
+[console] Loading progress: 13/18 (72%)
+[console] Loading progress: 13/18 (72%)
+[console] Loading progress: 13/18 (72%)
+[console] Loading progress: 13/18 (72%)
+[console] Loading progress: 13/18 (72%)
+[console] Loading progress: 13/18 (72%)
+[console] Loading progress: 13/18 (72%)
+[console] Loading progress: 13/18 (72%)
+[console] Loading progress: 13/18 (72%)
+[console] Loading progress: 13/18 (72%)
+[console] Loading progress: 13/18 (72%)
+[console] Successfully downloaded: https://test.1ink.us/solar-system/resource/sounds/Stellardrone - Mars.mp3 -> resource/sounds/Stellardrone - Mars.mp3
+[console] Loading progress: 14/18 (78%)
+[console] Loading progress: 14/18 (78%)
+[console] Loading progress: 14/18 (78%)
+[console] Loading progress: 14/18 (78%)
+[console] Loading progress: 14/18 (78%)
+[console] Loading progress: 14/18 (78%)
+[console] Loading progress: 14/18 (78%)
+[console] Loading progress: 14/18 (78%)
+[console] Loading progress: 14/18 (78%)
+[console] Loading progress: 14/18 (78%)
+[console] Loading progress: 14/18 (78%)
+[console] Loading progress: 14/18 (78%)
+[console] Loading progress: 14/18 (78%)
+[console] Loading progress: 14/18 (78%)
+[console] Loading progress: 14/18 (78%)
+[console] Successfully downloaded: https://test.1ink.us/solar-system/resource/sounds/Stellardrone - Galaxies.mp3 -> resource/sounds/Stellardrone - Galaxies.mp3
+[console] Loading progress: 15/18 (83%)
+[console] Loading progress: 15/18 (83%)
+[console] Loading progress: 15/18 (83%)
+[console] Loading progress: 15/18 (83%)
+[console] Successfully downloaded: https://test.1ink.us/solar-system/resource/sounds/Stellardrone - Billions And Billions.mp3 -> resource/sounds/Stellardrone - Billions And Billions.mp3
+[console] Loading progress: 16/18 (89%)
+[console] Loading progress: 16/18 (89%)
+[console] Loading progress: 16/18 (89%)
+[console] Loading progress: 16/18 (89%)
+[console] Loading progress: 16/18 (89%)
+[console] Successfully downloaded: https://test.1ink.us/solar-system/resource/sounds/Stellardrone - The Edge of Forever.mp3 -> resource/sounds/Stellardrone - The Edge of Forever.mp3
+[console] Loading progress: 17/18 (94%)
+[console] Loading progress: 17/18 (94%)
+[console] Loading progress: 17/18 (94%)
+[console] Successfully downloaded: https://test.1ink.us/solar-system/resource/sounds/Stellardrone - Gravitation (Remix).mp3 -> resource/sounds/Stellardrone - Gravitation (Remix).mp3
+[console] Loading progress: 18/18 (100%)
+[console] Loading progress: 18/18 (100%)
+[console] All resources downloaded. Initializing scene...
+[console] [WebResourceFetcher] Fetching: https://test.1ink.us/solar-system/resource/textures_low/Main_SkyBox/PositiveX.dds ...
+[console] Failed to load resource: the server responded with a status of 404 ()
+[console] [WebResourceFetcher] Warning: Failed to download https://test.1ink.us/solar-system/resource/textures_low/Main_SkyBox/PositiveX.dds (fallback texture will be used if applicable)
+[console] [WebResourceFetcher] Fetching: https://test.1ink.us/solar-system/resource/textures_low/Main_SkyBox/NegativeX.dds ...
+[console] Failed to load resource: the server responded with a status of 404 ()
+[console] [WebResourceFetcher] Warning: Failed to download https://test.1ink.us/solar-system/resource/textures_low/Main_SkyBox/NegativeX.dds (fallback texture will be used if applicable)
+[console] [WebResourceFetcher] Fetching: https://test.1ink.us/solar-system/resource/textures_low/Main_SkyBox/PositiveY.dds ...
+[console] Failed to load resource: the server responded with a status of 404 ()
+[console] [WebResourceFetcher] Warning: Failed to download https://test.1ink.us/solar-system/resource/textures_low/Main_SkyBox/PositiveY.dds (fallback texture will be used if applicable)
+[console] [WebResourceFetcher] Fetching: https://test.1ink.us/solar-system/resource/textures_low/Main_SkyBox/NegativeY.dds ...
+[console] Failed to load resource: the server responded with a status of 404 ()
+[console] [WebResourceFetcher] Warning: Failed to download https://test.1ink.us/solar-system/resource/textures_low/Main_SkyBox/NegativeY.dds (fallback texture will be used if applicable)
+[console] [WebResourceFetcher] Fetching: https://test.1ink.us/solar-system/resource/textures_low/Main_SkyBox/PositiveZ.dds ...
+[console] Failed to load resource: the server responded with a status of 404 ()
+[console] [WebResourceFetcher] Warning: Failed to download https://test.1ink.us/solar-system/resource/textures_low/Main_SkyBox/PositiveZ.dds (fallback texture will be used if applicable)
+[console] [WebResourceFetcher] Fetching: https://test.1ink.us/solar-system/resource/textures_low/Main_SkyBox/NegativeZ.dds ...
+[console] Failed to load resource: the server responded with a status of 404 ()
+[console] [WebResourceFetcher] Warning: Failed to download https://test.1ink.us/solar-system/resource/textures_low/Main_SkyBox/NegativeZ.dds (fallback texture will be used if applicable)
+[console] [SkyBox] Warning: failed to load face resource/textures_low/Main_SkyBox/PositiveX.dds (Could not open file: resource/textures_low/Main_SkyBox/PositiveX.dds). Using fallback cubemap.
+[console] resource/textures_low/flares_bright_Low.dds Loaded
+[console] resource/textures_low/Star_Spectrum_Low.dds Loaded
+[console] [StagedLoading] 9 planet systems deferred until camera approaches.
+[console] [StagedLoading] Camera within 500 units — starting download for Mercury
+[console] Starting download: https://test.1ink.us/solar-system/resource/textures_low/Mercury_Diffuse_Low.dds to resource/textures_low/Mercury_Diffuse_Low.dds
+[console] Starting download: https://test.1ink.us/solar-system/resource/textures_low/Mercury_Normal_Low.dds to resource/textures_low/Mercury_Normal_Low.dds
+[console] Starting download: https://test.1ink.us/solar-system/resource/textures_low/Mercury_Specular_Low.dds to resource/textures_low/Mercury_Specular_Low.dds
+[console] [StagedLoading] Camera within 650 units — starting download for Earth
+[console] Starting download: https://test.1ink.us/solar-system/resource/textures_low/Earth_Day_Diffuse_Low.dds to resource/textures_low/Earth_Day_Diffuse_Low.dds
+[console] Starting download: https://test.1ink.us/solar-system/resource/textures_low/Earth_Normal_Low.dds to resource/textures_low/Earth_Normal_Low.dds
+[console] Starting download: https://test.1ink.us/solar-system/resource/textures_low/Earth_Specular_Low.dds to resource/textures_low/Earth_Specular_Low.dds
+[console] Starting download: https://test.1ink.us/solar-system/resource/textures_low/Earth_Clouds_Diffuse_Low.dds to resource/textures_low/Earth_Clouds_Diffuse_Low.dds
+[console] Starting download: https://test.1ink.us/solar-system/resource/textures_low/Earth_Night_Diffuse_Low.dds to resource/textures_low/Earth_Night_Diffuse_Low.dds
+[console] Starting download: https://test.1ink.us/solar-system/resource/textures_low/Earth_Clouds_Normal_Low.dds to resource/textures_low/Earth_Clouds_Normal_Low.dds
+[console] Starting download: https://test.1ink.us/solar-system/resource/textures_low/Moon_Diffuse_Low.dds to resource/textures_low/Moon_Diffuse_Low.dds
+[console] Starting download: https://test.1ink.us/solar-system/resource/textures_low/Moon_Normal_Low.dds to resource/textures_low/Moon_Normal_Low.dds
+[console] [StagedLoading] Camera within 1218.22 units — starting download for Jupiter
+[console] Starting download: https://test.1ink.us/solar-system/resource/textures_low/Jupiter_Diffuse_Low.dds to resource/textures_low/Jupiter_Diffuse_Low.dds
+[console] Starting download: https://test.1ink.us/solar-system/resource/textures_low/Jupiter_Normal_Low.dds to resource/textures_low/Jupiter_Normal_Low.dds
+[console] Starting download: https://test.1ink.us/solar-system/resource/textures_low/Io_Diffuse_Low.dds to resource/textures_low/Io_Diffuse_Low.dds
+[console] Starting download: https://test.1ink.us/solar-system/resource/textures_low/Io_Normal_Low.dds to resource/textures_low/Io_Normal_Low.dds
+[console] Starting download: https://test.1ink.us/solar-system/resource/textures_low/Europa_Diffuse_Low.dds to resource/textures_low/Europa_Diffuse_Low.dds
+[console] Starting download: https://test.1ink.us/solar-system/resource/textures_low/Europa_Normal_Low.dds to resource/textures_low/Europa_Normal_Low.dds
+[console] Starting download: https://test.1ink.us/solar-system/resource/textures_low/Ganymede_Diffuse_Low.dds to resource/textures_low/Ganymede_Diffuse_Low.dds
+[console] Starting download: https://test.1ink.us/solar-system/resource/textures_low/Ganymede_Normal_Low.dds to resource/textures_low/Ganymede_Normal_Low.dds
+[console] Starting download: https://test.1ink.us/solar-system/resource/textures_low/Callisto_Diffuse_Low.dds to resource/textures_low/Callisto_Diffuse_Low.dds
+[console] Starting download: https://test.1ink.us/solar-system/resource/textures_low/Callisto_Normal_Low.dds to resource/textures_low/Callisto_Normal_Low.dds
+[console] [StagedLoading] Camera within 1427.26 units — starting download for Pluto
+[console] Starting download: https://test.1ink.us/solar-system/resource/textures_low/Pluto_Diffuse_Low.dds to resource/textures_low/Pluto_Diffuse_Low.dds
+[console] Starting download: https://test.1ink.us/solar-system/resource/textures_low/Pluto_Normal_Low.dds to resource/textures_low/Pluto_Normal_Low.dds
+[console] Starting download: https://test.1ink.us/solar-system/resource/textures_low/Pluto_Specular_Low.dds to resource/textures_low/Pluto_Specular_Low.dds
+[console] Starting download: https://test.1ink.us/solar-system/resource/textures_low/Charon_Diffuse_Low.dds to resource/textures_low/Charon_Diffuse_Low.dds
+[console] Starting download: https://test.1ink.us/solar-system/resource/textures_low/Charon_Normal_Low.dds to resource/textures_low/Charon_Normal_Low.dds
+[console] Starting download: https://test.1ink.us/solar-system/resource/textures_low/Charon_Specular_Low.dds to resource/textures_low/Charon_Specular_Low.dds
+[console] Successfully downloaded: https://test.1ink.us/solar-system/resource/textures_low/Mercury_Diffuse_Low.dds -> resource/textures_low/Mercury_Diffuse_Low.dds
+[console] Successfully downloaded: https://test.1ink.us/solar-system/resource/textures_low/Earth_Normal_Low.dds -> resource/textures_low/Earth_Normal_Low.dds
+[console] Successfully downloaded: https://test.1ink.us/solar-system/resource/textures_low/Mercury_Specular_Low.dds -> resource/textures_low/Mercury_Specular_Low.dds
+[console] Successfully downloaded: https://test.1ink.us/solar-system/resource/textures_low/Mercury_Normal_Low.dds -> resource/textures_low/Mercury_Normal_Low.dds
+[console] Successfully downloaded: https://test.1ink.us/solar-system/resource/textures_low/Earth_Day_Diffuse_Low.dds -> resource/textures_low/Earth_Day_Diffuse_Low.dds
+[console] Successfully downloaded: https://test.1ink.us/solar-system/resource/textures_low/Earth_Specular_Low.dds -> resource/textures_low/Earth_Specular_Low.dds
+[console] [StagedLoading] Required assets ready for Mercury — initializing system.
+[console] resource/textures_low/Mercury_Diffuse_Low.dds Loaded
+[console] resource/textures_low/Mercury_Normal_Low.dds Loaded
+[console] resource/textures_low/Mercury_Specular_Low.dds Loaded
+[console] [StagedLoading] Required assets ready for Earth — initializing system.
+[console] resource/textures_low/Earth_Day_Diffuse_Low.dds Loaded
+[console] [WebResourceFetcher] Fetching: https://test.1ink.us/solar-system/resource/textures_low/Earth_Clouds_Diffuse_Low.dds ...
+[console] Successfully downloaded: https://test.1ink.us/solar-system/resource/textures_low/Earth_Night_Diffuse_Low.dds -> resource/textures_low/Earth_Night_Diffuse_Low.dds
+[console] Successfully downloaded: https://test.1ink.us/solar-system/resource/textures_low/Jupiter_Diffuse_Low.dds -> resource/textures_low/Jupiter_Diffuse_Low.dds
+[console] Successfully downloaded: https://test.1ink.us/solar-system/resource/textures_low/Jupiter_Normal_Low.dds -> resource/textures_low/Jupiter_Normal_Low.dds
+[console] Successfully downloaded: https://test.1ink.us/solar-system/resource/textures_low/Moon_Diffuse_Low.dds -> resource/textures_low/Moon_Diffuse_Low.dds
+[console] Successfully downloaded: https://test.1ink.us/solar-system/resource/textures_low/Earth_Clouds_Diffuse_Low.dds -> resource/textures_low/Earth_Clouds_Diffuse_Low.dds
+[console] [WebResourceFetcher] Downloaded and written to MEMFS: https://test.1ink.us/solar-system/resource/textures_low/Earth_Clouds_Diffuse_Low.dds -> resource/textures_low/Earth_Clouds_Diffuse_Low.dds
+[console] resource/textures_low/Earth_Clouds_Diffuse_Low.dds Loaded
+[console] resource/textures_low/Earth_Night_Diffuse_Low.dds Loaded
+[console] resource/textures_low/Earth_Normal_Low.dds Loaded
+[console] resource/textures_low/Earth_Specular_Low.dds Loaded
+[console] resource/textures_low/Moon_Diffuse_Low.dds Loaded
+[console] [WebResourceFetcher] Fetching: https://test.1ink.us/solar-system/resource/textures_low/Moon_Normal_Low.dds ...
+[console] Successfully downloaded: https://test.1ink.us/solar-system/resource/textures_low/Io_Diffuse_Low.dds -> resource/textures_low/Io_Diffuse_Low.dds
+[console] Successfully downloaded: https://test.1ink.us/solar-system/resource/textures_low/Io_Normal_Low.dds -> resource/textures_low/Io_Normal_Low.dds
+[console] [WebResourceFetcher] Downloaded and written to MEMFS: https://test.1ink.us/solar-system/resource/textures_low/Moon_Normal_Low.dds -> resource/textures_low/Moon_Normal_Low.dds
+[console] resource/textures_low/Moon_Normal_Low.dds Loaded
+[console] resource/textures_low/Earth_Clouds_Diffuse_Low.dds Loaded
+[console] [WebResourceFetcher] Fetching: https://test.1ink.us/solar-system/resource/textures_low/Earth_Clouds_Normal_Low.dds ...
+[console] Successfully downloaded: https://test.1ink.us/solar-system/resource/textures_low/Moon_Normal_Low.dds -> resource/textures_low/Moon_Normal_Low.dds
+[console] Successfully downloaded: https://test.1ink.us/solar-system/resource/textures_low/Earth_Clouds_Normal_Low.dds -> resource/textures_low/Earth_Clouds_Normal_Low.dds
+[console] Successfully downloaded: https://test.1ink.us/solar-system/resource/textures_low/Ganymede_Diffuse_Low.dds -> resource/textures_low/Ganymede_Diffuse_Low.dds
+[console] [WebResourceFetcher] Downloaded and written to MEMFS: https://test.1ink.us/solar-system/resource/textures_low/Earth_Clouds_Normal_Low.dds -> resource/textures_low/Earth_Clouds_Normal_Low.dds
+[console] resource/textures_low/Earth_Clouds_Normal_Low.dds Loaded
+[console] [StagedLoading] Required assets ready for Jupiter — initializing system.
+[console] resource/textures_low/Jupiter_Diffuse_Low.dds Loaded
+[console] resource/textures_low/Jupiter_Normal_Low.dds Loaded
+[console] resource/textures_low/Io_Diffuse_Low.dds Loaded
+[console] resource/textures_low/Io_Normal_Low.dds Loaded
+[console] [WebResourceFetcher] Fetching: https://test.1ink.us/solar-system/resource/textures_low/Europa_Diffuse_Low.dds ...
+[console] Successfully downloaded: https://test.1ink.us/solar-system/resource/textures_low/Pluto_Diffuse_Low.dds -> resource/textures_low/Pluto_Diffuse_Low.dds
+[console] Successfully downloaded: https://test.1ink.us/solar-system/resource/textures_low/Pluto_Normal_Low.dds -> resource/textures_low/Pluto_Normal_Low.dds
+[console] Successfully downloaded: https://test.1ink.us/solar-system/resource/textures_low/Pluto_Specular_Low.dds -> resource/textures_low/Pluto_Specular_Low.dds
+[console] Successfully downloaded: https://test.1ink.us/solar-system/resource/textures_low/Callisto_Diffuse_Low.dds -> resource/textures_low/Callisto_Diffuse_Low.dds
+[console] Successfully downloaded: https://test.1ink.us/solar-system/resource/textures_low/Callisto_Normal_Low.dds -> resource/textures_low/Callisto_Normal_Low.dds
+[console] Successfully downloaded: https://test.1ink.us/solar-system/resource/textures_low/Ganymede_Normal_Low.dds -> resource/textures_low/Ganymede_Normal_Low.dds
+[console] Successfully downloaded: https://test.1ink.us/solar-system/resource/textures_low/Europa_Diffuse_Low.dds -> resource/textures_low/Europa_Diffuse_Low.dds
+[console] Successfully downloaded: https://test.1ink.us/solar-system/resource/textures_low/Charon_Specular_Low.dds -> resource/textures_low/Charon_Specular_Low.dds
+[console] Successfully downloaded: https://test.1ink.us/solar-system/resource/textures_low/Charon_Diffuse_Low.dds -> resource/textures_low/Charon_Diffuse_Low.dds
+[console] Successfully downloaded: https://test.1ink.us/solar-system/resource/textures_low/Europa_Normal_Low.dds -> resource/textures_low/Europa_Normal_Low.dds
+[console] Successfully downloaded: https://test.1ink.us/solar-system/resource/textures_low/Charon_Normal_Low.dds -> resource/textures_low/Charon_Normal_Low.dds
+[console] [WebResourceFetcher] Downloaded and written to MEMFS: https://test.1ink.us/solar-system/resource/textures_low/Europa_Diffuse_Low.dds -> resource/textures_low/Europa_Diffuse_Low.dds
+[console] resource/textures_low/Europa_Diffuse_Low.dds Loaded
+[console] resource/textures_low/Europa_Normal_Low.dds Loaded
+[console] resource/textures_low/Ganymede_Diffuse_Low.dds Loaded
+[console] resource/textures_low/Ganymede_Normal_Low.dds Loaded
+[console] resource/textures_low/Callisto_Diffuse_Low.dds Loaded
+[console] resource/textures_low/Callisto_Normal_Low.dds Loaded
+[console] [StagedLoading] Required assets ready for Pluto — initializing system.
+[console] resource/textures_low/Pluto_Diffuse_Low.dds Loaded
+[console] resource/textures_low/Pluto_Normal_Low.dds Loaded
+[console] resource/textures_low/Pluto_Specular_Low.dds Loaded
+[console] resource/textures_low/Charon_Diffuse_Low.dds Loaded
+[console] resource/textures_low/Charon_Normal_Low.dds Loaded
+[console] resource/textures_low/Charon_Specular_Low.dds Loaded

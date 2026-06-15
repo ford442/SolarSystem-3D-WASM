@@ -13,9 +13,9 @@ private:
     std::vector<TextureImage2D> _diffuses;
     TextureImage2D _normalMap, _specular;
 
-    std::string _diffuseHighPath = "resource/textures/Pluto_Diffuse.dds";
-    std::string _normalHighPath = "resource/textures/Pluto_Normal.dds";
-    std::string _specularHighPath = "resource/textures/Pluto_Specular.dds";
+    std::string _diffuseHighPath = "resource/textures_low/Pluto_Diffuse_Low.dds";
+    std::string _normalHighPath = "resource/textures_low/Pluto_Normal_Low.dds";
+    std::string _specularHighPath = "resource/textures_low/Pluto_Specular_Low.dds";
 
     bool _isHighResLoaded = false;
     bool _isHighResLoading = false;
