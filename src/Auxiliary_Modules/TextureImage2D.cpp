@@ -5,15 +5,21 @@
 #include <stdexcept>
 
 namespace {
-    bool IsGpuTextureValid(GLuint textureId) {
+    bool IsGpuTextureValid(GLuint textureId, unsigned int width, unsigned int height) {
         if (textureId == 0) {
             return false;
         }
 
-        GLint width = 0;
+#ifdef __EMSCRIPTEN__
+        // WebGL 2 (ES 3.0) does not provide glGetTexLevelParameteriv.
+        // Dimensions were validated before GPU upload; non-zero size means upload succeeded.
+        return width > 0 && height > 0;
+#else
+        GLint gpuWidth = 0;
         glBindTexture(GL_TEXTURE_2D, textureId);
-        glGetTexLevelParameteriv(GL_TEXTURE_2D, 0, GL_TEXTURE_WIDTH, &width);
-        return width > 0;
+        glGetTexLevelParameteriv(GL_TEXTURE_2D, 0, GL_TEXTURE_WIDTH, &gpuWidth);
+        return gpuWidth > 0;
+#endif
     }
 
 #ifdef __EMSCRIPTEN__
@@ -162,7 +168,7 @@ void TextureImage2D::LoadTextureFromFile(const std::string& path, GLint wrapPara
     }
 #endif
 
-    if (!IsGpuTextureValid(_textureID)) {
+    if (!IsGpuTextureValid(_textureID, _width, _height)) {
         glDeleteTextures(1, &_textureID);
         _textureID = 0;
         if (!allowFallback) {
