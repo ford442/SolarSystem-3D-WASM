@@ -5,7 +5,7 @@ Deimos::Deimos(const SatelliteInfo& satelliteInfo, std::shared_ptr<SpaceObject> 
 {
 }
 
-void Deimos::AdjustToParent(bool isRunTime) {
+void Deimos::AdjustToParent(float timeScale) {
     static float x = 0, z = -2.95f;
 
     static float circleRadius = 0.001f;
@@ -13,7 +13,7 @@ void Deimos::AdjustToParent(bool isRunTime) {
     static float velocity = 3.5f;
     static float rotationAngle = 0.0f;
 
-    if (isRunTime) {
+    if (timeScale > 0.0f) {
         time += 0.0001f;
         rotationAngle -= 4 *  0.0315f;
 

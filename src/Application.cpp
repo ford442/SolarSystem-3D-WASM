@@ -10,14 +10,46 @@
 
 using namespace std;
 
+// Time and sim controls (enhancement)
+float gTimeScale = 1.0f;
+bool gTimePaused = false;
+bool gAdvanceStep = false;
+
 #ifdef __EMSCRIPTEN__
 extern "C" {
     EMSCRIPTEN_KEEPALIVE void SetCameraPose(float x, float y, float z, float yaw, float pitch) {
         camera.SetPosition(glm::vec3(x, y, z));
         camera.SetYawPitch(yaw, pitch);
     }
+    EMSCRIPTEN_KEEPALIVE void SetQualityPreset(int preset) {
+        g_qualityPreset = (preset < 0 ? 0 : preset > 2 ? 2 : preset);
+        std::cout << "[Quality] Preset set to " << g_qualityPreset 
+                  << " (0=low,1=medium,2=full)" << std::endl;
+    }
+    EMSCRIPTEN_KEEPALIVE void FocusPlanet(int idx) {
+        // simple focus presets for web (approx pos, 2s transition)
+        glm::vec3 p(0); float r=10;
+        if(idx==1){p=glm::vec3(1500,0,350); r=2;} //merc
+        else if(idx==2){p=glm::vec3(1125,0,-1340);r=3;}
+        else if(idx==3){p=glm::vec3(1900,0,0);r=3;}
+        else if(idx==4){p=glm::vec3(-1732,0,1000);r=2;}
+        else if(idx==5){p=glm::vec3(1350,0,1737);r=20;}
+        else if(idx==6){p=glm::vec3(0,-100,2450);r=50;}
+        else if(idx==7){p=glm::vec3(0,0,-2650);r=20;}
+        else if(idx==8){p=glm::vec3(-2900,0,0);r=20;}
+        else if(idx==9){p=glm::vec3(2800,0,1757);r=3;}
+        glm::vec3 off = glm::normalize(glm::vec3(0.7,0.3,0.7)) * (r+30);
+        glm::vec3 tp = p + off;
+        glm::vec3 d = glm::normalize(p - tp);
+        float ty = glm::degrees(std::atan2(d.z, d.x));
+        float tpitch = glm::degrees(std::asin(d.y));
+        camera.StartTransitionTo(tp, ty, tpitch, 2.0f);
+    }
 }
 #endif
+
+// Global for quality presets (set from JS or URL). Visible to planet LOD code.
+int g_qualityPreset = 2; // 0=low,1=medium,2=full
 
 // Helper function to get texture path with fallback for WebAssembly
 std::string GetTexturePath(const std::string& lowRes, const std::string& highRes) {
@@ -194,6 +226,8 @@ void Application::RunOneFrame() {
     deltaTime = currentFrame - lastFrame;
     lastFrame = currentFrame;
 
+    camera.UpdateTransition(deltaTime);
+
     glBindFramebuffer(GL_FRAMEBUFFER, 0);
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
@@ -247,12 +281,12 @@ void Application::ShadowMapPass(const RenderableSceneComponent& component) {
     _shadowMapShader->SetMat4("lightSpaceMatrix", component.lightSpaceMatrix);
 
     component.planet->SetShader(*_shadowMapShader);
-    component.planet->AdjustToParent(isTimeRun);
+    component.planet->AdjustToParent(gTimePaused ? 0.0f : gTimeScale);
     component.planet->Render();
 
     for (const auto& satellite : component.satellites) {
         satellite->SetShader(*_shadowMapShader);
-        satellite->AdjustToParent(isTimeRun);
+        satellite->AdjustToParent(gTimePaused ? 0.0f : gTimeScale);
         satellite->Render();
     }
 
@@ -267,12 +301,12 @@ void Application::RenderPass(const RenderableSceneComponent& component) {
     ConfigureMainPlanetShader(component);
 
     component.planet->SetShader(*_mainPlanetShader);
-    component.planet->AdjustToParent(isTimeRun);
+    component.planet->AdjustToParent(gTimePaused ? 0.0f : gTimeScale);
     component.planet->Render();
 
     for (const auto& satellite : component.satellites) {
         satellite->SetShader(*_mainPlanetShader);
-        satellite->AdjustToParent(isTimeRun);
+        satellite->AdjustToParent(gTimePaused ? 0.0f : gTimeScale);
         satellite->Render();
     }
 
@@ -340,7 +374,7 @@ void Application::RenderClouds(Clouds* renderableClouds, const glm::mat4& lightS
 
         _mainCloudsShader->Use();
         _mainCloudsShader->SetMat4("lightSpaceMatrix", lightSpaceMatrix);
-        renderableClouds->AdjustToParent(isTimeRun);
+        renderableClouds->AdjustToParent(gTimePaused ? 0.0f : gTimeScale);
         renderableClouds->Render();
 
         glEnable(GL_CULL_FACE);
@@ -538,8 +572,10 @@ void Application::RenderHints() const {
     _tmpStringCache.emplace_back(wstring(_currentMusicTrack.begin(), _currentMusicTrack.end()));
 
     deque<wstring> timeRunHint;
-    timeRunHint.emplace_back(L"Time running(F): ");
-    timeRunHint.emplace_back((isTimeRun) ? L"On" : L"Off");
+    timeRunHint.emplace_back(L"Time (P:pause, +/-:scale, .:step): ");
+    std::wstringstream wss;
+    wss << (gTimePaused ? L"paused" : L"run") << L" x" << static_cast<int>(gTimeScale);
+    timeRunHint.emplace_back( wss.str() );
 
     deque<wstring> planetStarHint;
     planetStarHint.emplace_back(L"Planet/Star distances(Z): ");
@@ -548,6 +584,12 @@ void Application::RenderHints() const {
     deque<wstring> satelliteHint;
     satelliteHint.emplace_back(L"Satellite distances(X): ");
     satelliteHint.emplace_back((isRenderSatelliteDistances) ? L"On" : L"Off");
+
+#ifdef __EMSCRIPTEN__
+    // Indicate low-res start + high-res streaming (visual in streaming-progress + on-screen when active)
+    deque<wstring> textureHint;
+    textureHint.emplace_back(L"Web: low-res start; high-res streams when close (see HUD)");
+#endif
 
     deque<wstring> cameraSpeedHint;
     cameraSpeedHint.emplace_back(L"Camera speed(1/2): ");
@@ -593,6 +635,9 @@ void Application::RenderHints() const {
     _textRenderer->Render(*_mainTextShader, timeRunHint, 0.01 * _displayWidth, 0.875 * _displayHeight, 0.35, textColor);
     _textRenderer->Render(*_mainTextShader, planetStarHint, 0.01 * _displayWidth, 0.85 * _displayHeight, 0.35, textColor);
     _textRenderer->Render(*_mainTextShader, satelliteHint, 0.01 * _displayWidth, 0.825 * _displayHeight, 0.35, textColor);
+#ifdef __EMSCRIPTEN__
+    _textRenderer->Render(*_mainTextShader, textureHint, 0.01 * _displayWidth, 0.80 * _displayHeight, 0.30, glm::vec3(0.6f, 0.8f, 1.0f));
+#endif
     _textRenderer->Render(*_mainTextShader, cameraSpeedHint, 0.01 * _displayWidth, 0.8 * _displayHeight, 0.35, textColor);
     _textRenderer->Render(*_mainTextShader, smoothCameraHint, 0.01 * _displayWidth, 0.775 * _displayHeight, 0.35, textColor);
     _textRenderer->Render(*_mainTextShader, smoothZoomHint, 0.01 * _displayWidth, 0.75 * _displayHeight, 0.35, textColor);
@@ -621,6 +666,11 @@ void Application::RenderTextureLoadingProgress() const {
         if (typeof window.updateStreamingProgress === 'function') {
             window.updateStreamingProgress($0, $1);
         }
+        // Also wire simple progress into the existing loading hook where applicable
+        // (high-res streaming phase reuses the same (loaded,total) shape).
+        if (typeof window.updateLoadingProgress === 'function' && $1 > 0) {
+            window.updateLoadingProgress($0, $1);
+        }
     }, completed, total);
 #endif
 
@@ -639,11 +689,20 @@ void Application::RenderTextureLoadingProgress() const {
     _mainTextShader->SetMat4("projection", textProjection);
     _mainTextShader->SetBool("is3D", false);
 
-    // Build hint string with progress counters, e.g. "Streaming high-res... (2/5)"
-    std::wstring hint = L"Streaming high-res... (" + std::to_wstring(completed) + L"/" + std::to_wstring(total) + L")";
-    deque<wstring> loadingHint;
-    loadingHint.emplace_back(hint);
-    _textRenderer->Render(*_mainTextShader, loadingHint, 0.5f * _displayWidth - 150, 0.1f * _displayHeight, 0.25, textColor);
+    // Build hint string with progress counters, e.g. "High-res upgrade (2/5)"
+    // Throttled render (via static) to avoid per-frame spam; visual is brief.
+    static int lastCompleted = -1;
+    static int lastTotal = -1;
+    static int frameCounter = 0;
+    frameCounter = (frameCounter + 1) % 10;
+    if (frameCounter == 0 || completed != lastCompleted || total != lastTotal) {
+        lastCompleted = completed;
+        lastTotal = total;
+        std::wstring hint = L"High-res upgrade (" + std::to_wstring(completed) + L"/" + std::to_wstring(total) + L")";
+        deque<wstring> loadingHint;
+        loadingHint.emplace_back(hint);
+        _textRenderer->Render(*_mainTextShader, loadingHint, 0.5f * _displayWidth - 150, 0.1f * _displayHeight, 0.25, textColor);
+    }
 
     glDisable(GL_BLEND);
     glEnable(GL_DEPTH_TEST);
@@ -1604,6 +1663,42 @@ void Application::KeyCallback(GLFWwindow*, int key, int, int action, int) {
         isVertSyncEnabled = !isVertSyncEnabled;
         VertSync(isVertSyncEnabled);
     }
+
+    if (action == GLFW_PRESS) {
+        // Planet focus presets (smooth transition) - using known fixed positions
+        auto doFocus = [&](glm::vec3 p, float r) {
+            glm::vec3 offset = glm::normalize(glm::vec3(0.7f, 0.3f, 0.7f)) * (r + 30.0f);
+            glm::vec3 tpos = p + offset;
+            glm::vec3 dir = glm::normalize(p - tpos);
+            float ty = glm::degrees(std::atan2(dir.z, dir.x));
+            float tp = glm::degrees(std::asin(dir.y));
+            camera.StartTransitionTo(tpos, ty, tp, 2.0f);
+        };
+        if (key == GLFW_KEY_F2) doFocus(glm::vec3(1500.f,0,350.f), 2.0f*0.38f); // merc approx
+        if (key == GLFW_KEY_F3) doFocus(glm::vec3(1125.f,0,-1340.f), 2.0f*0.95f); // venus
+        if (key == GLFW_KEY_F4) doFocus(glm::vec3(1900.f,0,0.f), 2.0f); // earth
+        if (key == GLFW_KEY_F5) doFocus(glm::vec3(-1732.f,0,1000.f), 2.0f*0.53f); // mars
+        if (key == GLFW_KEY_F6) doFocus(glm::vec3(1350.f,0,1737.f), 2.0f*9.14f); // jup approx
+        if (key == GLFW_KEY_F7) doFocus(glm::vec3(0.f,-100.f,2450.f), 2.0f*9.14f*5); // sat
+        if (key == GLFW_KEY_F8) doFocus(glm::vec3(0.f,0.f,-2650.f), 2.0f*4); // ura
+        if (key == GLFW_KEY_F9) doFocus(glm::vec3(-2900.f,0,0.f), 2.0f*4); // nep
+        if (key == GLFW_KEY_F10) doFocus(glm::vec3(2800.f,0,1757.f), 2.0f*1); // plu
+        if (key == GLFW_KEY_F11) { glm::vec3 p(0); doFocus(p, 10); }
+
+        // Time scale / pause / step
+        if (key == GLFW_KEY_EQUAL || key == GLFW_KEY_KP_ADD) {
+            gTimeScale = glm::clamp(gTimeScale * 2.0f, 0.01f, 10000.0f);
+        }
+        if (key == GLFW_KEY_MINUS || key == GLFW_KEY_KP_SUBTRACT) {
+            gTimeScale = glm::clamp(gTimeScale / 2.0f, 0.01f, 10000.0f);
+        }
+        if (key == GLFW_KEY_P) {
+            gTimePaused = !gTimePaused;
+        }
+        if (key == GLFW_KEY_PERIOD) {
+            gAdvanceStep = true;
+        }
+    }
 }
 
 bool Application::WGLExtensionSupported(const char* extensionName) {
@@ -1694,28 +1789,28 @@ void Application::UpdatePlanetSystemLoading() {
 
 void Application::UpdateLOD() {
 #ifdef __EMSCRIPTEN__
-    // WebGL max texture size is often 8192, but the high-res planet textures are
-    // 16384x8192 DXT5 DDS files. Uploading them fails on those contexts and can
-    // leave planets rendering as black orbs. Keep the web build on textures_low
-    // only and skip the high-res LOD upgrades entirely.
-    return;
+    if (_renderableSceneComponents.empty()) return;
 
-    // Original LOD logic (disabled for web):
-    // Central LOD manager: only attempt high-res upgrades for the nearest 1-2 planets
-    // to avoid bursty queuing when the camera flies through the inner system.
-    // if (_renderableSceneComponents.empty()) return;
-    // const glm::vec3 camPos = camera.GetPosition();
-    // std::vector<std::pair<float, size_t>> distances;
-    // distances.reserve(_renderableSceneComponents.size());
-    // for (size_t i = 0; i < _renderableSceneComponents.size(); ++i) {
-    //     float d = glm::length(camPos - _renderableSceneComponents[i].planet->GetPosition());
-    //     distances.emplace_back(d, i);
-    // }
-    // std::sort(distances.begin(), distances.end());
-    // constexpr size_t kMaxLODCandidates = 2;
-    // for (size_t k = 0; k < distances.size() && k < kMaxLODCandidates; ++k) {
-    //     _renderableSceneComponents[distances[k].second].planet->LoadHighResIfClose(camPos);
-    // }
+    const glm::vec3 camPos = camera.GetPosition();
+
+    if (g_qualityPreset == 0) {
+        // Low preset: force downgrade any high-res (using fake far pos to trigger logic) and skip upgrades.
+        for (auto& rc : _renderableSceneComponents) {
+            if (rc.planet && rc.planet->IsHighResLoaded()) {
+                glm::vec3 fakeFar = camPos + glm::vec3(100000.0f, 0.0f, 0.0f);
+                rc.planet->LoadHighResIfClose(fakeFar);
+            }
+        }
+        return;
+    }
+
+    // Call on *all* ready planets: far ones will downgrade if loaded + past hysteresis;
+    // near ones will upgrade if appropriate.
+    for (auto& rc : _renderableSceneComponents) {
+        if (rc.planet) {
+            rc.planet->LoadHighResIfClose(camPos);
+        }
+    }
 #endif
 }
 
@@ -1736,8 +1831,12 @@ void Application::RenderPlanetProxyMarkers() const {
         if (manifest.state == PlanetSystemManifest::State::READY) continue;
 
         std::wstring label(manifest.name.begin(), manifest.name.end());
-        if (manifest.state == PlanetSystemManifest::State::DOWNLOADING) {
-            label += L" [loading...]";
+        if (manifest.state == PlanetSystemManifest::State::NOT_LOADED) {
+            label += L" (approach to load)";
+        } else if (manifest.state == PlanetSystemManifest::State::DOWNLOADING) {
+            int done = manifest.totalDownloads - manifest.pendingDownloads;
+            int pct = (manifest.totalDownloads > 0) ? (done * 100 / manifest.totalDownloads) : 0;
+            label += L" [downloading " + std::to_wstring(pct) + L"%]";
         }
 
         std::deque<wchar_t> chars(label.begin(), label.end());

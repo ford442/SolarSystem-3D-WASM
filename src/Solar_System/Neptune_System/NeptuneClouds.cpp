@@ -4,11 +4,11 @@ NeptuneClouds::NeptuneClouds(const CloudsInfo& cloudsInfo, std::shared_ptr<Space
 {
 }
 
-void NeptuneClouds::AdjustToParent(bool isRunTime) {
+void NeptuneClouds::AdjustToParent(float timeScale) {
     static float rotationAngle = 0;
 
-    if (isRunTime) {
-        rotationAngle += 8 *  0.01;
+    if (timeScale > 0.0f) {
+        rotationAngle += (8 *  0.01) * timeScale;
     }
 
     LoadIdentityModelMatrix();

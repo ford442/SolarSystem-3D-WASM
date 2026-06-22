@@ -13,11 +13,11 @@ Jupiter::Jupiter(const PlanetInfo& planetInfo, std::shared_ptr<Star> parentStar)
 #endif
 }
 
-void Jupiter::AdjustToParent(bool isRunTime) {
+void Jupiter::AdjustToParent(float timeScale) {
     static float rotationAngle = 0;
 
-    if (isRunTime) {
-        rotationAngle += 4 *  0.014;
+    if (timeScale > 0.0f) {
+        rotationAngle += (4 * 0.014f * timeScale) * timeScale;
     }
 
     LoadIdentityModelMatrix();
@@ -44,11 +44,40 @@ void Jupiter::Render() const {
 }
 
 void Jupiter::LoadHighResIfClose(const glm::vec3& cameraPos) {
-    if (_isHighResLoaded || _isHighResLoading) {
+    float distance = glm::length(cameraPos - GetPosition());
+    _lastCameraDistance = distance;
+
+    if (_isHighResLoaded) {
+        if (distance > _lodThreshold * 2.0f) {
+            std::cout << "[LOD] Camera distance to Jupiter: " << distance << " units. Downgrading high-res to low-res..." << std::endl;
+            _diffuses.at(0).ReloadTexture(_diffuseLowPath);
+            _normalMap.ReloadTexture(_normalLowPath);
+            _isHighResLoaded = false;
+            _isHighResLoading = false;
+            _highResTexturesLoaded = 0;
+            _highResTexturesProcessed = 0;
+            std::cout << "[LOD] Jupiter high-res textures downgraded (VRAM freed)" << std::endl;
+            return;
+        }
         return;
     }
 
-    float distance = glm::length(cameraPos - GetPosition());
+#ifdef __EMSCRIPTEN__
+    if (g_qualityPreset == 0) return; // Low preset: never load high-res
+#endif
+
+    if (_isHighResLoading) {
+        if (distance > _lodThreshold * 1.8f) {
+            std::cout << "[LOD] Camera moved away from Jupiter during load (dist=" << distance << ") — deprioritizing." << std::endl;
+            auto& queue = TextureLoadingQueue::GetInstance();
+            queue.CancelLoad(_diffuseHighPath);
+            queue.CancelLoad(_normalHighPath);
+            _isHighResLoading = false;
+            // allow re-attempt later
+            return;
+        }
+        return;
+    }
 
     if (distance < _lodThreshold) {
         std::cout << "[LOD] Camera distance to Jupiter: " << distance << " units. Queueing high-res textures..." << std::endl;
@@ -63,7 +92,7 @@ void Jupiter::LoadHighResIfClose(const glm::vec3& cameraPos) {
             if (success) _highResTexturesLoaded++;
             _highResLoadProgress = _highResTexturesLoaded / (float)_highResTextureCount;
             if (_highResTexturesProcessed == _highResTextureCount) {
-                _isHighResLoaded = true;  // Permanently finalized: prevents re-queuing regardless of outcome
+                _isHighResLoaded = true;
                 _isHighResLoading = false;
                 if (_highResTexturesLoaded == _highResTextureCount) {
                     std::cout << "[LOD] Jupiter high-res textures loaded successfully" << std::endl;
@@ -76,4 +105,8 @@ void Jupiter::LoadHighResIfClose(const glm::vec3& cameraPos) {
         queue.QueueTextureLoad(_diffuseHighPath, "Jupiter_Diffuse_High", &_diffuses.at(0), onLoaded);
         queue.QueueTextureLoad(_normalHighPath, "Jupiter_Normal_High", &_normalMap, onLoaded);
     }
+}
+
+void Jupiter::UnloadHighResIfFar(const glm::vec3& cameraPos) {
+    LoadHighResIfClose(cameraPos);
 }

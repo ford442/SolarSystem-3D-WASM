@@ -147,6 +147,12 @@ Native desktop should remain unchanged:
 - **GPU memory**: Only allocated when a planet is actually initialized.
 - **Network**: Uses existing `emscripten_async_wget2` (concurrent, non-blocking). Multiple planet systems can download in parallel if the player is near several orbital zones.
 
+### Related Issues
+- #55 Staged loading (manifests, optionalAssetPaths, proxy markers with %, pending/total state)
+- #53 Feedback (3D % labels + streaming overlay)
+- #52 Async (DownloadFile for staged + queue for LOD)
+- #58 Documentation alignment
+
 ### 9. File Modifications
 
 | File | Action |

@@ -5,6 +5,8 @@
 #include <functional>
 #include <memory>
 #include <vector>
+#include <unordered_set>
+#include <chrono>
 
 class TextureImage2D;
 
@@ -14,6 +16,7 @@ struct TextureLoadJob {
     TextureImage2D* targetTexture;
     std::function<void(bool)> callback;
     int retries = 0;
+    std::chrono::steady_clock::time_point nextAttemptTime{};
     const int maxRetries = 3;
 };
 
@@ -26,6 +29,10 @@ public:
     int GetQueuedCount() const { return static_cast<int>(_queue.size()) + (_isLoading ? 1 : 0); }
     bool IsLoading() const { return _isLoading; }
     const std::string& GetCurrentLoadingPath() const { return _currentPath; }
+
+    // Cancel a pending or in-flight load (deprioritize when camera moves away).
+    // For in-flight async downloads, suppresses the texture reload on completion.
+    void CancelLoad(const std::string& path);
 
     // Cumulative stats for JS progress reporting
     int GetTotalQueued()    const { return _totalQueued; }
@@ -41,6 +48,10 @@ private:
     std::queue<TextureLoadJob> _queue;
     bool _isLoading = false;
     std::string _currentPath;
+
+    // Dedup + cancel support for resilience against repeated LOD checks and camera movement.
+    std::unordered_set<std::string> _pendingPaths;
+    std::unordered_set<std::string> _cancelledPaths;
 
     int _totalQueued    = 0;
     int _totalCompleted = 0;

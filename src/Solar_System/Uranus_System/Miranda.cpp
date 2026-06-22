@@ -5,7 +5,7 @@ Miranda::Miranda(const SatelliteInfo& satelliteInfo, std::shared_ptr<SpaceObject
 {
 }
 
-void Miranda::AdjustToParent(bool isRunTime) {
+void Miranda::AdjustToParent(float timeScale) {
     static float y = 0, x = -34.8f;
 
     static float circleRadius = 0.005f;
@@ -13,7 +13,7 @@ void Miranda::AdjustToParent(bool isRunTime) {
     static float velocity = 1.35f;
     static float rotationAngle = 0.0f;
 
-    if (isRunTime) {
+    if (timeScale > 0.0f) {
         time += 0.0001f;
         rotationAngle -= 4 * 0.0115f;
 

@@ -130,3 +130,37 @@ void Camera::UpdateCameraVectors() {
     _rightVector = glm::normalize(glm::cross(_frontVector, _worldUpVector));  // normalize the vectors, because their length gets closer to 0 the more you look up or down which results in slower movement.
     _upVector    = glm::normalize(glm::cross(_rightVector, _frontVector));
 }
+
+void Camera::StartTransitionTo(const glm::vec3& targetPos, float targetYaw, float targetPitch, float durationSeconds) {
+    if (durationSeconds <= 0.0f) {
+        _position = targetPos;
+        _yaw = targetYaw;
+        _pitch = targetPitch;
+        UpdateCameraVectors();
+        _transitionActive = false;
+        return;
+    }
+    _transitionStartPos = _position;
+    _transitionStartYaw = _yaw;
+    _transitionStartPitch = _pitch;
+    _transitionTargetPos = targetPos;
+    _transitionTargetYaw = targetYaw;
+    _transitionTargetPitch = targetPitch;
+    _transitionDuration = durationSeconds;
+    _transitionElapsed = 0.0f;
+    _transitionActive = true;
+}
+
+void Camera::UpdateTransition(float deltaTime) {
+    if (!_transitionActive) return;
+    _transitionElapsed += deltaTime;
+    float t = _transitionElapsed / _transitionDuration;
+    if (t >= 1.0f) {
+        t = 1.0f;
+        _transitionActive = false;
+    }
+    _position = glm::mix(_transitionStartPos, _transitionTargetPos, t);
+    _yaw = glm::mix(_transitionStartYaw, _transitionTargetYaw, t);
+    _pitch = glm::mix(_transitionStartPitch, _transitionTargetPitch, t);
+    UpdateCameraVectors();
+}

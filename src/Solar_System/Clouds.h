@@ -16,7 +16,7 @@ struct CloudsInfo {
 class Clouds : public OuterShell {
 public:
     explicit Clouds(const CloudsInfo& cloudsInfo, std::shared_ptr<SpaceObject> parent);
-    void AdjustToParent(bool isRunTime) = 0;
+    void AdjustToParent(float timeScale) = 0;
 
 protected:
     TextureImage2D _diffuse, _normal;

@@ -895,6 +895,13 @@ void CDDSImage::upload_texture2D(uint32_t imageIndex, uint32_t target) {
     assert(
             target == GL_TEXTURE_2D || (target >= GL_TEXTURE_CUBE_MAP_POSITIVE_X && target <= GL_TEXTURE_CUBE_MAP_NEGATIVE_Z));
 
+    // Track the highest mip level that was *actually* uploaded. We must declare
+    // GL_TEXTURE_MAX_LEVEL exactly to this value (0-based). Using the file's
+    // get_num_mipmaps() can over-declare if a trailing mip upload fails or if
+    // the DDS chain is intentionally short (e.g. DXT stopping at 4x4). WebGL 2
+    // treats over-declared MAX_LEVEL with missing levels as incomplete -> black.
+    unsigned int lastUploadedLevel = 0;
+
     if (is_compressed()) {
         // Clear any pending GL error before uploading so we get clean error feedback.
         glGetError();
@@ -917,6 +924,8 @@ void CDDSImage::upload_texture2D(uint32_t imageIndex, uint32_t target) {
             if (err != GL_NO_ERROR) {
                 fprintf(stderr, "nv_dds: glCompressedTexImage2D level 0 failed (format 0x%X, size %u): GL error 0x%X\n",
                         m_format, image.get_size(), err);
+            } else {
+                lastUploadedLevel = 0;
             }
         }
 
@@ -931,6 +940,8 @@ void CDDSImage::upload_texture2D(uint32_t imageIndex, uint32_t target) {
                     fprintf(stderr, "nv_dds: glCompressedTexImage2D mipmap level %u failed (format 0x%X, %ux%u, size %u): GL error 0x%X\n",
                             i + 1, m_format, mipmap.get_width(), mipmap.get_height(), mipmap.get_size(), err);
                     break;  // stop uploading further levels to prevent cascade
+                } else {
+                    lastUploadedLevel = i + 1;
                 }
             }
         }
@@ -968,6 +979,14 @@ void CDDSImage::upload_texture2D(uint32_t imageIndex, uint32_t target) {
             }
             glTexImage2D(target, 0, internalFormat, image.get_width(), image.get_height(), 0, GL_RGBA, GL_UNSIGNED_BYTE, rgbaPixels);
             delete[] rgbaPixels;
+            {
+                GLenum err = glGetError();
+                if (err != GL_NO_ERROR) {
+                    fprintf(stderr, "nv_dds: glTexImage2D RGB->RGBA base level failed (0x%X)\n", err);
+                } else {
+                    lastUploadedLevel = 0;
+                }
+            }
 
             // Convert all Mipmaps from RGB to RGBA
             for (unsigned int m = 0; m < image.get_num_mipmaps(); m++) {
@@ -983,23 +1002,66 @@ void CDDSImage::upload_texture2D(uint32_t imageIndex, uint32_t target) {
                 }
                 glTexImage2D(target, m + 1, internalFormat, mipmap.get_width(), mipmap.get_height(), 0, GL_RGBA, GL_UNSIGNED_BYTE, rgbaMip);
                 delete[] rgbaMip;
+                {
+                    GLenum err = glGetError();
+                    if (err != GL_NO_ERROR) {
+                        fprintf(stderr, "nv_dds: glTexImage2D RGB->RGBA mipmap level %u failed (0x%X)\n", m + 1, err);
+                        break;
+                    } else {
+                        lastUploadedLevel = m + 1;
+                    }
+                }
             }
         } else {
             // Standard upload for R8 or RGBA8
             glTexImage2D(target, 0, internalFormat, image.get_width(), image.get_height(), 0, m_format, GL_UNSIGNED_BYTE, image);
+            {
+                GLenum err = glGetError();
+                if (err != GL_NO_ERROR) {
+                    fprintf(stderr, "nv_dds: glTexImage2D base level failed (0x%X)\n", err);
+                } else {
+                    lastUploadedLevel = 0;
+                }
+            }
             for (unsigned int i = 0; i < image.get_num_mipmaps(); i++) {
                 const CSurface &mipmap = image.get_mipmap(i);
                 glTexImage2D(target, i + 1, internalFormat, mipmap.get_width(), mipmap.get_height(), 0, m_format, GL_UNSIGNED_BYTE, mipmap);
+                {
+                    GLenum err = glGetError();
+                    if (err != GL_NO_ERROR) {
+                        fprintf(stderr, "nv_dds: glTexImage2D mipmap level %u failed (0x%X)\n", i + 1, err);
+                        break;
+                    } else {
+                        lastUploadedLevel = i + 1;
+                    }
+                }
             }
         }
 #else
         GLenum internalFormat = m_components;
         glTexImage2D(target, 0, internalFormat, image.get_width(), image.get_height(), 0, m_format, GL_UNSIGNED_BYTE, image);
+        {
+            GLenum err = glGetError();
+            if (err != GL_NO_ERROR) {
+                fprintf(stderr, "nv_dds: glTexImage2D base level failed (0x%X)\n", err);
+            } else {
+                lastUploadedLevel = 0;
+            }
+        }
 
         // load all mipmaps
         for (unsigned int i = 0; i < image.get_num_mipmaps(); i++) {
             const CSurface &mipmap = image.get_mipmap(i);
             glTexImage2D(target, i + 1, internalFormat, mipmap.get_width(), mipmap.get_height(), 0, m_format, GL_UNSIGNED_BYTE, mipmap);
+            {
+                GLenum err = glGetError();
+                if (err != GL_NO_ERROR) {
+                    fprintf(stderr, "nv_dds: glTexImage2D mipmap level %u failed (0x%X)\n", i + 1, err);
+                    break;
+                } else {
+                    lastUploadedLevel = i + 1;
+                }
+            }
         }
 #endif
 
@@ -1007,14 +1069,13 @@ void CDDSImage::upload_texture2D(uint32_t imageIndex, uint32_t target) {
             glPixelStorei(GL_UNPACK_ALIGNMENT, alignment);
     }
 
-#ifdef __EMSCRIPTEN__
-    // WebGL 2 Strictness Fix: Prevent "incomplete" black textures by capping the mipmap level.
-    // If WebGL expects a 1x1 mipmap and the DDS stops at 4x4 (common for DXT), it renders the entire texture solid black.
-    // We explicitly declare the exact range of levels we uploaded (0 .. num_mipmaps).
+    // Set MAX_LEVEL to the *last successfully uploaded* level (0-based).
+    // Critical for WebGL 2 strictness with DXT and partial/short mip chains.
+    // Desktop GL is usually more forgiving; we set it unconditionally for
+    // consistent behavior and to avoid relying on driver defaults.
     GLenum paramTarget = (target == GL_TEXTURE_2D) ? GL_TEXTURE_2D : GL_TEXTURE_CUBE_MAP;
     glTexParameteri(paramTarget, GL_TEXTURE_BASE_LEVEL, 0);
-    glTexParameteri(paramTarget, GL_TEXTURE_MAX_LEVEL, static_cast<GLint>(image.get_num_mipmaps()));
-#endif
+    glTexParameteri(paramTarget, GL_TEXTURE_MAX_LEVEL, static_cast<GLint>(lastUploadedLevel));
 }
 
 #ifndef GL_ES_VERSION_2_0

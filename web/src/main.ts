@@ -6,6 +6,8 @@ const loadingContainer = document.getElementById('loading-container') as HTMLEle
 const progressBar = document.getElementById('progress-bar') as HTMLElement;
 const progressText = document.getElementById('progress-text') as HTMLElement;
 const streamingProgress = document.getElementById('streaming-progress') as HTMLElement;
+const streamingText = document.getElementById('streaming-text') as HTMLElement;
+const streamingBar = document.getElementById('streaming-progress-bar') as HTMLElement;
 const deployedBaseUrl = new URL(import.meta.env.BASE_URL, window.location.href);
 // Runtime DDS assets (textures/, textures_low/) are hosted on the deployment server,
 // not in the Vite bundle. In dev, point fetches at production so LOD streaming works.
@@ -31,6 +33,9 @@ function updateProgress(loaded: number, total: number) {
         setTimeout(() => {
             if (loadingContainer) {
                 loadingContainer.classList.add('hidden');
+                // Ensure it cannot block mouse/keyboard interaction after initial load
+                loadingContainer.style.pointerEvents = 'none';
+                loadingContainer.style.zIndex = '-1';
             }
         }, 500);
     }
@@ -45,12 +50,20 @@ function updateStreamingProgress(completed: number, total: number) {
         return;
     }
     streamingProgress.style.display = 'block';
-    streamingProgress.textContent = `Streaming high-res… (${completed}/${total})`;
+    const pct = total > 0 ? Math.round((completed / total) * 100) : 0;
+    if (streamingText) {
+        streamingText.textContent = `High-res upgrade: ${completed}/${total} (${pct}%)`;
+    } else {
+        streamingProgress.textContent = `High-res upgrade: ${completed}/${total}`;
+    }
+    if (streamingBar) {
+        streamingBar.style.width = pct + '%';
+    }
     if (completed >= total) {
         // Auto-hide after streaming is done
         setTimeout(() => {
-            streamingProgress.style.display = 'none';
-        }, 2000);
+            if (streamingProgress) streamingProgress.style.display = 'none';
+        }, 2500);
     }
 }
 
@@ -58,6 +71,16 @@ function updateStreamingProgress(completed: number, total: number) {
 (window as any).updateLoadingProgress = updateProgress;
 (window as any).updateStreamingProgress = updateStreamingProgress;
 (window as any).__solarSystemAssetBase = runtimeAssetBase;
+
+// TypeScript declarations for C++-called window callbacks (and asset base)
+declare global {
+  interface Window {
+    updateLoadingProgress?: (loaded: number, total: number) => void;
+    updateStreamingProgress?: (completed: number, total: number) => void;
+    setCameraPose?: (x: number, y: number, z: number, yaw: number, pitch: number) => void;
+    __solarSystemAssetBase?: string;
+  }
+}
 
 const moduleConfig = {
     canvas: canvas,
@@ -79,4 +102,17 @@ const moduleConfig = {
 Module(moduleConfig).then((instance: any) => {
     console.log("Module loaded successfully", instance);
     (window as any).setCameraPose = instance.cwrap('SetCameraPose', null, ['number', 'number', 'number', 'number', 'number']);
+    (window as any).setQualityPreset = instance.cwrap('SetQualityPreset', null, ['number']);
+    (window as any).focusPlanet = instance.cwrap('FocusPlanet', null, ['number']);
+
+    // URL param support: ?quality=low|medium|full (or ?q=0|1|2)
+    try {
+        const params = new URLSearchParams(window.location.search);
+        const q = (params.get('quality') || params.get('q') || 'full').toLowerCase();
+        let preset = 2;
+        if (q === 'low' || q === '0') preset = 0;
+        else if (q === 'medium' || q === 'med' || q === '1') preset = 1;
+        else if (q === 'full' || q === '2') preset = 2;
+        if ((window as any).setQualityPreset) (window as any).setQualityPreset(preset);
+    } catch(e) { /* ignore */ }
 });

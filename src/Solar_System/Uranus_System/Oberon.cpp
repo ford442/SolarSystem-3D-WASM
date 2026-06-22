@@ -5,7 +5,7 @@ Oberon::Oberon(const SatelliteInfo& satelliteInfo, std::shared_ptr<SpaceObject> 
 {
 }
 
-void Oberon::AdjustToParent(bool isRunTime) {
+void Oberon::AdjustToParent(float timeScale) {
     static float y = 0, x = -61.0f;
 
     static float circleRadius = 0.005f;
@@ -13,7 +13,7 @@ void Oberon::AdjustToParent(bool isRunTime) {
     static float velocity = 0.6f;
     static float rotationAngle = 0.0f;
 
-    if (isRunTime) {
+    if (timeScale > 0.0f) {
         time += 0.0001f;
         rotationAngle -= 4 * 0.0115f;
 

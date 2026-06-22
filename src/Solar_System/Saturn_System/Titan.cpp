@@ -5,7 +5,7 @@ Titan::Titan(const SatelliteInfo& satelliteInfo, std::shared_ptr<SpaceObject> pa
 {
 }
 
-void Titan::AdjustToParent(bool isRunTime) {
+void Titan::AdjustToParent(float timeScale) {
     static float x = 0.f, z = -87.5f;
 
     static float circleRadius = 0.005f;
@@ -13,7 +13,7 @@ void Titan::AdjustToParent(bool isRunTime) {
     static float velocity = 0.53f;
     static float rotationAngle = 0.0f;
 
-    if (isRunTime) {
+    if (timeScale > 0.0f) {
         time += 0.0001f;
         rotationAngle -= 4 * 0.0115f;
 

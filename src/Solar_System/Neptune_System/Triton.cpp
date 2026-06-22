@@ -5,7 +5,7 @@ Triton::Triton(const SatelliteInfo& satelliteInfo, std::shared_ptr<SpaceObject> 
 {
 }
 
-void Triton::AdjustToParent(bool isRunTime) {
+void Triton::AdjustToParent(float timeScale) {
     static float x = 0, y = 20, z = -37.5f;
 
     static float circleRadius = 0.005f;
@@ -14,7 +14,7 @@ void Triton::AdjustToParent(bool isRunTime) {
     static float rotationAngle = 0.0f;
     static bool goUp = false;
 
-    if (isRunTime) {
+    if (timeScale > 0.0f) {
         time += 0.0001f;
         rotationAngle -= 4 *  0.0115f;
         if (y >= 20.f)

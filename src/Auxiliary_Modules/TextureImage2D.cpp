@@ -61,13 +61,21 @@ void TextureImage2D::LoadTextureFromFile(const std::string& path, GLint wrapPara
         CDDSImage image;
         image.load(path, false);
         isCompressed = image.is_compressed();
-        hasEmbeddedMipmaps = (image.get_num_mipmaps() > 0);
         _width = image.get_width();
         _height = image.get_height();
 #ifdef __EMSCRIPTEN__
         ValidateTextureDimensions(path, _width, _height);
 #endif
         image.upload_texture2D();
+        // hasEmbedded reflects what was *actually* uploaded (MAX_LEVEL>0).
+        // For compressed DXT with short chains or partial failures, upload_texture2D
+        // now sets MAX_LEVEL to the true last resident level.
+        hasEmbeddedMipmaps = (image.get_num_mipmaps() > 0);
+#ifdef __EMSCRIPTEN__
+        GLint actualMax = 0;
+        glGetTexParameteriv(GL_TEXTURE_2D, GL_TEXTURE_MAX_LEVEL, &actualMax);
+        hasEmbeddedMipmaps = (actualMax > 0);
+#endif
     }
     catch (const std::runtime_error& error) {
 #ifdef __EMSCRIPTEN__
@@ -243,6 +251,12 @@ void TextureImage2D::CreateFallbackTexture(GLint wrapParam, GLint minFilter, GLi
                         ? GL_LINEAR : minFilter;
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, safeMin);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, magFilter);
+
+#ifdef __EMSCRIPTEN__
+    // Explicit single-level declaration for WebGL 2 completeness.
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_BASE_LEVEL, 0);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAX_LEVEL, 0);
+#endif
 
     _width = 4;
     _height = 4;

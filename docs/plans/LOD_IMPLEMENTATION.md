@@ -204,3 +204,9 @@ To test the implementation:
 - No new network code introduced
 - Same security model as PR #17
 - Textures served from same origin (no CORS issues)
+
+## Related Issues
+- #51 mipmap black textures / MAX_LEVEL
+- #52 async resilience (queue, cancel, retries)
+- #54 memory downgrade + quality presets
+- #58 docs alignment (this + grok/TESTING/VERIF updates)

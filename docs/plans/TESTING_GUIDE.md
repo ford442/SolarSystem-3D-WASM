@@ -286,14 +286,131 @@ cd build
 ## Success Criteria
 
 ✅ **Test passes if:**
-1. Initial load is fast (only low-res textures downloaded)
-2. Low-res textures display correctly on Earth
-3. Zooming close triggers high-res download (console logs visible)
-4. High-res textures display correctly after load
-5. No memory leaks (memory usage reasonable after texture swap)
-6. No repeated downloads (textures fetched only once)
-7. Desktop build unchanged (loads high-res directly)
-8. Error handling works (graceful degradation on missing files)
+1. Initial load is fast (only core + low-res for first planets)
+2. Low-res textures (or 4×4 placeholders) display
+3. Zooming close triggers high-res queue + streaming UI (console + overlay)
+4. High-res textures (or fallback) load without black/incomplete artifacts
+5. Downgrade on distance > ~100u works (VRAM note in logs)
+6. No repeated downloads (dedup + _isHighResLoaded guard)
+7. Desktop build unchanged (loads high-res directly, no LOD messages)
+8. Error handling works (graceful on missing high/optional; required fails still init with fallbacks)
+9. Proxy markers + % labels appear for unloaded planets; disappear on READY
+
+## Current Architecture End-to-End (Staged + LOD + Async Streaming)
+
+The original Earth-focused guide is still useful for manual low-res creation when real assets are available. The architecture has since been extended to **all planets**, staged loading for the whole system, a robust queue, hysteresis downgrade, quality presets, streaming progress, and proxy markers.
+
+### 1. One-Time Setup (Placeholders are shipped)
+Repo now includes `resource/textures_low/*_Low.dds` (4×4 grey checkers for planets + moons/rings/clouds). No manual `convert` needed for basic LOD/staged verification.
+- Real high-res + skybox are remote (dev mode redirects to them; preview uses local placeholders).
+- All required low-res are referenced in manifests + GetTexturePath.
+
+### 2. Build & Serve for Testing
+```bash
+./build-web.sh
+cd web
+npm run preview   # or: npm run dev (forces REMOTE_ASSET_BASE for real textures)
+# http://localhost:4173/solar-system/   (or 5173 for dev)
+```
+Use Chrome. Open DevTools → Console + Network.
+
+### 3. Initial State (no planets yet)
+- Loading bar → 100% → hides.
+- Sun (corona + lens flare + HDR), 3D distance labels (when bodies present), full camera (WASD + mouse + scroll) work immediately.
+- Console: core resource messages.
+- Planets: **3D proxy markers** only (rendered via TextRenderer in 3D mode at proxy orbital positions).
+
+### 4. Trigger Staged Loading (Proxy → Download → READY)
+Teleport or fly near a planet's proxy (Sun = 0,0,0; Earth ~1900 on +X):
+```js
+// In DevTools console
+window.setCameraPose(1850, 10, 50, 90, -5);   // near Earth proxy; yaw/pitch in degrees
+```
+Expected:
+- Console: `[StagedLoading] Camera within ... — starting download for Earth`
+- 3D label updates: `Earth [downloading 37%]`
+- Network: low-res planet textures + moons (Earth: Earth_*_Low + Moon_* + clouds etc.)
+- When all required done: `[StagedLoading] Required assets ready for Earth — initializing system.`
+- Planet (low-res) + moons + clouds/rings appear; proxy label vanishes.
+- Other planets remain as proxies.
+
+Repeat for outer (larger radius) or inner. Multiple can download in parallel.
+
+### 5. High-Res LOD Streaming (Queue + UI)
+Fly or teleport inside ~50 units of a planet center:
+```js
+window.setCameraPose(1900, 0, 0, 180, 0);  // very close to Earth
+```
+Expected (console + overlay):
+- `[LOD] Camera distance to Earth: 12.3 units. Queueing high-res textures...`
+- `updateStreamingProgress` DOM element appears: "High-res upgrade: 1/3 (33%)" etc.
+- Per-planet queue logs + final: `[LOD] Earth high-res textures loaded successfully`
+- `TextureLoadingQueue` ensures: dedup (no duplicates if you jiggle camera), backoff on transient errors, serialized.
+- Visual (real assets): texture sharpness jumps. Placeholders: no visible change but paths exercised.
+- No further requests while `_isHighResLoaded`.
+
+Test queue cancel:
+- Start load → immediately `setCameraPose` far away → console deprioritize/cancel for that planet's paths; loading aborts without applying (or partial).
+
+### 6. Downgrade + Hysteresis + Presets
+- Fly away > ~100 units (2× threshold):
+  - `[LOD] ... Downgrading high-res to low-res...`
+  - `[LOD] Earth high-res textures downgraded (VRAM freed)`
+  - `_isHighResLoaded=false`; low-res reloaded via ReloadTexture.
+- Quality preset (low forces immediate downgrade of any loaded + suppresses upgrades):
+  - URL: `.../solar-system/?quality=0`
+  - Or: `Module.SetQualityPreset(0)` (also 1/2)
+  - In code: `g_qualityPreset==0` path uses fake-far to drive downgrade for all.
+- Medium/full allow upgrades normally.
+
+### 7. Streaming UI + Throttled Progress
+- High-res phase uses separate overlay (`#streaming-progress` in index.html) + bar.
+- C++ calls `updateStreamingProgress(completed, total)` every frame while queued (throttled naturally by queue).
+- Auto-hides ~2.5s after done. Also updates main loading hook during streaming for compatibility.
+- In 3D: while planet DOWNLOADING, labels show live % from `totalDownloads - pendingDownloads`.
+
+### 8. Multi-Planet + Moons/Rings/Clouds
+- Jupiter etc. bring many optionals (Io/Europa... + rings). Required block init; optionals log "[StagedLoading] Optional asset unavailable..." but do not block (use fallbacks).
+- All planets implement LoadHighResIfClose + Unload (delegates to Load).
+- Test by visiting several systems; watch console for independent high-res queues.
+
+### 9. Error / Resilience Cases
+- Temporarily rename a high-res DDS → on zoom: queue attempts, some fail, final message "attempt finished (some or all failed, keeping low-res permanently)". Planet keeps low.
+- Rename required low-res for a not-yet-loaded planet → staged will fail init for that system (others unaffected).
+- Optional missing: tolerated.
+- Rapid camera changes: no duplicate jobs, cancels work, backoff prevents spam.
+- MAX_LEVEL safety: no black on load/reload/GenerateMipmap paths (watch for absence of "incomplete texture" GL complaints).
+
+### 10. Verification Commands / JS Helpers
+- Teleport list (approximate centers):
+  - Mercury ~500, Venus ~900, Earth 1900, Mars ~2600, Jupiter ~5000-ish, etc. (exact from planet ctors or labels).
+- Watch: `window.__solarSystemAssetBase` (base for fetches).
+- Force streaming hide: manually set display none on `#streaming-progress`.
+- Low preset URL test + close/far cycles.
+- Check `_renderableSceneComponents` length grows only as planets activate (via any debug exposure).
+
+### 11. Performance / Memory
+- Task manager: watch GPU/JS heap before/after high-res of a heavy world (Saturn/Jupiter). Downgrade should release.
+- Initial payload small; per-planet incremental.
+- FPS may throttle to 0 in background tab (rAF); confirm by labels moving on input.
+
+## Additional Notes
+
+### Adjusting LOD Threshold or Activation Radius
+- LOD: per-planet e.g. `src/Solar_System/Earth_System/Earth.cpp` (and .h `_lodThreshold`).
+- Staged radius: in `Application.cpp` manifest initializers (search `activationRadius`).
+
+Smaller LOD = closer for upgrade. Larger activation = planets "pop in" from farther.
+
+### Monitoring
+- Chrome Performance + Memory.
+- WebGL inspector (active textures, MAX_LEVEL values, completeness).
+- Console is authoritative for flow.
+
+### Future / Related
+- See `VERIFICATION_CHECKLIST.md`, `staged_loading_plan.md`, `LOD_IMPLEMENTATION.md`, `grok.md`, `AGENTS.md`.
+
+**Related GitHub Issues (cross-linked per P3 task)**: #51–#58 (mipmap safety, async/queue, feedback/UI, presets+memory, staged+proxies, render, nav, docs alignment).
 
 ## Additional Notes
 

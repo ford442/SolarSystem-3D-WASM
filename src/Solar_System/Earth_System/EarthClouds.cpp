@@ -4,11 +4,11 @@ EarthClouds::EarthClouds(const CloudsInfo& cloudsInfo, std::shared_ptr<SpaceObje
 {
 }
 
-void EarthClouds::AdjustToParent(bool isRunTime) {
+void EarthClouds::AdjustToParent(float timeScale) {
     static float rotationAngle = 0;
 
-    if (isRunTime) {
-        rotationAngle += 1.25 * 0.015;
+    if (timeScale > 0.0f) {
+        rotationAngle += (1.25 * 0.015) * timeScale;
     }
 
     LoadIdentityModelMatrix();

@@ -273,3 +273,7 @@ All changes are minimal, focused, and maintain backwards compatibility with the 
 - [WebGL 2 Specification](https://www.khronos.org/registry/webgl/specs/latest/2.0/)
 - [GLSL ES 3.0 Specification](https://www.khronos.org/registry/OpenGL/specs/es/3.0/GLSL_ES_Specification_3.00.pdf)
 - [SDL_mixer Documentation](https://www.libsdl.org/projects/SDL_mixer/)
+
+## Related Issues (LOD / Staged / Streaming Evolution)
+See also later work captured in LOD_IMPLEMENTATION.md, staged_loading_plan.md, TESTING_GUIDE.md, VERIFICATION_CHECKLIST.md:
+- #51–#58 covering mipmap/MAX_LEVEL safety, async queue resilience + streaming, UI feedback (proxies/%), presets+downgrade memory, staged completeness+manifests+optionals, render pipeline verification, nav enhancements (focus/lerp/time), and this docs alignment.

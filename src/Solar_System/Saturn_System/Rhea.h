@@ -5,7 +5,7 @@
 class Rhea : public Satellite {
 public:
     explicit Rhea(const SatelliteInfo& satelliteInfo, std::shared_ptr<SpaceObject> parent);
-    void AdjustToParent(bool isRunTime) override;
+    void AdjustToParent(float timeScale) override;
     void Render() const override;
 
 private:

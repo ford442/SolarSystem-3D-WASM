@@ -3,6 +3,7 @@
 #include <fstream>
 #include <iostream>
 #include <sys/stat.h>
+#include <unordered_set>
 
 #ifdef __EMSCRIPTEN__
 
@@ -14,6 +15,9 @@ namespace {
         std::string resolvedUrl;
         std::string virtualPath;
     };
+
+    // Guard against duplicate concurrent async downloads for the exact same virtual asset.
+    std::unordered_set<std::string> s_activeDownloads;
 
     bool IsAbsoluteUrl(const std::string& url) {
         return url.rfind("http://", 0) == 0 || url.rfind("https://", 0) == 0;
@@ -79,6 +83,7 @@ void EnsureDirectoryExists(const std::string& path) {
 // Callback wrappers for emscripten_async_wget2
 void OnLoad2(unsigned int handle, void* arg, const char* file) {
     auto* context = static_cast<DownloadContext*>(arg);
+    s_activeDownloads.erase(context->virtualPath);
     std::cout << "Successfully downloaded: " << context->resolvedUrl << " -> " << context->virtualPath << std::endl;
     if (context->callback) {
         context->callback(true);
@@ -88,6 +93,7 @@ void OnLoad2(unsigned int handle, void* arg, const char* file) {
 
 void OnError2(unsigned int handle, void* arg, int status) {
     auto* context = static_cast<DownloadContext*>(arg);
+    s_activeDownloads.erase(context->virtualPath);
     std::cerr << "Failed to download " << context->resolvedUrl << " -> " << context->virtualPath << ". Status: " << status << std::endl;
     if (context->callback) {
         context->callback(false);
@@ -103,6 +109,14 @@ void OnProgress2(unsigned int handle, void* arg, int bytesLoaded) {
 }
 
 void WebResourceFetcher::DownloadFile(const std::string& url, const std::string& virtualPath, std::function<void(bool)> callback) {
+    if (s_activeDownloads.count(virtualPath)) {
+        // Duplicate concurrent request for same asset; ignore to avoid redundant traffic.
+        // The first one will deliver and invoke its callback.
+        if (callback) callback(false); // signal as non-success for caller dedup, caller may ignore
+        return;
+    }
+    s_activeDownloads.insert(virtualPath);
+
     EnsureDirectoryExists(virtualPath);
     const std::string resolvedUrl = ResolveResourceUrl(url);
     std::cout << "Starting download: " << resolvedUrl << " to " << virtualPath << std::endl;

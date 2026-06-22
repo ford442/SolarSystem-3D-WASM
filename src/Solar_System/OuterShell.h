@@ -6,7 +6,7 @@
 class OuterShell : public SpaceObject {
 public:
     explicit OuterShell(MeshHolder model, const Shader& shader, std::shared_ptr<SpaceObject> parent, float earthScaleFactor);
-    virtual void AdjustToParent(bool isRunTime) = 0;
+    virtual void AdjustToParent(float timeScale) = 0;
     std::shared_ptr<SpaceObject> GetParent() const;
 
 protected:

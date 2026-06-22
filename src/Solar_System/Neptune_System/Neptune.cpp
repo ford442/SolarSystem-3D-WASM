@@ -13,11 +13,11 @@ Neptune::Neptune(const PlanetInfo& planetInfo, std::shared_ptr<Star> parentStar)
 #endif
 }
 
-void Neptune::AdjustToParent(bool isRunTime) {
+void Neptune::AdjustToParent(float timeScale) {
     static float rotationAngle = 0;
 
-    if (isRunTime) {
-        rotationAngle += 4 *  0.01;
+    if (timeScale > 0.0f) {
+        rotationAngle += (4 * 0.01f * timeScale) * timeScale;
     }
 
     LoadIdentityModelMatrix();
@@ -49,11 +49,40 @@ void Neptune::Render() const {
 }
 
 void Neptune::LoadHighResIfClose(const glm::vec3& cameraPos) {
-    if (_isHighResLoaded || _isHighResLoading) {
+    float distance = glm::length(cameraPos - GetPosition());
+    _lastCameraDistance = distance;
+
+    if (_isHighResLoaded) {
+        if (distance > _lodThreshold * 2.0f) {
+            std::cout << "[LOD] Camera distance to Neptune: " << distance << " units. Downgrading high-res to low-res..." << std::endl;
+            _diffuses.at(0).ReloadTexture(_diffuseLowPath);
+            _normalMap.ReloadTexture(_normalLowPath);
+            _isHighResLoaded = false;
+            _isHighResLoading = false;
+            _highResTexturesLoaded = 0;
+            _highResTexturesProcessed = 0;
+            std::cout << "[LOD] Neptune high-res textures downgraded (VRAM freed)" << std::endl;
+            return;
+        }
+        if (_isHighResLoading) return; // shouldn't be
         return;
     }
 
-    float distance = glm::length(cameraPos - GetPosition());
+#ifdef __EMSCRIPTEN__
+    if (g_qualityPreset == 0) return; // Low preset: never load high-res
+#endif
+
+    if (_isHighResLoading) {
+        if (distance > _lodThreshold * 1.8f) {
+            std::cout << "[LOD] Camera moved away from Neptune during load (dist=" << distance << ") — deprioritizing." << std::endl;
+            auto& queue = TextureLoadingQueue::GetInstance();
+            queue.CancelLoad(_diffuseHighPath);
+            queue.CancelLoad(_normalHighPath);
+            _isHighResLoading = false;
+            return;
+        }
+        return;
+    }
 
     if (distance < _lodThreshold) {
         std::cout << "[LOD] Camera distance to Neptune: " << distance << " units. Queueing high-res textures..." << std::endl;
@@ -68,7 +97,7 @@ void Neptune::LoadHighResIfClose(const glm::vec3& cameraPos) {
             if (success) _highResTexturesLoaded++;
             _highResLoadProgress = _highResTexturesLoaded / (float)_highResTextureCount;
             if (_highResTexturesProcessed == _highResTextureCount) {
-                _isHighResLoaded = true;  // Permanently finalized: prevents re-queuing regardless of outcome
+                _isHighResLoaded = true;
                 _isHighResLoading = false;
                 if (_highResTexturesLoaded == _highResTextureCount) {
                     std::cout << "[LOD] Neptune high-res textures loaded successfully" << std::endl;
@@ -81,4 +110,8 @@ void Neptune::LoadHighResIfClose(const glm::vec3& cameraPos) {
         queue.QueueTextureLoad(_diffuseHighPath, "Neptune_Diffuse_High", &_diffuses.at(0), onLoaded);
         queue.QueueTextureLoad(_normalHighPath, "Neptune_Normal_High", &_normalMap, onLoaded);
     }
+}
+
+void Neptune::UnloadHighResIfFar(const glm::vec3& cameraPos) {
+    LoadHighResIfClose(cameraPos);
 }

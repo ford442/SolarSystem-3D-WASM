@@ -5,7 +5,7 @@ Phobos::Phobos(const SatelliteInfo& satelliteInfo, std::shared_ptr<SpaceObject> 
 {
 }
 
-void Phobos::AdjustToParent(bool isRunTime) {
+void Phobos::AdjustToParent(float timeScale) {
     static float x = 0, z = -2.5f;
 
     static float circleRadius = 0.001f;
@@ -13,7 +13,7 @@ void Phobos::AdjustToParent(bool isRunTime) {
     static float velocity = 4.f;
     static float rotationAngle = 0.0f;
 
-    if (isRunTime) {
+    if (timeScale > 0.0f) {
         time += 0.0001f;
         rotationAngle -= 4 *  0.0315f;
 

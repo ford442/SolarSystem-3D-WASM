@@ -6,7 +6,7 @@
 class EarthClouds : public Clouds {
 public:
     explicit EarthClouds(const CloudsInfo& cloudsInfo, std::shared_ptr<SpaceObject> parent);
-    void AdjustToParent(bool isRunTime) override;
+    void AdjustToParent(float timeScale) override;
     void Render() const override;
 };
 

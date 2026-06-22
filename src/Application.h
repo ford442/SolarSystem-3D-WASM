@@ -15,7 +15,7 @@ using namespace irrklang;
 #endif
 
 namespace {
-    Camera camera(0.001f, 20000.f, 7.5f, 0.1f, glm::vec3(-134.0f, 0.0f, 0.0f));
+    Camera camera(0.001f, 20000.f, 5.0f, 0.05f, glm::vec3(-134.0f, 0.0f, 0.0f)); // tuned for better nav
     float lastX, lastY;
     float starExposure = 8.0f, starGamma = 0.4545454f, starTemperatureInKelvin = 5778.0f;
     double deltaTime = 0.0, lastFrame = 0.0;

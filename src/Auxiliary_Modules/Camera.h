@@ -46,6 +46,12 @@ public:
 
     // Processes input received from a mouse scroll-wheel event. Only requires input on the vertical wheel-axis
     void ProcessMouseScroll(float yoffset);
+
+    // Starts a smooth transition to target position and orientation over given seconds
+    void StartTransitionTo(const glm::vec3& targetPos, float targetYaw, float targetPitch, float durationSeconds = 2.0f);
+
+    // Updates any active smooth transition (call every frame with deltaTime)
+    void UpdateTransition(float deltaTime);
 private:
     glm::vec3 _position;
     glm::vec3 _frontVector;
@@ -58,6 +64,15 @@ private:
     float _mouseSensitivity;
     float _zoom;
     float _nearPlane, _farPlane, _aspect;
+
+    // Smooth transition state
+    bool _transitionActive = false;
+    glm::vec3 _transitionStartPos{0};
+    float _transitionStartYaw = 0, _transitionStartPitch = 0;
+    glm::vec3 _transitionTargetPos{0};
+    float _transitionTargetYaw = 0, _transitionTargetPitch = 0;
+    float _transitionDuration = 2.0f;
+    float _transitionElapsed = 0.0f;
 
     void UpdateCameraVectors();
 };

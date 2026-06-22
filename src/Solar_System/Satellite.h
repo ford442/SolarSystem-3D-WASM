@@ -29,7 +29,7 @@ public:
     std::shared_ptr<SpaceObject> GetParent() const;
     float GetRadius() const;
     float GetEarthSizeCoefficient() const;
-    virtual void AdjustToParent(bool isRunTime) = 0;
+    virtual void AdjustToParent(float timeScale) = 0;
 
 protected:
     std::shared_ptr<SpaceObject> _parent;

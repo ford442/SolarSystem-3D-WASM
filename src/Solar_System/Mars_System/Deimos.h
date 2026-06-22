@@ -5,7 +5,7 @@
 class Deimos : public Satellite {
 public:
     explicit Deimos(const SatelliteInfo& satelliteInfo, std::shared_ptr<SpaceObject> parent);
-    void AdjustToParent(bool isRunTime) override;
+    void AdjustToParent(float timeScale) override;
     void Render() const override;
 
 private:

@@ -5,7 +5,7 @@ Umbriel::Umbriel(const SatelliteInfo& satelliteInfo, std::shared_ptr<SpaceObject
 {
 }
 
-void Umbriel::AdjustToParent(bool isRunTime) {
+void Umbriel::AdjustToParent(float timeScale) {
     static float y = 0, x = -49.0f;
 
     static float circleRadius = 0.005f;
@@ -13,7 +13,7 @@ void Umbriel::AdjustToParent(bool isRunTime) {
     static float velocity = 0.95f;
     static float rotationAngle = 0.0f;
 
-    if (isRunTime) {
+    if (timeScale > 0.0f) {
         time += 0.0001f;
         rotationAngle -= 4 * 0.0115f;
 

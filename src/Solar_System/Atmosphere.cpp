@@ -7,7 +7,7 @@ Atmosphere::Atmosphere(const AtmosphereInfo& atmosphereInfo, std::shared_ptr<Spa
     _atmosphereOuterBoundary *= atmosphereInfo.scaleFactor;
 }
 
-void Atmosphere::AdjustToParent(bool) {
+void Atmosphere::AdjustToParent(float timeScale) {
     GetShader().SetVec3("C_R", _atmosphereColor);
     GetShader().SetFloat("innerRadius", _innerRadius);
     GetShader().SetFloat("outerRadius", _outerRadius);

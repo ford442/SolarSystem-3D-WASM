@@ -5,7 +5,7 @@ Moon::Moon(const SatelliteInfo& satelliteInfo, std::shared_ptr<SpaceObject> pare
 {
 }
 
-void Moon::AdjustToParent(bool isRunTime) {
+void Moon::AdjustToParent(float timeScale) {
     static float x = 0, z = -25.f;
 
     static float circleRadius = 0.005f;
@@ -13,7 +13,7 @@ void Moon::AdjustToParent(bool isRunTime) {
     static float velocity = 2.f;
     static float rotationAngle = 0.0f;
 
-    if (isRunTime) {
+    if (timeScale > 0.0f) {
         time += 0.0001f;
         rotationAngle -= 0.0115f;
 

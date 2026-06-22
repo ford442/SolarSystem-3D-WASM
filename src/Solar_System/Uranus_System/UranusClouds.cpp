@@ -4,11 +4,11 @@ UranusClouds::UranusClouds(const CloudsInfo& cloudsInfo, std::shared_ptr<SpaceOb
 {
 }
 
-void UranusClouds::AdjustToParent(bool isRunTime) {
+void UranusClouds::AdjustToParent(float timeScale) {
     static float rotationAngle = 0;
 
-    if (isRunTime) {
-        rotationAngle += 6 * 0.009575;
+    if (timeScale > 0.0f) {
+        rotationAngle += (6 * 0.009575) * timeScale;
     }
 
     LoadIdentityModelMatrix();

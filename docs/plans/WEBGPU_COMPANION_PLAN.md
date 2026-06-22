@@ -158,6 +158,6 @@ Alternative: long-lived branch `feature/webgpu-companion` if folder pollution is
 
 | Date | Session | Notes |
 |------|---------|-------|
-| _TBD_ | 0 | Scaffold `web/threejs/` |
+| 2026-06-22 | 0 | Scaffold `web/threejs/`: Vite+TS, WebGPURenderer+WebGL fallback, single textured Earth sphere (procedural canvas), OrbitControls, sun light. Local dev verified. No C++ changes. README + plan log updated. |
 
 _Update this table at the end of each work session._

@@ -5,7 +5,7 @@ Ariel::Ariel(const SatelliteInfo& satelliteInfo, std::shared_ptr<SpaceObject> pa
 {
 }
 
-void Ariel::AdjustToParent(bool isRunTime) {
+void Ariel::AdjustToParent(float timeScale) {
     static float y = 0, x = -44.0f;
 
     static float circleRadius = 0.005f;
@@ -13,7 +13,7 @@ void Ariel::AdjustToParent(bool isRunTime) {
     static float velocity = 1.15f;
     static float rotationAngle = 0.0f;
 
-    if (isRunTime) {
+    if (timeScale > 0.0f) {
         time += 0.0001f;
         rotationAngle -= 4 * 0.0115f;
 

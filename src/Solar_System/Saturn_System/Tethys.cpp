@@ -5,7 +5,7 @@ Tethys::Tethys(const SatelliteInfo& satelliteInfo, std::shared_ptr<SpaceObject> 
 {
 }
 
-void Tethys::AdjustToParent(bool isRunTime) {
+void Tethys::AdjustToParent(float timeScale) {
     static float x = 0.f, z = -69.5f;
 
     static float circleRadius = 0.005f;
@@ -13,7 +13,7 @@ void Tethys::AdjustToParent(bool isRunTime) {
     static float velocity = 0.73f;
     static float rotationAngle = 0.0f;
 
-    if (isRunTime) {
+    if (timeScale > 0.0f) {
         time += 0.0001f;
         rotationAngle -= 4 * 0.0115f;
 

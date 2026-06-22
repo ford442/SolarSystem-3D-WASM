@@ -5,7 +5,7 @@ Titania::Titania(const SatelliteInfo& satelliteInfo, std::shared_ptr<SpaceObject
 {
 }
 
-void Titania::AdjustToParent(bool isRunTime) {
+void Titania::AdjustToParent(float timeScale) {
     static float y = 0, x = -55.0f;
 
     static float circleRadius = 0.005f;
@@ -13,7 +13,7 @@ void Titania::AdjustToParent(bool isRunTime) {
     static float velocity = 0.75f;
     static float rotationAngle = 0.0f;
 
-    if (isRunTime) {
+    if (timeScale > 0.0f) {
         time += 0.0001f;
         rotationAngle -= 4 * 0.0115f;
 

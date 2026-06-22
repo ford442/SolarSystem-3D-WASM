@@ -366,15 +366,56 @@ set(CMAKE_EXE_LINKER_FLAGS "... --preload-file ${CMAKE_SOURCE_DIR}/resource/icon
 
 ### 9.4 LOD (Level of Detail) Texture System
 
-**Goal:** Reduce initial download size on web by loading low-res textures first, then upgrading to high-res when the camera is close.
+**Goal:** Reduce initial download size on web by loading low-res textures first (via staged manifests), then upgrading to high-res only when the camera is close. High-res can downgrade on distance to control VRAM.
 
 - `GetTexturePath(lowRes, highRes)` returns `lowRes` for WASM and `highRes` for desktop.
-- Low-res textures live in `resource/textures_low/`.
-- Each frame, `RenderPass()` calls `planet->LoadHighResIfClose(camera.GetPosition())`.
-- Threshold is typically **50 units** (configurable per planet).
-- Once `_isHighResLoaded` is true, no further fetches occur for that planet.
+- Low-res textures live in `resource/textures_low/` (includes 4×4 grey checker placeholders for all bodies + rings/clouds/moons so local builds never 404).
+- Per-frame: `UpdateLOD()` (called from `RunOneFrame`) invokes `planet->LoadHighResIfClose(camera.GetPosition())` on all READY planets. Low preset (0) forces downgrade via fake-far position.
+- `_lodThreshold` = 50 units typical. Hysteresis: downgrade only when distance > `_lodThreshold * 2.0f` (~100u). While `_isHighResLoading`, distance > ~1.8× triggers `TextureLoadingQueue::CancelLoad` (deprioritize).
+- State: `_isHighResLoaded`, `_isHighResLoading`, `_lastCameraDistance`, `_highRes*` counters for progress.
+- `ReloadTexture(low/high)` path in `TextureImage2D` + per-frame rebind of `GetTexture()` ID in every planet/satellite/ring/cloud render pass (prevents stale ID after hot-swap).
+- Queue-driven: `TextureLoadingQueue` (dedup via `_pendingPaths`, backoff via `nextAttemptTime`, maxRetries=3, `CancelLoad`, cumulative `GetTotalQueued/Completed/Failed`). Serialized (one in-flight at a time).
+- Reporting: `RenderTextureLoadingProgress()` pushes via `EM_ASM` to `window.updateStreamingProgress(completed, total)`; UI shows overlay bar + auto-hide. Also re-uses loading hook while streaming.
 
-**Implemented for:** Mercury, Venus, Earth, Mars, Jupiter, Saturn, Uranus, Neptune, Pluto.
+**Implemented for:** Mercury, Venus, Earth, Mars, Jupiter, Saturn, Uranus, Neptune, Pluto (and their major moons via the same per-class overrides). All use low/high path members stored at construction.
+
+**Mipmap safety (nv_dds + TextureImage2D):**
+- `upload_texture2D` tracks `lastUploadedLevel` (0-based) across DXT compressed + uncompressed paths (handles short chains ending at 4×4).
+- Always emits `glTexParameteri(..., GL_TEXTURE_BASE_LEVEL, 0)` and `GL_TEXTURE_MAX_LEVEL, lastUploadedLevel`.
+- After `glGenerateMipmap` (uncompressed no-embedded case) `TextureImage2D` re-queries `actualMax` via `glGetTexParameteriv` and re-declares MAX to the generated count. Prevents "incomplete texture = black".
+- Fallback 4×4 checker explicitly sets MAX_LEVEL=0.
+- Skybox forces MAX=0 + GL_LINEAR (no mips) on the cubemap target after faces.
+
+### 9.5 Staged Planet Loading (Web Only) + Proxy Markers
+
+To minimize initial download size and WASM memory, **no planet systems are initialized at startup** (only core: Sun, skybox, fonts, shaders, sounds).
+
+`PlanetSystemManifest` (in `Application.h`):
+```cpp
+struct PlanetSystemManifest {
+    std::string name;
+    glm::vec3 proxyPosition;
+    float activationRadius;                 // ~800 inner, ~1500 outer
+    std::vector<std::string> assetPaths;    // required (block on pending==0)
+    std::vector<std::string> optionalAssetPaths; // moons/rings/clouds (fire-and-forget; tolerate 404)
+    std::function<void()> initFunc;
+    enum class State { NOT_LOADED, DOWNLOADING, READY };
+    int pendingDownloads{0}, totalDownloads{0}; // plain int (callbacks on main thread; keeps brace-init copyable)
+};
+```
+
+Flow (`UpdatePlanetSystemLoading` every frame):
+1. `NOT_LOADED` + dist < radius → `DOWNLOADING`, fire `WebResourceFetcher::DownloadFile` for each (async_wget2). Optionals also launched but don't affect pending.
+2. Callbacks decrement `pendingDownloads` (success or fail for required).
+3. When `pendingDownloads <= 0` → `initFunc()` (e.g. `InitEarthSystem()`) → push RenderableSceneComponent → `READY`.
+
+While not READY, `RenderPlanetProxyMarkers()` draws 3D billboard text labels at proxyPosition:
+- "Earth (approach to load)"
+- "Jupiter [downloading 42%]"
+
+Uses existing text shader + 3D mode. Desktop: all manifests empty; planets init immediately in `InitStarSystem()`.
+
+`LoadCoreResources()` populates only shared + non-planet items for WASM. High-res textures are **never** in manifests — they arrive later via LOD queue.
 
 ### 9.5 Staged Planet Loading (Web Only)
 
@@ -445,14 +486,16 @@ python3 -m http.server 8000
 Navigate to `http://localhost:8000/SolarSystem.html`.
 
 **Checklist:**
-1. Loading screen appears at 0%.
-2. Progress bar advances as resources download.
-3. Console shows `Loading 63 resources...` and per-resource success messages.
-4. At 100%, loading screen hides and scene renders.
-5. Earth/Mercury/etc. render with low-res textures initially.
-6. Zooming to < 50 units triggers `[LOD] ... Loading high-res textures...` messages.
-7. Visual quality improves after high-res fetch.
-8. No CORS errors (verify you used `http://`, not `file://`).
+1. Loading screen appears at 0%. Core (sun/shaders) load; progress reaches 100%.
+2. Proxy markers appear for planets (e.g. "Earth (approach to load)", "Saturn [downloading XX%]").
+3. Fly/zoom inside activation radius (use `window.setCameraPose` for teleport) → staged download + "[StagedLoading]" + init.
+4. Planet appears with low-res (placeholders locally).
+5. Zoom < 50 units → `[LOD] ... Queueing high-res textures...`; `updateStreamingProgress` overlay shows "High-res upgrade: N/M (%)".
+6. Downgrade: fly > ~100 units → downgrade log + reload low-res.
+7. Preset test: `?quality=0` or `Module.SetQualityPreset(0)` forces low (no upgrades).
+8. Queue resilience: rapid approach/depart shows deprioritize/cancel without crashes or dupes.
+9. No black textures; graceful 404 handling on optionals.
+10. No CORS errors (use http://, not file://). Console + Network tab show staged low first, high on demand.
 
 ### 11.3 Quick Verification Files
 
@@ -549,4 +592,4 @@ This section captures non-obvious, durable facts for running this project in a C
 - The on-screen **FPS counter often reads 0**: this is `requestAnimationFrame` throttling when the canvas/tab is not focused, **not** a freeze. Confirm liveness by checking that labels move when you move the mouse / press WASD.
 - Planets load lazily via staged loading only when the camera flies within their activation radius (800–1500 units) of huge orbital distances. For testing you can teleport instantly with the exposed JS binding `window.setCameraPose(x, y, z, yaw, pitch)` (the Sun is at the origin; yaw=0 looks +X, yaw=90 looks +Z).
 
-*Last updated: 2026-06-22*
+*Last updated: 2026-06-22 (LOD/staged/async streaming + queue + hysteresis + optional manifests + MAX_LEVEL safety + streaming UI reflected)*

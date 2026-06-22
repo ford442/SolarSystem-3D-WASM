@@ -15,11 +15,11 @@ Earth::Earth(const PlanetInfo& planetInfo, std::shared_ptr<Star> parentStar) : P
 #endif
 }
 
-void Earth::AdjustToParent(bool isRunTime) {
+void Earth::AdjustToParent(float timeScale) {
     static float rotationAngle = 0;
 
-    if (isRunTime) {
-        rotationAngle += 0.0075;
+    if (timeScale > 0.0f) {
+        rotationAngle += (0.0075f * timeScale) * timeScale;
     }
 
     LoadIdentityModelMatrix();
@@ -55,11 +55,45 @@ void Earth::Render() const {
 }
 
 void Earth::LoadHighResIfClose(const glm::vec3& cameraPos) {
-    if (_isHighResLoaded || _isHighResLoading) {
+    float distance = glm::length(cameraPos - GetPosition());
+    _lastCameraDistance = distance;
+
+    if (_isHighResLoaded) {
+        if (distance > _lodThreshold * 2.0f) {
+            // Downgrade with hysteresis to free GPU memory. Low-res assets are already in MEMFS.
+            std::cout << "[LOD] Camera distance to Earth: " << distance << " units. Downgrading high-res to low-res..." << std::endl;
+            _diffuses.at(0).ReloadTexture(_diffuseLowPath);
+            _normalMap.ReloadTexture(_normalLowPath);
+            _specular.ReloadTexture(_specularLowPath);
+            _isHighResLoaded = false;
+            _isHighResLoading = false;
+            _highResTexturesLoaded = 0;
+            _highResTexturesProcessed = 0;
+            std::cout << "[LOD] Earth high-res textures downgraded (VRAM freed)" << std::endl;
+            return;
+        }
         return;
     }
 
-    float distance = glm::length(cameraPos - GetPosition());
+#ifdef __EMSCRIPTEN__
+    if (g_qualityPreset == 0) return; // Low preset: never load/keep high-res
+#endif
+
+    if (_isHighResLoading) {
+        // Deprioritize: if camera has moved well away, cancel any queued/in-flight applies
+        if (distance > _lodThreshold * 1.8f) {
+            std::cout << "[LOD] Camera moved away from Earth during load (dist=" << distance
+                      << ") — deprioritizing high-res." << std::endl;
+            auto& queue = TextureLoadingQueue::GetInstance();
+            queue.CancelLoad(_diffuseHighPath);
+            queue.CancelLoad(_normalHighPath);
+            queue.CancelLoad(_specularHighPath);
+            _isHighResLoading = false;
+            // do not force _loaded=true; allows re-attempt on next close pass
+            return;
+        }
+        return;
+    }
 
     if (distance < _lodThreshold) {
         std::cout << "[LOD] Camera distance to Earth: " << distance << " units. Queueing high-res textures..." << std::endl;
@@ -75,7 +109,7 @@ void Earth::LoadHighResIfClose(const glm::vec3& cameraPos) {
             if (success) _highResTexturesLoaded++;
             _highResLoadProgress = _highResTexturesLoaded / (float)_highResTextureCount;
             if (_highResTexturesProcessed == _highResTextureCount) {
-                _isHighResLoaded = true;  // Permanently finalized: prevents re-queuing regardless of outcome
+                _isHighResLoaded = true;
                 _isHighResLoading = false;
                 if (_highResTexturesLoaded == _highResTextureCount) {
                     std::cout << "[LOD] Earth high-res textures loaded successfully" << std::endl;
@@ -89,4 +123,10 @@ void Earth::LoadHighResIfClose(const glm::vec3& cameraPos) {
         queue.QueueTextureLoad(_normalHighPath, "Earth_Normal_High", &_normalMap, onLoaded);
         queue.QueueTextureLoad(_specularHighPath, "Earth_Specular_High", &_specular, onLoaded);
     }
+}
+
+void Earth::UnloadHighResIfFar(const glm::vec3& cameraPos) {
+    // Delegate to LoadHighResIfClose which now handles downgrade when far.
+    // Kept for API symmetry / future.
+    LoadHighResIfClose(cameraPos);
 }

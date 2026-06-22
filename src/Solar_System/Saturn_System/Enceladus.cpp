@@ -5,7 +5,7 @@ Enceladus::Enceladus(const SatelliteInfo& satelliteInfo, std::shared_ptr<SpaceOb
 {
 }
 
-void Enceladus::AdjustToParent(bool isRunTime) {
+void Enceladus::AdjustToParent(float timeScale) {
     static float x = 0.f, z = -65.0f;
 
     static float circleRadius = 0.005f;
@@ -13,7 +13,7 @@ void Enceladus::AdjustToParent(bool isRunTime) {
     static float velocity = 0.78f;
     static float rotationAngle = 0.0f;
 
-    if (isRunTime) {
+    if (timeScale > 0.0f) {
         time += 0.0001f;
         rotationAngle -= 4 * 0.0115f;
 

@@ -5,7 +5,7 @@ Rhea::Rhea(const SatelliteInfo& satelliteInfo, std::shared_ptr<SpaceObject> pare
 {
 }
 
-void Rhea::AdjustToParent(bool isRunTime) {
+void Rhea::AdjustToParent(float timeScale) {
     static float x = 0.f, z = -78.5f;
 
     static float circleRadius = 0.005f;
@@ -13,7 +13,7 @@ void Rhea::AdjustToParent(bool isRunTime) {
     static float velocity = 0.63f;
     static float rotationAngle = 0.0f;
 
-    if (isRunTime) {
+    if (timeScale > 0.0f) {
         time += 0.0001f;
         rotationAngle -= 4 * 0.0115f;
 
