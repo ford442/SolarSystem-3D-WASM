@@ -524,4 +524,29 @@ Runtime assets (textures, sounds) are expected to be served from the same origin
 
 ---
 
-*Last updated: 2026-04-28*
+## 16. Cursor Cloud specific instructions
+
+This section captures non-obvious, durable facts for running this project in a Cursor Cloud VM. The startup update script only refreshes the web frontend's npm deps (`npm install --prefix web`); all heavy toolchain/build state below is expected to persist in the VM snapshot.
+
+### Runnable target
+- **Only the web (WASM) target is runnable in this Linux cloud env.** The native desktop build (`./build.sh`) links Windows-only libs (`glew32`, `OpenGL32`, `irrKlang`, `mingw32`) and will not build/run here. Scope all work to the web target.
+
+### Emscripten toolchain (preinstalled, persisted in snapshot)
+- Emscripten SDK lives at `/content/build_space/emsdk` (version 6.0.0). `build-web.sh` and `setup_web_dependencies.sh` auto-source it from that path, so `./build-web.sh` works without arguments. If `emcc` is already on PATH you can also use `./build-web.sh --no-emsdk`.
+- WASM dependencies (GLM headers + the Assimp static lib `external/assimp/build-wasm/lib/libassimp.a`) are prebuilt under `external/` and also persist in the snapshot. `setup_web_dependencies.sh` is idempotent and skips work if they already exist.
+- If the toolchain or `external/` is ever missing, re-create with: `git clone https://github.com/emscripten-core/emsdk /content/build_space/emsdk && (cd /content/build_space/emsdk && ./emsdk install latest && ./emsdk activate latest)` then `./build-web.sh`.
+
+### Build / lint / run (web)
+- Rebuild WASM after C++/CMake changes: `./build-web.sh` (copies `SolarSystem.js` → `web/src/`, `SolarSystem.wasm`/`SolarSystem.data` → `web/public/`). This is the slow path; only needed for C++ changes.
+- Frontend typecheck (closest thing to lint): `cd web && npx tsc`. Frontend bundle build: `cd web && npx vite build` (or `npm run build`, which first re-runs the full WASM build via `build:emcc`).
+- **Run (dev):** `cd web && npm run dev` → open `http://localhost:5173/solar-system/` (note the `/solar-system/` base path; `/` alone 404s). TypeScript edits hot-reload; C++ edits require a `./build-web.sh` rebuild + refresh.
+- **Run (preview/prod):** `cd web && npm run preview` → `http://localhost:4173/solar-system/` (serves the `dist/` build).
+- No automated test suite exists; verification is manual/visual.
+
+### Asset / rendering caveats (important — avoid false "broken" conclusions)
+- Only **4×4 placeholder** low-res DDS textures are committed; the real planet textures and the skybox are hosted on a remote server (`https://test.1ink.us/solar-system/`) that is currently unreachable (404/CORS). **Therefore planet surfaces and the skybox do not render locally.** What *does* render and proves the engine works: the procedural **Sun** (corona, HDR glow, lens flare) and the 3D distance **labels**, plus full first-person camera navigation.
+- In **dev** mode, `web/src/main.ts` forces all runtime asset fetches to the remote URL (`REMOTE_ASSET_BASE`), so even local placeholder textures are not used. **preview** mode uses the local base URL, so it fetches the bundled placeholder textures (copied to `web/public/resource/textures_low/`).
+- The on-screen **FPS counter often reads 0**: this is `requestAnimationFrame` throttling when the canvas/tab is not focused, **not** a freeze. Confirm liveness by checking that labels move when you move the mouse / press WASD.
+- Planets load lazily via staged loading only when the camera flies within their activation radius (800–1500 units) of huge orbital distances. For testing you can teleport instantly with the exposed JS binding `window.setCameraPose(x, y, z, yaw, pitch)` (the Sun is at the origin; yaw=0 looks +X, yaw=90 looks +Z).
+
+*Last updated: 2026-06-22*
