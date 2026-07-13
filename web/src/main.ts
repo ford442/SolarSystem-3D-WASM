@@ -9,10 +9,9 @@ const streamingProgress = document.getElementById('streaming-progress') as HTMLE
 const streamingText = document.getElementById('streaming-text') as HTMLElement;
 const streamingBar = document.getElementById('streaming-progress-bar') as HTMLElement;
 const deployedBaseUrl = new URL(import.meta.env.BASE_URL, window.location.href);
-// Runtime DDS assets (textures/, textures_low/) are hosted on the deployment server,
-// not in the Vite bundle. In dev, point fetches at production so LOD streaming works.
-const REMOTE_ASSET_BASE = 'https://test.1ink.us/solar-system/';
-const runtimeAssetBase = import.meta.env.DEV ? REMOTE_ASSET_BASE : deployedBaseUrl.toString();
+// Use bundled same-origin placeholders by default in every mode. Developers can
+// opt into a separate runtime asset host with VITE_ASSET_BASE when needed.
+const runtimeAssetBase = import.meta.env.VITE_ASSET_BASE?.trim() || deployedBaseUrl.toString();
 
 // Global progress tracking
 

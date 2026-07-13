@@ -302,17 +302,26 @@ The original Earth-focused guide is still useful for manual low-res creation whe
 
 ### 1. One-Time Setup (Placeholders are shipped)
 Repo now includes `resource/textures_low/*_Low.dds` (4×4 grey checkers for planets + moons/rings/clouds). No manual `convert` needed for basic LOD/staged verification.
-- Real high-res + skybox are remote (dev mode redirects to them; preview uses local placeholders).
+- Dev, preview, and production use same-origin assets by default, including the bundled low-res placeholders.
+- Set `VITE_ASSET_BASE` when a test specifically needs a remote high-res asset host.
 - All required low-res are referenced in manifests + GetTexturePath.
 
 ### 2. Build & Serve for Testing
 ```bash
 ./build-web.sh
 cd web
-npm run preview   # or: npm run dev (forces REMOTE_ASSET_BASE for real textures)
-# http://localhost:4173/solar-system/   (or 5173 for dev)
+npm run dev       # same-origin placeholders at http://localhost:5173/solar-system/
+npm run preview   # production bundle at http://localhost:4173/solar-system/
+
+# Optional: exercise remote high-res/staged asset delivery.
+VITE_ASSET_BASE=https://test.1ink.us/solar-system/ npm run dev
 ```
 Use Chrome. Open DevTools → Console + Network.
+
+With the default `npm run dev`, staged planet loads should request
+`/solar-system/resource/textures_low/*_Low.dds` from the local Vite server and display the
+grey-checker placeholders. The optional override must point at a base URL containing the
+`resource/` directory and should end with `/`.
 
 ### 3. Initial State (no planets yet)
 - Loading bar → 100% → hides.

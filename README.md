@@ -111,6 +111,28 @@ python3 -m http.server 8000
 
 See [PORTING_GUIDE.md](PORTING_GUIDE.md) for detailed information about the WebAssembly port.
 
+### Web Development Assets
+
+The Vite development server uses same-origin runtime assets by default. After `./build-web.sh`,
+the bundled low-resolution placeholders are available under `web/public/resource/textures_low/`,
+so local development does not depend on the production CDN:
+
+```bash
+cd web
+npm run dev
+# Open http://localhost:5173/solar-system/
+```
+
+To test against a remote or alternate asset host, set `VITE_ASSET_BASE` to the base URL that
+contains the `resource/` directory. Include the trailing slash:
+
+```bash
+VITE_ASSET_BASE=https://test.1ink.us/solar-system/ npm run dev
+```
+
+The override is optional. Without it, dev, preview, and production all resolve runtime assets
+relative to the deployed Vite base URL.
+
 <h2 id="limitations">Limitations</h2>
 
 Due to virtual memory limitations (mainly if the executable file is compiled with a 32-bit 

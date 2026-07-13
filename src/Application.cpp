@@ -3,6 +3,7 @@
 #include "Auxiliary_Modules/TextureLoadingQueue.h"
 #include <SDL_image.h>
 #include <algorithm>
+#include <array>
 #include <random>
 #include <iomanip>
 #include <iostream>
@@ -63,6 +64,35 @@ std::string GetTexturePath(const std::string& lowRes, const std::string& highRes
 #else
     return highRes;
 #endif
+}
+
+namespace {
+    constexpr std::array<const char*, 6> kLowSkyBoxFaces = {
+        "resource/textures_low/Main_SkyBox/PositiveX.dds",
+        "resource/textures_low/Main_SkyBox/NegativeX.dds",
+        "resource/textures_low/Main_SkyBox/PositiveY.dds",
+        "resource/textures_low/Main_SkyBox/NegativeY.dds",
+        "resource/textures_low/Main_SkyBox/PositiveZ.dds",
+        "resource/textures_low/Main_SkyBox/NegativeZ.dds"
+    };
+
+    constexpr std::array<const char*, 6> kHighSkyBoxFaces = {
+        "resource/textures/Main_SkyBox/PositiveX.dds",
+        "resource/textures/Main_SkyBox/NegativeX.dds",
+        "resource/textures/Main_SkyBox/PositiveY.dds",
+        "resource/textures/Main_SkyBox/NegativeY.dds",
+        "resource/textures/Main_SkyBox/PositiveZ.dds",
+        "resource/textures/Main_SkyBox/NegativeZ.dds"
+    };
+
+    std::vector<std::string> GetSkyBoxFaces() {
+        std::vector<std::string> faces;
+        faces.reserve(kLowSkyBoxFaces.size());
+        for (size_t i = 0; i < kLowSkyBoxFaces.size(); ++i) {
+            faces.push_back(GetTexturePath(kLowSkyBoxFaces[i], kHighSkyBoxFaces[i]));
+        }
+        return faces;
+    }
 }
 
 // Error Callback
@@ -817,30 +847,36 @@ void Application::UpdateLoadingProgress() {
 }
 
 void Application::LoadCoreResources() {
-    const std::vector<std::string> coreResources = {
-        // Models
-        "resource/models/sphere.obj",
-        "resource/models/phobos.obj",
-        "resource/models/deimos.obj",
-        "resource/models/saturn_ring.obj",
-        "resource/models/uranus_ring.obj",
-        // SkyBox
-        "resource/textures_low/Main_SkyBox/PositiveX.dds",
-        "resource/textures_low/Main_SkyBox/NegativeX.dds",
-        "resource/textures_low/Main_SkyBox/PositiveY.dds",
-        "resource/textures_low/Main_SkyBox/NegativeY.dds",
-        "resource/textures_low/Main_SkyBox/PositiveZ.dds",
-        "resource/textures_low/Main_SkyBox/NegativeZ.dds",
-        // Sun
-        "resource/textures_low/Star_Spectrum_Low.dds",
-        "resource/textures_low/flares_bright_Low.dds",
-        // Sounds
-        "resource/sounds/Stellardrone - Galaxies.mp3",
-        "resource/sounds/Stellardrone - Mars.mp3",
-        "resource/sounds/Stellardrone - Billions And Billions.mp3",
-        "resource/sounds/Stellardrone - Gravitation (Remix).mp3",
-        "resource/sounds/Stellardrone - The Edge of Forever.mp3"
+    struct CoreResource {
+        std::string url;
+        std::string virtualPath;
     };
+
+    std::vector<CoreResource> coreResources = {
+        // Models
+        {"resource/models/sphere.obj", "resource/models/sphere.obj"},
+        {"resource/models/phobos.obj", "resource/models/phobos.obj"},
+        {"resource/models/deimos.obj", "resource/models/deimos.obj"},
+        {"resource/models/saturn_ring.obj", "resource/models/saturn_ring.obj"},
+        {"resource/models/uranus_ring.obj", "resource/models/uranus_ring.obj"},
+        // Sun
+        {"resource/textures_low/Star_Spectrum_Low.dds", "resource/textures_low/Star_Spectrum_Low.dds"},
+        {"resource/textures_low/flares_bright_Low.dds", "resource/textures_low/flares_bright_Low.dds"},
+        // Sounds
+        {"resource/sounds/Stellardrone - Galaxies.mp3", "resource/sounds/Stellardrone - Galaxies.mp3"},
+        {"resource/sounds/Stellardrone - Mars.mp3", "resource/sounds/Stellardrone - Mars.mp3"},
+        {"resource/sounds/Stellardrone - Billions And Billions.mp3", "resource/sounds/Stellardrone - Billions And Billions.mp3"},
+        {"resource/sounds/Stellardrone - Gravitation (Remix).mp3", "resource/sounds/Stellardrone - Gravitation (Remix).mp3"},
+        {"resource/sounds/Stellardrone - The Edge of Forever.mp3", "resource/sounds/Stellardrone - The Edge of Forever.mp3"}
+    };
+
+    const auto skyBoxFaces = GetSkyBoxFaces();
+    for (size_t i = 0; i < skyBoxFaces.size(); ++i) {
+        // The CDN only hosts the full skybox tier. Cache it over the selected
+        // low-res MEMFS face so a failed/offline fetch leaves the bundled
+        // placeholder available to InitSceneObjects().
+        coreResources.push_back({kHighSkyBoxFaces[i], skyBoxFaces[i]});
+    }
 
     _totalResources = static_cast<int>(coreResources.size());
     _resourcesPending = _totalResources;
@@ -851,7 +887,7 @@ void Application::LoadCoreResources() {
     UpdateLoadingProgress();
 
     for(const auto& res : coreResources) {
-        WebResourceFetcher::DownloadFile(res, res, [this](bool success) {
+        WebResourceFetcher::DownloadFile(res.url, res.virtualPath, [this](bool success) {
             _resourcesPending--;
             if (!success) {
                 std::cerr << "Failed to download core resource!" << std::endl;
@@ -868,14 +904,7 @@ void Application::InitSceneObjects() {
     _hdrShader = make_unique<Shader>("resource/shaders/passThrough.vs", "resource/shaders/hdr.fs");
     _hdr = make_unique<HDR>(*_hdrShader, _displayWidth, _displayHeight);
 
-    const vector<string> skyBoxFaces = {
-            "resource/textures_low/Main_SkyBox/PositiveX.dds",
-            "resource/textures_low/Main_SkyBox/NegativeX.dds",
-            "resource/textures_low/Main_SkyBox/PositiveY.dds",
-            "resource/textures_low/Main_SkyBox/NegativeY.dds",
-            "resource/textures_low/Main_SkyBox/PositiveZ.dds",
-            "resource/textures_low/Main_SkyBox/NegativeZ.dds"
-    };
+    const vector<string> skyBoxFaces = GetSkyBoxFaces();
 
     _skyBox = make_unique<SkyBox>(skyBoxFaces);
     _mainTextShader = make_unique<Shader>("resource/shaders/text.vs", "resource/shaders/text.fs");
