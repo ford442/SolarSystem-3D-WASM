@@ -150,9 +150,8 @@ Alternative: long-lived branch `feature/webgpu-companion` if folder pollution is
 ## Related Issues & Docs
 
 - GitHub: label `webgpu` — companion renderer epic
-- `grok.md` — current WebGL 2 priorities (stabilize before expanding)
-- `AGENTS.md` §9 — LOD and staged loading architecture
-- `docs/plans/LOD_IMPLEMENTATION.md` — reference for distance thresholds (~50 units)
+- [docs/ARCHITECTURE.md](../ARCHITECTURE.md) — main WebGL 2 renderer (LOD, staged loading)
+- [AGENTS.md](../../AGENTS.md) — agent environment notes
 
 ---
 

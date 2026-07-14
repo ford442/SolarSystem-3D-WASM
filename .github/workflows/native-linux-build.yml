@@ -1,0 +1,47 @@
+name: Native Linux build
+
+on:
+  pull_request:
+    branches:
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: native-linux-build-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build-native-linux:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Install native dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            build-essential cmake ninja-build \
+            libglew-dev libglfw3-dev libgl1-mesa-dev \
+            libsdl2-dev libsdl2-image-dev libsdl2-mixer-dev \
+            libfreetype-dev libassimp-dev \
+            xvfb
+
+      - name: Build native binary
+        run: ./build.sh
+
+      - name: Smoke test binary under Xvfb
+        working-directory: ${{ github.workspace }}
+        env:
+          LIBGL_ALWAYS_SOFTWARE: "1"
+          MESA_GL_VERSION_OVERRIDE: "4.6"
+          SDL_AUDIODRIVER: dummy
+        run: |
+          set -o pipefail
+          timeout 12s xvfb-run -a ./build/SolarSystem 2>&1 | tee /tmp/solar-native.log || test $? -eq 124
+          grep -q "OpenGL version:" /tmp/solar-native.log

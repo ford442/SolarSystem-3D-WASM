@@ -1,5 +1,7 @@
 # CLAUDE.md
 
+> **Canonical docs:** [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) (system design) and [README.md](README.md) (build, assets, deploy). This file is Claude Code–specific quick reference; do not treat it as the sole architecture source.
+
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
 ## Project Overview
@@ -178,7 +180,8 @@ npm run dev
 
 ## Notes for Future Development
 
-- The PORTING_GUIDE.md contains detailed Emscripten porting notes (memory tuning, async considerations, library substitutions)
+- [docs/plans/PORTING_GUIDE.md](docs/plans/PORTING_GUIDE.md) — Emscripten porting notes (memory, async, library substitutions)
+- [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) — staged loading, LOD, asset URL resolution
 - Sound assets are managed via Git LFS and excluded from web preload to avoid CI/sandbox issues
-- The project intentionally omits most DDS texture payloads; runtime assets are fetched from a remote `/resource/` path in production
+- Most DDS payloads are deploy artifacts; placeholders live in `resource/textures_low/`. Runtime fetches use `VITE_ASSET_BASE` or same-origin `resource/` (see README)
 - Web deployment should use a server that correctly sets MIME types for `.wasm` files (application/wasm)

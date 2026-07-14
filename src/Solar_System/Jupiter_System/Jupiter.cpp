@@ -1,10 +1,11 @@
 #include "Jupiter.h"
 #include "../../Auxiliary_Modules/TextureLoadingQueue.h"
+#include "../OrbitLayout.h"
 
 Jupiter::Jupiter(const PlanetInfo& planetInfo, std::shared_ptr<Star> parentStar) : Planet(planetInfo, std::move(parentStar)), _diffuses(planetInfo.diffuseTextures),
     _normalMap(planetInfo.normalMap)
 {
-    Translate(_parentStar->GetPosition() + glm::vec3(1350.f, 0.0f, 1737.0f));
+    Translate(_parentStar->GetPosition() + OrbitLayout::GetOffset(OrbitLayout::Body::Jupiter));
 #ifdef __EMSCRIPTEN__
     _isHighResLoaded = false;
     _isHighResLoading = false;
@@ -21,7 +22,7 @@ void Jupiter::AdjustToParent(float timeScale) {
     }
 
     LoadIdentityModelMatrix();
-    Translate(_parentStar->GetPosition() + glm::vec3(1350.f, 0.0f, 1737.0f));
+    Translate(_parentStar->GetPosition() + OrbitLayout::GetOffset(OrbitLayout::Body::Jupiter));
     Scale(glm::vec3(_earthSizeCoefficient));
     Rotate(-3.1f, glm::vec3(0, 0, 1));
     Rotate(rotationAngle, glm::vec3(0.0f, 1.0f, 0.0f));

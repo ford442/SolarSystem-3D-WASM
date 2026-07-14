@@ -19,6 +19,7 @@ export function isMobileLikeDevice(): boolean {
 interface TouchControlsOptions {
     canvas: HTMLCanvasElement;
     settingsPanel: HTMLElement;
+    explorerPanel?: HTMLElement;
     loadingContainer: HTMLElement;
     bindings: TouchControlBindings;
 }
@@ -34,13 +35,14 @@ function touchDistance(touches: TouchList): number {
     return Math.hypot(dx, dy);
 }
 
-function isUiTarget(target: EventTarget | null, settingsPanel: HTMLElement): boolean {
+function isUiTarget(target: EventTarget | null, panels: HTMLElement[]): boolean {
     if (!(target instanceof Element)) return false;
-    return settingsPanel.contains(target);
+    return panels.some((panel) => panel.contains(target));
 }
 
 export function initTouchControls(options: TouchControlsOptions): () => void {
-    const { canvas, settingsPanel, loadingContainer, bindings } = options;
+    const { canvas, settingsPanel, explorerPanel, loadingContainer, bindings } = options;
+    const uiPanels = explorerPanel ? [settingsPanel, explorerPanel] : [settingsPanel];
 
     if (!isMobileLikeDevice()) {
         return () => undefined;
@@ -94,7 +96,7 @@ export function initTouchControls(options: TouchControlsOptions): () => void {
     };
 
     const onTouchStart = (event: TouchEvent): void => {
-        if (isInteractionBlocked() || isUiTarget(event.target, settingsPanel)) return;
+        if (isInteractionBlocked() || isUiTarget(event.target, uiPanels)) return;
 
         if (event.touches.length >= 2) {
             pinchActive = true;
@@ -130,7 +132,7 @@ export function initTouchControls(options: TouchControlsOptions): () => void {
     };
 
     const onTouchMove = (event: TouchEvent): void => {
-        if (isInteractionBlocked() || isUiTarget(event.target, settingsPanel)) return;
+        if (isInteractionBlocked() || isUiTarget(event.target, uiPanels)) return;
 
         if (event.touches.length >= 2) {
             const distance = touchDistance(event.touches);

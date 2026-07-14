@@ -1,10 +1,11 @@
 #include "Mars.h"
 #include "../../Auxiliary_Modules/TextureLoadingQueue.h"
+#include "../OrbitLayout.h"
 
 Mars::Mars(const PlanetInfo& planetInfo, std::shared_ptr<Star> parentStar) : Planet(planetInfo, std::move(parentStar)), _diffuses(planetInfo.diffuseTextures),
     _normalMap(planetInfo.normalMap)
 {
-    Translate(_parentStar->GetPosition() + glm::vec3(-1732.0f, 0.0f, 1000.0f));
+    Translate(_parentStar->GetPosition() + OrbitLayout::GetOffset(OrbitLayout::Body::Mars));
 #ifdef __EMSCRIPTEN__
     _isHighResLoaded = false;
     _isHighResLoading = false;
@@ -21,7 +22,7 @@ void Mars::AdjustToParent(float timeScale) {
     }
 
     LoadIdentityModelMatrix();
-    Translate(_parentStar->GetPosition() + glm::vec3(-1732.0f, 0.0f, 1000.0f));
+    Translate(_parentStar->GetPosition() + OrbitLayout::GetOffset(OrbitLayout::Body::Mars));
     Rotate(-25.2f, glm::vec3(0, 0, 1));
     Scale(glm::vec3(_earthSizeCoefficient));
     Rotate(rotationAngle, glm::vec3(0.0f, 1.0f, 0.0f));

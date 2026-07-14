@@ -502,7 +502,9 @@ Smaller LOD = closer for upgrade. Larger activation = planets "pop in" from fart
 - Console is authoritative for flow.
 
 ### Future / Related
-- See `VERIFICATION_CHECKLIST.md`, `staged_loading_plan.md`, `LOD_IMPLEMENTATION.md`, `grok.md`, `AGENTS.md`.
+- [docs/ARCHITECTURE.md](../ARCHITECTURE.md) — canonical loading/LOD architecture
+- [docs/plans/archive/](../plans/archive/) — completed implementation plans
+- [AGENTS.md](../../AGENTS.md) — Cursor Cloud agent notes
 
 **Related GitHub Issues (cross-linked per P3 task)**: #51–#58 (mipmap safety, async/queue, feedback/UI, presets+memory, staged+proxies, render, nav, docs alignment).
 

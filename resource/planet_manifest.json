@@ -1,0 +1,186 @@
+{
+  "version": 1,
+  "systems": [
+    {
+      "name": "Mercury",
+      "init": "Mercury",
+      "proxyPosition": [1500, 0, 350],
+      "activationRadius": 800,
+      "required": [
+        "resource/textures_low/Mercury_Diffuse_Low.dds",
+        "resource/textures_low/Mercury_Normal_Low.dds",
+        "resource/textures_low/Mercury_Specular_Low.dds"
+      ],
+      "optional": []
+    },
+    {
+      "name": "Venus",
+      "init": "Venus",
+      "proxyPosition": [1125, 0, -1340],
+      "activationRadius": 800,
+      "required": [
+        "resource/textures_low/Venus_Diffuse_Low.dds",
+        "resource/textures_low/Venus_Normal_Low.dds"
+      ],
+      "optional": []
+    },
+    {
+      "name": "Earth",
+      "init": "EarthSystem",
+      "proxyPosition": [1900, 0, 0],
+      "activationRadius": 800,
+      "required": [
+        "resource/textures_low/Earth_Day_Diffuse_Low.dds",
+        "resource/textures_low/Earth_Normal_Low.dds",
+        "resource/textures_low/Earth_Specular_Low.dds"
+      ],
+      "optional": [
+        "resource/textures_low/Earth_Clouds_Diffuse_Low.dds",
+        "resource/textures_low/Earth_Night_Diffuse_Low.dds",
+        "resource/textures_low/Earth_Clouds_Normal_Low.dds",
+        "resource/textures_low/Moon_Diffuse_Low.dds",
+        "resource/textures_low/Moon_Normal_Low.dds"
+      ],
+      "optionalHighRes": [
+        "resource/textures/Moon_Diffuse.dds",
+        "resource/textures/Earth_Clouds_Diffuse.dds"
+      ]
+    },
+    {
+      "name": "Mars",
+      "init": "MarsSystem",
+      "proxyPosition": [-1732, 0, 1000],
+      "activationRadius": 800,
+      "required": [
+        "resource/textures_low/Mars_Diffuse_Low.dds",
+        "resource/textures_low/Mars_Normal_Low.dds"
+      ],
+      "optional": [
+        "resource/textures_low/Phobos_Diffuse_Low.dds",
+        "resource/textures_low/Phobos_Normal_Low.dds",
+        "resource/textures_low/Deimos_Diffuse_Low.dds",
+        "resource/textures_low/Deimos_Normal_Low.dds"
+      ]
+    },
+    {
+      "name": "Jupiter",
+      "init": "JupiterSystem",
+      "proxyPosition": [1350, 0, 1737],
+      "activationRadius": 1500,
+      "required": [
+        "resource/textures_low/Jupiter_Diffuse_Low.dds",
+        "resource/textures_low/Jupiter_Normal_Low.dds"
+      ],
+      "optional": [
+        "resource/textures_low/Io_Diffuse_Low.dds",
+        "resource/textures_low/Io_Normal_Low.dds",
+        "resource/textures_low/Europa_Diffuse_Low.dds",
+        "resource/textures_low/Europa_Normal_Low.dds",
+        "resource/textures_low/Ganymede_Diffuse_Low.dds",
+        "resource/textures_low/Ganymede_Normal_Low.dds",
+        "resource/textures_low/Callisto_Diffuse_Low.dds",
+        "resource/textures_low/Callisto_Normal_Low.dds"
+      ],
+      "optionalHighRes": [
+        "resource/textures/Io_Diffuse.dds",
+        "resource/textures/Europa_Diffuse.dds",
+        "resource/textures/Ganymede_Diffuse.dds"
+      ]
+    },
+    {
+      "name": "Saturn",
+      "init": "SaturnSystem",
+      "proxyPosition": [0, -100, 2450],
+      "activationRadius": 1500,
+      "required": [
+        "resource/textures_low/Saturn_Diffuse_Low.dds",
+        "resource/textures_low/Saturn_Normal_Low.dds"
+      ],
+      "optional": [
+        "resource/textures_low/Saturn_Rings_Low.dds",
+        "resource/textures_low/Mimas_Diffuse_Low.dds",
+        "resource/textures_low/Mimas_Normal_Low.dds",
+        "resource/textures_low/Enceladus_Diffuse_Low.dds",
+        "resource/textures_low/Enceladus_Normal_Low.dds",
+        "resource/textures_low/Tethys_Diffuse_Low.dds",
+        "resource/textures_low/Tethys_Normal_Low.dds",
+        "resource/textures_low/Dione_Diffuse_Low.dds",
+        "resource/textures_low/Dione_Normal_Low.dds",
+        "resource/textures_low/Rhea_Diffuse_Low.dds",
+        "resource/textures_low/Rhea_Normal_Low.dds",
+        "resource/textures_low/Titan_Diffuse_Low.dds",
+        "resource/textures_low/Titan_Normal_Low.dds",
+        "resource/textures_low/Iapetus_Diffuse_Low.dds",
+        "resource/textures_low/Iapetus_Normal_Low.dds"
+      ],
+      "optionalHighRes": [
+        "resource/textures/Titan_Diffuse.dds",
+        "resource/textures/Saturn_Rings.dds"
+      ]
+    },
+    {
+      "name": "Uranus",
+      "init": "UranusSystem",
+      "proxyPosition": [0, 0, -2650],
+      "activationRadius": 1500,
+      "required": [
+        "resource/textures_low/Uranus_Diffuse_Low.dds",
+        "resource/textures_low/Uranus_Normal_Low.dds"
+      ],
+      "optional": [
+        "resource/textures_low/Uranus_Clouds_Diffuse_Low.dds",
+        "resource/textures_low/Uranus_Rings_Low.dds",
+        "resource/textures_low/Uranus_Clouds_Normal_Low.dds",
+        "resource/textures_low/Miranda_Diffuse_Low.dds",
+        "resource/textures_low/Miranda_Normal_Low.dds",
+        "resource/textures_low/Ariel_Diffuse_Low.dds",
+        "resource/textures_low/Ariel_Normal_Low.dds",
+        "resource/textures_low/Umbriel_Diffuse_Low.dds",
+        "resource/textures_low/Umbriel_Normal_Low.dds",
+        "resource/textures_low/Titania_Diffuse_Low.dds",
+        "resource/textures_low/Titania_Normal_Low.dds",
+        "resource/textures_low/Oberon_Diffuse_Low.dds",
+        "resource/textures_low/Oberon_Normal_Low.dds"
+      ],
+      "optionalHighRes": [
+        "resource/textures/Uranus_Rings.dds",
+        "resource/textures/Uranus_Clouds_Diffuse.dds"
+      ]
+    },
+    {
+      "name": "Neptune",
+      "init": "NeptuneSystem",
+      "proxyPosition": [-2900, 0, 0],
+      "activationRadius": 1500,
+      "required": [
+        "resource/textures_low/Neptune_Diffuse_Low.dds",
+        "resource/textures_low/Neptune_Normal_Low.dds"
+      ],
+      "optional": [
+        "resource/textures_low/Neptune_Clouds_Diffuse_Low.dds",
+        "resource/textures_low/Neptune_Clouds_Normal_Low.dds",
+        "resource/textures_low/Triton_Diffuse_Low.dds",
+        "resource/textures_low/Triton_Normal_Low.dds"
+      ],
+      "optionalHighRes": [
+        "resource/textures/Neptune_Clouds_Diffuse.dds"
+      ]
+    },
+    {
+      "name": "Pluto",
+      "init": "PlutoSystem",
+      "proxyPosition": [2800, 0, 1757.73],
+      "activationRadius": 1500,
+      "required": [
+        "resource/textures_low/Pluto_Diffuse_Low.dds",
+        "resource/textures_low/Pluto_Normal_Low.dds",
+        "resource/textures_low/Pluto_Specular_Low.dds"
+      ],
+      "optional": [
+        "resource/textures_low/Charon_Diffuse_Low.dds",
+        "resource/textures_low/Charon_Normal_Low.dds",
+        "resource/textures_low/Charon_Specular_Low.dds"
+      ]
+    }
+  ]
+}

@@ -1,92 +1,31 @@
 #include "Application.h"
+#include "QualitySettings.h"
+#include "ResourceManifest.h"
+#include "SimState.h"
 #include "Auxiliary_Modules/WebResourceFetcher.h"
 #include "Auxiliary_Modules/TextureLoadingQueue.h"
+#include "Solar_System/OrbitLayout.h"
 #include <SDL_image.h>
 #include <algorithm>
 #include <array>
+#include <fstream>
 #include <random>
+#include <cstring>
 #include <iomanip>
 #include <iostream>
 
 using namespace std;
 
 namespace {
-    struct QualitySettings {
-        uint16_t shadowResolution;
-        int maxConcurrentTextureLoads;
-        int requestedMsaaSamples;
-        const char* name;
-    };
-
-    bool g_isMobileWeb = false;
-
-    QualitySettings GetQualitySettings(int preset, bool mobile) {
-        if (mobile) {
-            switch (preset) {
-                case 0: return {512, 0, 0, "low"};
-                case 1: return {1024, 2, 0, "medium"};
-                default: return {2048, 2, 0, "full"};
-            }
-        }
-        switch (preset) {
-            case 0: return {1024, 0, 0, "low"};
-            case 1: return {2048, 2, 0, "medium"};
-            default: return {3000, 4, 4, "full"};
-        }
-    }
-
     Application* activeApplication = nullptr;
 
 #ifdef __EMSCRIPTEN__
     float g_touchForward = 0.0f;
     float g_touchRight = 0.0f;
     float g_touchVertical = 0.0f;
-
-    bool ReadIsMobileWeb() {
-        return EM_ASM_INT({
-            try {
-                const ua = navigator.userAgent || '';
-                const mobileUa = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(ua);
-                const coarsePointer = window.matchMedia('(pointer: coarse)').matches;
-                const smallScreen = Math.min(window.screen.width, window.screen.height) <= 768;
-                return (mobileUa || (coarsePointer && smallScreen)) ? 1 : 0;
-            } catch (error) {
-                console.warn('[Quality] Could not detect mobile device:', error);
-                return 0;
-            }
-        }) != 0;
-    }
-
-    int ReadInitialQualityPreset() {
-        return EM_ASM_INT({
-            try {
-                const params = new URLSearchParams(window.location.search);
-                const quality = params.get('quality') || params.get('q');
-                if (quality) {
-                    const normalized = quality.toLowerCase();
-                    if (normalized === 'low' || normalized === '0') return 0;
-                    if (normalized === 'medium' || normalized === 'med' || normalized === '1') return 1;
-                    if (normalized === 'full' || normalized === '2') return 2;
-                }
-
-                const ua = navigator.userAgent || '';
-                const mobileUa = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(ua);
-                const coarsePointer = window.matchMedia('(pointer: coarse)').matches;
-                const smallScreen = Math.min(window.screen.width, window.screen.height) <= 768;
-                if (mobileUa || (coarsePointer && smallScreen)) {
-                    console.log('[Quality] Mobile device detected; defaulting to low preset');
-                    return 0;
-                }
-            } catch (error) {
-                console.warn('[Quality] Could not read URL preset:', error);
-            }
-            return 2;
-        });
-    }
 #endif
 }
 
-// Time and sim controls (enhancement)
 float gTimeScale = 1.0f;
 bool gTimePaused = false;
 bool gAdvanceStep = false;
@@ -166,79 +105,33 @@ extern "C" {
         return activeApplication && activeApplication->GetMusicMuted() ? 1 : 0;
     }
     EMSCRIPTEN_KEEPALIVE void FocusPlanet(int idx) {
-        // simple focus presets for web (approx pos, 2s transition)
-        glm::vec3 p(0); float r=10;
-        if(idx==1){p=glm::vec3(1500,0,350); r=2;} //merc
-        else if(idx==2){p=glm::vec3(1125,0,-1340);r=3;}
-        else if(idx==3){p=glm::vec3(1900,0,0);r=3;}
-        else if(idx==4){p=glm::vec3(-1732,0,1000);r=2;}
-        else if(idx==5){p=glm::vec3(1350,0,1737);r=20;}
-        else if(idx==6){p=glm::vec3(0,-100,2450);r=50;}
-        else if(idx==7){p=glm::vec3(0,0,-2650);r=20;}
-        else if(idx==8){p=glm::vec3(-2900,0,0);r=20;}
-        else if(idx==9){p=glm::vec3(2800,0,1757);r=3;}
-        glm::vec3 off = glm::normalize(glm::vec3(0.7,0.3,0.7)) * (r+30);
-        glm::vec3 tp = p + off;
-        glm::vec3 d = glm::normalize(p - tp);
-        float ty = glm::degrees(std::atan2(d.z, d.x));
-        float tpitch = glm::degrees(std::asin(d.y));
-        camera.StartTransitionTo(tp, ty, tpitch, 2.0f);
-    }
-}
-#endif
-
-// Global for quality presets (set from JS or URL). Visible to planet LOD code.
-int g_qualityPreset = 2; // 0=low,1=medium,2=full
-
-// Construction policy is deliberately platform-specific: the browser starts
-// from its preloaded low-resolution MEMFS asset; native starts at full quality.
-std::string GetTexturePath(const std::string& lowRes, const std::string& highRes) {
-#ifdef __EMSCRIPTEN__
-    return lowRes;
-#else
-    return highRes;
-#endif
-}
-
-namespace {
-    constexpr std::array<const char*, 6> kLowSkyBoxFaces = {
-        "resource/textures_low/Main_SkyBox/PositiveX.dds",
-        "resource/textures_low/Main_SkyBox/NegativeX.dds",
-        "resource/textures_low/Main_SkyBox/PositiveY.dds",
-        "resource/textures_low/Main_SkyBox/NegativeY.dds",
-        "resource/textures_low/Main_SkyBox/PositiveZ.dds",
-        "resource/textures_low/Main_SkyBox/NegativeZ.dds"
-    };
-
-    constexpr std::array<const char*, 6> kHighSkyBoxFaces = {
-        "resource/textures/Main_SkyBox/PositiveX.dds",
-        "resource/textures/Main_SkyBox/NegativeX.dds",
-        "resource/textures/Main_SkyBox/PositiveY.dds",
-        "resource/textures/Main_SkyBox/NegativeY.dds",
-        "resource/textures/Main_SkyBox/PositiveZ.dds",
-        "resource/textures/Main_SkyBox/NegativeZ.dds"
-    };
-
-    std::vector<std::string> GetSkyBoxFaces() {
-        std::vector<std::string> faces;
-        faces.reserve(kLowSkyBoxFaces.size());
-        for (size_t i = 0; i < kLowSkyBoxFaces.size(); ++i) {
-            faces.push_back(GetTexturePath(kLowSkyBoxFaces[i], kHighSkyBoxFaces[i]));
+        if (activeApplication) {
+            activeApplication->FocusPlanetByIndex(idx);
         }
-        return faces;
     }
-
-    const std::vector<std::string>& GetBackgroundSongPaths() {
-        static const std::vector<std::string> kBackgroundSongPaths = {
-            "resource/sounds/Stellardrone - Galaxies.mp3",
-            "resource/sounds/Stellardrone - Mars.mp3",
-            "resource/sounds/Stellardrone - Billions And Billions.mp3",
-            "resource/sounds/Stellardrone - Gravitation (Remix).mp3",
-            "resource/sounds/Stellardrone - The Edge of Forever.mp3"
-        };
-        return kBackgroundSongPaths;
+    EMSCRIPTEN_KEEPALIVE void SetOrbitScaleMode(int mode) {
+        if (activeApplication) {
+            activeApplication->ApplyOrbitScaleMode(mode);
+        } else {
+            OrbitLayout::SetScaleMode(mode == 1 ? OrbitLayout::ScaleMode::Realistic : OrbitLayout::ScaleMode::Compressed);
+        }
+    }
+    EMSCRIPTEN_KEEPALIVE int GetOrbitScaleMode() {
+        return static_cast<int>(OrbitLayout::GetScaleMode());
+    }
+    EMSCRIPTEN_KEEPALIVE int GetNearestPlanetIndex() {
+        return activeApplication ? activeApplication->GetNearestPlanetIndexForJs() : -1;
+    }
+    EMSCRIPTEN_KEEPALIVE int GetFocusedPlanetIndex() {
+        return activeApplication ? activeApplication->GetFocusedPlanetIndex() : -1;
+    }
+    EMSCRIPTEN_KEEPALIVE float GetPlanetSceneDistance(int idx) {
+        idx = std::clamp(idx, 0, 9);
+        return OrbitLayout::GetSceneDistance(static_cast<OrbitLayout::Body>(idx));
     }
 }
+#endif
+
 
 // Error Callback
 void glfwErrorCallback(int error, const char* description) {
@@ -330,7 +223,14 @@ void Application::InitSystems() {
 
     FT_Init_FreeType(&_ft);
 
-#ifdef __EMSCRIPTEN__
+#ifndef __EMSCRIPTEN__
+    if (SDL_Init(SDL_INIT_EVERYTHING)) {
+        Dispose();
+        throw runtime_error("Failed to init SDL");
+    }
+#endif
+
+#ifdef SOLARSYSTEM_USE_SDL_MIXER
     if (Mix_OpenAudio(44100, MIX_DEFAULT_FORMAT, 2, 2048) < 0) {
         std::cerr << "[Audio] Failed to init SDL_mixer: " << Mix_GetError() << std::endl;
         _mixerInitialized = false;
@@ -345,13 +245,6 @@ void Application::InitSystems() {
         throw runtime_error("Failed to init sound engine");
     }
     _soundEngine->setSoundVolume(0.3);
-#endif
-
-#ifndef __EMSCRIPTEN__
-    if (SDL_Init(SDL_INIT_EVERYTHING)) {
-        Dispose();
-        throw runtime_error("Failed to init SDL");
-    }
 #endif
 
     if (!IMG_Init(IMG_INIT_JPG | IMG_INIT_PNG)) {
@@ -445,6 +338,8 @@ void Application::RunOneFrame() {
 
 #ifdef __EMSCRIPTEN__
     UpdateSearchNearestPlanet();
+#endif
+#ifdef SOLARSYSTEM_USE_SDL_MIXER
     UpdateBackgroundMusic();
 #endif
 
@@ -456,545 +351,6 @@ void Application::RunOneFrame() {
 #endif
 }
 
-void Application::ProcessSceneComponentsRendering() {
-    for (const auto& renderableSceneComponent : _renderableSceneComponents) {
-        ShadowMapPass(renderableSceneComponent);
-        RenderPass(renderableSceneComponent);
-    }
-}
-
-void Application::ShadowMapPass(const RenderableSceneComponent& component) {
-    glBindFramebuffer(GL_FRAMEBUFFER, _shadowMapFBO->GetFBO());
-    glClear(GL_DEPTH_BUFFER_BIT);
-    glViewport(0, 0, _shadowMapFBO->GetShadowMapWidth(), _shadowMapFBO->GetShadowMapHeight());
-
-    // A cleared depth texture contains 1.0 everywhere, which the existing
-    // lighting shaders interpret as fully lit. Keep the texture bound but skip
-    // all shadow geometry when shadows are disabled.
-    if (gShadowQuality == 0) {
-        glBindFramebuffer(GL_FRAMEBUFFER, 0);
-        return;
-    }
-
-    _shadowMapShader->Use();
-    _shadowMapShader->SetMat4("lightSpaceMatrix", component.lightSpaceMatrix);
-
-    component.planet->SetShader(*_shadowMapShader);
-    component.planet->AdjustToParent(gTimePaused ? 0.0f : gTimeScale);
-    component.planet->Render();
-
-    for (const auto& satellite : component.satellites) {
-        satellite->SetShader(*_shadowMapShader);
-        satellite->AdjustToParent(gTimePaused ? 0.0f : gTimeScale);
-        satellite->Render();
-    }
-
-    RenderPlanetaryRing(*_shadowMapShader, component.planetaryRing.get(), component.lightSpaceMatrix);
-    glBindFramebuffer(GL_FRAMEBUFFER, 0);
-}
-
-void Application::RenderPass(const RenderableSceneComponent& component) {
-    glViewport(0, 0, _displayWidth, _displayHeight);
-    _mainPlanetShader->Use();
-
-    ConfigureMainPlanetShader(component);
-
-    component.planet->SetShader(*_mainPlanetShader);
-    component.planet->AdjustToParent(gTimePaused ? 0.0f : gTimeScale);
-    component.planet->Render();
-
-    for (const auto& satellite : component.satellites) {
-        satellite->SetShader(*_mainPlanetShader);
-        satellite->AdjustToParent(gTimePaused ? 0.0f : gTimeScale);
-        satellite->Render();
-    }
-
-    if (_nearestPlanetIndex >= 0
-        && static_cast<size_t>(_nearestPlanetIndex) < _renderableSceneComponents.size()
-        && component.planet == _renderableSceneComponents[static_cast<size_t>(_nearestPlanetIndex)].planet)
-        ProcessStarRendering();
-
-    RenderAtmospheres(component.atmospheres, component.lightSpaceMatrix, component.planetaryRing.get());
-    RenderClouds(component.clouds.get(), component.lightSpaceMatrix);
-    RenderPlanetaryRing(*_mainRingShader, component.planetaryRing.get(), component.lightSpaceMatrix);
-}
-
-void Application::RenderAtmospheres(const std::vector<RenderableAtmosphere>& renderableAtmospheres, const glm::mat4& lightSpaceMatrix, const PlanetaryRing* ring) const {
-    if (!renderableAtmospheres.empty()) {
-        glDepthMask(GL_FALSE);
-        glEnable(GL_BLEND);
-        glBlendFunc(GL_ONE, GL_ONE);
-
-        _mainAtmosphereShader->Use();
-        _mainAtmosphereShader->SetMat4("lightSpaceMatrix", lightSpaceMatrix);
-
-        for (const auto& renderableAtmosphere : renderableAtmospheres) {
-            _mainAtmosphereShader->SetVec3("camPosition", camera.GetPosition() - renderableAtmosphere.atmosphere->GetPosition());
-            _mainAtmosphereShader->SetVec3("lightPos", _sun->GetPosition() - renderableAtmosphere.atmosphere->GetPosition());
-            _mainAtmosphereShader->SetVec3("mieTint", renderableAtmosphere.atmosphere->GetMieTint());
-            _mainAtmosphereShader->SetFloat("SCALE_H_FACTOR", renderableAtmosphere.hScaleFactor);
-            _mainAtmosphereShader->SetFloat("SCALE_L_FACTOR", 1.0f);
-            _mainAtmosphereShader->SetFloat("earthSizeCoefficient", renderableAtmosphere.parentEarthSizeCoefficient);
-            _mainAtmosphereShader->SetBool("isUseToneMapping", renderableAtmosphere.isUseToneMapping);
-            _mainAtmosphereShader->SetBool("isNearbyPlanetaryRing", ring != nullptr);
-
-            if (ring) {
-                _mainAtmosphereShader->SetVec3("ringParentPlanetCenter", ring->GetParent()->GetPosition());
-                _mainAtmosphereShader->SetFloat("ringParentPlanetRadiusSquared", ring->GetParent()->GetRadius() * ring->GetParent()->GetRadius());
-                _mainAtmosphereShader->SetBool("isUseSphereIntersect", ring->GetParent() != renderableAtmosphere.atmosphere->GetParent());
-
-                _mainAtmosphereShader->SetVec3("ringCenter", ring->GetPosition());
-                _mainAtmosphereShader->SetVec3("ringNormal", ring->GetRingNormal());
-                _mainAtmosphereShader->SetVec2("ringInnerOuterRadiuses", glm::vec2(ring->GetInnerRadius(), ring->GetOuterRadius()));
-                _mainAtmosphereShader->SetInt("ringDiffuse", 9);
-                glBindTextureUnit(9, ring->GetRingTexture());
-            }
-
-            if (CalculateSpaceObjectDistance(renderableAtmosphere.atmosphere.get()) <= renderableAtmosphere.atmosphere->GetAtmosphereOuterBoundary())
-                glFrontFace(GL_CW);
-
-            renderableAtmosphere.atmosphere->AdjustToParent();
-            renderableAtmosphere.atmosphere->Render();
-
-            glFrontFace(GL_CCW);
-        }
-
-        glDisable(GL_BLEND);
-        glDepthMask(GL_TRUE);
-    }
-}
-
-void Application::RenderClouds(Clouds* renderableClouds, const glm::mat4& lightSpaceMatrix) const {
-    if (renderableClouds) {
-        glDepthMask(GL_FALSE);
-        glEnable(GL_BLEND);
-        glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_COLOR);
-        glDisable(GL_CULL_FACE);
-
-        _mainCloudsShader->Use();
-        _mainCloudsShader->SetMat4("lightSpaceMatrix", lightSpaceMatrix);
-        renderableClouds->AdjustToParent(gTimePaused ? 0.0f : gTimeScale);
-        renderableClouds->Render();
-
-        glEnable(GL_CULL_FACE);
-        glDisable(GL_BLEND);
-        glDepthMask(GL_TRUE);
-    }
-}
-
-void Application::RenderPlanetaryRing(const Shader& shader, PlanetaryRing* planetaryRing, const glm::mat4& lightSpaceMatrix) const {
-    if (planetaryRing) {
-        glEnable(GL_BLEND);
-        glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
-
-        shader.Use();
-        shader.SetMat4("lightSpaceMatrix", lightSpaceMatrix);
-        planetaryRing->SetShader(shader);
-        planetaryRing->AdjustToParent();
-        planetaryRing->Render();
-
-        glDisable(GL_BLEND);
-    }
-}
-
-void Application::ProcessStarRendering() {
-#ifdef __EMSCRIPTEN__
-    glDepthMask(GL_FALSE);
-    glDisable(GL_DEPTH_TEST);
-    glEnable(GL_BLEND);
-    RenderStar();
-    glDisable(GL_BLEND);
-    glEnable(GL_DEPTH_TEST);
-    glDepthMask(GL_TRUE);
-    _sun->SetVisibility(1.0f);
-#else
-    glDepthMask(GL_FALSE);
-    glBeginQuery(GL_SAMPLES_PASSED, _sun->GetStarOcclusionValue(0));
-    glDisable(GL_DEPTH_TEST);
-    glEnable(GL_BLEND);
-    RenderStar();
-    glDisable(GL_BLEND);
-    glEnable(GL_DEPTH_TEST);
-    glDepthFunc(GL_LEQUAL);
-    glEndQuery(GL_SAMPLES_PASSED);
-
-    glBeginQuery(GL_SAMPLES_PASSED, _sun->GetStarOcclusionValue(1));
-    RenderStar();
-    glEndQuery(GL_SAMPLES_PASSED);
-    glDepthMask(GL_TRUE);
-    glDepthFunc(GL_LESS);
-
-    UpdateOcclusionQuery();
-#endif
-}
-
-void Application::RenderStarCorona() const {
-    glDepthMask(GL_FALSE);
-    glEnable(GL_BLEND);
-    glBlendFunc(GL_ONE, GL_ONE);
-
-    _mainCoronaStarShader->Use();
-    _sun->SetShader(*_mainCoronaStarShader);
-    _sun->TakeStarSystemCenter();
-    _sun->Render();
-    _sun->SetShader(*_mainStarShader);
-
-    glDepthMask(GL_TRUE);
-    glDisable(GL_BLEND);
-}
-
-void Application::RenderStar() const {
-    glEnable(GL_BLEND);
-    glBlendFunc(GL_SRC_ALPHA, GL_ONE);
-
-    _mainStarShader->Use();
-    _sun->TakeStarSystemCenter();
-    _sun->Render();
-
-    glDisable(GL_BLEND);
-}
-
-void Application::RenderStarEffects() const {
-    const PlanetaryRing* nearestPlanetaryRing = nullptr;
-    if (!_renderableSceneComponents.empty()
-        && _nearestPlanetIndex >= 0
-        && static_cast<size_t>(_nearestPlanetIndex) < _renderableSceneComponents.size()) {
-        nearestPlanetaryRing = _renderableSceneComponents[static_cast<size_t>(_nearestPlanetIndex)].planetaryRing.get();
-    }
-
-    optional<RingCameraInfo> ringCameraInfo;
-    if (nearestPlanetaryRing) {
-        ringCameraInfo = {camera.GetPosition(), nearestPlanetaryRing->GetPosition(), nearestPlanetaryRing->GetRingNormal(),
-                          glm::vec2(nearestPlanetaryRing->GetInnerRadius(), nearestPlanetaryRing->GetOuterRadius()),
-                          nearestPlanetaryRing->GetRingTexture()};
-    }
-
-    glBindFramebuffer(GL_FRAMEBUFFER, _hdr->GetHdrFBO());
-    glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-    glEnable(GL_BLEND);
-    glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
-    _sun->RenderGlow(_cameraProjection, _cameraView, camera.GetFrontVector() - camera.GetRightVector(), camera.GetAspect(),
-                     CalculateSpaceObjectDistance(_sun.get()), ringCameraInfo, starTemperatureInKelvin);
-
-    glBindFramebuffer(GL_FRAMEBUFFER, 0);
-    glDisable(GL_DEPTH_TEST);
-    glDepthMask(GL_FALSE);
-    glEnable(GL_BLEND);
-    glBlendFunc(GL_ONE, GL_ONE);
-    _hdr->Render(starExposure, starGamma);
-    float intensity = glm::min(_sun->GetCurrentGlowSize() * _sun->GetVisibility(), 1.0f);
-    _lensFlare->Render(_cameraProjection, _cameraView, _sun->GetPosition(), glm::vec3(1.0), camera.GetAspect(), 0.1, intensity, ringCameraInfo);
-
-    glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
-    glDisable(GL_BLEND);
-    glDepthMask(GL_TRUE);
-    glEnable(GL_DEPTH_TEST);
-}
-
-void Application::RenderPlanetSatelliteStarDistances() const {
-    glDisable(GL_DEPTH_TEST);
-    glEnable(GL_BLEND);
-    glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
-
-    if (isRenderPlanetStarDistances)
-        RenderSpaceObjectDistance(_sun.get());
-
-    for(const auto& renderableComponentPS : _renderableSceneComponents) {
-        if (isRenderPlanetStarDistances) {
-            RenderSpaceObjectDistance(renderableComponentPS.planet.get());
-        }
-
-        if (isRenderSatelliteDistances) {
-            for(const auto& satellite : renderableComponentPS.satellites) {
-                RenderSpaceObjectDistance(satellite.get());
-            }
-        }
-    }
-
-    glDisable(GL_BLEND);
-    glEnable(GL_DEPTH_TEST);
-}
-
-void Application::RenderSpaceObjectDistance(const SpaceObject* spaceObject) const {
-    // Reuse pre-allocated container to eliminate per-frame heap allocation
-    _distanceInfoCache.clear();
-    _distanceInfoCache.insert(_distanceInfoCache.end(), spaceObject->GetEngName().begin(), spaceObject->GetEngName().end());
-
-    if (!spaceObject->GetOtherLangName().empty()) {
-        _distanceInfoCache.push_back(L'[');
-        _distanceInfoCache.insert(_distanceInfoCache.end(), spaceObject->GetOtherLangName().begin(), spaceObject->GetOtherLangName().end());
-        _distanceInfoCache.push_back(L']');
-        _distanceInfoCache.push_back(L' ');
-    }
-
-    wstring distance(to_wstring(static_cast<uint16_t>(CalculateSpaceObjectDistance(spaceObject))));
-    _distanceInfoCache.insert(_distanceInfoCache.end(), make_move_iterator(distance.begin()), make_move_iterator(distance.end()));
-
-    _mainTextShader->Use();
-    _mainTextShader->SetVec3("particleCenterWorldSpace", spaceObject->GetPosition());
-    _mainTextShader->SetBool("is3D", true);
-    _textRenderer->Render(*_mainTextShader, _distanceInfoCache, 0.0, 0.0, 0.075, glm::vec3(0.98431, 0.80784, 0.69412));
-}
-
-void Application::RenderHints() const {
-    static const glm::mat4 textProjection = glm::ortho(0.0f, static_cast<float>(_displayWidth), 0.0f, static_cast<float>(_displayHeight));
-    static const string gpuHintString = string(reinterpret_cast<const char *>(glGetString(GL_RENDERER)));
-    static constexpr glm::vec3 textColor = glm::vec3(0.98431, 0.80784, 0.69412);
-
-    glDisable(GL_DEPTH_TEST);
-    glEnable(GL_BLEND);
-    glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
-
-    _mainTextShader->Use();
-    _mainTextShader->SetMat4("projection", textProjection);
-    _mainTextShader->SetBool("is3D", false);
-
-    // Reuse pre-allocated containers to eliminate per-frame heap allocations
-    _fpsHintCache.clear();
-    _fpsHintCache.emplace_back(L"FPS: ");
-    _fpsHintCache.emplace_back(to_wstring(_fpsHandler.GetCurrentFps()));
-
-    _gpuHintCache.clear();
-    _gpuHintCache.emplace_back(wstring(gpuHintString.begin(), gpuHintString.end()));
-
-    _soundVolumeHintCache.clear();
-    stringstream soundVolumeStream;
-#ifdef __EMSCRIPTEN__
-    soundVolumeStream << fixed << setprecision(0) << (_musicMuted ? 0.0f : _musicVolume) * 100.0;
-#else
-    soundVolumeStream << fixed << setprecision(0) << _soundEngine->getSoundVolume() * 100.0;
-#endif
-    string soundVolume = soundVolumeStream.str();
-    _soundVolumeHintCache.emplace_back(wstring(L"Sound volume(PgUp/PgDown): ").append(soundVolume.begin(), soundVolume.end()).append(L" %"));
-
-    _tmpStringCache.clear();
-    _tmpStringCache.emplace_back(wstring(_currentMusicTrack.begin(), _currentMusicTrack.end()));
-
-    deque<wstring> timeRunHint;
-    timeRunHint.emplace_back(L"Time (P:pause, +/-:scale, .:step): ");
-    std::wstringstream wss;
-    wss << (gTimePaused ? L"paused" : L"run") << L" x" << static_cast<int>(gTimeScale);
-    timeRunHint.emplace_back( wss.str() );
-
-    deque<wstring> planetStarHint;
-    planetStarHint.emplace_back(L"Planet/Star distances(Z): ");
-    planetStarHint.emplace_back((isRenderPlanetStarDistances) ? L"On" : L"Off");
-
-    deque<wstring> satelliteHint;
-    satelliteHint.emplace_back(L"Satellite distances(X): ");
-    satelliteHint.emplace_back((isRenderSatelliteDistances) ? L"On" : L"Off");
-
-#ifdef __EMSCRIPTEN__
-    // Indicate low-res start + high-res streaming (visual in streaming-progress + on-screen when active)
-    deque<wstring> textureHint;
-    textureHint.emplace_back(L"Web: low-res start; high-res streams when close (see HUD)");
-#endif
-
-    deque<wstring> cameraSpeedHint;
-    cameraSpeedHint.emplace_back(L"Camera speed(1/2): ");
-    cameraSpeedHint.emplace_back(to_wstring(camera.GetMovementSpeed()));
-
-    deque<wstring> smoothCameraHint;
-    smoothCameraHint.emplace_back(L"Smooth camera(Arrows)");
-
-    deque<wstring> smoothZoomHint;
-    smoothZoomHint.emplace_back(L"Smooth zoom(V/B)");
-
-    deque<wstring> movementHint;
-    movementHint.emplace_back(L"Move up/down(SPACE/C)");
-
-    deque<wstring> speedBostHint;
-    speedBostHint.emplace_back(L"Speed boost(SHIFT)");
-
-    deque<wstring> starExposureHint;
-    starExposureHint.emplace_back(L"Star Exposure(3/4): ");
-    starExposureHint.emplace_back(to_wstring(starExposure));
-
-    deque<wstring> starGammaHint;
-    starGammaHint.emplace_back(L"Star Gamma(5/6): ");
-    starGammaHint.emplace_back(to_wstring(starGamma));
-
-    deque<wstring> starTemperatureHint;
-    stringstream  starTemperatureStream;
-    starTemperatureStream << fixed << setprecision(0) << starTemperatureInKelvin;
-    string starTemperatureStr = starTemperatureStream.str();
-    starTemperatureHint.emplace_back(wstring(L"Star Temperature(7/8): ").append(make_move_iterator(starTemperatureStr.begin()),
-                                                                                make_move_iterator(starTemperatureStr.end())));
-    deque<wstring> vertSyncHint;
-    vertSyncHint.emplace_back(L"Vert Sync(F1): ");
-    vertSyncHint.emplace_back((isVertSyncEnabled) ? L"On" : L"Off");
-
-    deque<wstring> textHints;
-    textHints.emplace_back(L"Text hints(TAB)");
-
-    _textRenderer->ReverseRender(*_mainTextShader, _tmpStringCache, 0.99 * _displayWidth, 0.95 * _displayHeight, 0.35, textColor);
-    _textRenderer->Render(*_mainTextShader, _fpsHintCache, 0.01 * _displayWidth, 0.95 * _displayHeight, 0.35, CurrentFpsColor());
-    _textRenderer->Render(*_mainTextShader, _gpuHintCache, 0.01 * _displayWidth, 0.925 * _displayHeight, 0.35, textColor);
-    _textRenderer->Render(*_mainTextShader, _soundVolumeHintCache, 0.01 * _displayWidth, 0.9 * _displayHeight, 0.35, textColor);
-    _textRenderer->Render(*_mainTextShader, timeRunHint, 0.01 * _displayWidth, 0.875 * _displayHeight, 0.35, textColor);
-    _textRenderer->Render(*_mainTextShader, planetStarHint, 0.01 * _displayWidth, 0.85 * _displayHeight, 0.35, textColor);
-    _textRenderer->Render(*_mainTextShader, satelliteHint, 0.01 * _displayWidth, 0.825 * _displayHeight, 0.35, textColor);
-#ifdef __EMSCRIPTEN__
-    _textRenderer->Render(*_mainTextShader, textureHint, 0.01 * _displayWidth, 0.80 * _displayHeight, 0.30, glm::vec3(0.6f, 0.8f, 1.0f));
-#endif
-    _textRenderer->Render(*_mainTextShader, cameraSpeedHint, 0.01 * _displayWidth, 0.8 * _displayHeight, 0.35, textColor);
-    _textRenderer->Render(*_mainTextShader, smoothCameraHint, 0.01 * _displayWidth, 0.775 * _displayHeight, 0.35, textColor);
-    _textRenderer->Render(*_mainTextShader, smoothZoomHint, 0.01 * _displayWidth, 0.75 * _displayHeight, 0.35, textColor);
-    _textRenderer->Render(*_mainTextShader, movementHint, 0.01 * _displayWidth, 0.725 * _displayHeight, 0.35, textColor);
-    _textRenderer->Render(*_mainTextShader, speedBostHint, 0.01 * _displayWidth, 0.7 * _displayHeight, 0.35, textColor);
-    _textRenderer->Render(*_mainTextShader, starExposureHint, 0.01 * _displayWidth, 0.675 * _displayHeight, 0.35, textColor);
-    _textRenderer->Render(*_mainTextShader, starGammaHint, 0.01 * _displayWidth, 0.65 * _displayHeight, 0.35, textColor);
-    _textRenderer->Render(*_mainTextShader, starTemperatureHint, 0.01 * _displayWidth, 0.625 * _displayHeight, 0.35, textColor);
-    _textRenderer->Render(*_mainTextShader, vertSyncHint, 0.01 * _displayWidth, 0.6 * _displayHeight, 0.35, textColor);
-    _textRenderer->Render(*_mainTextShader, textHints, 0.01 * _displayWidth, 0.575 * _displayHeight, 0.35, textColor);
-
-    glDisable(GL_BLEND);
-    glEnable(GL_DEPTH_TEST);
-}
-
-void Application::RenderTextureLoadingProgress() const {
-    auto& queue = TextureLoadingQueue::GetInstance();
-    const int queued    = queue.GetQueuedCount();
-    const int completed = queue.GetTotalProcessed();
-    const int total     = queue.GetTotalQueued();
-    const int active    = queue.GetActiveLoadCount();
-
-#ifdef __EMSCRIPTEN__
-    EM_ASM({
-        if (typeof window.updateStreamingProgress === 'function') {
-            window.updateStreamingProgress($0, $1, $2);
-        }
-        if (typeof window.updateLoadingProgress === 'function' && $1 > 0) {
-            window.updateLoadingProgress($0, $1);
-        }
-    }, completed, total, active);
-#endif
-
-    if (queued == 0) {
-        return;
-    }
-
-    glDisable(GL_DEPTH_TEST);
-    glEnable(GL_BLEND);
-    glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
-
-    static const glm::mat4 textProjection = glm::ortho(0.0f, static_cast<float>(_displayWidth), 0.0f, static_cast<float>(_displayHeight));
-    static constexpr glm::vec3 textColor = glm::vec3(0.3f, 0.8f, 1.0f);
-
-    _mainTextShader->Use();
-    _mainTextShader->SetMat4("projection", textProjection);
-    _mainTextShader->SetBool("is3D", false);
-
-    // Build hint string with progress counters, e.g. "High-res upgrade (2/5)"
-    // Throttled render (via static) to avoid per-frame spam; visual is brief.
-    static int lastCompleted = -1;
-    static int lastTotal = -1;
-    static int lastActive = -1;
-    static int frameCounter = 0;
-    frameCounter = (frameCounter + 1) % 10;
-    if (frameCounter == 0 || completed != lastCompleted || total != lastTotal || active != lastActive) {
-        lastCompleted = completed;
-        lastTotal = total;
-        lastActive = active;
-        std::wstring hint = L"High-res upgrade (" + std::to_wstring(completed) + L"/" + std::to_wstring(total) + L")";
-        if (active > 0) {
-            hint += L" [" + std::to_wstring(active) + L" active]";
-        }
-        deque<wstring> loadingHint;
-        loadingHint.emplace_back(hint);
-        _textRenderer->Render(*_mainTextShader, loadingHint, 0.5f * _displayWidth - 150, 0.1f * _displayHeight, 0.25, textColor);
-    }
-
-    glDisable(GL_BLEND);
-    glEnable(GL_DEPTH_TEST);
-}
-
-void Application::ConfigureMainShaders() {
-    static const double zCoef = 2.0 / glm::log2(camera.GetFar() + 1.0);
-
-    static const glm::mat4 skyBoxProjection = glm::perspective(glm::radians(45.0f), camera.GetAspect(), camera.GetNear(), camera.GetFar());
-
-    _cameraProjection = camera.GetProjectionMatrix();
-    _cameraView = camera.GetViewMatrix();
-
-    _mainSkyBoxShader->Use();
-    _mainSkyBoxShader->SetMat4("view", glm::mat4(glm::mat3(_cameraView)));
-    _mainSkyBoxShader->SetMat4("projection", skyBoxProjection);
-
-    _mainTextShader->Use();
-    _mainTextShader->SetMat4("projection", _cameraProjection);
-    _mainTextShader->SetMat4("view", _cameraView);
-    _mainTextShader->SetInt("text", 0);
-
-    _mainStarShader->Use();
-    _mainStarShader->SetMat4("projection", _cameraProjection);
-    _mainStarShader->SetMat4("view", _cameraView);
-    _mainStarShader->SetVec3("centerDir", glm::normalize(camera.GetPosition() - _sun->GetPosition()));
-    _mainStarShader->SetVec3("shiftStarColor", _sun->GetShiftColor());
-    _mainStarShader->SetVec3("colorMult", glm::vec3(0.96862745, 0.58039215, 0.235294117) * _sun->GetShiftColor());
-    _mainStarShader->SetFloat("sunTemperatureInKelvin", _sun->GetStarTemperatureInKelvin());
-    _mainStarShader->SetFloat("starRadiusInKilometers", _sun->GetStarRadius());
-    _mainStarShader->SetFloat("zCoef", zCoef);
-    _mainStarShader->SetFloat("uColorMap", _sun->GetTemperatureColorUCoordinate());
-    _mainStarShader->SetBool("isVisible", _sun->GetVisibility() == 1.0);
-    _mainStarShader->SetInt("colorMap", 0);
-    glBindTextureUnit(0, _sun->GetStarSpectrumTexture());
-
-    _mainCoronaStarShader->Use();
-    _mainCoronaStarShader->SetMat4("projection", _cameraProjection);
-    _mainCoronaStarShader->SetMat4("view", _cameraView);
-    _mainCoronaStarShader->SetVec3("center", _sun->GetPosition());
-    _mainCoronaStarShader->SetVec3("cameraRight", camera.GetRightVector());
-    _mainCoronaStarShader->SetVec3("cameraUp", camera.GetUpVector());
-    _mainCoronaStarShader->SetVec3("starShiftColor", _sun->GetShiftColor());
-    _mainCoronaStarShader->SetFloat("zCoef", zCoef);
-    _mainCoronaStarShader->SetFloat("maxSize", 7.1);
-    _mainCoronaStarShader->SetFloat("starRadius", _sun->GetStarRadius());
-    _mainCoronaStarShader->SetFloat("deltaTime", glfwGetTime() * 0.002);
-
-    _mainPlanetShader->Use();
-    _mainPlanetShader->SetMat4("projection", _cameraProjection);
-    _mainPlanetShader->SetMat4("view", _cameraView);
-    _mainPlanetShader->SetVec3("viewPos", camera.GetPosition());
-    _mainPlanetShader->SetVec3("lightPos", _sun->GetPosition());
-    _mainPlanetShader->SetVec3("starGlowTint", _sun->GetGlowTintMult());
-    _mainPlanetShader->SetFloat("farPlane", camera.GetFar());
-    _mainPlanetShader->SetFloat("zCoef", zCoef);
-    _mainPlanetShader->SetFloat("bias", 0.0005);
-    _mainPlanetShader->SetInt("shadowMap", 6);
-    glBindTextureUnit(6, _shadowMapFBO->GetShadowMap());
-
-    _mainAtmosphereShader->Use();
-    _mainAtmosphereShader->SetMat4("projection", _cameraProjection);
-    _mainAtmosphereShader->SetMat4("view", _cameraView);
-    _mainAtmosphereShader->SetFloat("farPlane", camera.GetFar());
-    _mainAtmosphereShader->SetFloat("zCoef", zCoef);
-    _mainAtmosphereShader->SetFloat("bias", 0.001);
-    _mainAtmosphereShader->SetInt("shadowMap", 11);
-    glBindTextureUnit(11, _shadowMapFBO->GetShadowMap());
-
-    _mainCloudsShader->Use();
-    _mainCloudsShader->SetMat4("projection", _cameraProjection);
-    _mainCloudsShader->SetMat4("view", _cameraView);
-    _mainCloudsShader->SetVec3("viewPos", camera.GetPosition());
-    _mainCloudsShader->SetVec3("lightPos", _sun->GetPosition());
-    _mainCloudsShader->SetFloat("farPlane", camera.GetFar());
-    _mainCloudsShader->SetFloat("zCoef", zCoef);
-    _mainCloudsShader->SetFloat("bias", 0.001);
-    _mainCloudsShader->SetInt("shadowMap", 8);
-    glBindTextureUnit(8, _shadowMapFBO->GetShadowMap());
-
-    _mainRingShader->Use();
-    _mainRingShader->SetMat4("projection", _cameraProjection);
-    _mainRingShader->SetMat4("view", _cameraView);
-    _mainRingShader->SetVec3("lightPos", _sun->GetPosition());
-    _mainRingShader->SetVec3("camPos", camera.GetPosition());
-    _mainRingShader->SetVec3("starGlowTint", _sun->GetGlowTintMult());
-    _mainRingShader->SetFloat("zCoef", zCoef);
-    _mainRingShader->SetFloat("bias", 0.001);
-    _mainRingShader->SetInt("shadowMap", 5);
-    glBindTextureUnit(5, _shadowMapFBO->GetShadowMap());
-}
 
 void Application::InitScene() {
 #ifdef __EMSCRIPTEN__
@@ -1018,78 +374,16 @@ void Application::UpdateLoadingProgress() {
 #endif
 }
 
-void Application::LoadCoreResources() {
-    struct CoreResource {
-        std::string url;
-        std::string virtualPath;
-    };
-
-    std::vector<CoreResource> coreResources = {
-        // Models
-        {"resource/models/sphere.obj", "resource/models/sphere.obj"},
-        {"resource/models/phobos.obj", "resource/models/phobos.obj"},
-        {"resource/models/deimos.obj", "resource/models/deimos.obj"},
-        {"resource/models/saturn_ring.obj", "resource/models/saturn_ring.obj"},
-        {"resource/models/uranus_ring.obj", "resource/models/uranus_ring.obj"},
-        // Sun
-        {"resource/textures_low/Star_Spectrum_Low.dds", "resource/textures_low/Star_Spectrum_Low.dds"},
-        {"resource/textures_low/flares_bright_Low.dds", "resource/textures_low/flares_bright_Low.dds"},
-    };
-
-    const auto skyBoxFaces = GetSkyBoxFaces();
-    for (size_t i = 0; i < skyBoxFaces.size(); ++i) {
-        // The CDN only hosts the full skybox tier. Cache it over the selected
-        // low-res MEMFS face so a failed/offline fetch leaves the bundled
-        // placeholder available to InitSceneObjects().
-        coreResources.push_back({kHighSkyBoxFaces[i], skyBoxFaces[i]});
-    }
-
-    _totalResources = static_cast<int>(coreResources.size());
-    _resourcesPending = _totalResources;
-
-    std::cout << "Loading " << _totalResources << " core resources..." << std::endl;
-    
-    // Initialize progress bar
-    UpdateLoadingProgress();
-
-    for(const auto& res : coreResources) {
-        WebResourceFetcher::DownloadFile(res.url, res.virtualPath, [this, virtualPath = res.virtualPath](bool success) {
-            _resourcesPending--;
-            if (!success) {
-                std::cerr << "[Loading] Failed to download required core resource: " << virtualPath << std::endl;
-            }
-            UpdateLoadingProgress();
-        });
-    }
-}
-
-void Application::LoadOptionalSounds() {
-#ifdef __EMSCRIPTEN__
-    const auto& songPaths = GetBackgroundSongPaths();
-    std::cout << "[Audio] Starting optional background music download ("
-              << songPaths.size() << " tracks)..." << std::endl;
-
-    for (const auto& path : songPaths) {
-        WebResourceFetcher::DownloadFile(path, path, [this, path](bool success) {
-            if (success && WebResourceFetcher::ResourceExists(path)) {
-                _availableSongPaths.insert(path);
-                std::cout << "[Audio] Loaded track: " << path << std::endl;
-                return;
-            }
-
-            std::cerr << "[Audio] Missing track (skipped): " << path << std::endl;
-        });
-    }
-#endif
-}
 
 void Application::InitSceneObjects() {
     camera.SetAspect(static_cast<float>(_displayWidth) / static_cast<float>(_displayHeight));
     const auto qualitySettings = GetQualitySettings(
         gShadowQuality == 0 ? g_qualityPreset : gShadowQuality - 1, g_isMobileWeb);
     _shadowMapFBO = make_unique<ShadowMapFBO>(qualitySettings.shadowResolution, qualitySettings.shadowResolution);
+    _hdrEnabled = qualitySettings.enableHdr;
     _hdrShader = make_unique<Shader>("resource/shaders/passThrough.vs", "resource/shaders/hdr.fs");
-    _hdr = make_unique<HDR>(*_hdrShader, _displayWidth, _displayHeight);
+    _hdr = make_unique<HDR>(*_hdrShader, _displayWidth, _displayHeight, _hdrEnabled);
+    LogQualityTier(qualitySettings, _hdrEnabled, gShadowQuality);
 
     const vector<string> skyBoxFaces = GetSkyBoxFaces();
 
@@ -1123,7 +417,7 @@ void Application::InitSceneObjects() {
     InitStarSystem();
 
     glfwShowWindow(_mainWindow);
-#ifndef __EMSCRIPTEN__
+#ifdef _WIN32
     glfwSetWindowMonitor(_mainWindow, glfwGetPrimaryMonitor(), 0, 0, _displayWidth, _displayHeight, GLFW_DONT_CARE);
 #endif
 
@@ -1131,574 +425,6 @@ void Application::InitSceneObjects() {
     StartPlayBackgroundMusic();
 }
 
-void Application::InitSongList() {
-    _backgroundSongPaths = GetBackgroundSongPaths();
-    
-    default_random_engine randEngine(static_cast<uint32_t>(chrono::high_resolution_clock::now().time_since_epoch().count()));
-    shuffle(_backgroundSongPaths.begin(), _backgroundSongPaths.end(), randEngine);
-}
-
-void Application::InitStarSystem() {
-    _sphereModel = std::make_unique<MeshHolder>("resource/models/sphere.obj");
-
-    _starGlowShader = make_unique<Shader>("resource/shaders/starGlow.vs", "resource/shaders/starGlow.fs");
-    StarInfo sunInfo(*_sphereModel, *_mainStarShader, *_starGlowShader, TextureImage2D("resource/textures_low/Star_Spectrum_Low.dds"),
-                     starTemperatureInKelvin, 696342.0, glm::vec3(0.99607843, 0.890196078, 0.725490196), L"Sun", L"Солнце");
-    _sun = make_shared<Sun>(sunInfo);
-
-#ifdef __EMSCRIPTEN__
-    // All planet systems are deferred on web — assets are downloaded on demand
-    const glm::vec3 sunPos = _sun->GetPosition();
-    _planetSystemManifests = {
-        {
-            "Mercury", sunPos + glm::vec3(1500.f, 0.f, 350.f), 800.f,
-            // Required: low-res planet textures (must be ready before init)
-            {
-                TexturePaths::Mercury::Diffuse.low,
-                TexturePaths::Mercury::Normal.low,
-                TexturePaths::Mercury::Specular.low
-            },
-            // Optional: no moons or rings for Mercury
-            {},
-            [this]{ InitMercury(*_sphereModel); }
-        },
-        {
-            "Venus", sunPos + glm::vec3(1125.f, 0.f, -1340.f), 800.f,
-            // Required: low-res planet textures
-            {
-                TexturePaths::Venus::Diffuse.low,
-                TexturePaths::Venus::Normal.low
-            },
-            // Optional: no moons or rings for Venus
-            {},
-            [this]{ InitVenus(*_sphereModel); }
-        },
-        {
-            "Earth", sunPos + glm::vec3(1900.f, 0.f, 0.f), 800.f,
-            // Required: low-res planet textures
-            {
-                TexturePaths::Earth::Diffuse.low,
-                TexturePaths::Earth::Normal.low,
-                TexturePaths::Earth::Specular.low
-            },
-            // Optional: cloud layers and moon textures (fallback if unavailable)
-            {
-                "resource/textures_low/Earth_Clouds_Diffuse_Low.dds",
-                "resource/textures_low/Earth_Night_Diffuse_Low.dds",
-                "resource/textures_low/Earth_Clouds_Normal_Low.dds",
-                TexturePaths::Moon::Diffuse.low,
-                TexturePaths::Moon::Normal.low
-            },
-            [this]{ InitEarthSystem(*_sphereModel); },
-            {
-                TexturePaths::Moon::Diffuse.high,
-                "resource/textures/Earth_Clouds_Diffuse.dds"
-            }
-        },
-        {
-            "Mars", sunPos + glm::vec3(-1732.f, 0.f, 1000.f), 800.f,
-            // Required: low-res planet textures
-            {
-                TexturePaths::Mars::Diffuse.low,
-                TexturePaths::Mars::Normal.low
-            },
-            // Optional: moon textures (fallback if unavailable)
-            {
-                TexturePaths::Phobos::Diffuse.low,
-                TexturePaths::Phobos::Normal.low,
-                TexturePaths::Deimos::Diffuse.low,
-                TexturePaths::Deimos::Normal.low
-            },
-            [this]{ InitMarsSystem(*_sphereModel); }
-        },
-        {
-            "Jupiter", sunPos + glm::vec3(1350.f, 0.f, 1737.f), 1500.f,
-            // Required: low-res planet textures
-            {
-                TexturePaths::Jupiter::Diffuse.low,
-                TexturePaths::Jupiter::Normal.low
-            },
-            // Optional: Galilean moon textures (fallback if unavailable)
-            {
-                TexturePaths::Io::Diffuse.low,
-                TexturePaths::Io::Normal.low,
-                TexturePaths::Europa::Diffuse.low,
-                TexturePaths::Europa::Normal.low,
-                TexturePaths::Ganymede::Diffuse.low,
-                TexturePaths::Ganymede::Normal.low,
-                TexturePaths::Callisto::Diffuse.low,
-                TexturePaths::Callisto::Normal.low
-            },
-            [this]{ InitJupiterSystem(*_sphereModel); },
-            {
-                TexturePaths::Io::Diffuse.high,
-                TexturePaths::Europa::Diffuse.high,
-                TexturePaths::Ganymede::Diffuse.high
-            }
-        },
-        {
-            "Saturn", sunPos + glm::vec3(0.f, -100.f, 2450.f), 1500.f,
-            // Required: low-res planet textures
-            {
-                TexturePaths::Saturn::Diffuse.low,
-                TexturePaths::Saturn::Normal.low
-            },
-            // Optional: ring and moon textures (fallback if unavailable)
-            {
-                "resource/textures_low/Saturn_Rings_Low.dds",
-                TexturePaths::Mimas::Diffuse.low,
-                TexturePaths::Mimas::Normal.low,
-                TexturePaths::Enceladus::Diffuse.low,
-                TexturePaths::Enceladus::Normal.low,
-                TexturePaths::Tethys::Diffuse.low,
-                TexturePaths::Tethys::Normal.low,
-                TexturePaths::Dione::Diffuse.low,
-                TexturePaths::Dione::Normal.low,
-                TexturePaths::Rhea::Diffuse.low,
-                TexturePaths::Rhea::Normal.low,
-                TexturePaths::Titan::Diffuse.low,
-                TexturePaths::Titan::Normal.low,
-                TexturePaths::Iapetus::Diffuse.low,
-                TexturePaths::Iapetus::Normal.low
-            },
-            [this]{ InitSaturnSystem(*_sphereModel); },
-            {
-                TexturePaths::Titan::Diffuse.high,
-                "resource/textures/Saturn_Rings.dds"
-            }
-        },
-        {
-            "Uranus", sunPos + glm::vec3(0.f, 0.f, -2650.f), 1500.f,
-            // Required: low-res planet textures
-            {
-                TexturePaths::Uranus::Diffuse.low,
-                TexturePaths::Uranus::Normal.low
-            },
-            // Optional: cloud layers, ring, and moon textures (fallback if unavailable)
-            {
-                "resource/textures_low/Uranus_Clouds_Diffuse_Low.dds",
-                "resource/textures_low/Uranus_Rings_Low.dds",
-                "resource/textures_low/Uranus_Clouds_Normal_Low.dds",
-                TexturePaths::Miranda::Diffuse.low,
-                TexturePaths::Miranda::Normal.low,
-                TexturePaths::Ariel::Diffuse.low,
-                TexturePaths::Ariel::Normal.low,
-                TexturePaths::Umbriel::Diffuse.low,
-                TexturePaths::Umbriel::Normal.low,
-                TexturePaths::Titania::Diffuse.low,
-                TexturePaths::Titania::Normal.low,
-                TexturePaths::Oberon::Diffuse.low,
-                TexturePaths::Oberon::Normal.low
-            },
-            [this]{ InitUranusSystem(*_sphereModel); },
-            {
-                "resource/textures/Uranus_Rings.dds",
-                "resource/textures/Uranus_Clouds_Diffuse.dds"
-            }
-        },
-        {
-            "Neptune", sunPos + glm::vec3(-2900.f, 0.f, 0.f), 1500.f,
-            // Required: low-res planet textures
-            {
-                TexturePaths::Neptune::Diffuse.low,
-                TexturePaths::Neptune::Normal.low
-            },
-            // Optional: cloud layer and moon textures (fallback if unavailable)
-            {
-                "resource/textures_low/Neptune_Clouds_Diffuse_Low.dds",
-                "resource/textures_low/Neptune_Clouds_Normal_Low.dds",
-                TexturePaths::Triton::Diffuse.low,
-                TexturePaths::Triton::Normal.low
-            },
-            [this]{ InitNeptuneSystem(*_sphereModel); },
-            {
-                "resource/textures/Neptune_Clouds_Diffuse.dds"
-            }
-        },
-        {
-            "Pluto", sunPos + glm::vec3(2800.f, 0.f, 1757.73f), 1500.f,
-            // Required: low-res planet textures
-            {
-                TexturePaths::Pluto::Diffuse.low,
-                TexturePaths::Pluto::Normal.low,
-                TexturePaths::Pluto::Specular.low
-            },
-            // Optional: moon textures (fallback if unavailable)
-            {
-                TexturePaths::Charon::Diffuse.low,
-                TexturePaths::Charon::Normal.low,
-                TexturePaths::Charon::Specular.low
-            },
-            [this]{ InitPlutoSystem(*_sphereModel); }
-        },
-    };
-    std::cout << "[StagedLoading] " << _planetSystemManifests.size()
-              << " planet systems deferred until camera approaches." << std::endl;
-#else
-    // Desktop: load all immediately (no memory constraint)
-    InitMercury(*_sphereModel);
-    InitVenus(*_sphereModel);
-    InitEarthSystem(*_sphereModel);
-    InitMarsSystem(*_sphereModel);
-    InitJupiterSystem(*_sphereModel);
-    InitSaturnSystem(*_sphereModel);
-    InitUranusSystem(*_sphereModel);
-    InitNeptuneSystem(*_sphereModel);
-    InitPlutoSystem(*_sphereModel);
-#endif
-}
-
-void Application::InitMercury(const MeshHolder& sphereModel) {
-    PlanetInfo mercuryInfo(sphereModel, 0.38, *_mainPlanetShader,
-            {
-                TextureImage2D(GetTexturePath(TexturePaths::Mercury::Diffuse.low, TexturePaths::Mercury::Diffuse.high)),
-            }, TextureImage2D(GetTexturePath(TexturePaths::Mercury::Normal.low, TexturePaths::Mercury::Normal.high)), L"Mercury", L"Меркурий", TextureImage2D(GetTexturePath(TexturePaths::Mercury::Specular.low, TexturePaths::Mercury::Specular.high)));
-    shared_ptr<Planet> mercury = make_shared<Mercury>(mercuryInfo, _sun);
-
-    const glm::mat4 lightProjection = glm::ortho(-mercury->GetRadius() * 3.0f, mercury->GetRadius() * 3.0f, -mercury->GetRadius() * 3.0f, mercury->GetRadius() * 3.0f, camera.GetNear(), camera.GetFar());
-    const glm::mat4 lightView = glm::lookAt(_sun->GetPosition(), mercury->GetPosition() - _sun->GetPosition(), glm::vec3(0.0, 1.0, 0.0));
-    const glm::mat4 lightSpaceMatrix = lightProjection * lightView;
-
-    RenderableSceneComponent mercurySystemComponent;
-    mercurySystemComponent.lightSpaceMatrix = lightSpaceMatrix;
-    mercurySystemComponent.planet = move(mercury);
-    _renderableSceneComponents.push_back(move(mercurySystemComponent));
-}
-
-void Application::InitVenus(const MeshHolder& sphereModel) {
-    PlanetInfo venusInfo(sphereModel, 0.95, *_mainPlanetShader,
-            {
-                TextureImage2D(GetTexturePath(TexturePaths::Venus::Diffuse.low, TexturePaths::Venus::Diffuse.high)),
-            }, TextureImage2D(GetTexturePath(TexturePaths::Venus::Normal.low, TexturePaths::Venus::Normal.high)), L"Venus", L"Венера");
-    shared_ptr<Planet> venus = make_shared<Venus>(venusInfo, _sun);
-
-    AtmosphereInfo venusAtmosphereInfo(sphereModel, *_mainAtmosphereShader, 1.1, glm::vec3(203/255.f, 158/255.f, 69/255.), venus->GetRadius() - 0.00007, 1.995);
-    unique_ptr<Atmosphere> venusAtmosphere = make_unique<Atmosphere>(venusAtmosphereInfo, venus);
-
-    const glm::mat4 lightProjection = glm::ortho(-venus->GetRadius() * 3.0f, venus->GetRadius() * 3.0f, -venus->GetRadius() * 3.0f, venus->GetRadius() * 3.0f, camera.GetNear(), camera.GetFar());
-    const glm::mat4 lightView = glm::lookAt(_sun->GetPosition(), venus->GetPosition() - _sun->GetPosition(), glm::vec3(0.0, 1.0, 0.0));
-    const glm::mat4 lightSpaceMatrix = lightProjection * lightView;
-
-    RenderableAtmosphere renderableVenusAtmosphere;
-    renderableVenusAtmosphere.atmosphere = move(venusAtmosphere);
-    renderableVenusAtmosphere.hScaleFactor = 6.0;
-    renderableVenusAtmosphere.parentEarthSizeCoefficient = venus->GetEarthSizeCoefficient();
-
-    RenderableSceneComponent venusSystemComponent;
-    venusSystemComponent.lightSpaceMatrix = lightSpaceMatrix;
-    venusSystemComponent.planet = move(venus);
-    venusSystemComponent.atmospheres.push_back(move(renderableVenusAtmosphere));
-    _renderableSceneComponents.push_back(move(venusSystemComponent));
-}
-
-void Application::InitEarthSystem(const MeshHolder& sphereModel) {
-    // Load textures with low-res fallback for Web
-    PlanetInfo earthInfo(sphereModel, 1.0, *_mainPlanetShader,
-            {
-                TextureImage2D(GetTexturePath(TexturePaths::Earth::Diffuse.low, TexturePaths::Earth::Diffuse.high)),
-                TextureImage2D("resource/textures_low/Earth_Clouds_Diffuse_Low.dds"),
-                TextureImage2D("resource/textures_low/Earth_Night_Diffuse_Low.dds"),
-            }, TextureImage2D(GetTexturePath(TexturePaths::Earth::Normal.low, TexturePaths::Earth::Normal.high)), L"Earth", L"Земля", TextureImage2D(GetTexturePath(TexturePaths::Earth::Specular.low, TexturePaths::Earth::Specular.high)));
-    shared_ptr<Planet> earth = make_shared<Earth>(earthInfo, _sun);
-
-    SatelliteInfo moonInfo(sphereModel, 0.2724, *_mainPlanetShader, {TextureImage2D(GetTexturePath(TexturePaths::Moon::Diffuse.low, TexturePaths::Moon::Diffuse.high))}, TextureImage2D(GetTexturePath(TexturePaths::Moon::Normal.low, TexturePaths::Moon::Normal.high)),
-                           L"Moon", L"Луна");
-    shared_ptr<Satellite> moon = make_shared<Moon>(moonInfo, earth);
-
-    AtmosphereInfo earthAtmosphereInfo(sphereModel, *_mainAtmosphereShader, 1.1, glm::vec3(0.3, 0.7, 1.0), earth->GetRadius() - 0.00007, 2.1);
-    unique_ptr<Atmosphere> earthAtmosphere = make_unique<Atmosphere>(earthAtmosphereInfo, earth);
-
-    CloudsInfo earthCloudsInfo(sphereModel, *_mainCloudsShader, 1.0055, TextureImage2D("resource/textures_low/Earth_Clouds_Diffuse_Low.dds"),
-                               TextureImage2D("resource/textures_low/Earth_Clouds_Normal_Low.dds"));
-    unique_ptr<Clouds> earthClouds = make_unique<EarthClouds>(earthCloudsInfo, earth);
-
-    const glm::mat4 lightProjection = glm::ortho(-earth->GetRadius() * 3.0f, earth->GetRadius() * 3.0f, -earth->GetRadius() * 3.0f, earth->GetRadius() * 3.0f, camera.GetNear(), camera.GetFar());
-    const glm::mat4 lightView = glm::lookAt(_sun->GetPosition(), earth->GetPosition() - _sun->GetPosition(), glm::vec3(0.0, 1.0, 0.0));
-    const glm::mat4 lightSpaceMatrix = lightProjection * lightView;
-
-    RenderableAtmosphere renderableEarthAtmosphere;
-    renderableEarthAtmosphere.atmosphere = move(earthAtmosphere);
-    renderableEarthAtmosphere.hScaleFactor = 6.0;
-    renderableEarthAtmosphere.parentEarthSizeCoefficient = earth->GetEarthSizeCoefficient();
-
-    RenderableSceneComponent earthSystemComponent;
-    earthSystemComponent.lightSpaceMatrix = lightSpaceMatrix;
-    earthSystemComponent.planet = move(earth);
-    earthSystemComponent.satellites = vector<shared_ptr<Satellite>>{move(moon)};
-    earthSystemComponent.atmospheres.push_back(move(renderableEarthAtmosphere));
-    earthSystemComponent.clouds = move(earthClouds);
-    _renderableSceneComponents.push_back(move(earthSystemComponent));
-}
-
-void Application::InitMarsSystem(const MeshHolder& sphereModel) {
-    MeshHolder phobosModel("resource/models/phobos.obj"), deimosModel("resource/models/deimos.obj");
-
-    PlanetInfo marsInfo(sphereModel, 0.53, *_mainPlanetShader,
-            {
-                TextureImage2D(GetTexturePath(TexturePaths::Mars::Diffuse.low, TexturePaths::Mars::Diffuse.high)),
-            }, TextureImage2D(GetTexturePath(TexturePaths::Mars::Normal.low, TexturePaths::Mars::Normal.high)), L"Mars", L"Марс");
-    shared_ptr<Planet> mars = make_shared<Mars>(marsInfo, _sun);
-
-    SatelliteInfo phobosInfo(phobosModel, 0.001768, *_mainPlanetShader, {TextureImage2D(GetTexturePath(TexturePaths::Phobos::Diffuse.low, TexturePaths::Phobos::Diffuse.high))}, TextureImage2D(GetTexturePath(TexturePaths::Phobos::Normal.low, TexturePaths::Phobos::Normal.high)),
-                             L"Phobos", L"Фобос");
-    SatelliteInfo deimosInfo(deimosModel, 0.00097316, *_mainPlanetShader, {TextureImage2D(GetTexturePath(TexturePaths::Deimos::Diffuse.low, TexturePaths::Deimos::Diffuse.high))}, TextureImage2D(GetTexturePath(TexturePaths::Deimos::Normal.low, TexturePaths::Deimos::Normal.high)),
-                             L"Deimos", L"Деймос");
-    shared_ptr<Satellite> phobos = make_shared<Phobos>(phobosInfo, mars);
-    shared_ptr<Satellite> deimos = make_shared<Deimos>(deimosInfo, mars);
-
-    AtmosphereInfo marsAtmosphereInfo(sphereModel, *_mainAtmosphereShader, 0.583, glm::vec3(0.976, 0.302, 0.208), mars->GetRadius() - 0.00007, 1.113);
-    unique_ptr<Atmosphere> marsAtmosphere = make_unique<Atmosphere>(marsAtmosphereInfo, mars);
-
-    const glm::mat4 lightProjection = glm::ortho(-mars->GetRadius() * 3.0f, mars->GetRadius() * 3.0f, -mars->GetRadius() * 3.0f, mars->GetRadius() * 3.0f, camera.GetNear(),
-                                                 glm::length(_sun->GetPosition() - mars->GetPosition()) + 50.f);
-    const glm::mat4 lightView = glm::lookAt(_sun->GetPosition(), mars->GetPosition() - _sun->GetPosition(), glm::vec3(0.0, 1.0, 0.0));
-    const glm::mat4 lightSpaceMatrix = lightProjection * lightView;
-
-    RenderableAtmosphere renderableMarsAtmosphere;
-    renderableMarsAtmosphere.atmosphere = move(marsAtmosphere);
-    renderableMarsAtmosphere.hScaleFactor = 6.0;
-    renderableMarsAtmosphere.parentEarthSizeCoefficient = mars->GetEarthSizeCoefficient();
-
-    RenderableSceneComponent marsSystemComponent;
-    marsSystemComponent.lightSpaceMatrix = lightSpaceMatrix;
-    marsSystemComponent.planet = move(mars);
-    marsSystemComponent.satellites = vector<shared_ptr<Satellite>>{move(phobos), move(deimos)};
-    marsSystemComponent.atmospheres.push_back(move(renderableMarsAtmosphere));
-    _renderableSceneComponents.push_back(move(marsSystemComponent));
-}
-
-void Application::InitJupiterSystem(const MeshHolder& sphereModel) {
-    PlanetInfo jupiterInfo(sphereModel, 11.2, *_mainPlanetShader,
-            {
-                TextureImage2D(GetTexturePath(TexturePaths::Jupiter::Diffuse.low, TexturePaths::Jupiter::Diffuse.high)),
-            }, TextureImage2D(GetTexturePath(TexturePaths::Jupiter::Normal.low, TexturePaths::Jupiter::Normal.high)), L"Jupiter", L"Юпитер");
-    shared_ptr<Planet> jupiter = make_shared<Jupiter>(jupiterInfo, _sun);
-
-    SatelliteInfo ioInfo(sphereModel, 0.28592, *_mainPlanetShader, {TextureImage2D(GetTexturePath(TexturePaths::Io::Diffuse.low, TexturePaths::Io::Diffuse.high))}, TextureImage2D(GetTexturePath(TexturePaths::Io::Normal.low, TexturePaths::Io::Normal.high)),
-                         L"Io", L"Ио");
-    SatelliteInfo europaInfo(sphereModel, 0.244985, *_mainPlanetShader, {TextureImage2D(GetTexturePath(TexturePaths::Europa::Diffuse.low, TexturePaths::Europa::Diffuse.high))}, TextureImage2D(GetTexturePath(TexturePaths::Europa::Normal.low, TexturePaths::Europa::Normal.high)),
-                             L"Europa", L"Европа");
-    SatelliteInfo ganymedeInfo(sphereModel, 0.41345, *_mainPlanetShader, {TextureImage2D(GetTexturePath(TexturePaths::Ganymede::Diffuse.low, TexturePaths::Ganymede::Diffuse.high))}, TextureImage2D(GetTexturePath(TexturePaths::Ganymede::Normal.low, TexturePaths::Ganymede::Normal.high)),
-                               L"Ganymede", L"Ганимед");
-    SatelliteInfo callistoInfo(sphereModel, 0.3783236, *_mainPlanetShader, {TextureImage2D(GetTexturePath(TexturePaths::Callisto::Diffuse.low, TexturePaths::Callisto::Diffuse.high))}, TextureImage2D(GetTexturePath(TexturePaths::Callisto::Normal.low, TexturePaths::Callisto::Normal.high)),
-                               L"Callisto", L"Каллисто");
-    shared_ptr<Satellite> io = make_shared<Io>(ioInfo, jupiter);
-    shared_ptr<Satellite> europa = make_shared<Europa>(europaInfo, jupiter);
-    shared_ptr<Satellite> ganymede = make_shared<Ganymede>(ganymedeInfo, jupiter);
-    shared_ptr<Satellite> callisto = make_shared<Callisto>(callistoInfo, jupiter);
-
-    AtmosphereInfo jupiterAtmosphereInfo(sphereModel, *_mainAtmosphereShader, 11.4, glm::vec3(153.f/255, 139.f/255, 120.f/255), jupiter->GetRadius() - 0.00007, 23.35);
-    unique_ptr<Atmosphere> jupiterAtmosphere = make_unique<Atmosphere>(jupiterAtmosphereInfo, jupiter);
-
-    const glm::mat4 lightProjection = glm::ortho(-jupiter->GetRadius() * 3.0f, jupiter->GetRadius() * 3.0f, -jupiter->GetRadius() * 3.0f, jupiter->GetRadius() * 3.0f, camera.GetNear(), camera.GetFar());
-    const glm::mat4 lightView = glm::lookAt(_sun->GetPosition(), jupiter->GetPosition() - _sun->GetPosition(), glm::vec3(0.0, 1.0, 0.0));
-    const glm::mat4 lightSpaceMatrix = lightProjection * lightView;
-
-    RenderableAtmosphere renderableJupiterAtmosphere;
-    renderableJupiterAtmosphere.atmosphere = move(jupiterAtmosphere);
-    renderableJupiterAtmosphere.hScaleFactor = 26.0;
-    renderableJupiterAtmosphere.parentEarthSizeCoefficient = jupiter->GetEarthSizeCoefficient();
-    renderableJupiterAtmosphere.isUseToneMapping = true;
-
-    RenderableSceneComponent jupiterSystemComponent;
-    jupiterSystemComponent.lightSpaceMatrix = lightSpaceMatrix;
-    jupiterSystemComponent.planet = move(jupiter);
-    jupiterSystemComponent.satellites = vector<shared_ptr<Satellite>>{move(io), move(europa), move(ganymede), move(callisto)};
-    jupiterSystemComponent.atmospheres.push_back(move(renderableJupiterAtmosphere));
-    _renderableSceneComponents.push_back(move(jupiterSystemComponent));
-}
-
-void Application::InitSaturnSystem(const MeshHolder& sphereModel) {
-    MeshHolder saturnRingModel("resource/models/saturn_ring.obj");
-
-    PlanetInfo saturnInfo(sphereModel, 9.14, *_mainPlanetShader,
-            {
-                TextureImage2D(GetTexturePath(TexturePaths::Saturn::Diffuse.low, TexturePaths::Saturn::Diffuse.high)),
-            }, TextureImage2D(GetTexturePath(TexturePaths::Saturn::Normal.low, TexturePaths::Saturn::Normal.high)), L"Saturn", L"Сатурн");
-    shared_ptr<Planet> saturn = make_shared<Saturn>(saturnInfo, _sun);
-
-    PlanetaryRingInfo saturnRingInfo(saturnRingModel, 22.0, 43.7, *_mainPlanetShader, TextureImage2D("resource/textures_low/Saturn_Rings_Low.dds")); 
-    unique_ptr<PlanetaryRing> saturnRing = make_unique<SaturnRing>(saturnRingInfo, saturn);
-
-    SatelliteInfo mimasInfo(sphereModel, 0.03111, *_mainPlanetShader, {TextureImage2D(GetTexturePath(TexturePaths::Mimas::Diffuse.low, TexturePaths::Mimas::Diffuse.high))}, TextureImage2D(GetTexturePath(TexturePaths::Mimas::Normal.low, TexturePaths::Mimas::Normal.high)),
-                            L"Mimas", L"Мимас");
-    SatelliteInfo enceladusInfo(sphereModel, 0.03957, *_mainPlanetShader, {TextureImage2D(GetTexturePath(TexturePaths::Enceladus::Diffuse.low, TexturePaths::Enceladus::Diffuse.high))}, TextureImage2D(GetTexturePath(TexturePaths::Enceladus::Normal.low, TexturePaths::Enceladus::Normal.high)),
-                            L"Enceladus", L"Энцелад");
-    SatelliteInfo tethysInfo(sphereModel, 0.083346, *_mainPlanetShader, {TextureImage2D(GetTexturePath(TexturePaths::Tethys::Diffuse.low, TexturePaths::Tethys::Diffuse.high))}, TextureImage2D(GetTexturePath(TexturePaths::Tethys::Normal.low, TexturePaths::Tethys::Normal.high)),
-                            L"Tethys", L"Тефия");
-    SatelliteInfo dioneInfo(sphereModel, 0.08812, *_mainPlanetShader, {TextureImage2D(GetTexturePath(TexturePaths::Dione::Diffuse.low, TexturePaths::Dione::Diffuse.high))}, TextureImage2D(GetTexturePath(TexturePaths::Dione::Normal.low, TexturePaths::Dione::Normal.high)),
-                            L"Dione", L"Диона");
-    SatelliteInfo rheaInfo(sphereModel, 0.119886, *_mainPlanetShader, {TextureImage2D(GetTexturePath(TexturePaths::Rhea::Diffuse.low, TexturePaths::Rhea::Diffuse.high))}, TextureImage2D(GetTexturePath(TexturePaths::Rhea::Normal.low, TexturePaths::Rhea::Normal.high)),
-                            L"Rhea", L"Рея");
-    SatelliteInfo titanInfo(sphereModel, 0.404136, *_mainPlanetShader, {TextureImage2D(GetTexturePath(TexturePaths::Titan::Diffuse.low, TexturePaths::Titan::Diffuse.high))}, TextureImage2D(GetTexturePath(TexturePaths::Titan::Normal.low, TexturePaths::Titan::Normal.high)),
-                            L"Titan", L"Титан");
-    SatelliteInfo iapetusInfo(sphereModel, 0.115288, *_mainPlanetShader, {TextureImage2D(GetTexturePath(TexturePaths::Iapetus::Diffuse.low, TexturePaths::Iapetus::Diffuse.high))}, TextureImage2D(GetTexturePath(TexturePaths::Iapetus::Normal.low, TexturePaths::Iapetus::Normal.high)),
-                            L"Iapetus", L"Япет");
-    shared_ptr<Satellite> mimas = make_shared<Mimas>(mimasInfo, saturn);
-    shared_ptr<Satellite> enceladus = make_shared<Enceladus>(enceladusInfo, saturn);
-    shared_ptr<Satellite> tethys = make_shared<Tethys>(tethysInfo, saturn);
-    shared_ptr<Satellite> dione = make_shared<Dione>(dioneInfo, saturn);
-    shared_ptr<Satellite> rhea = make_shared<Rhea>(rheaInfo, saturn);
-    shared_ptr<Satellite> titan = make_shared<Titan>(titanInfo, saturn);
-    shared_ptr<Satellite> iapetus = make_shared<Iapetus>(iapetusInfo, saturn);
-
-    AtmosphereInfo saturnAtmosphereInfo(sphereModel, *_mainAtmosphereShader, 9.34, glm::vec3(84.f/255, 132.f/255, 176.f/255), saturn->GetRadius() - 0.00007, 18.6);
-    unique_ptr<Atmosphere> saturnAtmosphere = make_unique<Atmosphere>(saturnAtmosphereInfo, saturn);
-
-    AtmosphereInfo titanAtmosphereInfo(sphereModel, *_mainAtmosphereShader, 0.504136, glm::vec3(40.f/255, 33.f/255, 72.f/255), titan->GetRadius() - 0.00007, 0.8429210,
-                                       glm::vec3(0.36862745, 0.0666667, 0.0196078)); 
-    unique_ptr<Atmosphere> titanAtmosphere = make_unique<Atmosphere>(titanAtmosphereInfo, titan);
-
-    const glm::mat4 lightProjection = glm::ortho(-saturn->GetRadius() * 3.0f, saturn->GetRadius() * 3.0f, -saturn->GetRadius() * 3.0f, saturn->GetRadius() * 3.0f, camera.GetNear(), camera.GetFar());
-    const glm::mat4 lightView = glm::lookAt(_sun->GetPosition(), saturn->GetPosition() - _sun->GetPosition(), glm::vec3(0.0, 1.0, 0.0));
-    const glm::mat4 lightSpaceMatrix = lightProjection * lightView;
-
-    RenderableAtmosphere renderableSaturnAtmosphere;
-    renderableSaturnAtmosphere.atmosphere = move(saturnAtmosphere);
-    renderableSaturnAtmosphere.hScaleFactor = 27.0;
-    renderableSaturnAtmosphere.parentEarthSizeCoefficient = saturn->GetEarthSizeCoefficient();
-    renderableSaturnAtmosphere.isUseToneMapping = true;
-
-    RenderableAtmosphere renderableTitanAtmosphere;
-    renderableTitanAtmosphere.atmosphere = move(titanAtmosphere);
-    renderableTitanAtmosphere.hScaleFactor = 4.8;
-    renderableTitanAtmosphere.parentEarthSizeCoefficient = titan->GetEarthSizeCoefficient();
-
-    RenderableSceneComponent saturnSystemComponent;
-    saturnSystemComponent.lightSpaceMatrix = lightSpaceMatrix;
-    saturnSystemComponent.planet = move(saturn);
-    saturnSystemComponent.satellites = vector<shared_ptr<Satellite>>{move(mimas), move(enceladus), move(tethys), move(dione), move(rhea), move(titan), move(iapetus)};
-    saturnSystemComponent.atmospheres.push_back(move(renderableSaturnAtmosphere));
-    saturnSystemComponent.atmospheres.push_back(move(renderableTitanAtmosphere));
-    saturnSystemComponent.planetaryRing = move(saturnRing);
-    _renderableSceneComponents.push_back(move(saturnSystemComponent));
-}
-
-void Application::InitUranusSystem(const MeshHolder& sphereModel) {
-    MeshHolder uranusRingModel("resource/models/uranus_ring.obj");
-
-    PlanetInfo uranusInfo(sphereModel, 3.98085, *_mainPlanetShader,
-            {
-                TextureImage2D(GetTexturePath(TexturePaths::Uranus::Diffuse.low, TexturePaths::Uranus::Diffuse.high)),
-                TextureImage2D("resource/textures_low/Uranus_Clouds_Diffuse_Low.dds")
-            }, TextureImage2D(GetTexturePath(TexturePaths::Uranus::Normal.low, TexturePaths::Uranus::Normal.high)), L"Uranus", L"Уран");
-    shared_ptr<Planet> uranus = make_shared<Uranus>(uranusInfo, _sun);
-    PlanetaryRingInfo uranusRingInfo(uranusRingModel, 12.6, 16.0, *_mainPlanetShader, TextureImage2D("resource/textures_low/Uranus_Rings_Low.dds")); // Radiuses from 3D model
-    unique_ptr<PlanetaryRing> uranusRing = make_unique<UranusRing>(uranusRingInfo, uranus);
-
-    SatelliteInfo mirandaInfo(sphereModel, 0.0368858, *_mainPlanetShader, {TextureImage2D(GetTexturePath(TexturePaths::Miranda::Diffuse.low, TexturePaths::Miranda::Diffuse.high))}, TextureImage2D(GetTexturePath(TexturePaths::Miranda::Normal.low, TexturePaths::Miranda::Normal.high)),
-                            L"Miranda", L"Миранда");
-    SatelliteInfo arielInfo(sphereModel, 0.090865, *_mainPlanetShader, {TextureImage2D(GetTexturePath(TexturePaths::Ariel::Diffuse.low, TexturePaths::Ariel::Diffuse.high))}, TextureImage2D(GetTexturePath(TexturePaths::Ariel::Normal.low, TexturePaths::Ariel::Normal.high)),
-                            L"Ariel", L"Ариэль");
-    SatelliteInfo umbrielInfo(sphereModel, 0.091775, *_mainPlanetShader, {TextureImage2D(GetTexturePath(TexturePaths::Umbriel::Diffuse.low, TexturePaths::Umbriel::Diffuse.high))}, TextureImage2D(GetTexturePath(TexturePaths::Umbriel::Normal.low, TexturePaths::Umbriel::Normal.high)),
-                            L"Umbriel", L"Умбриэль");
-    SatelliteInfo titaniaInfo(sphereModel, 0.123748, *_mainPlanetShader, {TextureImage2D(GetTexturePath(TexturePaths::Titania::Diffuse.low, TexturePaths::Titania::Diffuse.high))}, TextureImage2D(GetTexturePath(TexturePaths::Titania::Normal.low, TexturePaths::Titania::Normal.high)),
-                            L"Titania", L"Титания");
-    SatelliteInfo oberonInfo(sphereModel, 0.11951, *_mainPlanetShader, {TextureImage2D(GetTexturePath(TexturePaths::Oberon::Diffuse.low, TexturePaths::Oberon::Diffuse.high))}, TextureImage2D(GetTexturePath(TexturePaths::Oberon::Normal.low, TexturePaths::Oberon::Normal.high)),
-                            L"Oberon", L"Оберон");
-    shared_ptr<Satellite> miranda = make_shared<Miranda>(mirandaInfo, uranus);
-    shared_ptr<Satellite> ariel = make_shared<Ariel>(arielInfo, uranus);
-    shared_ptr<Satellite> umbriel = make_shared<Umbriel>(umbrielInfo, uranus);
-    shared_ptr<Satellite> titania = make_shared<Titania>(titaniaInfo, uranus);
-    shared_ptr<Satellite> oberon = make_shared<Oberon>(oberonInfo, uranus);
-
-    CloudsInfo uranusCloudsInfo(sphereModel, *_mainCloudsShader, 3.98635, TextureImage2D("resource/textures_low/Uranus_Clouds_Diffuse_Low.dds"),
-                            TextureImage2D("resource/textures_low/Uranus_Clouds_Normal_Low.dds"));
-    unique_ptr<Clouds> uranusClouds = make_unique<UranusClouds>(uranusCloudsInfo, uranus);
-
-    AtmosphereInfo uranusAtmosphereInfo(sphereModel, *_mainAtmosphereShader, 4.0, glm::vec3(45.f/255, 101.f/255, 114.f/255), uranus->GetRadius() - 0.00007, 8.1);
-    unique_ptr<Atmosphere> uranusAtmosphere = make_unique<Atmosphere>(uranusAtmosphereInfo, uranus);
-
-    const glm::mat4 lightProjection = glm::ortho(-uranus->GetRadius() * 3.0f, uranus->GetRadius() * 3.0f, -uranus->GetRadius() * 3.0f, uranus->GetRadius() * 3.0f, camera.GetNear(), camera.GetFar());
-    const glm::mat4 lightView = glm::lookAt(_sun->GetPosition(), uranus->GetPosition() - _sun->GetPosition(), glm::vec3(0.0, 1.0, 0.0));
-    const glm::mat4 lightSpaceMatrix = lightProjection * lightView;
-
-    RenderableAtmosphere renderableUranusAtmosphere;
-    renderableUranusAtmosphere.atmosphere = move(uranusAtmosphere);
-    renderableUranusAtmosphere.hScaleFactor = 24.0;
-    renderableUranusAtmosphere.parentEarthSizeCoefficient = uranus->GetEarthSizeCoefficient();
-    renderableUranusAtmosphere.isUseToneMapping = true;
-
-    RenderableSceneComponent uranusSystemComponent;
-    uranusSystemComponent.lightSpaceMatrix = lightSpaceMatrix;
-    uranusSystemComponent.planet = move(uranus);
-    uranusSystemComponent.satellites = vector<shared_ptr<Satellite>>{move(miranda), move(ariel), move(umbriel), move(titania), move(oberon)};
-    uranusSystemComponent.atmospheres.push_back(move(renderableUranusAtmosphere));
-    uranusSystemComponent.clouds = move(uranusClouds);
-    uranusSystemComponent.planetaryRing = move(uranusRing);
-    _renderableSceneComponents.push_back(move(uranusSystemComponent));
-}
-
-void Application::InitNeptuneSystem(const MeshHolder& sphereModel) {
-    PlanetInfo neptuneInfo(sphereModel, 3.8647, *_mainPlanetShader,
-            {
-                TextureImage2D(GetTexturePath(TexturePaths::Neptune::Diffuse.low, TexturePaths::Neptune::Diffuse.high)),
-                TextureImage2D("resource/textures_low/Neptune_Clouds_Diffuse_Low.dds")
-            }, TextureImage2D(GetTexturePath(TexturePaths::Neptune::Normal.low, TexturePaths::Neptune::Normal.high)), L"Neptune", L"Нептун");
-    shared_ptr<Planet> neptune = make_shared<Neptune>(neptuneInfo, _sun);
-
-    SatelliteInfo tritonInfo(sphereModel, 0.2724, *_mainPlanetShader, {TextureImage2D(GetTexturePath(TexturePaths::Triton::Diffuse.low, TexturePaths::Triton::Diffuse.high))}, TextureImage2D(GetTexturePath(TexturePaths::Triton::Normal.low, TexturePaths::Triton::Normal.high)),
-                             L"Triton", L"Тритон");
-    shared_ptr<Satellite> triton = make_shared<Triton>(tritonInfo, neptune);
-
-    CloudsInfo neptuneCloudsInfo(sphereModel, *_mainCloudsShader, 3.87, TextureImage2D("resource/textures_low/Neptune_Clouds_Diffuse_Low.dds"),
-                                TextureImage2D("resource/textures_low/Neptune_Clouds_Normal_Low.dds"));
-    unique_ptr<Clouds> neptuneClouds = make_unique<NeptuneClouds>(neptuneCloudsInfo, neptune);
-
-    AtmosphereInfo neptuneAtmosphereInfo(sphereModel, *_mainAtmosphereShader, 3.9, glm::vec3(62.f/255, 92.f/255, 169.f/255), neptune->GetRadius() - 0.00007, 7.9);
-    unique_ptr<Atmosphere> neptuneAtmosphere = make_unique<Atmosphere>(neptuneAtmosphereInfo, neptune);
-
-    const glm::mat4 lightProjection = glm::ortho(-neptune->GetRadius() * 3.0f, neptune->GetRadius() * 3.0f, -neptune->GetRadius() * 3.0f, neptune->GetRadius() * 3.0f, camera.GetNear(), camera.GetFar());
-    const glm::mat4 lightView = glm::lookAt(_sun->GetPosition(), neptune->GetPosition() - _sun->GetPosition(), glm::vec3(0.0, 1.0, 0.0));
-    const glm::mat4 lightSpaceMatrix = lightProjection * lightView;
-
-    RenderableAtmosphere renderableNeptuneAtmosphere;
-    renderableNeptuneAtmosphere.atmosphere = move(neptuneAtmosphere);
-    renderableNeptuneAtmosphere.hScaleFactor = 23.0;
-    renderableNeptuneAtmosphere.parentEarthSizeCoefficient = neptune->GetEarthSizeCoefficient();
-    renderableNeptuneAtmosphere.isUseToneMapping = true;
-
-    RenderableSceneComponent neptuneSystemComponent;
-    neptuneSystemComponent.lightSpaceMatrix = lightSpaceMatrix;
-    neptuneSystemComponent.planet = move(neptune);
-    neptuneSystemComponent.satellites = vector<shared_ptr<Satellite>>{move(triton)};
-    neptuneSystemComponent.atmospheres.push_back(move(renderableNeptuneAtmosphere));
-    neptuneSystemComponent.clouds = move(neptuneClouds);
-    _renderableSceneComponents.push_back(move(neptuneSystemComponent));
-}
-
-void Application::InitPlutoSystem(const MeshHolder& sphereModel) {
-    PlanetInfo plutoInfo(sphereModel, 0.18651, *_mainPlanetShader,
-            {
-                TextureImage2D(GetTexturePath(TexturePaths::Pluto::Diffuse.low, TexturePaths::Pluto::Diffuse.high)),
-            }, TextureImage2D(GetTexturePath(TexturePaths::Pluto::Normal.low, TexturePaths::Pluto::Normal.high)), L"Pluto", L"Плутон", TextureImage2D(GetTexturePath(TexturePaths::Pluto::Specular.low, TexturePaths::Pluto::Specular.high)));
-    shared_ptr<Planet> pluto = make_shared<Pluto>(plutoInfo, _sun);
-
-    SatelliteInfo charonInfo(sphereModel, 0.09512, *_mainPlanetShader, {TextureImage2D(GetTexturePath(TexturePaths::Charon::Diffuse.low, TexturePaths::Charon::Diffuse.high))}, TextureImage2D(GetTexturePath(TexturePaths::Charon::Normal.low, TexturePaths::Charon::Normal.high)),
-                             L"Charon", L"Харон", TextureImage2D(GetTexturePath(TexturePaths::Charon::Specular.low, TexturePaths::Charon::Specular.high)));
-    shared_ptr<Satellite> charon  = make_shared<Charon>(charonInfo, pluto);
-
-    AtmosphereInfo plutoAtmosphereInfo(sphereModel, *_mainAtmosphereShader, 0.45, glm::vec3(92.f/255, 120.f/255, 141.f/255), pluto->GetRadius(), 1.0,
-                                       glm::vec3(35.f/255, 52.f/255, 220.f/255));
-    unique_ptr<Atmosphere> plutoAtmosphere = make_unique<Atmosphere>(plutoAtmosphereInfo, pluto);
-
-    const glm::mat4 lightProjection = glm::ortho(-pluto->GetRadius() * 3.0f, pluto->GetRadius() * 3.0f, -pluto->GetRadius() * 3.0f, pluto->GetRadius() * 3.0f, camera.GetNear(), camera.GetFar());
-    const glm::mat4 lightView = glm::lookAt(_sun->GetPosition(), pluto->GetPosition() - _sun->GetPosition(), glm::vec3(0.0, 1.0, 0.0));
-    const glm::mat4 lightSpaceMatrix = lightProjection * lightView;
-
-    RenderableAtmosphere renderablePlutoAtmosphere;
-    renderablePlutoAtmosphere.atmosphere = move(plutoAtmosphere);
-    renderablePlutoAtmosphere.hScaleFactor = 16.0;
-    renderablePlutoAtmosphere.parentEarthSizeCoefficient = pluto->GetEarthSizeCoefficient();
-    renderablePlutoAtmosphere.isUseToneMapping = true;
-
-    RenderableSceneComponent plutoSystemComponent;
-    plutoSystemComponent.lightSpaceMatrix = lightSpaceMatrix;
-    plutoSystemComponent.planet = move(pluto);
-    plutoSystemComponent.satellites = vector<shared_ptr<Satellite>>{move(charon)};
-    plutoSystemComponent.atmospheres.push_back(move(renderablePlutoAtmosphere));
-    _renderableSceneComponents.push_back(move(plutoSystemComponent));
-}
 
 void Application::DisplaySystemInformation() const {
     cout << "GPU Supplier: " << glGetString(GL_VENDOR) << endl;
@@ -1727,8 +453,17 @@ void Application::DisplaySystemInformation() const {
 void Application::LoadWindowIcon() const {
     constexpr auto execIconPath = "resource/icons/solarsystem-logo.png";
     SDL_Surface* windowIcon = IMG_Load(execIconPath);
-    if (windowIcon == nullptr)
-        throw runtime_error(string("Cannot load exe icon ") + execIconPath);
+    if (windowIcon == nullptr) {
+        std::cerr << "WARNING: Cannot load window icon " << execIconPath
+                  << " (" << IMG_GetError() << ")" << std::endl;
+        return;
+    }
+    if (windowIcon->w > 256 || windowIcon->h > 256) {
+        std::cerr << "WARNING: Skipping oversized window icon ("
+                  << windowIcon->w << "x" << windowIcon->h << ")" << std::endl;
+        SDL_FreeSurface(windowIcon);
+        return;
+    }
     GLFWimage image;
     image.pixels = static_cast<unsigned char*>(windowIcon->pixels);
     image.width = windowIcon->w;
@@ -1775,14 +510,14 @@ void Application::ProcessInput(GLFWwindow* window) {
     }
     
     if (glfwGetKey(window, GLFW_KEY_PAGE_UP) == GLFW_PRESS) {
-#ifdef __EMSCRIPTEN__
+#ifdef SOLARSYSTEM_USE_SDL_MIXER
         SetMusicVolume(GetMusicVolume() + 0.05f);
 #else
         _soundEngine->setSoundVolume(clamp(_soundEngine->getSoundVolume() + 0.01, 0.0, 1.0));
 #endif
     }
     if (glfwGetKey(window, GLFW_KEY_PAGE_DOWN) == GLFW_PRESS) {
-#ifdef __EMSCRIPTEN__
+#ifdef SOLARSYSTEM_USE_SDL_MIXER
         SetMusicVolume(GetMusicVolume() - 0.05f);
 #else
         _soundEngine->setSoundVolume(clamp(_soundEngine->getSoundVolume() - 0.01, 0.0, 1.0));
@@ -1948,7 +683,8 @@ void Application::KeyCallback(GLFWwindow*, int key, int, int action, int) {
 }
 
 bool Application::WGLExtensionSupported(const char* extensionName) {
-#ifdef __EMSCRIPTEN__
+#if defined(__EMSCRIPTEN__) || !defined(_WIN32)
+    (void)extensionName;
     return false;
 #else
     PFNWGLGETEXTENSIONSSTRINGEXTPROC wglGetExtensionsStringEXT = nullptr;
@@ -1958,7 +694,7 @@ bool Application::WGLExtensionSupported(const char* extensionName) {
 }
 
 void Application::VertSync(bool enable) {
-#ifdef __EMSCRIPTEN__
+#if defined(__EMSCRIPTEN__) || !defined(_WIN32)
     glfwSwapInterval(enable ? 1 : 0);
 #else
     PFNWGLSWAPINTERVALEXTPROC wglSwapIntervalEXT = nullptr;
@@ -1982,143 +718,69 @@ void Application::StopSearchNearestPlanet() {
 #endif
 }
 
-void Application::UpdatePlanetSystemLoading() {
-#ifdef __EMSCRIPTEN__
-    const glm::vec3 camPos = camera.GetPosition();
-    for (auto& manifest : _planetSystemManifests) {
-        if (manifest.state == PlanetSystemManifest::State::READY) continue;
 
-        if (manifest.state == PlanetSystemManifest::State::NOT_LOADED) {
-            float dist = glm::length(camPos - manifest.proxyPosition);
-            if (dist < manifest.activationRadius) {
-                std::cout << "[StagedLoading] Camera within " << dist
-                          << " units — starting download for " << manifest.name << std::endl;
-                manifest.state = PlanetSystemManifest::State::DOWNLOADING;
-                manifest.totalDownloads = static_cast<int>(manifest.assetPaths.size());
-                manifest.pendingDownloads = manifest.totalDownloads;
+void Application::ApplyOrbitScaleMode(int mode) {
+    const auto scaleMode = mode == 1 ? OrbitLayout::ScaleMode::Realistic : OrbitLayout::ScaleMode::Compressed;
+    OrbitLayout::SetScaleMode(scaleMode);
+    RefreshPlanetProxyPositions();
+    std::cout << "[OrbitScale] " << (scaleMode == OrbitLayout::ScaleMode::Realistic ? "realistic" : "compressed")
+              << " distances active" << std::endl;
+}
 
-                // Download required assets — decrement pendingDownloads on completion (success or failure)
-                for (const auto& path : manifest.assetPaths) {
-                    WebResourceFetcher::DownloadFile(path, path, [&manifest](bool success) {
-                        manifest.pendingDownloads--;
-                        if (!success) {
-                            std::cerr << "[StagedLoading] Required asset failed for "
-                                      << manifest.name << std::endl;
-                        }
-                    });
-                }
+void Application::FocusPlanetByIndex(int idx) {
+    idx = std::clamp(idx, 0, 9);
+    _focusedPlanetIndex = idx;
 
-                // Download optional assets (moons, rings, clouds) — fire-and-forget.
-                // These do NOT block init; failure is expected when textures are not yet deployed.
-                for (const auto& path : manifest.optionalAssetPaths) {
-                    WebResourceFetcher::DownloadFile(path, path, [name = manifest.name](bool success) {
-                        if (!success) {
-                            std::cout << "[StagedLoading] Optional asset unavailable for "
-                                      << name << " — fallback texture will be used." << std::endl;
-                        }
-                    });
-                }
-            }
+    glm::vec3 target(0.0f);
+    float focusRadius = 10.0f;
+
+    if (idx == 0) {
+        if (_sun) {
+            target = _sun->GetPosition();
         }
-
-        if (manifest.state == PlanetSystemManifest::State::DOWNLOADING) {
-            if (manifest.pendingDownloads <= 0) {
-                std::cout << "[StagedLoading] Required assets ready for " << manifest.name
-                          << " — initializing system." << std::endl;
-                manifest.initFunc();
-                manifest.state = PlanetSystemManifest::State::READY;
-            }
+        focusRadius = 40.0f;
+    } else {
+        const size_t componentIndex = static_cast<size_t>(idx - 1);
+        if (componentIndex < _renderableSceneComponents.size()) {
+            const auto& planet = _renderableSceneComponents[componentIndex].planet;
+            target = planet->GetPosition();
+            focusRadius = std::max(planet->GetRadius() * 4.0f, 2.0f);
+        } else {
+            target = OrbitLayout::GetOffset(static_cast<OrbitLayout::Body>(idx));
+            focusRadius = 20.0f;
         }
     }
+
+    const glm::vec3 offset = glm::normalize(glm::vec3(0.7f, 0.3f, 0.7f)) * (focusRadius + 30.0f);
+    const glm::vec3 cameraPos = target + offset;
+    const glm::vec3 lookDir = glm::normalize(target - cameraPos);
+    const float yaw = glm::degrees(std::atan2(lookDir.z, lookDir.x));
+    const float pitch = glm::degrees(std::asin(lookDir.y));
+    camera.StartTransitionTo(cameraPos, yaw, pitch, 2.0f);
+
+#ifdef __EMSCRIPTEN__
+    EM_ASM({
+        if (typeof window.onPlanetFocused === 'function') {
+            window.onPlanetFocused($0);
+        }
+    }, idx);
 #endif
 }
 
-void Application::UpdateLOD() {
-#ifdef __EMSCRIPTEN__
-    if (_renderableSceneComponents.empty()) return;
-
-    const glm::vec3 camPos = camera.GetPosition();
-
-    if (g_qualityPreset == 0) {
-        // Low preset: force downgrade/cancel every high-res scene texture and skip upgrades.
-        const glm::vec3 fakeFar = camPos + glm::vec3(100000.0f, 0.0f, 0.0f);
-        for (auto& rc : _renderableSceneComponents) {
-            if (rc.planet) rc.planet->LoadHighResIfClose(fakeFar);
-            for (auto& satellite : rc.satellites) satellite->LoadHighResIfClose(fakeFar);
-            if (rc.planetaryRing) rc.planetaryRing->LoadHighResIfClose(fakeFar);
-            if (rc.clouds) rc.clouds->LoadHighResIfClose(fakeFar);
-        }
-        return;
-    }
-
-    // Call on *all* ready planets: far ones will downgrade if loaded + past hysteresis;
-    // near ones will upgrade if appropriate.
-    for (auto& rc : _renderableSceneComponents) {
-        if (rc.planet) {
-            rc.planet->LoadHighResIfClose(camPos);
-        }
-        for (auto& satellite : rc.satellites) {
-            satellite->LoadHighResIfClose(camPos);
-        }
-        if (rc.planetaryRing) {
-            rc.planetaryRing->LoadHighResIfClose(camPos);
-        }
-        if (rc.clouds) {
-            rc.clouds->LoadHighResIfClose(camPos);
-        }
-    }
-#endif
+int Application::GetFocusedPlanetIndex() const {
+    return _focusedPlanetIndex;
 }
 
-void Application::ApplyQualityPreset(int preset) {
-    g_qualityPreset = std::clamp(preset, 0, 2);
-    const auto settings = GetQualitySettings(g_qualityPreset, g_isMobileWeb);
-
-    TextureLoadingQueue::GetInstance().SetMaxConcurrentLoads(settings.maxConcurrentTextureLoads);
-
-    if (gShadowQuality > 0) {
-        gShadowQuality = g_qualityPreset + 1;
+int Application::GetNearestPlanetIndexForJs() const {
+    if (_nearestPlanetIndex < 0) {
+        return -1;
     }
-
-    if (gShadowQuality > 0 && _shadowMapFBO &&
-        (_shadowMapFBO->GetShadowMapWidth() != settings.shadowResolution ||
-         _shadowMapFBO->GetShadowMapHeight() != settings.shadowResolution)) {
-        _shadowMapFBO = make_unique<ShadowMapFBO>(settings.shadowResolution, settings.shadowResolution);
-    }
-
-    const double shadowMemoryMiB =
-        static_cast<double>(settings.shadowResolution) * settings.shadowResolution * 4.0 / (1024.0 * 1024.0);
-    std::cout << "[Quality] " << settings.name
-              << ": shadow=" << settings.shadowResolution << "x" << settings.shadowResolution
-              << " (~" << fixed << setprecision(1) << shadowMemoryMiB << " MiB depth storage), high-res concurrency="
-              << settings.maxConcurrentTextureLoads
-              << ", LOD distance multiplier=" << (g_qualityPreset == 1 ? 1.5f : 1.0f)
-              << ", MSAA=" << settings.requestedMsaaSamples << "x" << defaultfloat << std::endl;
-#ifdef __EMSCRIPTEN__
-    std::cout << "[Quality] WebGL MSAA is fixed when the context is created; reload with ?quality="
-              << settings.name << " to change it." << std::endl;
-#endif
+    return static_cast<int>(_nearestPlanetIndex) + 1;
 }
 
-void Application::ApplyShadowQuality(int quality) {
-    gShadowQuality = std::clamp(quality, 0, 3);
-    if (gShadowQuality == 0) {
-        std::cout << "[Shadows] disabled" << std::endl;
-        return;
-    }
-
-    const auto settings = GetQualitySettings(gShadowQuality - 1, g_isMobileWeb);
-    if (_shadowMapFBO &&
-        (_shadowMapFBO->GetShadowMapWidth() != settings.shadowResolution ||
-         _shadowMapFBO->GetShadowMapHeight() != settings.shadowResolution)) {
-        _shadowMapFBO = make_unique<ShadowMapFBO>(settings.shadowResolution, settings.shadowResolution);
-    }
-    std::cout << "[Shadows] " << settings.shadowResolution << "x"
-              << settings.shadowResolution << std::endl;
-}
 
 void Application::SetMusicVolume(float volume) {
-#ifdef __EMSCRIPTEN__
+#ifdef SOLARSYSTEM_USE_SDL_MIXER
     _musicVolume = glm::clamp(volume, 0.0f, 1.0f);
     if (!_musicMuted && _mixerInitialized && Mix_PlayingMusic()) {
         Mix_VolumeMusic(static_cast<int>(MIX_MAX_VOLUME * _musicVolume));
@@ -2129,7 +791,7 @@ void Application::SetMusicVolume(float volume) {
 }
 
 float Application::GetMusicVolume() const {
-#ifdef __EMSCRIPTEN__
+#ifdef SOLARSYSTEM_USE_SDL_MIXER
     return _musicVolume;
 #else
     return _soundEngine->getSoundVolume();
@@ -2137,7 +799,7 @@ float Application::GetMusicVolume() const {
 }
 
 void Application::SetMusicMuted(bool muted) {
-#ifdef __EMSCRIPTEN__
+#ifdef SOLARSYSTEM_USE_SDL_MIXER
     _musicMuted = muted;
     if (!_mixerInitialized) {
         return;
@@ -2155,47 +817,13 @@ void Application::SetMusicMuted(bool muted) {
 }
 
 bool Application::GetMusicMuted() const {
-#ifdef __EMSCRIPTEN__
+#ifdef SOLARSYSTEM_USE_SDL_MIXER
     return _musicMuted;
 #else
     return false;
 #endif
 }
 
-void Application::RenderPlanetProxyMarkers() const {
-#ifdef __EMSCRIPTEN__
-    if (_planetSystemManifests.empty()) return;
-
-    glDisable(GL_DEPTH_TEST);
-    glEnable(GL_BLEND);
-    glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
-
-    _mainTextShader->Use();
-    _mainTextShader->SetMat4("projection", _cameraProjection);
-    _mainTextShader->SetMat4("view", _cameraView);
-    _mainTextShader->SetBool("is3D", true);
-
-    for (const auto& manifest : _planetSystemManifests) {
-        if (manifest.state == PlanetSystemManifest::State::READY) continue;
-
-        std::wstring label(manifest.name.begin(), manifest.name.end());
-        if (manifest.state == PlanetSystemManifest::State::NOT_LOADED) {
-            label += L" (approach to load)";
-        } else if (manifest.state == PlanetSystemManifest::State::DOWNLOADING) {
-            int done = manifest.totalDownloads - manifest.pendingDownloads;
-            int pct = (manifest.totalDownloads > 0) ? (done * 100 / manifest.totalDownloads) : 0;
-            label += L" [downloading " + std::to_wstring(pct) + L"%]";
-        }
-
-        std::deque<wchar_t> chars(label.begin(), label.end());
-        _mainTextShader->SetVec3("particleCenterWorldSpace", manifest.proxyPosition);
-        _textRenderer->Render(*_mainTextShader, chars, 0.0, 0.0, 0.075, glm::vec3(0.5f, 0.7f, 1.0f));
-    }
-
-    glDisable(GL_BLEND);
-    glEnable(GL_DEPTH_TEST);
-#endif
-}
 
 void Application::StartSearchNearestPlanet() {
     _isSearchNearestPlanet = true;
@@ -2249,7 +877,7 @@ void Application::UpdateSearchNearestPlanet() {
 void Application::StartPlayBackgroundMusic() {
     _isBackgroundMusicPlay = true;
 
-#ifdef __EMSCRIPTEN__
+#ifdef SOLARSYSTEM_USE_SDL_MIXER
     _currentSongIndex = 0;
     _musicStartTime = 0;
     _musicDuration = 0;
@@ -2293,7 +921,7 @@ void Application::StartPlayBackgroundMusic() {
 }
 
 void Application::UpdateBackgroundMusic() {
-#ifdef __EMSCRIPTEN__
+#ifdef SOLARSYSTEM_USE_SDL_MIXER
     if (!_isBackgroundMusicPlay || !_mixerInitialized || _musicMuted || _backgroundSongPaths.empty())
         return;
 
@@ -2359,7 +987,7 @@ void Application::UpdateBackgroundMusic() {
 
 void Application::StopPlayBackgroundMusic() {
     _isBackgroundMusicPlay = false;
-#ifdef __EMSCRIPTEN__
+#ifdef SOLARSYSTEM_USE_SDL_MIXER
     if (_currentMusic) {
         Mix_HaltMusic();
         Mix_FreeMusic(_currentMusic);
@@ -2383,9 +1011,9 @@ void Application::Dispose() {
     StopSearchNearestPlanet();
     StopPlayBackgroundMusic();
     
-#ifdef __EMSCRIPTEN__
+#ifdef SOLARSYSTEM_USE_SDL_MIXER
     Mix_CloseAudio();
-#else
+#elif !defined(__EMSCRIPTEN__)
     _soundEngine->drop();
 #endif
 }
@@ -2405,18 +1033,6 @@ glm::vec3 Application::CurrentFpsColor() const {
         return {0.239, 0.949, 0.45};
 }
 
-void Application::ConfigureMainPlanetShader(const RenderableSceneComponent& renderableComponent) {
-    _mainPlanetShader->SetMat4("lightSpaceMatrix", renderableComponent.lightSpaceMatrix);
-    _mainPlanetShader->SetBool("isNearbyPlanetaryRing", renderableComponent.planetaryRing != nullptr);
-
-    if (renderableComponent.planetaryRing) {
-        _mainPlanetShader->SetVec3("ringCenter", renderableComponent.planetaryRing->GetPosition());
-        _mainPlanetShader->SetVec3("ringNormal", renderableComponent.planetaryRing->GetRingNormal());
-        _mainPlanetShader->SetVec2("ringInnerOuterRadiuses", glm::vec2(renderableComponent.planetaryRing->GetInnerRadius(), renderableComponent.planetaryRing->GetOuterRadius()));
-        _mainPlanetShader->SetInt("ringDiffuse", 7);
-        glBindTextureUnit(7, renderableComponent.planetaryRing->GetRingTexture());
-    }
-}
 
 Application::~Application() {
     if (activeApplication == this) {

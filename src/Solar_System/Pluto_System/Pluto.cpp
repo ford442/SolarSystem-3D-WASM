@@ -1,10 +1,11 @@
 #include "Pluto.h"
 #include "../../Auxiliary_Modules/TextureLoadingQueue.h"
+#include "../OrbitLayout.h"
 
 Pluto::Pluto(const PlanetInfo& planetInfo, std::shared_ptr<Star> parentStar) : Planet(planetInfo, std::move(parentStar)), _diffuses(planetInfo.diffuseTextures),
     _normalMap(planetInfo.normalMap), _specular(planetInfo.specularTexture)
 {
-    Translate(_parentStar->GetPosition() + glm::vec3(2800.0f, 0.0f, 1757.73f));
+    Translate(_parentStar->GetPosition() + OrbitLayout::GetOffset(OrbitLayout::Body::Pluto));
 #ifdef __EMSCRIPTEN__
     _isHighResLoaded = false;
     _isHighResLoading = false;
@@ -21,7 +22,7 @@ void Pluto::AdjustToParent(float timeScale) {
     }
 
     LoadIdentityModelMatrix();
-    Translate(_parentStar->GetPosition() + glm::vec3(2800.0f, 0.0f, 1757.73f));
+    Translate(_parentStar->GetPosition() + OrbitLayout::GetOffset(OrbitLayout::Body::Pluto));
     Scale(glm::vec3(_earthSizeCoefficient));
     Rotate(rotationAngle, glm::vec3(0.0f, 1.0f, 0.0f));
     UpdateModelMatrix();

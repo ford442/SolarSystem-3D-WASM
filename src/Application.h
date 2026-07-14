@@ -1,6 +1,8 @@
 #ifndef SOLARSYSTEM_APPLICATION_H
 #define SOLARSYSTEM_APPLICATION_H
+#include "ApplicationTypes.h"
 #include "Auxiliary_Modules/AuxiliaryModules.h"
+#include "PlanetSystemManifest.h"
 #include "Solar_System/SolarSystem.h"
 #include "SystemModules.h"
 #include <atomic>
@@ -9,6 +11,9 @@
 
 #ifdef __EMSCRIPTEN__
 #include <emscripten.h>
+#endif
+
+#ifdef SOLARSYSTEM_USE_SDL_MIXER
 #include <SDL_mixer.h>
 #else
 #include <irrKlang.h>
@@ -23,43 +28,6 @@ namespace {
     bool isFirstMouse = true, isTimeRun = true, isRenderHints = true, isRenderPlanetStarDistances = true, isRenderSatelliteDistances = true, isVertSyncEnabled = true;
 }
 
-struct RenderableAtmosphere {
-    std::unique_ptr<Atmosphere> atmosphere;
-    float hScaleFactor, parentEarthSizeCoefficient;
-    bool isUseToneMapping = false;
-};
-
-struct RenderableSceneComponent {
-    glm::mat4 lightSpaceMatrix;
-    std::shared_ptr<Planet> planet;
-    std::vector<std::shared_ptr<Satellite>> satellites;
-    std::vector<RenderableAtmosphere> atmospheres;
-    std::unique_ptr<Clouds> clouds;
-    std::unique_ptr<PlanetaryRing> planetaryRing;
-};
-
-// Staged-loading manifest for a planet system (WASM only)
-struct PlanetSystemManifest {
-    std::string name;                       // e.g. "Jupiter"
-    glm::vec3 proxyPosition;                // Fixed orbital position for distance check
-    float activationRadius;                 // Camera must be within this distance to trigger
-    std::vector<std::string> assetPaths;    // Required assets (low-res planet textures); block init until ready
-    std::vector<std::string> optionalAssetPaths; // Optional assets (moons, rings, clouds); fire-and-forget
-    std::function<void()> initFunc;         // Calls InitXxxSystem()
-    // Registered for deployment/auditing; fetched only when the camera crosses
-    // the owning object's LOD threshold.
-    std::vector<std::string> optionalHighResAssetPaths;
-
-    enum class State { NOT_LOADED, DOWNLOADING, READY } state = State::NOT_LOADED;
-    // Counts only required assets. Decremented in download completion callbacks,
-    // which run on the main thread (emscripten_async_wget2 onload/onerror and the
-    // native synchronous stub), so no atomic/locking is needed. Keeping this a
-    // plain int also keeps PlanetSystemManifest copyable, which is required for
-    // the brace-initializer-list assignment of _planetSystemManifests.
-    int pendingDownloads{0};
-    int totalDownloads{0};
-};
-
 class Application {
 public:
     Application();
@@ -68,6 +36,10 @@ public:
     void RunOneFrame(); // For Emscripten main loop
     void ApplyQualityPreset(int preset);
     void ApplyShadowQuality(int quality);
+    void ApplyOrbitScaleMode(int mode);
+    void FocusPlanetByIndex(int idx);
+    int GetFocusedPlanetIndex() const;
+    int GetNearestPlanetIndexForJs() const;
     void SetMusicVolume(float volume);
     float GetMusicVolume() const;
     void SetMusicMuted(bool muted);
@@ -82,23 +54,30 @@ private:
     GLFWwindow* _mainWindow = nullptr;
     uint16_t _displayWidth = 0, _displayHeight = 0;
     ssize_t _nearestPlanetIndex = -1;  // -1 when no planets are loaded yet
+    int _focusedPlanetIndex = -1;      // FocusPlanet index (0=sun … 9=pluto); -1 = none
     FPS_Handler _fpsHandler;
     FT_Library _ft = nullptr;
     bool _isBackgroundMusicPlay = false, _isSearchNearestPlanet = false;
     
-#ifdef __EMSCRIPTEN__
+#ifdef SOLARSYSTEM_USE_SDL_MIXER
     Mix_Music* _currentMusic = nullptr;
     int _currentSongIndex = 0;
     uint32_t _musicStartTime = 0;
     uint32_t _musicDuration = 0;
-    int _nearestPlanetSearchFrameCounter = 0;
     bool _mixerInitialized = false;
     float _musicVolume = 0.3f;
     bool _musicMuted = false;
     std::unordered_set<std::string> _availableSongPaths;
-#else
+#endif
+#ifndef __EMSCRIPTEN__
+    std::unique_ptr<std::thread> _searchNearestPlanetThread;
+#endif
+#ifdef __EMSCRIPTEN__
+    int _nearestPlanetSearchFrameCounter = 0;
+#endif
+#ifndef SOLARSYSTEM_USE_SDL_MIXER
     ISoundEngine* _soundEngine = nullptr;
-    std::unique_ptr<std::thread> _backgroundMusicThread, _searchNearestPlanetThread;
+    std::unique_ptr<std::thread> _backgroundMusicThread;
 #endif
     
     std::string _currentMusicTrack;
@@ -106,6 +85,7 @@ private:
     std::unique_ptr<TextRenderer> _textRenderer;
     std::unique_ptr<ShadowMapFBO> _shadowMapFBO;
     std::unique_ptr<HDR> _hdr;
+    bool _hdrEnabled = true;
     std::unique_ptr<SkyBox> _skyBox;
     std::unique_ptr<Shader> _shadowMapShader;
     std::unique_ptr<Shader> _mainSkyBoxShader, _mainTextShader, _mainStarShader, _mainCoronaStarShader, _mainPlanetShader, _mainAtmosphereShader, _mainCloudsShader,
@@ -133,6 +113,8 @@ private:
     void LoadOptionalSounds(); // Fire-and-forget background music downloads (WASM)
     void InitSceneObjects();
     void InitStarSystem();
+    void LoadPlanetSystemManifests(); // WASM: parse resource/planet_manifest.json
+    std::function<void()> MakePlanetInitFunc(const std::string& initTag);
     void InitMercury(const MeshHolder& sphereModel);
     void InitVenus(const MeshHolder& sphereModel);
     void InitEarthSystem(const MeshHolder& sphereModel);
@@ -146,6 +128,8 @@ private:
     void Dispose();
     void UpdateLoadingProgress(); // Update JavaScript loading progress bar
     void UpdatePlanetSystemLoading(); // Staged download + init of planet systems (WASM)
+    void RefreshPlanetProxyPositions(); // Keep WASM proxy markers aligned with orbit scale
+    void ApplyRenderResources(uint16_t shadowResolution, bool enableHdr);
     void UpdateLOD();             // Central LOD manager: upgrade textures for nearest planets (WASM)
     void RenderPlanetProxyMarkers() const; // Show orbital markers for unloaded planets (WASM)
     void StartSearchNearestPlanet();

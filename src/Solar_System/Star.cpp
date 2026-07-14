@@ -6,6 +6,9 @@ Star::Star(const StarInfo& starInfo) : SpaceObject(starInfo.starModel, *starInfo
 {
     InitBuffers();
     _starOcclusion.fill(0);
+#ifndef __EMSCRIPTEN__
+    glGenQueries(static_cast<GLsizei>(_starOcclusion.size()), _starOcclusion.data());
+#endif
     _starTemperatureColorUCoordinate = glm::clamp((_starTemperature - 800.0f) / 29200.f, 0.0f, 1.0f);
     CalculateShiftColor();
 }

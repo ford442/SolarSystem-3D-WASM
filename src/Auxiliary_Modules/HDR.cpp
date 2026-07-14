@@ -1,8 +1,11 @@
 #include "HDR.h"
 
-HDR::HDR(const Shader& shader, uint16_t width, uint16_t height) : _hdrShader(&shader) {
+HDR::HDR(const Shader& shader, uint16_t width, uint16_t height, bool enabled)
+    : _hdrShader(&shader), _enabled(enabled), _width(width), _height(height) {
     InitQuadBuffers();
-    InitFBO(width, height);
+    if (_enabled) {
+        InitFBO(width, height);
+    }
 }
 
 HDR::~HDR() {
@@ -14,21 +17,47 @@ HDR::~HDR() {
         glDeleteBuffers(1, &_quadVbo);
         _quadVbo = 0;
     }
-    if (_hdrFrameBuffer != 0) {
-        glDeleteFramebuffers(1, &_hdrFrameBuffer);
-        _hdrFrameBuffer = 0;
+    DestroyFBO();
+}
+
+void HDR::SetEnabled(bool enabled, uint16_t width, uint16_t height) {
+    if (enabled == _enabled && (!_enabled || (width == _width && height == _height))) {
+        return;
     }
-    if (_colorBuffer != 0) {
-        glDeleteTextures(1, &_colorBuffer);
-        _colorBuffer = 0;
-    }
-    if (_rboDepth != 0) {
-        glDeleteRenderbuffers(1, &_rboDepth);
-        _rboDepth = 0;
+
+    _enabled = enabled;
+    _width = width;
+    _height = height;
+    DestroyFBO();
+    if (_enabled) {
+        InitFBO(width, height);
     }
 }
 
+bool HDR::IsEnabled() const {
+    return _enabled;
+}
+
+void HDR::Resize(uint16_t width, uint16_t height) {
+    if (!_enabled) {
+        _width = width;
+        _height = height;
+        return;
+    }
+    if (width == _width && height == _height) {
+        return;
+    }
+    _width = width;
+    _height = height;
+    DestroyFBO();
+    InitFBO(width, height);
+}
+
 void HDR::Render(float exposure, float gamma) const {
+    if (!_enabled || _colorBuffer == 0) {
+        return;
+    }
+
     _hdrShader->Use();
     _hdrShader->SetInt("hdrBuffer", 0);
     glBindTextureUnit(0, _colorBuffer);
@@ -43,6 +72,21 @@ void HDR::Render(float exposure, float gamma) const {
 
 GLuint HDR::GetHdrFBO() const {
     return _hdrFrameBuffer;
+}
+
+void HDR::DestroyFBO() {
+    if (_hdrFrameBuffer != 0) {
+        glDeleteFramebuffers(1, &_hdrFrameBuffer);
+        _hdrFrameBuffer = 0;
+    }
+    if (_colorBuffer != 0) {
+        glDeleteTextures(1, &_colorBuffer);
+        _colorBuffer = 0;
+    }
+    if (_rboDepth != 0) {
+        glDeleteRenderbuffers(1, &_rboDepth);
+        _rboDepth = 0;
+    }
 }
 
 void HDR::InitQuadBuffers() {

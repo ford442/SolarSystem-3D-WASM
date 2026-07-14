@@ -1,10 +1,11 @@
 #include "Saturn.h"
 #include "../../Auxiliary_Modules/TextureLoadingQueue.h"
+#include "../OrbitLayout.h"
 
 Saturn::Saturn(const PlanetInfo& planetInfo, std::shared_ptr<Star> parentStar) : Planet(planetInfo, std::move(parentStar)), _diffuses(planetInfo.diffuseTextures),
 _normalMap(planetInfo.normalMap)
 {
-    Translate(_parentStar->GetPosition() + glm::vec3(0.0f, -100.f, 2450.0f));
+    Translate(_parentStar->GetPosition() + OrbitLayout::GetOffset(OrbitLayout::Body::Saturn));
 #ifdef __EMSCRIPTEN__
     _isHighResLoaded = false;
     _isHighResLoading = false;
@@ -21,7 +22,7 @@ void Saturn::AdjustToParent(float timeScale) {
     }
 
     LoadIdentityModelMatrix();
-    Translate(_parentStar->GetPosition() + glm::vec3(0.0f, -100.f, 2450.0f));
+    Translate(_parentStar->GetPosition() + OrbitLayout::GetOffset(OrbitLayout::Body::Saturn));
     Scale(glm::vec3(_earthSizeCoefficient));
     Rotate(-26.7f, glm::vec3(0, 0, 1));
     Rotate(-15.f, glm::vec3(1, 0, 0));

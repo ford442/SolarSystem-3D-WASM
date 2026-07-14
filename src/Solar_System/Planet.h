@@ -9,7 +9,7 @@
 #include <limits>
 
 #ifdef __EMSCRIPTEN__
-extern int g_qualityPreset;
+#include "../QualitySettings.h"
 #endif
 
 struct PlanetInfo {

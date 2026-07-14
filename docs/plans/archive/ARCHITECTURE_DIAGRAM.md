@@ -1,3 +1,7 @@
+# Architecture Diagram (archived)
+
+> **Superseded by [docs/ARCHITECTURE.md](../../ARCHITECTURE.md).** This diagram references `LoadResources()`; the current code uses `LoadCoreResources()` plus staged planet manifests.
+
 # Architecture Diagram: Progress Bar and LOD System
 
 ## System Flow Diagram

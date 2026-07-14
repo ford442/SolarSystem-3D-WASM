@@ -19,8 +19,12 @@
 #else
     #include <GL/glew.h>
     #include <GLFW/glfw3.h>
-    #include <irrKlang.h>
-    using namespace irrklang;
+    #ifdef SOLARSYSTEM_USE_SDL_MIXER
+        #include <SDL2/SDL_mixer.h>
+    #else
+        #include <irrKlang.h>
+        using namespace irrklang;
+    #endif
 #endif
 
 #include <ft2build.h>

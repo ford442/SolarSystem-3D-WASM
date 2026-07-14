@@ -9,6 +9,8 @@
     "build:emcc": "bash ../build-web.sh",
     "build": "npm run build:emcc && tsc && vite build",
     "preview": "vite preview",
+    "serve:mock-cdn": "node scripts/mock-asset-cdn.mjs",
+    "verify:cross-origin": "node verify-cross-origin-fetch.js",
     "test:textures": "node verify-textures.js"
   },
   "devDependencies": {

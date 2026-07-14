@@ -1,12 +1,13 @@
 #include "Earth.h"
 #include "../../Auxiliary_Modules/TextureLoadingQueue.h"
+#include "../OrbitLayout.h"
 #include <glm/glm.hpp>
 #include <iostream>
 
 Earth::Earth(const PlanetInfo& planetInfo, std::shared_ptr<Star> parentStar) : Planet(planetInfo, std::move(parentStar)), _diffuses(planetInfo.diffuseTextures),
     _normalMap(planetInfo.normalMap), _specular(planetInfo.specularTexture)
 {
-    Translate(_parentStar->GetPosition() + glm::vec3(1900.0f, 0.0f, 0.0f));
+    Translate(_parentStar->GetPosition() + OrbitLayout::GetOffset(OrbitLayout::Body::Earth));
 #ifdef __EMSCRIPTEN__
     _isHighResLoaded = false;
     _isHighResLoading = false;
@@ -23,7 +24,7 @@ void Earth::AdjustToParent(float timeScale) {
     }
 
     LoadIdentityModelMatrix();
-    Translate(_parentStar->GetPosition() + glm::vec3(1900.0f, 0.0f, 0.0f));
+    Translate(_parentStar->GetPosition() + OrbitLayout::GetOffset(OrbitLayout::Body::Earth));
     Scale(glm::vec3(_earthSizeCoefficient));
     Rotate(-23.4f, glm::vec3(0, 0, 1));
     Rotate(rotationAngle, glm::vec3(0.0f, 1.0f, 0.0f));

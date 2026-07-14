@@ -1,10 +1,11 @@
 #include "Uranus.h"
 #include "../../Auxiliary_Modules/TextureLoadingQueue.h"
+#include "../OrbitLayout.h"
 
 Uranus::Uranus(const PlanetInfo& planetInfo, std::shared_ptr<Star> parentStar) : Planet(planetInfo, std::move(parentStar)), _diffuses(planetInfo.diffuseTextures),
     _normalMap(planetInfo.normalMap)
 {
-    Translate(_parentStar->GetPosition() + glm::vec3(0.0f, 0.0f, -2650.0f));
+    Translate(_parentStar->GetPosition() + OrbitLayout::GetOffset(OrbitLayout::Body::Uranus));
 #ifdef __EMSCRIPTEN__
     _isHighResLoaded = false;
     _isHighResLoading = false;
@@ -21,7 +22,7 @@ void Uranus::AdjustToParent(float timeScale) {
     }
 
     LoadIdentityModelMatrix();
-    Translate(_parentStar->GetPosition() + glm::vec3(0.0f, 0.0f, -2650.0f));
+    Translate(_parentStar->GetPosition() + OrbitLayout::GetOffset(OrbitLayout::Body::Uranus));
     Scale(glm::vec3(_earthSizeCoefficient));
     Rotate(81.2f, glm::vec3(1, 0, 0));
     Rotate(rotationAngle, glm::vec3(0, 1, 0));

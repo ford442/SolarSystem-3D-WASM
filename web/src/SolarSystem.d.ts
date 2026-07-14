@@ -30,6 +30,8 @@ export type GetShadowQuality = () => ShadowQuality;
 
 export type PlanetIndex = 0 | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9;
 
+export type OrbitScaleMode = 0 | 1;
+
 export type SetMusicVolume = (volume: number) => void;
 export type GetMusicVolume = () => number;
 export type SetMusicMuted = (muted: boolean) => void;
@@ -37,6 +39,14 @@ export type GetMusicMuted = () => number;
 
 /** Planet index accepted by FocusPlanet: 0=sun, 1=Mercury, ..., 9=Pluto. */
 export type FocusPlanet = (index: PlanetIndex) => void;
+
+/** 0=compressed artistic orbits, 1=AU-proportional spacing. */
+export type SetOrbitScaleMode = (mode: OrbitScaleMode) => void;
+export type GetOrbitScaleMode = () => OrbitScaleMode;
+/** Returns 1–9 for nearest loaded planet, or -1 when unknown. */
+export type GetNearestPlanetIndex = () => number;
+export type GetFocusedPlanetIndex = () => number;
+export type GetPlanetSceneDistance = (index: PlanetIndex) => number;
 
 export interface SolarSystemCwrap {
   (
@@ -129,6 +139,31 @@ export interface SolarSystemCwrap {
     returnType: null,
     argTypes: ['number'],
   ): FocusPlanet;
+  (
+    ident: 'SetOrbitScaleMode',
+    returnType: null,
+    argTypes: ['number'],
+  ): SetOrbitScaleMode;
+  (
+    ident: 'GetOrbitScaleMode',
+    returnType: 'number',
+    argTypes: [],
+  ): GetOrbitScaleMode;
+  (
+    ident: 'GetNearestPlanetIndex',
+    returnType: 'number',
+    argTypes: [],
+  ): GetNearestPlanetIndex;
+  (
+    ident: 'GetFocusedPlanetIndex',
+    returnType: 'number',
+    argTypes: [],
+  ): GetFocusedPlanetIndex;
+  (
+    ident: 'GetPlanetSceneDistance',
+    returnType: 'number',
+    argTypes: ['number'],
+  ): GetPlanetSceneDistance;
 }
 
 export interface SolarSystemModuleConfig {
@@ -161,6 +196,11 @@ export interface SolarSystemModule {
   _SetMusicMuted: SetMusicMuted;
   _GetMusicMuted: GetMusicMuted;
   _FocusPlanet: FocusPlanet;
+  _SetOrbitScaleMode: SetOrbitScaleMode;
+  _GetOrbitScaleMode: GetOrbitScaleMode;
+  _GetNearestPlanetIndex: GetNearestPlanetIndex;
+  _GetFocusedPlanetIndex: GetFocusedPlanetIndex;
+  _GetPlanetSceneDistance: GetPlanetSceneDistance;
 }
 
 declare const SolarSystem: (
@@ -191,6 +231,12 @@ declare global {
     setMusicMuted?: SetMusicMuted;
     getMusicMuted?: GetMusicMuted;
     focusPlanet?: FocusPlanet;
+    setOrbitScaleMode?: SetOrbitScaleMode;
+    getOrbitScaleMode?: GetOrbitScaleMode;
+    getNearestPlanetIndex?: GetNearestPlanetIndex;
+    getFocusedPlanetIndex?: GetFocusedPlanetIndex;
+    getPlanetSceneDistance?: GetPlanetSceneDistance;
+    onPlanetFocused?: (index: number) => void;
     __solarSystemAssetBase?: string;
   }
 }

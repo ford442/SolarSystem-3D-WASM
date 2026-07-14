@@ -1,10 +1,12 @@
 import './style.css'
 import Module, {
+    type OrbitScaleMode,
     type QualityPreset,
     type ShadowQuality,
     type SolarSystemModuleConfig,
 } from './SolarSystem.js'
 import { initTouchControls, isMobileLikeDevice } from './touchControls'
+import { PlanetExplorer } from './planetExplorer'
 
 // Emscripten 6 prefers resizable WebAssembly buffers when the browser exposes
 // toResizableBuffer(). Current Chrome DOM/WebGL APIs reject views backed by
@@ -41,6 +43,7 @@ const musicVolumeValue = document.getElementById('music-volume-value') as HTMLOu
 const musicMutedInput = document.getElementById('music-muted') as HTMLInputElement;
 const settingsReset = document.getElementById('settings-reset') as HTMLButtonElement;
 const settingsStatus = document.getElementById('settings-status') as HTMLElement;
+const explorerPanel = document.getElementById('explorer-panel') as HTMLElement;
 const deployedBaseUrl = new URL(import.meta.env.BASE_URL, window.location.href);
 const isMobileDevice = isMobileLikeDevice();
 // Use bundled same-origin placeholders by default in every mode. Developers can
@@ -213,6 +216,7 @@ settingsToggle.addEventListener('click', () => {
 // Do not let pointer or keyboard input intended for the overlay reach GLFW.
 for (const eventName of ['pointerdown', 'pointerup', 'click', 'keydown', 'keyup']) {
     settingsPanel.addEventListener(eventName, (event) => event.stopPropagation());
+    explorerPanel.addEventListener(eventName, (event) => event.stopPropagation());
 }
 
 const moduleConfig: SolarSystemModuleConfig = {
@@ -252,14 +256,33 @@ Module(moduleConfig).then((instance) => {
     window.setMusicMuted = instance.cwrap('SetMusicMuted', null, ['number']);
     window.getMusicMuted = instance.cwrap('GetMusicMuted', 'number', []);
     window.focusPlanet = instance.cwrap('FocusPlanet', null, ['number']);
+    window.setOrbitScaleMode = instance.cwrap('SetOrbitScaleMode', null, ['number']);
+    window.getOrbitScaleMode = instance.cwrap('GetOrbitScaleMode', 'number', []);
+    window.getNearestPlanetIndex = instance.cwrap('GetNearestPlanetIndex', 'number', []);
+    window.getFocusedPlanetIndex = instance.cwrap('GetFocusedPlanetIndex', 'number', []);
+    window.getPlanetSceneDistance = instance.cwrap('GetPlanetSceneDistance', 'number', ['number']);
+
+    const explorer = new PlanetExplorer(explorerPanel);
+    void explorer.init({
+        focusPlanet: window.focusPlanet,
+        getNearestPlanetIndex: window.getNearestPlanetIndex,
+        getFocusedPlanetIndex: window.getFocusedPlanetIndex,
+        getPlanetSceneDistance: window.getPlanetSceneDistance,
+        getOrbitScaleMode: () => (window.getOrbitScaleMode?.() ?? 0) as OrbitScaleMode,
+        setOrbitScaleMode: window.setOrbitScaleMode,
+    }).catch((error: unknown) => {
+        console.error('Failed to initialize planet explorer:', error);
+    });
 
     if (isMobileDevice) {
         setPanelCollapsed(true);
+        explorerPanel.classList.add('is-collapsed');
     }
 
     initTouchControls({
         canvas,
         settingsPanel,
+        explorerPanel,
         loadingContainer,
         bindings: {
             setTouchMovement: (forward, right, vertical) => {

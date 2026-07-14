@@ -132,9 +132,10 @@ emscripten_set_main_loop_arg(RunOneFrame, ...);
 4. Test both builds regularly to ensure feature parity
 
 ## Reference Docs
-- **[AGENTS.md](../AGENTS.md)** – Detailed platform directives & project context
-- **[PORTING_GUIDE.md](../PORTING_GUIDE.md)** – WebAssembly port implementation details
-- **[ARCHITECTURE_DIAGRAM.md](../ARCHITECTURE_DIAGRAM.md)** – Visual structure
+- **[docs/ARCHITECTURE.md](../docs/ARCHITECTURE.md)** – Canonical system design (loading, LOD, assets)
+- **[README.md](../README.md)** – Build, deployment, runtime asset hosting
+- **[docs/plans/PORTING_GUIDE.md](../docs/plans/PORTING_GUIDE.md)** – WebAssembly port implementation details
+- **[AGENTS.md](../AGENTS.md)** – Cursor Cloud / AI agent environment notes
 
 ## Common Tasks
 

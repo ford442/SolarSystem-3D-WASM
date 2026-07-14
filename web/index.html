@@ -114,6 +114,40 @@
         <div id="streaming-progress-bar"></div>
       </div>
     </div>
+    <aside id="explorer-panel" class="explorer-panel" aria-label="Solar system explorer">
+      <button
+        id="explorer-toggle"
+        class="explorer-toggle"
+        type="button"
+        aria-expanded="true"
+        aria-controls="explorer-controls"
+      >
+        <span>Explorer</span>
+        <span class="explorer-toggle-icon" aria-hidden="true">−</span>
+      </button>
+      <div id="explorer-controls" class="explorer-controls">
+        <label class="explorer-row" for="orbit-scale-mode">
+          <span>Orbit scale</span>
+          <select id="orbit-scale-mode">
+            <option value="0">Compressed</option>
+            <option value="1">Realistic</option>
+          </select>
+        </label>
+        <small id="orbit-scale-help" class="explorer-help">
+          Artistic spacing for navigation — all worlds stay within a few thousand scene units.
+        </small>
+
+        <div id="explorer-body-list" class="explorer-body-list" role="listbox" aria-label="Celestial bodies"></div>
+
+        <article id="planet-info-card" class="planet-info-card" hidden>
+          <h2 id="planet-info-title" class="planet-info-title">Earth</h2>
+          <p id="planet-info-summary" class="planet-info-summary"></p>
+          <dl id="planet-info-facts" class="planet-info-facts"></dl>
+        </article>
+
+        <p id="explorer-status" class="explorer-status" aria-live="polite">Loading facts…</p>
+      </div>
+    </aside>
     <aside id="settings-panel" class="settings-panel" aria-label="Simulation settings">
       <button
         id="settings-toggle"

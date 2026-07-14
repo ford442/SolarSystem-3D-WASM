@@ -5,6 +5,20 @@ ShadowMapFBO::ShadowMapFBO(uint16_t shadowMapWidth, uint16_t shadowMapHeight) : 
 }
 
 ShadowMapFBO::~ShadowMapFBO() {
+    DestroyFBO();
+}
+
+void ShadowMapFBO::Resize(uint16_t shadowMapWidth, uint16_t shadowMapHeight) {
+    if (shadowMapWidth == _shadowMapWidth && shadowMapHeight == _shadowMapHeight) {
+        return;
+    }
+    _shadowMapWidth = shadowMapWidth;
+    _shadowMapHeight = shadowMapHeight;
+    DestroyFBO();
+    InitFBO();
+}
+
+void ShadowMapFBO::DestroyFBO() {
     if (_frameBuffer != 0) {
         glDeleteFramebuffers(1, &_frameBuffer);
         _frameBuffer = 0;

@@ -1,0 +1,136 @@
+{
+  "version": 1,
+  "sceneNote": "Distances in the 3D scene are artistic. Toggle scale mode to compare compressed orbits vs AU-proportional spacing.",
+  "bodies": [
+    {
+      "index": 0,
+      "id": "sun",
+      "name": "Sun",
+      "type": "star",
+      "diameterKm": 1392700,
+      "massEarths": 333000,
+      "orbitalPeriodDays": null,
+      "distanceAu": 0,
+      "moons": 0,
+      "summary": "G-type main-sequence star; contains 99.86% of the Solar System's mass."
+    },
+    {
+      "index": 1,
+      "id": "mercury",
+      "name": "Mercury",
+      "type": "terrestrial",
+      "diameterKm": 4879,
+      "massEarths": 0.055,
+      "orbitalPeriodDays": 88,
+      "distanceAu": 0.387,
+      "moons": 0,
+      "summary": "Smallest planet; extreme temperature swings between sunlit and shadowed hemispheres."
+    },
+    {
+      "index": 2,
+      "id": "venus",
+      "name": "Venus",
+      "type": "terrestrial",
+      "diameterKm": 12104,
+      "massEarths": 0.815,
+      "orbitalPeriodDays": 225,
+      "distanceAu": 0.723,
+      "moons": 0,
+      "summary": "Dense CO₂ atmosphere drives a runaway greenhouse; surface hotter than Mercury."
+    },
+    {
+      "index": 3,
+      "id": "earth",
+      "name": "Earth",
+      "type": "terrestrial",
+      "diameterKm": 12742,
+      "massEarths": 1,
+      "orbitalPeriodDays": 365.25,
+      "distanceAu": 1,
+      "moons": 1,
+      "summary": "Only known world with stable liquid water on the surface and abundant life."
+    },
+    {
+      "index": 4,
+      "id": "mars",
+      "name": "Mars",
+      "type": "terrestrial",
+      "diameterKm": 6779,
+      "massEarths": 0.107,
+      "orbitalPeriodDays": 687,
+      "distanceAu": 1.524,
+      "moons": 2,
+      "summary": "Iron-rich desert world with the largest volcano and canyon in the Solar System."
+    },
+    {
+      "index": 5,
+      "id": "jupiter",
+      "name": "Jupiter",
+      "type": "gas_giant",
+      "diameterKm": 139820,
+      "massEarths": 318,
+      "orbitalPeriodDays": 4333,
+      "distanceAu": 5.203,
+      "moons": 95,
+      "summary": "Most massive planet; Great Red Spot is a centuries-old anticyclonic storm."
+    },
+    {
+      "index": 6,
+      "id": "saturn",
+      "name": "Saturn",
+      "type": "gas_giant",
+      "diameterKm": 116460,
+      "massEarths": 95,
+      "orbitalPeriodDays": 10759,
+      "distanceAu": 9.537,
+      "moons": 146,
+      "summary": "Spectacular ring system of ice and rock; average density less than water."
+    },
+    {
+      "index": 7,
+      "id": "uranus",
+      "name": "Uranus",
+      "type": "ice_giant",
+      "diameterKm": 50724,
+      "massEarths": 14.5,
+      "orbitalPeriodDays": 30687,
+      "distanceAu": 19.191,
+      "moons": 28,
+      "summary": "Rotates on its side; faint rings and a methane haze give a blue-green hue."
+    },
+    {
+      "index": 8,
+      "id": "neptune",
+      "name": "Neptune",
+      "type": "ice_giant",
+      "diameterKm": 49244,
+      "massEarths": 17.1,
+      "orbitalPeriodDays": 60190,
+      "distanceAu": 30.069,
+      "moons": 16,
+      "summary": "Windiest planet; supersonic jet streams despite receiving little solar heat."
+    },
+    {
+      "index": 9,
+      "id": "pluto",
+      "name": "Pluto",
+      "type": "dwarf_planet",
+      "diameterKm": 2377,
+      "massEarths": 0.0022,
+      "orbitalPeriodDays": 90560,
+      "distanceAu": 39.482,
+      "moons": 5,
+      "summary": "Icy dwarf planet in the Kuiper Belt with a heart-shaped nitrogen glacier."
+    }
+  ],
+  "scaleModes": {
+    "compressed": {
+      "label": "Compressed orbits",
+      "description": "Artistic spacing for navigation — all worlds stay within a few thousand scene units."
+    },
+    "realistic": {
+      "label": "Realistic distances",
+      "description": "Orbit radii scaled to NASA semi-major axes (1 AU ≈ Earth's compressed distance). Vast empty space between worlds."
+    }
+  }
+}

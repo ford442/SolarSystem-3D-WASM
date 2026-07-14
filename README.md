@@ -22,7 +22,7 @@
     <li><a href="#overview">Overview</a></li>
     <li><a href="#features">Features</a></li>
     <li><a href="#dependencies">Dependencies</a></li>
-    <li><a href="#building-windows">Building (for Windows)</a></li>
+    <li><a href="#building">Building</a></li>
     <li><a href="#runtime-asset-hosting">Runtime asset hosting</a></li>
     <li><a href="#limitations">Limitations</a></li>
     <li><a href="#screenshots-and-videos">Project screenshots and video snippets</a></li>
@@ -70,9 +70,19 @@ The project is an animated 3D scene with a model of the Solar System.
   and shadows
 - ⚙️ Using 3D models with `obj` extension for planets, satellites, planetary rings, etc.
 
+<h2 id="documentation">Documentation</h2>
+
+| Document | Purpose |
+|----------|---------|
+| [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) | **Canonical** system design: loading layers, LOD, asset URLs, module map |
+| [docs/plans/PORTING_GUIDE.md](docs/plans/PORTING_GUIDE.md) | Emscripten port history and CMake/WebGL details |
+| [docs/CROSS_ORIGIN_HEADERS.md](docs/CROSS_ORIGIN_HEADERS.md) | COEP/CORS/CORP header matrix and CDN setup |
+| [docs/plans/TESTING_GUIDE.md](docs/plans/TESTING_GUIDE.md) | Manual verification (staged loading, LOD, teleport helpers) |
+| [AGENTS.md](AGENTS.md) | Cursor Cloud / AI agent environment notes only |
+
 <h2 id="web-porting">Web Porting (Emscripten)</h2>
 
-See [PORTING_GUIDE.md](PORTING_GUIDE.md) for detailed instructions on how to convert this project to run in a web browser using WebGL 2.
+See [docs/plans/PORTING_GUIDE.md](docs/plans/PORTING_GUIDE.md) for Emscripten build flags, shader migration, and platform substitutions.
 
 <h2 id="dependencies">Dependencies</h2>
 
@@ -80,17 +90,50 @@ See [PORTING_GUIDE.md](PORTING_GUIDE.md) for detailed instructions on how to con
 - [OpenGL 4.6](https://www.khronos.org/registry/OpenGL/specs/gl/glspec46.core.pdf)
 - [GLFW](https://github.com/glfw/glfw)
 - [GLEW](https://github.com/nigels-com/glew)
-- [SDL2](https://www.libsdl.org/download-2.0.php) and [SDL2_image](https://www.libsdl.org/projects/SDL_image/)
+- [SDL2](https://www.libsdl.org/download-2.0.php), [SDL2_image](https://www.libsdl.org/projects/SDL_image/), and [SDL2_mixer](https://www.libsdl.org/projects/SDL_mixer/) (Linux/macOS native and web)
 - [Assimp](https://github.com/assimp/assimp)
 - [FreeType](https://gitlab.freedesktop.org/freetype/freetype)
-- [irrKlang](https://www.ambiera.com/irrklang/)
+- [irrKlang](https://www.ambiera.com/irrklang/) (Windows native only)
 
-<h2 id="building-windows">Building</h2>
+<h2 id="building">Building</h2>
 
 ### For Windows (Native)
 Run an auxiliary script from the command line to automatically run the necessary [cmake](https://cmake.org/install/)
 commands using the `.\build.sh` command, while in the directory with the root `CMakeLists.txt` file 
 (the root project folder). Then an exe file with all necessary dlls will appear in the `build` folder.
+
+### For Linux (Native)
+
+Install build tools and development libraries (Ubuntu/Debian):
+
+```bash
+sudo apt install build-essential cmake ninja-build \
+  libglew-dev libglfw3-dev libgl1-mesa-dev \
+  libsdl2-dev libsdl2-image-dev libsdl2-mixer-dev \
+  libfreetype-dev libassimp-dev
+```
+
+Build and run from the repository root (assets are loaded from `resource/` relative to the
+working directory):
+
+```bash
+./build.sh
+./build/SolarSystem
+```
+
+On Linux, background music uses SDL_mixer (same as the web build) instead of irrKlang. MP3 tracks are
+optional: place them under `resource/sounds/` if you have the assets locally.
+
+High-resolution textures and the skybox (`resource/textures/`) are not in git; deploy or copy them
+locally for a full native run (low-res placeholders under `resource/textures_low/` are bundled for web).
+
+macOS (Homebrew):
+
+```bash
+brew install cmake ninja glew glfw sdl2 sdl2_image sdl2_mixer freetype assimp
+./build.sh
+./build/SolarSystem
+```
 
 ### For Web (Emscripten)
 To build for the web using WebAssembly:
@@ -109,29 +152,31 @@ python3 -m http.server 8000
 # Then open http://localhost:8000/SolarSystem.html
 ```
 
-See [PORTING_GUIDE.md](PORTING_GUIDE.md) for detailed information about the WebAssembly port.
+See [docs/plans/PORTING_GUIDE.md](docs/plans/PORTING_GUIDE.md) for detailed information about the WebAssembly port.
 
-### Web Development Assets
-
-The Vite development server uses same-origin runtime assets by default. After `./build-web.sh`,
-the bundled low-resolution placeholders are available under `web/public/resource/textures_low/`,
-so local development does not depend on the production CDN:
+### Web development workflow
 
 ```bash
+./build-web.sh          # after C++ changes
 cd web
-npm run dev
-# Open http://localhost:5173/solar-system/
+npm run dev             # http://localhost:5173/solar-system/
+npm run preview         # http://localhost:4173/solar-system/ (production bundle)
 ```
 
-To test against a remote or alternate asset host, set `VITE_ASSET_BASE` to the base URL that
-contains the `resource/` directory. Include the trailing slash:
+**Runtime asset URLs (one rule for all modes):** dev, preview, and production default to
+**same-origin** assets — the page base URL plus `resource/...`. After `./build-web.sh`, bundled
+4×4 placeholder DDS files are available under `web/public/resource/textures_low/`, so local work
+does not require a remote CDN.
+
+To use a separate asset host (recommended for production), set `VITE_ASSET_BASE` to the URL that
+**contains** the `resource/` directory (trailing slash required). This applies to `dev`, `build`,
+and `preview` equally:
 
 ```bash
-VITE_ASSET_BASE=https://test.1ink.us/solar-system/ npm run dev
+VITE_ASSET_BASE=https://assets.example.com/solar-system/2026.07.0/ npm run dev
 ```
 
-The override is optional. Without it, dev, preview, and production all resolve runtime assets
-relative to the deployed Vite base URL.
+See [docs/ARCHITECTURE.md § Runtime asset hosting](docs/ARCHITECTURE.md#6-runtime-asset-hosting) for resolution details.
 
 ### Web simulation controls
 
@@ -154,12 +199,21 @@ https://assets.example.com/solar-system/2026.07.0/
     ├── asset-manifest.json
     ├── textures/
     │   ├── Earth_Day_Diffuse.dds
-    │   └── Main_SkyBox/PositiveX.dds
+    │   └── Main_SkyBox/          # 6 cubemap faces (6K); fetched at core load
+    │       ├── PositiveX.dds
+    │       ├── NegativeX.dds
+    │       └── …
     ├── textures_low/
-    │   └── Earth_Day_Diffuse_Low.dds
+    │   ├── Earth_Day_Diffuse_Low.dds
+    │   └── Main_SkyBox/          # 4×4 placeholders (committed; skybox fallback)
     └── sounds/
         └── Stellardrone - Galaxies.mp3
 ```
+
+**Skybox note:** Core startup downloads high-res faces from `resource/textures/Main_SkyBox/` but
+writes them into `resource/textures_low/Main_SkyBox/` in MEMFS. If the CDN fetch fails, the
+bundled low-res placeholders are used so initialization still succeeds. Planet high-res textures
+are never in the core manifest — they arrive later via staged loading and the LOD queue.
 
 Set the public asset origin when building or starting Vite. The value is the directory that
 contains `resource/`, not the `resource/` directory itself:
@@ -191,25 +245,24 @@ placeholders stay in git and are also uploaded under `resource/textures_low/` fo
 
 ### Required HTTP headers
 
-For a same-origin asset tree, no CORS header is needed. For a separate asset origin used by
-`emscripten_async_wget2`/XHR, every DDS, MP3, and manifest response (including error responses)
-must include:
+Full matrix, production recommendations, and local testing: **[docs/CROSS_ORIGIN_HEADERS.md](docs/CROSS_ORIGIN_HEADERS.md)**.
 
-```http
-Access-Control-Allow-Origin: https://app.example.com
-Cross-Origin-Resource-Policy: cross-origin
-```
+**Summary:** This build uses `ASYNCIFY` only (no pthreads / `SharedArrayBuffer`), so **COEP/COOP are optional**. The simplest production setup omits them on both app and CDN.
 
-`Access-Control-Allow-Origin: *` is also valid because these requests do not use credentials.
-The app document currently uses `Cross-Origin-Embedder-Policy: require-corp` and
-`Cross-Origin-Opener-Policy: same-origin`; CORS-enabled XHR satisfies COEP, while
-`Cross-Origin-Resource-Policy: cross-origin` keeps the asset response explicitly compatible.
-The asset origin itself does not need to emit COEP or COOP.
+| Deployment | App origin (`app.example.com`) | Asset CDN (`cdn.example.com`) |
+|------------|-------------------------------|------------------------------|
+| **Recommended today** | No COEP/COOP | `Access-Control-Allow-Origin: *` + `Cross-Origin-Resource-Policy: cross-origin` |
+| **If adding pthreads later** | `Cross-Origin-Embedder-Policy: require-corp` + `Cross-Origin-Opener-Policy: same-origin` | CORS + CORP only — **never** COEP/COOP on DDS/MP3 |
 
-The production app and representative low/high DDS and WASM responses at
-`test.1ink.us/solar-system/` were audited on 2026-07-13. They returned `require-corp`,
-`same-origin`, `Access-Control-Allow-Origin: *`, and `Cross-Origin-Resource-Policy: cross-origin`.
-The current DDS cache lifetime is two days; for versioned asset prefixes use:
+For **same-origin** assets (default when `VITE_ASSET_BASE` is unset), no CORS or CORP headers are required.
+
+`emscripten_async_wget2` uses CORS-enabled XHR. Under COEP, cross-origin assets need `Cross-Origin-Resource-Policy: cross-origin` in addition to `Access-Control-Allow-Origin`. Failed fetches log `Failed to download … Status: N` in the console — check the Network tab for 0-status or missing CORP.
+
+**Local COEP testing:** `web/vite.config.ts` sets COEP+COOP on the Vite dev/preview server. Use `npm run serve:mock-cdn` plus `VITE_ASSET_BASE=http://127.0.0.1:5199/` to simulate a subdomain CDN, then `npm run verify:cross-origin`.
+
+**test.1ink.us note:** The live host applies `require-corp` to HTML *and* DDS responses via a global Apache rule. That works with current CORS+CORP but is **misconfigured** — remove COEP/COOP from the asset vhost; keep them on the app vhost only if you need `crossOriginIsolated`.
+
+For versioned asset prefixes on a CDN, prefer immutable caching:
 
 ```http
 Cache-Control: public, max-age=31536000, immutable
