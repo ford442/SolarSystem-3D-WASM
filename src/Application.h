@@ -45,6 +45,9 @@ struct PlanetSystemManifest {
     std::vector<std::string> assetPaths;    // Required assets (low-res planet textures); block init until ready
     std::vector<std::string> optionalAssetPaths; // Optional assets (moons, rings, clouds); fire-and-forget
     std::function<void()> initFunc;         // Calls InitXxxSystem()
+    // Registered for deployment/auditing; fetched only when the camera crosses
+    // the owning object's LOD threshold.
+    std::vector<std::string> optionalHighResAssetPaths;
 
     enum class State { NOT_LOADED, DOWNLOADING, READY } state = State::NOT_LOADED;
     // Counts only required assets. Decremented in download completion callbacks,
@@ -62,6 +65,8 @@ public:
     ~Application();
     void Exec();
     void RunOneFrame(); // For Emscripten main loop
+    void ApplyQualityPreset(int preset);
+    void ApplyShadowQuality(int quality);
 
 private:
     enum class AppState { LOADING, RUNNING };

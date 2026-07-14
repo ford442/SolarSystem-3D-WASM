@@ -15,3 +15,13 @@ float Planet::GetEarthSizeCoefficient() const {
     return _earthSizeCoefficient;
 }
 
+float Planet::GetEffectiveLODThreshold() const {
+#ifdef __EMSCRIPTEN__
+    // Medium uses a 1.5x distance multiplier. Expressed as a threshold, this
+    // means the camera must be 1.5x closer than full quality before upgrading.
+    if (g_qualityPreset == 1) {
+        return _lodThreshold / 1.5f;
+    }
+#endif
+    return _lodThreshold;
+}

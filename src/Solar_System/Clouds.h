@@ -2,6 +2,7 @@
 #define SOLARSYSTEM_CLOUDS_H
 #include "OuterShell.h"
 #include "../Auxiliary_Modules/TextureImage2D.h"
+#include "../Auxiliary_Modules/TextureLODController.h"
 
 struct CloudsInfo {
     MeshHolder cloudsModel;
@@ -17,9 +18,14 @@ class Clouds : public OuterShell {
 public:
     explicit Clouds(const CloudsInfo& cloudsInfo, std::shared_ptr<SpaceObject> parent);
     void AdjustToParent(float timeScale) = 0;
+    void LoadHighResIfClose(const glm::vec3& cameraPosition);
 
 protected:
     TextureImage2D _diffuse, _normal;
+    void ConfigureDiffuseLOD(const std::string& lowPath, const std::string& highPath, const std::string& label);
+
+private:
+    TextureLODController _diffuseLOD;
 };
 
 #endif //SOLARSYSTEM_CLOUDS_H

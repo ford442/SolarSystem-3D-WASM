@@ -4,8 +4,10 @@
   "version": "0.0.0",
   "type": "module",
   "scripts": {
-    "dev": "vite",
-    "build": "tsc && vite build",
+    "assets:prepare": "node scripts/prepare-assets.mjs",
+    "assets:transcode": "node scripts/transcode-dds-to-ktx2.mjs",
+    "dev": "npm run assets:prepare && vite",
+    "build": "npm run assets:prepare && tsc && vite build",
     "preview": "vite preview"
   },
   "devDependencies": {

@@ -1,6 +1,8 @@
 #include "SaturnRing.h"
 
 SaturnRing::SaturnRing(const PlanetaryRingInfo& planetaryRingInfo, std::shared_ptr<Planet> parent) : PlanetaryRing(planetaryRingInfo, std::move(parent)) {
+    ConfigureDiffuseLOD("resource/textures_low/Saturn_Rings_Low.dds",
+                        "resource/textures/Saturn_Rings.dds", "SaturnRing");
 }
 
 void SaturnRing::AdjustToParent() {

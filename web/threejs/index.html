@@ -2,22 +2,19 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <link rel="icon" type="image/svg+xml" href="./favicon.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Solar System (Three.js / WebGPU companion)</title>
-    <style>
-      body { margin: 0; overflow: hidden; background: #000; }
-      canvas { display: block; }
-      #info {
-        position: absolute; top: 10px; left: 10px;
-        color: #fff; font-family: sans-serif; font-size: 12px;
-        background: rgba(0,0,0,0.5); padding: 6px 10px; border-radius: 4px;
-        pointer-events: none;
-      }
-    </style>
   </head>
   <body>
-    <div id="info">Three.js + WebGPU (fallback to WebGL). Phase 0 scaffold.</div>
+    <canvas id="scene" aria-label="Interactive inner solar system"></canvas>
+    <section class="hud" aria-label="Companion renderer controls">
+      <h1>Inner Solar System · Companion</h1>
+      <p id="info">Initializing renderer…</p>
+      <p id="texture-status">Preparing KTX2 textures…</p>
+      <p class="hint">Drag to orbit · wheel to zoom · WASD + Space/C to glide</p>
+      <nav id="focus-presets" aria-label="Camera focus presets"></nav>
+    </section>
     <script type="module" src="/src/main.ts"></script>
   </body>
 </html>

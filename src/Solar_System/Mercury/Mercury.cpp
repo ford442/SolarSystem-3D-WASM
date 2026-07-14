@@ -46,10 +46,11 @@ void Mercury::Render() const {
 
 void Mercury::LoadHighResIfClose(const glm::vec3& cameraPos) {
     float distance = glm::length(cameraPos - GetPosition());
+    const float lodThreshold = GetEffectiveLODThreshold();
     _lastCameraDistance = distance;
 
     if (_isHighResLoaded) {
-        if (distance > _lodThreshold * 2.0f) {
+        if (distance > lodThreshold * 2.0f) {
             std::cout << "[LOD] Camera distance to Mercury: " << distance << " units. Downgrading high-res to low-res..." << std::endl;
             _diffuses.at(0).ReloadTexture(_diffuseLowPath);
             _normalMap.ReloadTexture(_normalLowPath);
@@ -69,7 +70,7 @@ void Mercury::LoadHighResIfClose(const glm::vec3& cameraPos) {
 #endif
 
     if (_isHighResLoading) {
-        if (distance > _lodThreshold * 1.8f) {
+        if (distance > lodThreshold * 1.8f) {
             std::cout << "[LOD] Camera moved away from Mercury during load (dist=" << distance << ") — deprioritizing." << std::endl;
             auto& queue = TextureLoadingQueue::GetInstance();
             queue.CancelLoad(_diffuseHighPath);
@@ -81,7 +82,7 @@ void Mercury::LoadHighResIfClose(const glm::vec3& cameraPos) {
         return;
     }
 
-    if (distance < _lodThreshold) {
+    if (distance < lodThreshold) {
         std::cout << "[LOD] Camera distance to Mercury: " << distance << " units. Queueing high-res textures..." << std::endl;
         _isHighResLoading = true;
         _highResTexturesLoaded = 0;
@@ -94,7 +95,7 @@ void Mercury::LoadHighResIfClose(const glm::vec3& cameraPos) {
             if (success) _highResTexturesLoaded++;
             _highResLoadProgress = _highResTexturesLoaded / (float)_highResTextureCount;
             if (_highResTexturesProcessed == _highResTextureCount) {
-                _isHighResLoaded = true;
+                _isHighResLoaded = (_highResTexturesLoaded == _highResTextureCount);
                 _isHighResLoading = false;
                 if (_highResTexturesLoaded == _highResTextureCount) {
                     std::cout << "[LOD] Mercury high-res textures loaded successfully" << std::endl;

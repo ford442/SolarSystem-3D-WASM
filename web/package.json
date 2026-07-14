@@ -8,7 +8,8 @@
     "dev": "vite",
     "build:emcc": "bash ../build-web.sh",
     "build": "npm run build:emcc && tsc && vite build",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "test:textures": "node verify-textures.js"
   },
   "devDependencies": {
     "typescript": "~5.9.3",

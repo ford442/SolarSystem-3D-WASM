@@ -3,6 +3,8 @@
 Titan::Titan(const SatelliteInfo& satelliteInfo, std::shared_ptr<SpaceObject> parent) : Satellite(satelliteInfo, std::move(parent)),
     _diffuses(satelliteInfo.diffuseTextures), _normalMap(satelliteInfo.normalMap)
 {
+    ConfigureDiffuseLOD(_diffuses.at(0), TexturePaths::Titan::Diffuse.low,
+                        TexturePaths::Titan::Diffuse.high, "Titan");
 }
 
 void Titan::AdjustToParent(float timeScale) {

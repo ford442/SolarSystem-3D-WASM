@@ -3,6 +3,8 @@
 Io::Io(const SatelliteInfo& satelliteInfo, std::shared_ptr<SpaceObject> parent) : Satellite(satelliteInfo, std::move(parent)),
     _diffuses(satelliteInfo.diffuseTextures), _normalMap(satelliteInfo.normalMap)
 {
+    ConfigureDiffuseLOD(_diffuses.at(0), TexturePaths::Io::Diffuse.low,
+                        TexturePaths::Io::Diffuse.high, "Io");
 }
 
 void Io::AdjustToParent(float timeScale) {

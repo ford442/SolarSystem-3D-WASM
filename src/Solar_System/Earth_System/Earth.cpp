@@ -56,10 +56,11 @@ void Earth::Render() const {
 
 void Earth::LoadHighResIfClose(const glm::vec3& cameraPos) {
     float distance = glm::length(cameraPos - GetPosition());
+    const float lodThreshold = GetEffectiveLODThreshold();
     _lastCameraDistance = distance;
 
     if (_isHighResLoaded) {
-        if (distance > _lodThreshold * 2.0f) {
+        if (distance > lodThreshold * 2.0f) {
             // Downgrade with hysteresis to free GPU memory. Low-res assets are already in MEMFS.
             std::cout << "[LOD] Camera distance to Earth: " << distance << " units. Downgrading high-res to low-res..." << std::endl;
             _diffuses.at(0).ReloadTexture(_diffuseLowPath);
@@ -81,7 +82,7 @@ void Earth::LoadHighResIfClose(const glm::vec3& cameraPos) {
 
     if (_isHighResLoading) {
         // Deprioritize: if camera has moved well away, cancel any queued/in-flight applies
-        if (distance > _lodThreshold * 1.8f) {
+        if (distance > lodThreshold * 1.8f) {
             std::cout << "[LOD] Camera moved away from Earth during load (dist=" << distance
                       << ") — deprioritizing high-res." << std::endl;
             auto& queue = TextureLoadingQueue::GetInstance();
@@ -95,7 +96,7 @@ void Earth::LoadHighResIfClose(const glm::vec3& cameraPos) {
         return;
     }
 
-    if (distance < _lodThreshold) {
+    if (distance < lodThreshold) {
         std::cout << "[LOD] Camera distance to Earth: " << distance << " units. Queueing high-res textures..." << std::endl;
         _isHighResLoading = true;
         _highResTexturesLoaded = 0;
@@ -109,7 +110,7 @@ void Earth::LoadHighResIfClose(const glm::vec3& cameraPos) {
             if (success) _highResTexturesLoaded++;
             _highResLoadProgress = _highResTexturesLoaded / (float)_highResTextureCount;
             if (_highResTexturesProcessed == _highResTextureCount) {
-                _isHighResLoaded = true;
+                _isHighResLoaded = (_highResTexturesLoaded == _highResTextureCount);
                 _isHighResLoading = false;
                 if (_highResTexturesLoaded == _highResTextureCount) {
                     std::cout << "[LOD] Earth high-res textures loaded successfully" << std::endl;

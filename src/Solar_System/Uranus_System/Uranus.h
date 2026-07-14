@@ -14,10 +14,10 @@ private:
     std::vector<TextureImage2D> _diffuses;
     TextureImage2D _normalMap;
 
-    std::string _diffuseLowPath = "resource/textures_low/Uranus_Diffuse_Low.dds";
-    std::string _diffuseHighPath = "resource/textures/Uranus_Diffuse.dds";
-    std::string _normalLowPath = "resource/textures_low/Uranus_Normal_Low.dds";
-    std::string _normalHighPath = "resource/textures/Uranus_Normal.dds";
+    std::string _diffuseLowPath = TexturePaths::Uranus::Diffuse.low;
+    std::string _diffuseHighPath = TexturePaths::Uranus::Diffuse.high;
+    std::string _normalLowPath = TexturePaths::Uranus::Normal.low;
+    std::string _normalHighPath = TexturePaths::Uranus::Normal.high;
 
     float _highResLoadProgress = 0.0f;
     int _highResTexturesLoaded = 0;

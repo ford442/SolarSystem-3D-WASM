@@ -1,6 +1,6 @@
 # WebGPU Companion Renderer — Multi-Session Plan
 
-**Status:** Exploratory / not started  
+**Status:** Phase 1 complete; companion remains opt-in
 **Target:** Parallel track alongside the existing C++/WASM WebGL 2 renderer  
 **Live reference:** [test.1ink.us/solar-system](https://test.1ink.us/solar-system/index.html) (premium WebGL 2 build)
 
@@ -31,20 +31,22 @@ A full WebGPU port of the custom C++ renderer (Emdawnwebgpu / webgpu.h / WGSL) w
 
 ### Phase 0 — Scaffold (Session 1)
 
-- [ ] Create `web/threejs/` Vite + TypeScript project (mirror base path `/solar-system/` or `/solar-system/webgpu/`).
-- [ ] Add Three.js r17x+ with `WebGPURenderer` fallback to `WebGLRenderer` when WebGPU unavailable.
-- [ ] Minimal scene: Sun point light, one textured sphere (Earth), orbit controls or FPS-style camera matching existing feel.
-- [ ] Document build/serve commands in this file and `web/threejs/README.md`.
-- [ ] **No C++ changes** in this phase.
+- [x] Create `web/threejs/` Vite + TypeScript project at `/solar-system/webgpu/`.
+- [x] Add Three.js with `WebGPURenderer` fallback to `WebGLRenderer` when WebGPU is unavailable.
+- [x] Minimal scene: Sun point light, textured Earth, and OrbitControls.
+- [x] Document build/serve commands in this file and `web/threejs/README.md`.
+- [x] **No C++ changes** in this phase.
 
 **Exit criteria:** Local dev server shows a rotating Earth with acceptable lighting; WebGPU path verified in Chrome.
 
 ### Phase 1 — Asset Pipeline (Session 2)
 
-- [ ] Inventory shared assets under `resource/` (models, textures).
-- [ ] Convert key DDS → KTX2 (Basis) or PNG/WebP for Three.js (`@gltf-transform/cli` or `toktx`).
-- [ ] Load low-res first, lazy-fetch high-res (reuse URL patterns from `window.__solarSystemAssetBase`).
-- [ ] Sphere + ring geometry for Saturn subset; skip moons initially.
+- [x] Extract Mercury–Mars positions, size scales, tilts, and rotation rates into shared JSON.
+- [x] Add a DDS → KTX2 script supporting legacy DXT1/3/5 and 32-bit RGBA inputs.
+- [x] Load KTX2 from local stubs or `VITE_KTX2_BASE` CDN/object-storage prefix.
+- [x] Render Mercury, Venus, Earth, and Mars with labels and smooth focus presets.
+- [x] Add OrbitControls plus damped WASD/Space/C flight approximating the C++ camera feel.
+- [ ] Add distance-driven low→high texture replacement after production KTX2 assets are published.
 
 **Exit criteria:** Inner planets render with low→high res swap on approach.
 
@@ -159,5 +161,6 @@ Alternative: long-lived branch `feature/webgpu-companion` if folder pollution is
 | Date | Session | Notes |
 |------|---------|-------|
 | 2026-06-22 | 0 | Scaffold `web/threejs/`: Vite+TS, WebGPURenderer+WebGL fallback, single textured Earth sphere (procedural canvas), OrbitControls, sun light. Local dev verified. No C++ changes. README + plan log updated. |
+| 2026-07-14 | 1 | Shared inner-planet orbital JSON, DDS→KTX2 conversion and local stubs, CDN-aware KTX2Loader, Mercury–Mars scene, focus presets, and damped flight controls. No C++ changes. |
 
 _Update this table at the end of each work session._

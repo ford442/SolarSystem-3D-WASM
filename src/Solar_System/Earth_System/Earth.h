@@ -17,12 +17,12 @@ private:
     TextureImage2D _normalMap, _specular;
 
     // LOD texture paths
-    std::string _diffuseLowPath = "resource/textures_low/Earth_Day_Diffuse_Low.dds";
-    std::string _diffuseHighPath = "resource/textures/Earth_Day_Diffuse.dds";
-    std::string _normalLowPath = "resource/textures_low/Earth_Normal_Low.dds";
-    std::string _normalHighPath = "resource/textures/Earth_Normal.dds";
-    std::string _specularLowPath = "resource/textures_low/Earth_Specular_Low.dds";
-    std::string _specularHighPath = "resource/textures/Earth_Specular.dds";
+    std::string _diffuseLowPath = TexturePaths::Earth::Diffuse.low;
+    std::string _diffuseHighPath = TexturePaths::Earth::Diffuse.high;
+    std::string _normalLowPath = TexturePaths::Earth::Normal.low;
+    std::string _normalHighPath = TexturePaths::Earth::Normal.high;
+    std::string _specularLowPath = TexturePaths::Earth::Specular.low;
+    std::string _specularHighPath = TexturePaths::Earth::Specular.high;
 
     float _highResLoadProgress = 0.0f;
     int _highResTexturesLoaded = 0;

@@ -2,6 +2,8 @@
 
 NeptuneClouds::NeptuneClouds(const CloudsInfo& cloudsInfo, std::shared_ptr<SpaceObject> parent) : Clouds(cloudsInfo, std::move(parent))
 {
+    ConfigureDiffuseLOD("resource/textures_low/Neptune_Clouds_Diffuse_Low.dds",
+                        "resource/textures/Neptune_Clouds_Diffuse.dds", "NeptuneClouds");
 }
 
 void NeptuneClouds::AdjustToParent(float timeScale) {

@@ -2,7 +2,9 @@
 #define SOLARSYSTEM_SATELLITE_H
 #include "SpaceObject.h"
 #include "Star.h"
+#include "TexturePaths.h"
 #include "../Auxiliary_Modules/TextureImage2D.h"
+#include "../Auxiliary_Modules/TextureLODController.h"
 #include <vector>
 #include <memory>
 
@@ -29,12 +31,18 @@ public:
     std::shared_ptr<SpaceObject> GetParent() const;
     float GetRadius() const;
     float GetEarthSizeCoefficient() const;
+    void LoadHighResIfClose(const glm::vec3& cameraPosition);
     virtual void AdjustToParent(float timeScale) = 0;
 
 protected:
     std::shared_ptr<SpaceObject> _parent;
     float _radius = 2.0; // Radius of the earth 3d model in Blender
     float _earthSizeCoefficient;
+    void ConfigureDiffuseLOD(TextureImage2D& diffuse, const std::string& lowPath,
+                             const std::string& highPath, const std::string& label);
+
+private:
+    TextureLODController _diffuseLOD;
 };
 
 #endif //SOLARSYSTEM_SATELLITE_H

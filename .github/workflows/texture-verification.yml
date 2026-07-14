@@ -1,0 +1,79 @@
+name: Texture verification
+
+on:
+  pull_request:
+    branches:
+      - main
+
+permissions:
+  contents: read
+
+concurrency:
+  group: texture-verification-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  verify-textures:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    env:
+      BUILD_JOBS: 2
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+
+      - name: Set up Emscripten
+        uses: emscripten-core/setup-emsdk@v16
+        with:
+          version: 6.0.0
+          actions-cache-folder: emsdk-cache
+
+      - name: Install frontend dependencies and Chrome
+        working-directory: web
+        run: npm ci
+
+      - name: Build WebAssembly
+        run: ./build-web.sh --no-emsdk
+
+      - name: Build Vite production bundle
+        working-directory: web
+        run: npm run build
+
+      - name: Start preview server
+        run: |
+          cd web
+          npm run preview -- --host 127.0.0.1 > "$RUNNER_TEMP/solar-preview.log" 2>&1 &
+          echo $! > "$RUNNER_TEMP/solar-preview.pid"
+          for attempt in {1..30}; do
+            if curl --fail --silent --show-error http://127.0.0.1:4173/solar-system/ > /dev/null; then
+              exit 0
+            fi
+            sleep 1
+          done
+          cat "$RUNNER_TEMP/solar-preview.log"
+          exit 1
+
+      - name: Verify texture and skybox loading
+        working-directory: web
+        env:
+          VERIFY_TEXTURES_URL: http://127.0.0.1:4173/solar-system/
+        run: npm run test:textures
+
+      - name: Show preview log
+        if: always()
+        run: cat "$RUNNER_TEMP/solar-preview.log" || true
+
+      - name: Stop preview server
+        if: always()
+        run: |
+          if [ -f "$RUNNER_TEMP/solar-preview.pid" ]; then
+            kill "$(cat "$RUNNER_TEMP/solar-preview.pid")" || true
+          fi

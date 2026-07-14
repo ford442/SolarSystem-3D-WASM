@@ -18,3 +18,12 @@ float Satellite::GetRadius() const {
 float Satellite::GetEarthSizeCoefficient() const {
     return _earthSizeCoefficient;
 }
+
+void Satellite::ConfigureDiffuseLOD(TextureImage2D& diffuse, const std::string& lowPath,
+                                    const std::string& highPath, const std::string& label) {
+    _diffuseLOD.Configure(diffuse, lowPath, highPath, label, TextureLoadCategory::Satellite);
+}
+
+void Satellite::LoadHighResIfClose(const glm::vec3& cameraPosition) {
+    _diffuseLOD.Update(cameraPosition, GetPosition());
+}

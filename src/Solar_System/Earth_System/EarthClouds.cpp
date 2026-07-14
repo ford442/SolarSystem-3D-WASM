@@ -2,6 +2,8 @@
 
 EarthClouds::EarthClouds(const CloudsInfo& cloudsInfo, std::shared_ptr<SpaceObject> parent) : Clouds(cloudsInfo, std::move(parent))
 {
+    ConfigureDiffuseLOD("resource/textures_low/Earth_Clouds_Diffuse_Low.dds",
+                        "resource/textures/Earth_Clouds_Diffuse.dds", "EarthClouds");
 }
 
 void EarthClouds::AdjustToParent(float timeScale) {

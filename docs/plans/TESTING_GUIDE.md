@@ -354,23 +354,48 @@ Expected (console + overlay):
 - `[LOD] Camera distance to Earth: 12.3 units. Queueing high-res textures...`
 - `updateStreamingProgress` DOM element appears: "High-res upgrade: 1/3 (33%)" etc.
 - Per-planet queue logs + final: `[LOD] Earth high-res textures loaded successfully`
-- `TextureLoadingQueue` ensures: dedup (no duplicates if you jiggle camera), backoff on transient errors, serialized.
+- `TextureLoadingQueue` ensures: dedup (no duplicates if you jiggle camera), backoff on transient errors, and preset-limited concurrency.
 - Visual (real assets): texture sharpness jumps. Placeholders: no visible change but paths exercised.
 - No further requests while `_isHighResLoaded`.
 
 Test queue cancel:
 - Start load → immediately `setCameraPose` far away → console deprioritize/cancel for that planet's paths; loading aborts without applying (or partial).
 
-### 6. Downgrade + Hysteresis + Presets
+### 6. Downgrade + Hysteresis + Quality Presets
 - Fly away > ~100 units (2× threshold):
   - `[LOD] ... Downgrading high-res to low-res...`
   - `[LOD] Earth high-res textures downgraded (VRAM freed)`
   - `_isHighResLoaded=false`; low-res reloaded via ReloadTexture.
-- Quality preset (low forces immediate downgrade of any loaded + suppresses upgrades):
-  - URL: `.../solar-system/?quality=0`
-  - Or: `Module.SetQualityPreset(0)` (also 1/2)
-  - In code: `g_qualityPreset==0` path uses fake-far to drive downgrade for all.
-- Medium/full allow upgrades normally.
+
+| Preset | High-res LOD | Effective upgrade radius | Shadow map | High-res concurrency | WebGL MSAA |
+|--------|--------------|--------------------------|------------|----------------------|------------|
+| `low` / `0` | Disabled; loaded/in-flight upgrades are downgraded or cancelled | none | 1024² (~4 MiB depth storage) | 0 | off |
+| `medium` / `1` | Enabled with camera distance ×1.5 | ~33 units for the default 50-unit threshold | 2048² (~16 MiB) | 2 | off |
+| `full` / `2` | Enabled with camera distance ×1.0 | 50 units | 3000² (~34.3 MiB) | 4 | 4× if the browser/context supports it |
+
+Use a URL preset when comparing MSAA because WebGL antialiasing is fixed at context creation:
+
+```text
+http://localhost:4173/solar-system/?quality=medium
+http://localhost:4173/solar-system/?quality=full
+```
+
+`window.setQualityPreset(0|1|2)` changes LOD, shadow resolution, and queue concurrency at runtime. Reload with the corresponding URL to change MSAA.
+
+#### Measurable medium-vs-full check
+
+1. Open each URL in a fresh tab and confirm the `[Quality]` console line:
+   - medium: `shadow=2048x2048`, `high-res concurrency=2`, `LOD distance multiplier=1.5`, `MSAA=0x`
+   - full: `shadow=3000x3000`, `high-res concurrency=4`, `LOD distance multiplier=1.0`, `MSAA=4x`
+2. Load Earth, then position the camera about 40 units from its center. With the approximate test position at `(1900, 0, 0)`, use:
+
+   ```js
+   window.setCameraPose(1940, 0, 0, 180, 0)
+   ```
+
+3. Full should queue Earth high-res textures because 40 < 50. Medium should retain low-res because `40 × 1.5 = 60`, outside the 50-unit threshold.
+4. With real assets, compare texture sharpness at that pose: full is high-res while medium remains low-res. The shadow allocation alone also saves about 18.3 MiB in medium, before accounting for fewer resident high-res textures.
+5. Move inside ~33 units in medium and confirm it then queues upgrades. When several texture jobs are pending, queue logs must never exceed `active 2/2` for medium or `active 4/4` for full.
 
 ### 7. Streaming UI + Throttled Progress
 - High-res phase uses separate overlay (`#streaming-progress` in index.html) + bar.
@@ -390,7 +415,67 @@ Test queue cancel:
 - Rapid camera changes: no duplicate jobs, cancels work, backoff prevents spam.
 - MAX_LEVEL safety: no black on load/reload/GenerateMipmap paths (watch for absence of "incomplete texture" GL complaints).
 
-### 10. Verification Commands / JS Helpers
+### 10. Automated Headless Texture Verification
+
+The Puppeteer smoke test runs production output in headless Chrome using ANGLE's SwiftShader
+fallback. Build and start the Vite preview server in one terminal:
+
+```bash
+./build-web.sh --no-emsdk
+cd web
+npm run build
+npm run preview
+```
+
+Then run the verifier in another terminal:
+
+```bash
+cd web
+npm run test:textures
+```
+
+The default target is `http://localhost:4173/solar-system/`. Override it with
+`VERIFY_TEXTURES_URL` when necessary. The test waits for and requires successful `Loaded`
+messages for all six `resource/textures_low/Main_SkyBox/*.dds` faces, which catches face-name,
+directory, and cubemap-path regressions. It exits non-zero for unhandled page errors and console
+diagnostics indicating any of the following:
+
+- incomplete or black textures;
+- a texture that WebGL reports as not renderable;
+- an incomplete GPU upload;
+- `GL_TEXTURE_MAX_LEVEL=0` with a mip-filtered texture.
+
+Missing optional high-resolution assets may still use the documented fallback path and do not by
+themselves fail this smoke test. `build-web.sh` mirrors the six committed skybox placeholders into
+the high-res runtime fetch path, preventing Vite's HTML SPA fallback from masquerading as a DDS
+response during local/CI runs. All six faces must always load cleanly.
+
+### Moon, ring, and cloud LOD smoke test
+
+The shared LOD controller covers Moon, Io, Europa, Ganymede, Titan, Saturn/Uranus rings, and the
+Earth/Neptune/Uranus cloud shells. Use a deployment with the corresponding optional high-resolution
+DDS files from `resource/asset-manifest.json`, activate the planet system, and teleport within 50
+world units of the object. For Titan, the console must show:
+
+```text
+[LOD][Titan] Queueing high-res diffuse texture
+[TextureLoadingQueue][satellite] Loading texture: Titan_Diffuse_High
+```
+
+The streaming overlay total must advance for that satellite request. Retreat beyond 100 world
+units and verify `[LOD][Titan] Downgraded diffuse texture`; repeated approach/retreat cycles should
+not grow the live WebGL texture count because `ReloadTexture` deletes the texture it replaces.
+Retreating while a request is active should instead log cancellation at 90 world units (the 1.8x
+hysteresis boundary), and the progress overlay must still settle.
+
+`.github/workflows/texture-verification.yml` runs this gate for every pull request targeting
+`main`. CI installs Emscripten and Puppeteer's Chrome, builds WASM with
+`./build-web.sh --no-emsdk`, builds and serves the Vite production bundle, waits for port 4173,
+and invokes `npm run test:textures`. Chrome is launched headlessly with
+`--use-gl=angle`, `--use-angle=swiftshader`, and `--enable-unsafe-swiftshader`, so the WebGL 2
+check does not require a hardware GPU on the runner.
+
+### 11. Verification Commands / JS Helpers
 - Teleport list (approximate centers):
   - Mercury ~500, Venus ~900, Earth 1900, Mars ~2600, Jupiter ~5000-ish, etc. (exact from planet ctors or labels).
 - Watch: `window.__solarSystemAssetBase` (base for fetches).
@@ -398,7 +483,7 @@ Test queue cancel:
 - Low preset URL test + close/far cycles.
 - Check `_renderableSceneComponents` length grows only as planets activate (via any debug exposure).
 
-### 11. Performance / Memory
+### 12. Performance / Memory
 - Task manager: watch GPU/JS heap before/after high-res of a heavy world (Saturn/Jupiter). Downgrade should release.
 - Initial payload small; per-planet incremental.
 - FPS may throttle to 0 in background tab (rAF); confirm by labels moving on input.

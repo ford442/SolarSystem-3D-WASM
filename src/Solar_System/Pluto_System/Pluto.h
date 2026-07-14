@@ -14,12 +14,12 @@ private:
     std::vector<TextureImage2D> _diffuses;
     TextureImage2D _normalMap, _specular;
 
-    std::string _diffuseLowPath = "resource/textures_low/Pluto_Diffuse_Low.dds";
-    std::string _diffuseHighPath = "resource/textures/Pluto_Diffuse.dds";
-    std::string _normalLowPath = "resource/textures_low/Pluto_Normal_Low.dds";
-    std::string _normalHighPath = "resource/textures/Pluto_Normal.dds";
-    std::string _specularLowPath = "resource/textures_low/Pluto_Specular_Low.dds";
-    std::string _specularHighPath = "resource/textures/Pluto_Specular.dds";
+    std::string _diffuseLowPath = TexturePaths::Pluto::Diffuse.low;
+    std::string _diffuseHighPath = TexturePaths::Pluto::Diffuse.high;
+    std::string _normalLowPath = TexturePaths::Pluto::Normal.low;
+    std::string _normalHighPath = TexturePaths::Pluto::Normal.high;
+    std::string _specularLowPath = TexturePaths::Pluto::Specular.low;
+    std::string _specularHighPath = TexturePaths::Pluto::Specular.high;
 
     float _highResLoadProgress = 0.0f;
     int _highResTexturesLoaded = 0;

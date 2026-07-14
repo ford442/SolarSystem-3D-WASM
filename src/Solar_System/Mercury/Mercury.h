@@ -14,12 +14,12 @@ private:
     std::vector<TextureImage2D> _diffuses;
     TextureImage2D _normalMap, _specular;
 
-    std::string _diffuseLowPath = "resource/textures_low/Mercury_Diffuse_Low.dds";
-    std::string _diffuseHighPath = "resource/textures/Mercury_Diffuse.dds";
-    std::string _normalLowPath = "resource/textures_low/Mercury_Normal_Low.dds";
-    std::string _normalHighPath = "resource/textures/Mercury_Normal.dds";
-    std::string _specularLowPath = "resource/textures_low/Mercury_Specular_Low.dds";
-    std::string _specularHighPath = "resource/textures/Mercury_Specular.dds";
+    std::string _diffuseLowPath = TexturePaths::Mercury::Diffuse.low;
+    std::string _diffuseHighPath = TexturePaths::Mercury::Diffuse.high;
+    std::string _normalLowPath = TexturePaths::Mercury::Normal.low;
+    std::string _normalHighPath = TexturePaths::Mercury::Normal.high;
+    std::string _specularLowPath = TexturePaths::Mercury::Specular.low;
+    std::string _specularHighPath = TexturePaths::Mercury::Specular.high;
 
     float _highResLoadProgress = 0.0f;
     int _highResTexturesLoaded = 0;

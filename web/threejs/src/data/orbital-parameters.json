@@ -1,0 +1,45 @@
+{
+  "source": "C++ Init/AdjustToParent values, companion scale 1 unit = 1 C++ world unit",
+  "bodies": [
+    {
+      "id": "mercury",
+      "name": "Mercury",
+      "position": [1500, 0, 350],
+      "earthRadiusScale": 0.38,
+      "axialTiltDegrees": 0,
+      "rotationRate": 0.003,
+      "texture": "Mercury_Diffuse.ktx2",
+      "fallbackColor": "#9b8b75"
+    },
+    {
+      "id": "venus",
+      "name": "Venus",
+      "position": [1125, 0, -1340],
+      "earthRadiusScale": 0.95,
+      "axialTiltDegrees": 177.3,
+      "rotationRate": -0.003,
+      "texture": "Venus_Diffuse.ktx2",
+      "fallbackColor": "#d5a55f"
+    },
+    {
+      "id": "earth",
+      "name": "Earth",
+      "position": [1900, 0, 0],
+      "earthRadiusScale": 1,
+      "axialTiltDegrees": -23.4,
+      "rotationRate": 0.0075,
+      "texture": "Earth_Day_Diffuse.ktx2",
+      "fallbackColor": "#2f6fc0"
+    },
+    {
+      "id": "mars",
+      "name": "Mars",
+      "position": [-1732, 0, 1000],
+      "earthRadiusScale": 0.53,
+      "axialTiltDegrees": -25.2,
+      "rotationRate": 0.0065,
+      "texture": "Mars_Diffuse.ktx2",
+      "fallbackColor": "#b65332"
+    }
+  ]
+}

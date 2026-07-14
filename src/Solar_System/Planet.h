@@ -3,6 +3,7 @@
 #include "SpaceObject.h"
 #include "Star.h"
 #include "../Auxiliary_Modules/TextureImage2D.h"
+#include "TexturePaths.h"
 #include <vector>
 #include <memory>
 #include <limits>
@@ -40,6 +41,8 @@ public:
     float GetLastCameraDistance() const { return _lastCameraDistance; }
 
 protected:
+    float GetEffectiveLODThreshold() const;
+
     std::shared_ptr<Star> _parentStar;
     float _radius = 2.0; // Radius of the earth 3d model in Blender
     float _earthSizeCoefficient;

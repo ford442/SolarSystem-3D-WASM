@@ -3,6 +3,8 @@
 Europa::Europa(const SatelliteInfo& satelliteInfo, std::shared_ptr<SpaceObject> parent) : Satellite(satelliteInfo, std::move(parent)),
     _diffuses(satelliteInfo.diffuseTextures), _normalMap(satelliteInfo.normalMap)
 {
+    ConfigureDiffuseLOD(_diffuses.at(0), TexturePaths::Europa::Diffuse.low,
+                        TexturePaths::Europa::Diffuse.high, "Europa");
 }
 
 void Europa::AdjustToParent(float timeScale) {
@@ -42,4 +44,3 @@ void Europa::Render() const {
 
     SpaceObject::Render();
 }
-

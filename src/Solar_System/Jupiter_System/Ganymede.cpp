@@ -3,6 +3,8 @@
 Ganymede::Ganymede(const SatelliteInfo& satelliteInfo, std::shared_ptr<SpaceObject> parent) : Satellite(satelliteInfo, std::move(parent)),
     _diffuses(satelliteInfo.diffuseTextures), _normalMap(satelliteInfo.normalMap)
 {
+    ConfigureDiffuseLOD(_diffuses.at(0), TexturePaths::Ganymede::Diffuse.low,
+                        TexturePaths::Ganymede::Diffuse.high, "Ganymede");
 }
 
 void Ganymede::AdjustToParent(float timeScale) {
@@ -42,4 +44,3 @@ void Ganymede::Render() const {
 
     SpaceObject::Render();
 }
-

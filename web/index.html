@@ -113,6 +113,58 @@
         <div id="streaming-progress-bar"></div>
       </div>
     </div>
+    <aside id="settings-panel" class="settings-panel" aria-label="Simulation settings">
+      <button
+        id="settings-toggle"
+        class="settings-toggle"
+        type="button"
+        aria-expanded="true"
+        aria-controls="settings-controls"
+      >
+        <span>Simulation</span>
+        <span class="settings-toggle-icon" aria-hidden="true">−</span>
+      </button>
+      <div id="settings-controls" class="settings-controls">
+        <fieldset id="settings-fieldset" disabled>
+          <label class="settings-row" for="quality-preset">
+            <span>Quality</span>
+            <select id="quality-preset">
+              <option value="0">Low</option>
+              <option value="1">Medium</option>
+              <option value="2">Full</option>
+            </select>
+          </label>
+
+          <label class="settings-slider" for="time-scale">
+            <span>Time scale</span>
+            <output id="time-scale-value" for="time-scale">1×</output>
+          </label>
+          <input
+            id="time-scale"
+            type="range"
+            min="-2"
+            max="4"
+            step="0.05"
+            value="0"
+            aria-describedby="time-scale-help"
+          />
+          <small id="time-scale-help">Log scale: 0.01× to 10,000×</small>
+
+          <label class="settings-switch" for="simulation-paused">
+            <span>Pause animation</span>
+            <input id="simulation-paused" type="checkbox" />
+          </label>
+
+          <label class="settings-switch" for="shadows-enabled">
+            <span>Shadows</span>
+            <input id="shadows-enabled" type="checkbox" checked />
+          </label>
+
+          <button id="settings-reset" class="settings-reset" type="button">Reset settings</button>
+        </fieldset>
+        <p id="settings-status" class="settings-status" aria-live="polite">Initializing controls…</p>
+      </div>
+    </aside>
     <canvas class="emscripten" id="canvas" oncontextmenu="event.preventDefault()" tabindex="-1"></canvas>
     <script type="module" src="/src/main.ts"></script>
   </body>

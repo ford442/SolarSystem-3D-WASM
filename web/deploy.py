@@ -1,79 +1,201 @@
-import os
-import paramiko
+#!/usr/bin/env python3
+"""Deploy the web bundle and/or the independently hosted runtime asset tree."""
+
+from __future__ import annotations
+
+import argparse
 import getpass
+import hashlib
+import json
+import os
+import posixpath
+from pathlib import Path, PurePosixPath
+from typing import Iterable
 
-# --- Server Configuration ---
-# Replace these with your server's details.
-# It's better to use environment variables or a config file for sensitive data.
-HOSTNAME = "1ink.us"
-PORT = 22  # Default SFTP/SSH port
-USERNAME = "ford442"
+import paramiko
 
-# --- Project Configuration ---
-# The local directory to upload from.
-LOCAL_DIRECTORY = "dist"
-# The directory on the server where the files should go (e.g., 'public_html/wasm-game').
-REMOTE_DIRECTORY = "test.1ink.us/solar-system"
 
-def upload_directory(sftp_client, local_path, remote_path):
-    """
-    Recursively uploads a directory and its contents to the remote server.
-    """
-    print(f"Creating remote directory: {remote_path}")
+WEB_DIR = Path(__file__).resolve().parent
+PROJECT_ROOT = WEB_DIR.parent
+DEFAULT_APP_SOURCE = WEB_DIR / "dist"
+DEFAULT_ASSET_SOURCE = PROJECT_ROOT / "resource"
+DEFAULT_MANIFEST = DEFAULT_ASSET_SOURCE / "asset-manifest.json"
+ASSET_DIRECTORIES = ("textures", "textures_low", "sounds")
+
+
+def env(name: str, default: str | None = None) -> str | None:
+    return os.environ.get(f"SOLAR_{name}", default)
+
+
+def parse_args() -> argparse.Namespace:
+    parser = argparse.ArgumentParser(
+        description="Upload the Vite bundle and runtime assets as independent deploy targets."
+    )
+    parser.add_argument("target", choices=("app", "assets", "all"), help="tree to upload")
+    parser.add_argument("--host", default=env("DEPLOY_HOST"))
+    parser.add_argument("--port", type=int, default=int(env("DEPLOY_PORT", "22")))
+    parser.add_argument("--user", default=env("DEPLOY_USER"))
+    parser.add_argument("--password", default=env("DEPLOY_PASSWORD"))
+    parser.add_argument("--key-file", default=env("DEPLOY_KEY_FILE"))
+    parser.add_argument("--app-source", type=Path, default=DEFAULT_APP_SOURCE)
+    parser.add_argument("--asset-source", type=Path, default=DEFAULT_ASSET_SOURCE)
+    parser.add_argument("--manifest", type=Path, default=DEFAULT_MANIFEST)
+    parser.add_argument("--app-remote", default=env("DEPLOY_APP_REMOTE"))
+    parser.add_argument("--asset-remote", default=env("DEPLOY_ASSET_REMOTE"))
+    parser.add_argument("--dry-run", action="store_true", help="validate and print without connecting")
+    args = parser.parse_args()
+
+    if not args.host and not args.dry_run:
+        parser.error("--host or SOLAR_DEPLOY_HOST is required")
+    if not args.user and not args.dry_run:
+        parser.error("--user or SOLAR_DEPLOY_USER is required")
+    if args.target in ("app", "all") and not args.app_remote:
+        parser.error("--app-remote or SOLAR_DEPLOY_APP_REMOTE is required")
+    if args.target in ("assets", "all") and not args.asset_remote:
+        parser.error("--asset-remote or SOLAR_DEPLOY_ASSET_REMOTE is required")
+    return args
+
+
+def sha256(path: Path) -> str:
+    digest = hashlib.sha256()
+    with path.open("rb") as source:
+        for chunk in iter(lambda: source.read(1024 * 1024), b""):
+            digest.update(chunk)
+    return digest.hexdigest()
+
+
+def load_and_validate_manifest(manifest_path: Path, asset_root: Path) -> dict:
+    with manifest_path.open(encoding="utf-8") as source:
+        manifest = json.load(source)
+
+    missing: list[str] = []
+    for asset in manifest.get("files", []):
+        relative = PurePosixPath(asset["path"])
+        if relative.is_absolute() or ".." in relative.parts:
+            raise ValueError(f"Unsafe manifest path: {relative}")
+
+        local_path = asset_root.joinpath(*relative.parts)
+        if not local_path.is_file():
+            if asset.get("optional", False):
+                print(f"Skipping optional missing asset: {relative}")
+                continue
+            missing.append(str(relative))
+            continue
+
+        expected = asset.get("sha256")
+        if expected and sha256(local_path) != expected.lower():
+            raise ValueError(f"SHA256 mismatch for {relative}")
+
+    if missing:
+        formatted = "\n  ".join(missing)
+        raise FileNotFoundError(f"Required manifest assets are missing:\n  {formatted}")
+    return manifest
+
+
+def iter_files(root: Path) -> Iterable[Path]:
+    return (path for path in sorted(root.rglob("*")) if path.is_file())
+
+
+def ensure_remote_directory(sftp: paramiko.SFTPClient, remote_path: str) -> None:
+    current = "/" if remote_path.startswith("/") else ""
+    for part in PurePosixPath(remote_path).parts:
+        if part == "/":
+            continue
+        current = posixpath.join(current, part)
+        try:
+            sftp.stat(current)
+        except IOError:
+            sftp.mkdir(current)
+
+
+def upload_file(
+    sftp: paramiko.SFTPClient | None, local_path: Path, remote_path: str, dry_run: bool
+) -> None:
+    print(f"{('[dry-run] ' if dry_run else '')}{local_path} -> {remote_path}")
+    if dry_run:
+        return
+    assert sftp is not None
+    ensure_remote_directory(sftp, posixpath.dirname(remote_path))
+    sftp.put(str(local_path), remote_path)
+
+
+def upload_tree(
+    sftp: paramiko.SFTPClient | None,
+    local_root: Path,
+    remote_root: str,
+    dry_run: bool,
+) -> None:
+    if not local_root.is_dir():
+        raise FileNotFoundError(f"Local directory does not exist: {local_root}")
+    for local_path in iter_files(local_root):
+        relative = local_path.relative_to(local_root).as_posix()
+        upload_file(sftp, local_path, posixpath.join(remote_root, relative), dry_run)
+
+
+def upload_assets(
+    sftp: paramiko.SFTPClient | None,
+    asset_root: Path,
+    manifest_path: Path,
+    remote_root: str,
+    dry_run: bool,
+) -> None:
+    load_and_validate_manifest(manifest_path, asset_root)
+    for directory in ASSET_DIRECTORIES:
+        local_directory = asset_root / directory
+        if not local_directory.is_dir():
+            if directory == "sounds":
+                print(f"Skipping optional asset directory: {local_directory}")
+                continue
+            raise FileNotFoundError(f"Required asset directory does not exist: {local_directory}")
+        upload_tree(sftp, local_directory, posixpath.join(remote_root, directory), dry_run)
+    upload_file(sftp, manifest_path, posixpath.join(remote_root, manifest_path.name), dry_run)
+
+
+def connect(args: argparse.Namespace) -> paramiko.SSHClient:
+    client = paramiko.SSHClient()
+    client.load_system_host_keys()
+    client.set_missing_host_key_policy(paramiko.RejectPolicy())
+
+    password = args.password
+    if not args.key_file and not password:
+        password = getpass.getpass(f"Password for {args.user}@{args.host}: ")
+
+    client.connect(
+        hostname=args.host,
+        port=args.port,
+        username=args.user,
+        password=password,
+        key_filename=args.key_file,
+    )
+    return client
+
+
+def main() -> None:
+    args = parse_args()
+    client: paramiko.SSHClient | None = None
+    sftp: paramiko.SFTPClient | None = None
     try:
-        # Create the target directory on the server if it doesn't exist.
-        sftp_client.mkdir(remote_path)
-    except IOError:
-        # Directory already exists, which is fine.
-        print(f"Directory {remote_path} already exists.")
+        if not args.dry_run:
+            client = connect(args)
+            sftp = client.open_sftp()
 
-    for item in os.listdir(local_path):
-        local_item_path = os.path.join(local_path, item)
-        remote_item_path = f"{remote_path}/{item}"
-
-        if os.path.isfile(local_item_path):
-            print(f"Uploading file: {local_item_path} -> {remote_item_path}")
-            sftp_client.put(local_item_path, remote_item_path)
-        elif os.path.isdir(local_item_path):
-            # If it's a directory, recurse into it.
-            upload_directory(sftp_client, local_item_path, remote_item_path)
-
-def main():
-    """
-    Main function to connect to the server and start the upload process.
-    """
-    password = 'GoogleBez12!' # getpass.getpass(f"Enter password for {USERNAME}@{HOSTNAME}: ")
-
-    transport = None
-    sftp = None
-    try:
-        # Establish the SSH connection
-        transport = paramiko.Transport((HOSTNAME, PORT))
-        print("Connecting to server...")
-        transport.connect(username=USERNAME, password=password)
-        print("Connection successful!")
-
-        # Create an SFTP client from the transport
-        sftp = paramiko.SFTPClient.from_transport(transport)
-        print(f"Starting upload of '{LOCAL_DIRECTORY}' to '{REMOTE_DIRECTORY}'...")
-
-        # Start the recursive upload
-        upload_directory(sftp, LOCAL_DIRECTORY, REMOTE_DIRECTORY)
-
-        print("\n✅ Deployment complete!")
-
-    except Exception as e:
-        print(f"❌ An error occurred: {e}")
+        if args.target in ("app", "all"):
+            upload_tree(sftp, args.app_source.resolve(), args.app_remote, args.dry_run)
+        if args.target in ("assets", "all"):
+            upload_assets(
+                sftp,
+                args.asset_source.resolve(),
+                args.manifest.resolve(),
+                args.asset_remote,
+                args.dry_run,
+            )
+        print("Deployment complete.")
     finally:
-        # Ensure the connection is closed
-        if sftp:
+        if sftp is not None:
             sftp.close()
-        if transport:
-            transport.close()
-        print("Connection closed.")
+        if client is not None:
+            client.close()
+
 
 if __name__ == "__main__":
-    if not os.path.exists(LOCAL_DIRECTORY):
-        print(f"Error: Local directory '{LOCAL_DIRECTORY}' not found. Did you run 'npm run build' first?")
-    else:
-        main()
+    main()

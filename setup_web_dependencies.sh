@@ -1,6 +1,8 @@
 #!/bin/bash
 set -e
 
+BUILD_JOBS="${BUILD_JOBS:-55}"
+
 # --- NEW: Source Emscripten SDK Environment ---
 # Ensure emcmake is available
 if ! command -v emcmake &> /dev/null; then
@@ -73,7 +75,7 @@ if [ ! -f "$ASSIMP_BUILD_DIR/lib/libassimp.a" ]; then
         -DCMAKE_INSTALL_PREFIX="$PWD/install"
 
     # Build
-    emmake make -j55
+    emmake make -j"$BUILD_JOBS"
 
     cd ../../..
 else
