@@ -18,7 +18,16 @@ namespace {
         const char* name;
     };
 
-    QualitySettings GetQualitySettings(int preset) {
+    bool g_isMobileWeb = false;
+
+    QualitySettings GetQualitySettings(int preset, bool mobile) {
+        if (mobile) {
+            switch (preset) {
+                case 0: return {512, 0, 0, "low"};
+                case 1: return {1024, 2, 0, "medium"};
+                default: return {2048, 2, 0, "full"};
+            }
+        }
         switch (preset) {
             case 0: return {1024, 0, 0, "low"};
             case 1: return {2048, 2, 0, "medium"};
@@ -29,13 +38,45 @@ namespace {
     Application* activeApplication = nullptr;
 
 #ifdef __EMSCRIPTEN__
+    float g_touchForward = 0.0f;
+    float g_touchRight = 0.0f;
+    float g_touchVertical = 0.0f;
+
+    bool ReadIsMobileWeb() {
+        return EM_ASM_INT({
+            try {
+                const ua = navigator.userAgent || '';
+                const mobileUa = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(ua);
+                const coarsePointer = window.matchMedia('(pointer: coarse)').matches;
+                const smallScreen = Math.min(window.screen.width, window.screen.height) <= 768;
+                return (mobileUa || (coarsePointer && smallScreen)) ? 1 : 0;
+            } catch (error) {
+                console.warn('[Quality] Could not detect mobile device:', error);
+                return 0;
+            }
+        }) != 0;
+    }
+
     int ReadInitialQualityPreset() {
         return EM_ASM_INT({
             try {
                 const params = new URLSearchParams(window.location.search);
-                const quality = (params.get('quality') || params.get('q') || 'full').toLowerCase();
-                if (quality === 'low' || quality === '0') return 0;
-                if (quality === 'medium' || quality === 'med' || quality === '1') return 1;
+                const quality = params.get('quality') || params.get('q');
+                if (quality) {
+                    const normalized = quality.toLowerCase();
+                    if (normalized === 'low' || normalized === '0') return 0;
+                    if (normalized === 'medium' || normalized === 'med' || normalized === '1') return 1;
+                    if (normalized === 'full' || normalized === '2') return 2;
+                }
+
+                const ua = navigator.userAgent || '';
+                const mobileUa = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(ua);
+                const coarsePointer = window.matchMedia('(pointer: coarse)').matches;
+                const smallScreen = Math.min(window.screen.width, window.screen.height) <= 768;
+                if (mobileUa || (coarsePointer && smallScreen)) {
+                    console.log('[Quality] Mobile device detected; defaulting to low preset');
+                    return 0;
+                }
             } catch (error) {
                 console.warn('[Quality] Could not read URL preset:', error);
             }
@@ -91,6 +132,38 @@ extern "C" {
     }
     EMSCRIPTEN_KEEPALIVE int GetShadowQuality() {
         return gShadowQuality;
+    }
+    EMSCRIPTEN_KEEPALIVE void SetTouchMovement(float forward, float right, float vertical) {
+        g_touchForward = glm::clamp(forward, -1.0f, 1.0f);
+        g_touchRight = glm::clamp(right, -1.0f, 1.0f);
+        g_touchVertical = glm::clamp(vertical, -1.0f, 1.0f);
+    }
+    EMSCRIPTEN_KEEPALIVE void AddTouchLook(float deltaX, float deltaY) {
+        camera.ProcessMouseMovement(deltaX, deltaY);
+    }
+    EMSCRIPTEN_KEEPALIVE void AddTouchZoom(float delta) {
+        if (std::abs(delta) > 0.0001f) {
+            camera.ProcessMouseScroll(delta);
+        }
+    }
+    EMSCRIPTEN_KEEPALIVE int IsMobileWeb() {
+        return g_isMobileWeb ? 1 : 0;
+    }
+    EMSCRIPTEN_KEEPALIVE void SetMusicVolume(float volume) {
+        if (activeApplication) {
+            activeApplication->SetMusicVolume(volume);
+        }
+    }
+    EMSCRIPTEN_KEEPALIVE float GetMusicVolume() {
+        return activeApplication ? activeApplication->GetMusicVolume() : 0.3f;
+    }
+    EMSCRIPTEN_KEEPALIVE void SetMusicMuted(int muted) {
+        if (activeApplication) {
+            activeApplication->SetMusicMuted(muted != 0);
+        }
+    }
+    EMSCRIPTEN_KEEPALIVE int GetMusicMuted() {
+        return activeApplication && activeApplication->GetMusicMuted() ? 1 : 0;
     }
     EMSCRIPTEN_KEEPALIVE void FocusPlanet(int idx) {
         // simple focus presets for web (approx pos, 2s transition)
@@ -154,6 +227,17 @@ namespace {
         }
         return faces;
     }
+
+    const std::vector<std::string>& GetBackgroundSongPaths() {
+        static const std::vector<std::string> kBackgroundSongPaths = {
+            "resource/sounds/Stellardrone - Galaxies.mp3",
+            "resource/sounds/Stellardrone - Mars.mp3",
+            "resource/sounds/Stellardrone - Billions And Billions.mp3",
+            "resource/sounds/Stellardrone - Gravitation (Remix).mp3",
+            "resource/sounds/Stellardrone - The Edge of Forever.mp3"
+        };
+        return kBackgroundSongPaths;
+    }
 }
 
 // Error Callback
@@ -179,8 +263,9 @@ void Application::InitSystems() {
     }
 
 #ifdef __EMSCRIPTEN__
+    g_isMobileWeb = ReadIsMobileWeb();
     g_qualityPreset = ReadInitialQualityPreset();
-    const auto qualitySettings = GetQualitySettings(g_qualityPreset);
+    const auto qualitySettings = GetQualitySettings(g_qualityPreset, g_isMobileWeb);
     glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 3);
     glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 0);
     glfwWindowHint(GLFW_CLIENT_API, GLFW_OPENGL_ES_API);
@@ -247,9 +332,12 @@ void Application::InitSystems() {
 
 #ifdef __EMSCRIPTEN__
     if (Mix_OpenAudio(44100, MIX_DEFAULT_FORMAT, 2, 2048) < 0) {
-        std::cerr << "Warning: Failed to init SDL_mixer: " << Mix_GetError() << std::endl;
+        std::cerr << "[Audio] Failed to init SDL_mixer: " << Mix_GetError() << std::endl;
+        _mixerInitialized = false;
     } else {
         Mix_AllocateChannels(16);
+        _mixerInitialized = true;
+        std::cout << "[Audio] SDL_mixer initialized" << std::endl;
     }
 #else
     _soundEngine = createIrrKlangDevice(ESOD_AUTO_DETECT, ESEO_MULTI_THREADED | ESEO_LOAD_PLUGINS);
@@ -672,7 +760,7 @@ void Application::RenderHints() const {
     _soundVolumeHintCache.clear();
     stringstream soundVolumeStream;
 #ifdef __EMSCRIPTEN__
-    soundVolumeStream << fixed << setprecision(0) << (static_cast<float>(Mix_VolumeMusic(-1)) / MIX_MAX_VOLUME) * 100.0;
+    soundVolumeStream << fixed << setprecision(0) << (_musicMuted ? 0.0f : _musicVolume) * 100.0;
 #else
     soundVolumeStream << fixed << setprecision(0) << _soundEngine->getSoundVolume() * 100.0;
 #endif
@@ -767,24 +855,19 @@ void Application::RenderHints() const {
 void Application::RenderTextureLoadingProgress() const {
     auto& queue = TextureLoadingQueue::GetInstance();
     const int queued    = queue.GetQueuedCount();
-    // Settled work includes satellite/ring/cloud upgrades and cancellation or
-    // terminal failure, so moving away cannot leave the progress bar stuck.
     const int completed = queue.GetTotalProcessed();
     const int total     = queue.GetTotalQueued();
+    const int active    = queue.GetActiveLoadCount();
 
 #ifdef __EMSCRIPTEN__
-    // Expose streaming stats to JavaScript so the frontend can show a proper
-    // "Streaming high-res... (2/5)" progress element.
     EM_ASM({
         if (typeof window.updateStreamingProgress === 'function') {
-            window.updateStreamingProgress($0, $1);
+            window.updateStreamingProgress($0, $1, $2);
         }
-        // Also wire simple progress into the existing loading hook where applicable
-        // (high-res streaming phase reuses the same (loaded,total) shape).
         if (typeof window.updateLoadingProgress === 'function' && $1 > 0) {
             window.updateLoadingProgress($0, $1);
         }
-    }, completed, total);
+    }, completed, total, active);
 #endif
 
     if (queued == 0) {
@@ -806,12 +889,17 @@ void Application::RenderTextureLoadingProgress() const {
     // Throttled render (via static) to avoid per-frame spam; visual is brief.
     static int lastCompleted = -1;
     static int lastTotal = -1;
+    static int lastActive = -1;
     static int frameCounter = 0;
     frameCounter = (frameCounter + 1) % 10;
-    if (frameCounter == 0 || completed != lastCompleted || total != lastTotal) {
+    if (frameCounter == 0 || completed != lastCompleted || total != lastTotal || active != lastActive) {
         lastCompleted = completed;
         lastTotal = total;
+        lastActive = active;
         std::wstring hint = L"High-res upgrade (" + std::to_wstring(completed) + L"/" + std::to_wstring(total) + L")";
+        if (active > 0) {
+            hint += L" [" + std::to_wstring(active) + L" active]";
+        }
         deque<wstring> loadingHint;
         loadingHint.emplace_back(hint);
         _textRenderer->Render(*_mainTextShader, loadingHint, 0.5f * _displayWidth - 150, 0.1f * _displayHeight, 0.25, textColor);
@@ -911,6 +999,7 @@ void Application::ConfigureMainShaders() {
 void Application::InitScene() {
 #ifdef __EMSCRIPTEN__
     LoadCoreResources();
+    LoadOptionalSounds();
 #else
     InitSceneObjects();
     _appState = AppState::RUNNING;
@@ -945,12 +1034,6 @@ void Application::LoadCoreResources() {
         // Sun
         {"resource/textures_low/Star_Spectrum_Low.dds", "resource/textures_low/Star_Spectrum_Low.dds"},
         {"resource/textures_low/flares_bright_Low.dds", "resource/textures_low/flares_bright_Low.dds"},
-        // Sounds
-        {"resource/sounds/Stellardrone - Galaxies.mp3", "resource/sounds/Stellardrone - Galaxies.mp3"},
-        {"resource/sounds/Stellardrone - Mars.mp3", "resource/sounds/Stellardrone - Mars.mp3"},
-        {"resource/sounds/Stellardrone - Billions And Billions.mp3", "resource/sounds/Stellardrone - Billions And Billions.mp3"},
-        {"resource/sounds/Stellardrone - Gravitation (Remix).mp3", "resource/sounds/Stellardrone - Gravitation (Remix).mp3"},
-        {"resource/sounds/Stellardrone - The Edge of Forever.mp3", "resource/sounds/Stellardrone - The Edge of Forever.mp3"}
     };
 
     const auto skyBoxFaces = GetSkyBoxFaces();
@@ -970,21 +1053,40 @@ void Application::LoadCoreResources() {
     UpdateLoadingProgress();
 
     for(const auto& res : coreResources) {
-        WebResourceFetcher::DownloadFile(res.url, res.virtualPath, [this](bool success) {
+        WebResourceFetcher::DownloadFile(res.url, res.virtualPath, [this, virtualPath = res.virtualPath](bool success) {
             _resourcesPending--;
             if (!success) {
-                std::cerr << "Failed to download core resource!" << std::endl;
+                std::cerr << "[Loading] Failed to download required core resource: " << virtualPath << std::endl;
             }
-            // Update progress after each resource
             UpdateLoadingProgress();
         });
     }
 }
 
+void Application::LoadOptionalSounds() {
+#ifdef __EMSCRIPTEN__
+    const auto& songPaths = GetBackgroundSongPaths();
+    std::cout << "[Audio] Starting optional background music download ("
+              << songPaths.size() << " tracks)..." << std::endl;
+
+    for (const auto& path : songPaths) {
+        WebResourceFetcher::DownloadFile(path, path, [this, path](bool success) {
+            if (success && WebResourceFetcher::ResourceExists(path)) {
+                _availableSongPaths.insert(path);
+                std::cout << "[Audio] Loaded track: " << path << std::endl;
+                return;
+            }
+
+            std::cerr << "[Audio] Missing track (skipped): " << path << std::endl;
+        });
+    }
+#endif
+}
+
 void Application::InitSceneObjects() {
     camera.SetAspect(static_cast<float>(_displayWidth) / static_cast<float>(_displayHeight));
     const auto qualitySettings = GetQualitySettings(
-        gShadowQuality == 0 ? g_qualityPreset : gShadowQuality - 1);
+        gShadowQuality == 0 ? g_qualityPreset : gShadowQuality - 1, g_isMobileWeb);
     _shadowMapFBO = make_unique<ShadowMapFBO>(qualitySettings.shadowResolution, qualitySettings.shadowResolution);
     _hdrShader = make_unique<Shader>("resource/shaders/passThrough.vs", "resource/shaders/hdr.fs");
     _hdr = make_unique<HDR>(*_hdrShader, _displayWidth, _displayHeight);
@@ -1030,16 +1132,10 @@ void Application::InitSceneObjects() {
 }
 
 void Application::InitSongList() {
-    _backgroundSongs = vector<string_view> {
-            "resource/sounds/Stellardrone - Galaxies.mp3",
-            "resource/sounds/Stellardrone - Mars.mp3",
-            "resource/sounds/Stellardrone - Billions And Billions.mp3",
-            "resource/sounds/Stellardrone - Gravitation (Remix).mp3",
-            "resource/sounds/Stellardrone - The Edge of Forever.mp3"
-    };
+    _backgroundSongPaths = GetBackgroundSongPaths();
     
     default_random_engine randEngine(static_cast<uint32_t>(chrono::high_resolution_clock::now().time_since_epoch().count()));
-    shuffle(_backgroundSongs.begin(), _backgroundSongs.end(), randEngine);
+    shuffle(_backgroundSongPaths.begin(), _backgroundSongPaths.end(), randEngine);
 }
 
 void Application::InitStarSystem() {
@@ -1680,16 +1776,14 @@ void Application::ProcessInput(GLFWwindow* window) {
     
     if (glfwGetKey(window, GLFW_KEY_PAGE_UP) == GLFW_PRESS) {
 #ifdef __EMSCRIPTEN__
-        int currentVolume = Mix_VolumeMusic(-1);
-        Mix_VolumeMusic(clamp(currentVolume + 1, 0, MIX_MAX_VOLUME));
+        SetMusicVolume(GetMusicVolume() + 0.05f);
 #else
         _soundEngine->setSoundVolume(clamp(_soundEngine->getSoundVolume() + 0.01, 0.0, 1.0));
 #endif
     }
     if (glfwGetKey(window, GLFW_KEY_PAGE_DOWN) == GLFW_PRESS) {
 #ifdef __EMSCRIPTEN__
-        int currentVolume = Mix_VolumeMusic(-1);
-        Mix_VolumeMusic(clamp(currentVolume - 1, 0, MIX_MAX_VOLUME));
+        SetMusicVolume(GetMusicVolume() - 0.05f);
 #else
         _soundEngine->setSoundVolume(clamp(_soundEngine->getSoundVolume() - 0.01, 0.0, 1.0));
 #endif
@@ -1752,6 +1846,24 @@ void Application::ProcessInput(GLFWwindow* window) {
         yScroll -= 0.16f;
         camera.ProcessMouseScroll(yScroll);
     }
+
+#ifdef __EMSCRIPTEN__
+    if (g_touchForward > 0.01f) {
+        camera.ProcessKeyboard(CameraVector::FORWARD, static_cast<float>(deltaTime) * g_touchForward);
+    } else if (g_touchForward < -0.01f) {
+        camera.ProcessKeyboard(CameraVector::BACKWARD, static_cast<float>(deltaTime) * -g_touchForward);
+    }
+    if (g_touchRight > 0.01f) {
+        camera.ProcessKeyboard(CameraVector::RIGHT, static_cast<float>(deltaTime) * g_touchRight);
+    } else if (g_touchRight < -0.01f) {
+        camera.ProcessKeyboard(CameraVector::LEFT, static_cast<float>(deltaTime) * -g_touchRight);
+    }
+    if (g_touchVertical > 0.01f) {
+        camera.ProcessKeyboard(CameraVector::WORLD_UP, static_cast<float>(deltaTime) * g_touchVertical);
+    } else if (g_touchVertical < -0.01f) {
+        camera.ProcessKeyboard(CameraVector::WORLD_DOWN, static_cast<float>(deltaTime) * -g_touchVertical);
+    }
+#endif
 
     glfwSetCursorPos(window, lastX, lastY);
 }
@@ -1960,7 +2072,7 @@ void Application::UpdateLOD() {
 
 void Application::ApplyQualityPreset(int preset) {
     g_qualityPreset = std::clamp(preset, 0, 2);
-    const auto settings = GetQualitySettings(g_qualityPreset);
+    const auto settings = GetQualitySettings(g_qualityPreset, g_isMobileWeb);
 
     TextureLoadingQueue::GetInstance().SetMaxConcurrentLoads(settings.maxConcurrentTextureLoads);
 
@@ -1995,7 +2107,7 @@ void Application::ApplyShadowQuality(int quality) {
         return;
     }
 
-    const auto settings = GetQualitySettings(gShadowQuality - 1);
+    const auto settings = GetQualitySettings(gShadowQuality - 1, g_isMobileWeb);
     if (_shadowMapFBO &&
         (_shadowMapFBO->GetShadowMapWidth() != settings.shadowResolution ||
          _shadowMapFBO->GetShadowMapHeight() != settings.shadowResolution)) {
@@ -2003,6 +2115,51 @@ void Application::ApplyShadowQuality(int quality) {
     }
     std::cout << "[Shadows] " << settings.shadowResolution << "x"
               << settings.shadowResolution << std::endl;
+}
+
+void Application::SetMusicVolume(float volume) {
+#ifdef __EMSCRIPTEN__
+    _musicVolume = glm::clamp(volume, 0.0f, 1.0f);
+    if (!_musicMuted && _mixerInitialized && Mix_PlayingMusic()) {
+        Mix_VolumeMusic(static_cast<int>(MIX_MAX_VOLUME * _musicVolume));
+    }
+#else
+    _soundEngine->setSoundVolume(glm::clamp(volume, 0.0f, 1.0f));
+#endif
+}
+
+float Application::GetMusicVolume() const {
+#ifdef __EMSCRIPTEN__
+    return _musicVolume;
+#else
+    return _soundEngine->getSoundVolume();
+#endif
+}
+
+void Application::SetMusicMuted(bool muted) {
+#ifdef __EMSCRIPTEN__
+    _musicMuted = muted;
+    if (!_mixerInitialized) {
+        return;
+    }
+    if (_musicMuted) {
+        Mix_VolumeMusic(0);
+        return;
+    }
+    if (Mix_PlayingMusic()) {
+        Mix_VolumeMusic(static_cast<int>(MIX_MAX_VOLUME * _musicVolume));
+    }
+#else
+    (void)muted;
+#endif
+}
+
+bool Application::GetMusicMuted() const {
+#ifdef __EMSCRIPTEN__
+    return _musicMuted;
+#else
+    return false;
+#endif
 }
 
 void Application::RenderPlanetProxyMarkers() const {
@@ -2103,13 +2260,13 @@ void Application::StartPlayBackgroundMusic() {
     };
 
     _backgroundMusicThread = make_unique<thread>([=]() {
-        for (ssize_t i = 0; i < _backgroundSongs.size() && _isBackgroundMusicPlay; i++) {
+        for (ssize_t i = 0; i < _backgroundSongPaths.size() && _isBackgroundMusicPlay; i++) {
             this_thread::sleep_for(1s); 
 
-            auto song = _soundEngine->play2D(_backgroundSongs[i].data(), false, true, true);
+            auto song = _soundEngine->play2D(_backgroundSongPaths[i].c_str(), false, true, true);
             song->setVolume(0);
             song->setIsPaused(false);
-            _currentMusicTrack = _backgroundSongs[i].substr(16); 
+            _currentMusicTrack = _backgroundSongPaths[i].substr(16); 
 
             while (!song->isFinished()) {
                 if (song->getPlayPosition() < 5000) { 
@@ -2126,7 +2283,7 @@ void Application::StartPlayBackgroundMusic() {
                 this_thread::sleep_for(25ms); 
             }
 
-            if (i == _backgroundSongs.size() - 1) 
+            if (i == _backgroundSongPaths.size() - 1) 
                 i = -1; 
 
             song->drop();
@@ -2137,8 +2294,15 @@ void Application::StartPlayBackgroundMusic() {
 
 void Application::UpdateBackgroundMusic() {
 #ifdef __EMSCRIPTEN__
-    if (!_isBackgroundMusicPlay || _backgroundSongs.empty())
+    if (!_isBackgroundMusicPlay || !_mixerInitialized || _musicMuted || _backgroundSongPaths.empty())
         return;
+
+    if (_availableSongPaths.empty())
+        return;
+
+    const auto applyMusicVolume = [this](float fadeMultiplier) {
+        Mix_VolumeMusic(static_cast<int>(MIX_MAX_VOLUME * _musicVolume * fadeMultiplier));
+    };
 
     if (!Mix_PlayingMusic()) {
         if (_currentMusic) {
@@ -2146,35 +2310,49 @@ void Application::UpdateBackgroundMusic() {
             _currentMusic = nullptr;
         }
 
-        if (_currentSongIndex >= _backgroundSongs.size()) {
-            _currentSongIndex = 0; 
+        const size_t songCount = _backgroundSongPaths.size();
+        for (size_t attempt = 0; attempt < songCount; ++attempt) {
+            if (_currentSongIndex >= static_cast<int>(songCount)) {
+                _currentSongIndex = 0;
+            }
+
+            const std::string& path = _backgroundSongPaths[_currentSongIndex];
+            ++_currentSongIndex;
+
+            if (_availableSongPaths.count(path) == 0) {
+                continue;
+            }
+
+            _currentMusic = Mix_LoadMUS(path.c_str());
+            if (!_currentMusic) {
+                std::cerr << "[Audio] Failed to decode track (skipped): " << path
+                          << " (" << Mix_GetError() << ")" << std::endl;
+                _availableSongPaths.erase(path);
+                continue;
+            }
+
+            _currentMusicTrack = path.substr(std::string("resource/sounds/").size());
+            Mix_PlayMusic(_currentMusic, 1);
+            applyMusicVolume(0.0f);
+            _musicStartTime = SDL_GetTicks();
+            _musicDuration = 180000;
+            std::cout << "[Audio] Now playing: " << _currentMusicTrack << std::endl;
+            return;
         }
 
-        _currentMusic = Mix_LoadMUS(_backgroundSongs[_currentSongIndex].data());
-        if (_currentMusic) {
-            _currentMusicTrack = _backgroundSongs[_currentSongIndex].substr(16); 
-            Mix_PlayMusic(_currentMusic, 1);
-            Mix_VolumeMusic(MIX_MAX_VOLUME * 0.3); 
-            _musicStartTime = SDL_GetTicks();
-            _musicDuration = 180000; 
-            
-            _currentSongIndex++;
-        }
+        std::cerr << "[Audio] No playable tracks available yet; waiting for downloads" << std::endl;
+        return;
+    }
+
+    const uint32_t currentTime = SDL_GetTicks();
+    const uint32_t elapsed = currentTime - _musicStartTime;
+
+    if (elapsed < 5000) {
+        applyMusicVolume(static_cast<float>(elapsed) / 5000.0f);
+    } else if (_musicDuration > 0 && elapsed > _musicDuration - 5000) {
+        applyMusicVolume(static_cast<float>(_musicDuration - elapsed) / 5000.0f);
     } else {
-        uint32_t currentTime = SDL_GetTicks();
-        uint32_t elapsed = currentTime - _musicStartTime;
-        
-        if (elapsed < 5000) {
-            float fade = static_cast<float>(elapsed) / 5000.0f;
-            Mix_VolumeMusic(static_cast<int>(MIX_MAX_VOLUME * 0.3f * fade));
-        }
-        else if (_musicDuration > 0 && elapsed > _musicDuration - 5000) {
-            float fade = static_cast<float>(_musicDuration - elapsed) / 5000.0f;
-            Mix_VolumeMusic(static_cast<int>(MIX_MAX_VOLUME * 0.3f * fade));
-        }
-        else {
-            Mix_VolumeMusic(MIX_MAX_VOLUME * 0.3); 
-        }
+        applyMusicVolume(1.0f);
     }
 #endif
 }

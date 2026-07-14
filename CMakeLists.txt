@@ -48,7 +48,7 @@ if(EMSCRIPTEN)
     set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -s SDL2_IMAGE_FORMATS='[\"png\",\"jpg\"]'")
 
     set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -s EXPORTED_RUNTIME_METHODS=['ccall','cwrap']")
-    set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -s EXPORTED_FUNCTIONS=['_main','_SetCameraPose','_SetQualityPreset','_GetQualityPreset','_SetTimeScale','_GetTimeScale','_SetPaused','_GetPaused','_SetShadowQuality','_GetShadowQuality','_FocusPlanet']")
+    set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -s EXPORTED_FUNCTIONS=['_main','_SetCameraPose','_SetQualityPreset','_GetQualityPreset','_SetTimeScale','_GetTimeScale','_SetPaused','_GetPaused','_SetShadowQuality','_GetShadowQuality','_SetTouchMovement','_AddTouchLook','_AddTouchZoom','_IsMobileWeb','_SetMusicVolume','_GetMusicVolume','_SetMusicMuted','_GetMusicMuted','_FocusPlanet']")
     set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -s MODULARIZE=1 -s EXPORT_ES6=1")
     
     set(CMAKE_EXECUTABLE_SUFFIX ".js")

@@ -14,6 +14,59 @@
 body {
   min-width: 320px;
   min-height: 100vh;
+  touch-action: none;
+  overscroll-behavior: none;
+}
+
+#canvas {
+  touch-action: none;
+}
+
+.touch-controls {
+  position: fixed;
+  inset: 0;
+  z-index: 850;
+  pointer-events: none;
+}
+
+.touch-joystick-zone {
+  position: absolute;
+  left: max(12px, env(safe-area-inset-left));
+  bottom: max(12px, env(safe-area-inset-bottom));
+  width: min(42vw, 220px);
+  height: min(42vw, 220px);
+  pointer-events: none;
+}
+
+.touch-joystick-base,
+.touch-joystick-knob {
+  position: fixed;
+  pointer-events: none;
+  transform: translate(-50%, -50%);
+  border-radius: 50%;
+  opacity: 0;
+  transition: opacity 0.12s ease;
+}
+
+.touch-joystick-base {
+  width: 116px;
+  height: 116px;
+  border: 2px solid rgba(110, 215, 255, 0.45);
+  background: rgba(8, 20, 36, 0.35);
+  box-shadow: inset 0 0 18px rgba(77, 217, 240, 0.12);
+}
+
+.touch-joystick-knob {
+  width: 54px;
+  height: 54px;
+  border: 2px solid rgba(160, 235, 255, 0.85);
+  background: rgba(55, 153, 211, 0.55);
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.35);
+}
+
+.touch-controls:not([hidden]) .touch-joystick-base,
+.touch-controls:not([hidden]) .touch-joystick-knob {
+  opacity: 0.45;
 }
 
 button,
@@ -126,7 +179,16 @@ input {
   cursor: pointer;
 }
 
-#time-scale-help {
+#music-volume {
+  width: 100%;
+  min-height: 44px;
+  margin: -5px 0 -3px;
+  accent-color: #55c8f5;
+  cursor: pointer;
+}
+
+#time-scale-help,
+#music-volume-help {
   display: block;
   margin-bottom: 8px;
   color: #a9bac8;

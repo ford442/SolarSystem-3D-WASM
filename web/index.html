@@ -3,11 +3,12 @@
   <head>
     <meta charset="UTF-8" />
     <link rel="icon" type="image/svg+xml" href="/vite.svg" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
     <title>SolarSystem WASM</title>
     <style>
-      body { margin: 0; overflow: hidden; background-color: black; }
-      canvas.emscripten { border: 0px none; background-color: black; width: 100vw; height: 100vh; display: block; }
+      body { margin: 0; overflow: hidden; background-color: black; touch-action: none; overscroll-behavior: none; }
+      html { touch-action: none; overscroll-behavior: none; }
+      canvas.emscripten { border: 0px none; background-color: black; width: 100vw; height: 100vh; display: block; touch-action: none; }
       
       #loading-container {
         position: fixed;
@@ -160,11 +161,36 @@
             <input id="shadows-enabled" type="checkbox" checked />
           </label>
 
+          <label class="settings-slider" for="music-volume">
+            <span>Music volume</span>
+            <output id="music-volume-value" for="music-volume">30%</output>
+          </label>
+          <input
+            id="music-volume"
+            type="range"
+            min="0"
+            max="100"
+            step="1"
+            value="30"
+            aria-describedby="music-volume-help"
+          />
+          <small id="music-volume-help">Background music from hosted MP3 assets</small>
+
+          <label class="settings-switch" for="music-muted">
+            <span>Mute music</span>
+            <input id="music-muted" type="checkbox" />
+          </label>
+
           <button id="settings-reset" class="settings-reset" type="button">Reset settings</button>
         </fieldset>
         <p id="settings-status" class="settings-status" aria-live="polite">Initializing controls…</p>
       </div>
     </aside>
+    <div id="touch-controls" class="touch-controls" hidden>
+      <div id="touch-joystick-zone" class="touch-joystick-zone" aria-hidden="true"></div>
+      <div id="touch-joystick-base" class="touch-joystick-base" aria-hidden="true"></div>
+      <div id="touch-joystick-knob" class="touch-joystick-knob" aria-hidden="true"></div>
+    </div>
     <canvas class="emscripten" id="canvas" oncontextmenu="event.preventDefault()" tabindex="-1"></canvas>
     <script type="module" src="/src/main.ts"></script>
   </body>

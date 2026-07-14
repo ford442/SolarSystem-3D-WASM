@@ -229,6 +229,20 @@ aws s3 sync resource/sounds/ "$ASSET_URI/sounds/" --cache-control 'public,max-ag
 aws s3 cp resource/asset-manifest.json "$ASSET_URI/asset-manifest.json" --cache-control 'public,max-age=31536000,immutable'
 ```
 
+Background music uses the same origin and `VITE_ASSET_BASE` resolution as textures. The five
+Stellardrone MP3 files live under `resource/sounds/` and are **not** embedded in the WASM
+`.data` bundle (they are stored via Git LFS and may be absent in local checkouts). At runtime
+the web build downloads them asynchronously in parallel with core assets:
+
+- `[Audio] Starting optional background music download (5 tracks)...`
+- `[Audio] Loaded track: resource/sounds/...` when a CDN/local file is present
+- `[Audio] Missing track (skipped): resource/sounds/...` on 404 or offline hosts
+
+Missing tracks do not block the loading screen or crash SDL_mixer; playback starts once at
+least one track is available. Use the settings panel **Music volume** slider or **Mute music**
+toggle (persisted in `localStorage`) to control output. Page Up/Page Down still adjust volume
+from the keyboard.
+
 Configure CORS on the bucket and response-header/CORP injection on the CDN before switching
 `VITE_ASSET_BASE` to the new version. Keep the previous version prefix available for rollback.
 

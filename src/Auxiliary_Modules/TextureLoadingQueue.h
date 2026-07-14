@@ -43,6 +43,7 @@ public:
     int GetActiveLoadCount() const { return _activeLoads; }
     int GetQueuedCount() const { return static_cast<int>(_queue.size()) + _activeLoads; }
     bool IsLoading() const { return _activeLoads > 0; }
+    bool IsMemoryBackpressureActive() const { return _memoryBackpressureActive; }
     const std::string& GetCurrentLoadingPath() const { return _currentPath; }
 
     // Cancel a pending or in-flight load (deprioritize when camera moves away).
@@ -66,8 +67,13 @@ private:
 
     std::queue<TextureLoadJob> _queue;
     int _activeLoads = 0;
-    int _maxConcurrentLoads = 1;
+    int _maxConcurrentLoads = 2;
+    bool _memoryBackpressureActive = false;
     std::string _currentPath;
+
+    int GetEffectiveMaxConcurrentLoads();
+    void FinishJob(TextureLoadJob job, bool success, bool didRetry);
+    void HandleDownloadResult(TextureLoadJob job, bool success);
 
     // Dedup + cancel support for resilience against repeated LOD checks and camera movement.
     std::unordered_set<std::string> _pendingPaths;

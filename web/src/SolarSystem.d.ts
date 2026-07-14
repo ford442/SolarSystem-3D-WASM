@@ -30,6 +30,11 @@ export type GetShadowQuality = () => ShadowQuality;
 
 export type PlanetIndex = 0 | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9;
 
+export type SetMusicVolume = (volume: number) => void;
+export type GetMusicVolume = () => number;
+export type SetMusicMuted = (muted: boolean) => void;
+export type GetMusicMuted = () => number;
+
 /** Planet index accepted by FocusPlanet: 0=sun, 1=Mercury, ..., 9=Pluto. */
 export type FocusPlanet = (index: PlanetIndex) => void;
 
@@ -80,6 +85,46 @@ export interface SolarSystemCwrap {
     argTypes: [],
   ): GetShadowQuality;
   (
+    ident: 'SetTouchMovement',
+    returnType: null,
+    argTypes: ['number', 'number', 'number'],
+  ): SetTouchMovement;
+  (
+    ident: 'AddTouchLook',
+    returnType: null,
+    argTypes: ['number', 'number'],
+  ): AddTouchLook;
+  (
+    ident: 'AddTouchZoom',
+    returnType: null,
+    argTypes: ['number'],
+  ): AddTouchZoom;
+  (
+    ident: 'IsMobileWeb',
+    returnType: 'number',
+    argTypes: [],
+  ): () => number;
+  (
+    ident: 'SetMusicVolume',
+    returnType: null,
+    argTypes: ['number'],
+  ): SetMusicVolume;
+  (
+    ident: 'GetMusicVolume',
+    returnType: 'number',
+    argTypes: [],
+  ): GetMusicVolume;
+  (
+    ident: 'SetMusicMuted',
+    returnType: null,
+    argTypes: ['number'],
+  ): SetMusicMuted;
+  (
+    ident: 'GetMusicMuted',
+    returnType: 'number',
+    argTypes: [],
+  ): GetMusicMuted;
+  (
     ident: 'FocusPlanet',
     returnType: null,
     argTypes: ['number'],
@@ -107,6 +152,14 @@ export interface SolarSystemModule {
   _GetPaused: GetPaused;
   _SetShadowQuality: SetShadowQuality;
   _GetShadowQuality: GetShadowQuality;
+  _SetTouchMovement: SetTouchMovement;
+  _AddTouchLook: AddTouchLook;
+  _AddTouchZoom: AddTouchZoom;
+  _IsMobileWeb: () => number;
+  _SetMusicVolume: SetMusicVolume;
+  _GetMusicVolume: GetMusicVolume;
+  _SetMusicMuted: SetMusicMuted;
+  _GetMusicMuted: GetMusicMuted;
   _FocusPlanet: FocusPlanet;
 }
 
@@ -119,7 +172,7 @@ export default SolarSystem;
 declare global {
   interface Window {
     updateLoadingProgress?: (loaded: number, total: number) => void;
-    updateStreamingProgress?: (completed: number, total: number) => void;
+    updateStreamingProgress?: (completed: number, total: number, active?: number) => void;
     setCameraPose?: SetCameraPose;
     setQualityPreset?: SetQualityPreset;
     getQualityPreset?: GetQualityPreset;
@@ -129,6 +182,14 @@ declare global {
     getPaused?: GetPaused;
     setShadowQuality?: SetShadowQuality;
     getShadowQuality?: GetShadowQuality;
+    setTouchMovement?: SetTouchMovement;
+    addTouchLook?: AddTouchLook;
+    addTouchZoom?: AddTouchZoom;
+    isMobileWeb?: () => number;
+    setMusicVolume?: SetMusicVolume;
+    getMusicVolume?: GetMusicVolume;
+    setMusicMuted?: SetMusicMuted;
+    getMusicMuted?: GetMusicMuted;
     focusPlanet?: FocusPlanet;
     __solarSystemAssetBase?: string;
   }

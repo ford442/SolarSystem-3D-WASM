@@ -5,6 +5,7 @@
 #include "SystemModules.h"
 #include <atomic>
 #include <functional>
+#include <unordered_set>
 
 #ifdef __EMSCRIPTEN__
 #include <emscripten.h>
@@ -67,6 +68,10 @@ public:
     void RunOneFrame(); // For Emscripten main loop
     void ApplyQualityPreset(int preset);
     void ApplyShadowQuality(int quality);
+    void SetMusicVolume(float volume);
+    float GetMusicVolume() const;
+    void SetMusicMuted(bool muted);
+    bool GetMusicMuted() const;
 
 private:
     enum class AppState { LOADING, RUNNING };
@@ -87,6 +92,10 @@ private:
     uint32_t _musicStartTime = 0;
     uint32_t _musicDuration = 0;
     int _nearestPlanetSearchFrameCounter = 0;
+    bool _mixerInitialized = false;
+    float _musicVolume = 0.3f;
+    bool _musicMuted = false;
+    std::unordered_set<std::string> _availableSongPaths;
 #else
     ISoundEngine* _soundEngine = nullptr;
     std::unique_ptr<std::thread> _backgroundMusicThread, _searchNearestPlanetThread;
@@ -105,7 +114,7 @@ private:
     std::unique_ptr<LensFlare> _lensFlare;
     std::shared_ptr<Star> _sun;
     std::vector<RenderableSceneComponent> _renderableSceneComponents;
-    std::vector<std::string_view> _backgroundSongs;
+    std::vector<std::string> _backgroundSongPaths;
     
     // Pre-allocated containers for RenderHints to eliminate per-frame allocations
     mutable std::deque<wchar_t> _distanceInfoCache;
@@ -120,7 +129,8 @@ private:
 
     void InitSystems();
     void InitScene();
-    void LoadCoreResources(); // Download only core assets (skybox, sun, models, sounds)
+    void LoadCoreResources(); // Download only core assets (skybox, sun, models)
+    void LoadOptionalSounds(); // Fire-and-forget background music downloads (WASM)
     void InitSceneObjects();
     void InitStarSystem();
     void InitMercury(const MeshHolder& sphereModel);
