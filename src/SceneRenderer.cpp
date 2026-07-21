@@ -42,6 +42,14 @@ void Application::ProcessSceneComponentsRendering() {
 }
 
 void Application::ShadowMapPass(const RenderableSceneComponent& component) {
+#ifdef __EMSCRIPTEN__
+    // XR presents into XRWebGLLayer's framebuffer (bound by JS). The normal
+    // shadow pass rebinds FBO 0 on exit, which would break stereo output — skip
+    // self-shadow maps in VR for now (lighting reads a cleared map as fully lit).
+    if (_xr.active) {
+        return;
+    }
+#endif
     glBindFramebuffer(GL_FRAMEBUFFER, _shadowMapFBO->GetFBO());
     glClear(GL_DEPTH_BUFFER_BIT);
     glViewport(0, 0, _shadowMapFBO->GetShadowMapWidth(), _shadowMapFBO->GetShadowMapHeight());
@@ -70,7 +78,15 @@ void Application::ShadowMapPass(const RenderableSceneComponent& component) {
 }
 
 void Application::RenderPass(const RenderableSceneComponent& component) {
-    glViewport(0, 0, _displayWidth, _displayHeight);
+#ifdef __EMSCRIPTEN__
+    if (_xr.active && _xr.currentEye >= 0 && _xr.currentEye < 2) {
+        const auto& eye = _xr.eyes[_xr.currentEye];
+        glViewport(eye.viewportX, eye.viewportY, eye.viewportWidth, eye.viewportHeight);
+    } else
+#endif
+    {
+        glViewport(0, 0, _displayWidth, _displayHeight);
+    }
     _mainPlanetShader->Use();
 
     ConfigureMainPlanetShader(component);
@@ -516,10 +532,24 @@ void Application::RenderTextureLoadingProgress() const {
 void Application::ConfigureMainShaders() {
     static const double zCoef = 2.0 / glm::log2(_camera.GetFar() + 1.0);
 
-    static const glm::mat4 skyBoxProjection = glm::perspective(glm::radians(45.0f), _camera.GetAspect(), _camera.GetNear(), _camera.GetFar());
+#ifdef __EMSCRIPTEN__
+    if (_xr.active && _xr.currentEye >= 0 && _xr.currentEye < _xr.eyeCount) {
+        const auto& eye = _xr.eyes[_xr.currentEye];
+        _cameraProjection = eye.projection;
+        _cameraView = eye.view;
+    } else
+#endif
+    {
+        _cameraProjection = _camera.GetProjectionMatrix();
+        _cameraView = _camera.GetViewMatrix();
+    }
 
-    _cameraProjection = _camera.GetProjectionMatrix();
-    _cameraView = _camera.GetViewMatrix();
+    // Skybox uses the active view's rotation; projection matches the eye frustum in XR.
+    const glm::mat4 skyBoxProjection =
+#ifdef __EMSCRIPTEN__
+        (_xr.active) ? _cameraProjection :
+#endif
+        glm::perspective(glm::radians(45.0f), _camera.GetAspect(), _camera.GetNear(), _camera.GetFar());
 
     _mainSkyBoxShader->Use();
     _mainSkyBoxShader->SetMat4("view", glm::mat4(glm::mat3(_cameraView)));

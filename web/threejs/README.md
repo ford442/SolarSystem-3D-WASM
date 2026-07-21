@@ -9,6 +9,7 @@ from, and does not replace, the C++/Emscripten WebGL 2 renderer.
 - Phase 1: complete — shared orbital JSON, DDS→KTX2 pipeline, Mercury through Mars,
   focus presets, OrbitControls, and damped WASD flight.
 - Next: low→high texture streaming, labels/proxies for outer planets, and simplified effects.
+- WebXR spike: on the **WebGLRenderer** fallback, Three's `VRButton` is attached (`renderer.xr.enabled`). The primary WASM app owns the full immersive-vr path — see `docs/plans/WEBXR_PLAN.md`.
 
 ## Run
 

@@ -252,6 +252,33 @@ input {
   background: rgba(255, 255, 255, 0.13);
 }
 
+.settings-vr {
+  width: 100%;
+  min-height: 44px;
+  margin-top: 8px;
+  color: #e8f7ff;
+  background: rgba(40, 120, 180, 0.35);
+  border: 1px solid rgba(120, 200, 255, 0.45);
+  border-radius: 8px;
+  cursor: pointer;
+  touch-action: manipulation;
+  font-weight: 600;
+}
+
+.settings-vr:hover:not(:disabled) {
+  background: rgba(50, 140, 200, 0.5);
+}
+
+.settings-vr:disabled {
+  opacity: 0.6;
+  cursor: wait;
+}
+
+.settings-vr-exit {
+  background: rgba(140, 60, 60, 0.4);
+  border-color: rgba(255, 140, 140, 0.45);
+}
+
 .settings-status {
   min-height: 18px;
   margin: 9px 0 0;

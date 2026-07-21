@@ -57,6 +57,20 @@ export type GetPlanetSceneDistance = (index: PlanetIndex) => number;
 export type SetOrbitLines = (enabled: number) => void;
 export type GetOrbitLines = () => number;
 
+export type SetXrSessionActive = (active: number) => void;
+export type SetXrEyeCount = (count: number) => void;
+export type SetXrEyeViewport = (
+  eye: number,
+  x: number,
+  y: number,
+  width: number,
+  height: number,
+) => void;
+export type GetXrMatrixScratch = () => number;
+export type CommitXrEyeMatrices = (eye: number) => void;
+export type RunXrFrame = () => void;
+export type GetCameraPositionComponent = () => number;
+
 export interface SolarSystemCwrap {
   (
     ident: 'SetCameraPose',
@@ -193,6 +207,51 @@ export interface SolarSystemCwrap {
     returnType: 'number',
     argTypes: [],
   ): GetOrbitLines;
+  (
+    ident: 'SetXrSessionActive',
+    returnType: null,
+    argTypes: ['number'],
+  ): SetXrSessionActive;
+  (
+    ident: 'SetXrEyeCount',
+    returnType: null,
+    argTypes: ['number'],
+  ): SetXrEyeCount;
+  (
+    ident: 'SetXrEyeViewport',
+    returnType: null,
+    argTypes: ['number', 'number', 'number', 'number', 'number'],
+  ): SetXrEyeViewport;
+  (
+    ident: 'GetXrMatrixScratch',
+    returnType: 'number',
+    argTypes: [],
+  ): GetXrMatrixScratch;
+  (
+    ident: 'CommitXrEyeMatrices',
+    returnType: null,
+    argTypes: ['number'],
+  ): CommitXrEyeMatrices;
+  (
+    ident: 'RunXrFrame',
+    returnType: null,
+    argTypes: [],
+  ): RunXrFrame;
+  (
+    ident: 'GetCameraPositionX',
+    returnType: 'number',
+    argTypes: [],
+  ): GetCameraPositionComponent;
+  (
+    ident: 'GetCameraPositionY',
+    returnType: 'number',
+    argTypes: [],
+  ): GetCameraPositionComponent;
+  (
+    ident: 'GetCameraPositionZ',
+    returnType: 'number',
+    argTypes: [],
+  ): GetCameraPositionComponent;
 }
 
 export interface SolarSystemModuleConfig {
@@ -201,11 +260,19 @@ export interface SolarSystemModuleConfig {
   print?: (text: string) => void;
   printErr?: (text: string) => void;
   onRuntimeInitialized?: () => void;
+  /** Passed through to Emscripten's WebGL context creation (GLFW). */
+  contextAttributes?: {
+    xrCompatible?: boolean;
+    majorVersion?: number;
+    minorVersion?: number;
+    antialias?: boolean;
+  };
 }
 
 export interface SolarSystemModule {
   canvas: HTMLCanvasElement;
   cwrap: SolarSystemCwrap;
+  HEAPF32: Float32Array;
   _main: (argc: number, argv: number) => number;
   _SetCameraPose: SetCameraPose;
   _SetQualityPreset: SetQualityPreset;
@@ -273,6 +340,15 @@ declare global {
     getPlanetSceneDistance?: GetPlanetSceneDistance;
     setOrbitLines?: SetOrbitLines;
     getOrbitLines?: GetOrbitLines;
+    setXrSessionActive?: SetXrSessionActive;
+    setXrEyeCount?: SetXrEyeCount;
+    setXrEyeViewport?: SetXrEyeViewport;
+    getXrMatrixScratch?: GetXrMatrixScratch;
+    commitXrEyeMatrices?: CommitXrEyeMatrices;
+    runXrFrame?: RunXrFrame;
+    getCameraPositionX?: GetCameraPositionComponent;
+    getCameraPositionY?: GetCameraPositionComponent;
+    getCameraPositionZ?: GetCameraPositionComponent;
     onPlanetFocused?: (index: number) => void;
     __solarSystemAssetBase?: string;
   }
