@@ -1,136 +1,170 @@
 {
-  "version": 1,
+  "version": 2,
   "sceneNote": "Distances in the 3D scene are artistic. Toggle scale mode to compare compressed orbits vs AU-proportional spacing.",
   "bodies": [
     {
       "index": 0,
       "id": "sun",
       "name": "Sun",
+      "nameRu": "Солнце",
       "type": "star",
       "diameterKm": 1392700,
       "massEarths": 333000,
+      "siderealRotationDays": 25.38,
       "orbitalPeriodDays": null,
       "distanceAu": 0,
       "moons": 0,
-      "summary": "G-type main-sequence star; contains 99.86% of the Solar System's mass."
+      "summary": "G-type main-sequence star; contains 99.86% of the Solar System's mass.",
+      "summaryRu": "Звезда спектрального класса G; содержит 99,86% массы Солнечной системы."
     },
     {
       "index": 1,
       "id": "mercury",
       "name": "Mercury",
+      "nameRu": "Меркурий",
       "type": "terrestrial",
       "diameterKm": 4879,
       "massEarths": 0.055,
+      "siderealRotationDays": 58.646,
       "orbitalPeriodDays": 88,
       "distanceAu": 0.387,
       "moons": 0,
-      "summary": "Smallest planet; extreme temperature swings between sunlit and shadowed hemispheres."
+      "summary": "Smallest planet; extreme temperature swings between sunlit and shadowed hemispheres.",
+      "summaryRu": "Самая маленькая планета; резкие перепады температуры между освещённой и теневой сторонами."
     },
     {
       "index": 2,
       "id": "venus",
       "name": "Venus",
+      "nameRu": "Венера",
       "type": "terrestrial",
       "diameterKm": 12104,
       "massEarths": 0.815,
+      "siderealRotationDays": -243.025,
       "orbitalPeriodDays": 225,
       "distanceAu": 0.723,
       "moons": 0,
-      "summary": "Dense CO₂ atmosphere drives a runaway greenhouse; surface hotter than Mercury."
+      "summary": "Dense CO₂ atmosphere drives a runaway greenhouse; surface hotter than Mercury.",
+      "summaryRu": "Плотная атмосфера CO₂ вызывает парниковый эффект; поверхность горячее, чем у Меркурия."
     },
     {
       "index": 3,
       "id": "earth",
       "name": "Earth",
+      "nameRu": "Земля",
       "type": "terrestrial",
       "diameterKm": 12742,
       "massEarths": 1,
+      "siderealRotationDays": 0.997,
       "orbitalPeriodDays": 365.25,
       "distanceAu": 1,
       "moons": 1,
-      "summary": "Only known world with stable liquid water on the surface and abundant life."
+      "summary": "Only known world with stable liquid water on the surface and abundant life.",
+      "summaryRu": "Единственный известный мир с устойчивой жидкой водой на поверхности и обилием жизни."
     },
     {
       "index": 4,
       "id": "mars",
       "name": "Mars",
+      "nameRu": "Марс",
       "type": "terrestrial",
       "diameterKm": 6779,
       "massEarths": 0.107,
+      "siderealRotationDays": 1.026,
       "orbitalPeriodDays": 687,
       "distanceAu": 1.524,
       "moons": 2,
-      "summary": "Iron-rich desert world with the largest volcano and canyon in the Solar System."
+      "summary": "Iron-rich desert world with the largest volcano and canyon in the Solar System.",
+      "summaryRu": "Пустынный мир, богатый железом, с крупнейшим вулканом и каньоном Солнечной системы."
     },
     {
       "index": 5,
       "id": "jupiter",
       "name": "Jupiter",
+      "nameRu": "Юпитер",
       "type": "gas_giant",
       "diameterKm": 139820,
       "massEarths": 318,
+      "siderealRotationDays": 0.414,
       "orbitalPeriodDays": 4333,
       "distanceAu": 5.203,
       "moons": 95,
-      "summary": "Most massive planet; Great Red Spot is a centuries-old anticyclonic storm."
+      "summary": "Most massive planet; Great Red Spot is a centuries-old anticyclonic storm.",
+      "summaryRu": "Самая массивная планета; Большое красное пятно — многовековой антициклонный шторм."
     },
     {
       "index": 6,
       "id": "saturn",
       "name": "Saturn",
+      "nameRu": "Сатурн",
       "type": "gas_giant",
       "diameterKm": 116460,
       "massEarths": 95,
+      "siderealRotationDays": 0.444,
       "orbitalPeriodDays": 10759,
       "distanceAu": 9.537,
       "moons": 146,
-      "summary": "Spectacular ring system of ice and rock; average density less than water."
+      "summary": "Spectacular ring system of ice and rock; average density less than water.",
+      "summaryRu": "Великолепная кольцевая система из льда и камня; средняя плотность меньше воды."
     },
     {
       "index": 7,
       "id": "uranus",
       "name": "Uranus",
+      "nameRu": "Уран",
       "type": "ice_giant",
       "diameterKm": 50724,
       "massEarths": 14.5,
+      "siderealRotationDays": -0.718,
       "orbitalPeriodDays": 30687,
       "distanceAu": 19.191,
       "moons": 28,
-      "summary": "Rotates on its side; faint rings and a methane haze give a blue-green hue."
+      "summary": "Rotates on its side; faint rings and a methane haze give a blue-green hue.",
+      "summaryRu": "Вращается «на боку»; слабые кольца и метановая дымка придают сине-зелёный оттенок."
     },
     {
       "index": 8,
       "id": "neptune",
       "name": "Neptune",
+      "nameRu": "Нептун",
       "type": "ice_giant",
       "diameterKm": 49244,
       "massEarths": 17.1,
+      "siderealRotationDays": 0.671,
       "orbitalPeriodDays": 60190,
       "distanceAu": 30.069,
       "moons": 16,
-      "summary": "Windiest planet; supersonic jet streams despite receiving little solar heat."
+      "summary": "Windiest planet; supersonic jet streams despite receiving little solar heat.",
+      "summaryRu": "Самая ветреная планета; сверхзвуковые струи ветра при слабом солнечном нагреве."
     },
     {
       "index": 9,
       "id": "pluto",
       "name": "Pluto",
+      "nameRu": "Плутон",
       "type": "dwarf_planet",
       "diameterKm": 2377,
       "massEarths": 0.0022,
+      "siderealRotationDays": 6.387,
       "orbitalPeriodDays": 90560,
       "distanceAu": 39.482,
       "moons": 5,
-      "summary": "Icy dwarf planet in the Kuiper Belt with a heart-shaped nitrogen glacier."
+      "summary": "Icy dwarf planet in the Kuiper Belt with a heart-shaped nitrogen glacier.",
+      "summaryRu": "Ледяная карликовая планета пояса Койпера с ледником азота в форме сердца."
     }
   ],
   "scaleModes": {
     "compressed": {
       "label": "Compressed orbits",
-      "description": "Artistic spacing for navigation — all worlds stay within a few thousand scene units."
+      "labelRu": "Сжатые орбиты",
+      "description": "Artistic spacing for navigation — all worlds stay within a few thousand scene units.",
+      "descriptionRu": "Художественные расстояния для навигации — все миры в пределах нескольких тысяч единиц сцены."
     },
     "realistic": {
       "label": "Realistic distances",
-      "description": "Orbit radii scaled to NASA semi-major axes (1 AU ≈ Earth's compressed distance). Vast empty space between worlds."
+      "labelRu": "Реалистичные расстояния",
+      "description": "Orbit radii scaled to NASA semi-major axes (1 AU ≈ Earth's compressed distance). Vast empty space between worlds.",
+      "descriptionRu": "Радиусы орбит по полуосям NASA (1 а.е. ≈ сжатое расстояние Земли). Огромные пустоты между мирами."
     }
   }
 }

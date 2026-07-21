@@ -70,6 +70,8 @@ export type GetXrMatrixScratch = () => number;
 export type CommitXrEyeMatrices = (eye: number) => void;
 export type RunXrFrame = () => void;
 export type GetCameraPositionComponent = () => number;
+export type GetCameraYaw = () => number;
+export type GetCameraPitch = () => number;
 
 export interface SolarSystemCwrap {
   (
@@ -252,6 +254,16 @@ export interface SolarSystemCwrap {
     returnType: 'number',
     argTypes: [],
   ): GetCameraPositionComponent;
+  (
+    ident: 'GetCameraYaw',
+    returnType: 'number',
+    argTypes: [],
+  ): GetCameraYaw;
+  (
+    ident: 'GetCameraPitch',
+    returnType: 'number',
+    argTypes: [],
+  ): GetCameraPitch;
 }
 
 export interface SolarSystemModuleConfig {
@@ -349,6 +361,8 @@ declare global {
     getCameraPositionX?: GetCameraPositionComponent;
     getCameraPositionY?: GetCameraPositionComponent;
     getCameraPositionZ?: GetCameraPositionComponent;
+    getCameraYaw?: GetCameraYaw;
+    getCameraPitch?: GetCameraPitch;
     onPlanetFocused?: (index: number) => void;
     __solarSystemAssetBase?: string;
   }
