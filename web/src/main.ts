@@ -36,8 +36,12 @@ const settingsFieldset = document.getElementById('settings-fieldset') as HTMLFie
 const qualitySelect = document.getElementById('quality-preset') as HTMLSelectElement;
 const timeScaleInput = document.getElementById('time-scale') as HTMLInputElement;
 const timeScaleValue = document.getElementById('time-scale-value') as HTMLOutputElement;
+const simulationDateInput = document.getElementById('simulation-date') as HTMLInputElement;
+const simulationDateSet = document.getElementById('simulation-date-set') as HTMLButtonElement;
+const simulationDateNow = document.getElementById('simulation-date-now') as HTMLButtonElement;
 const pausedInput = document.getElementById('simulation-paused') as HTMLInputElement;
 const shadowsInput = document.getElementById('shadows-enabled') as HTMLInputElement;
+const orbitLinesInput = document.getElementById('orbit-lines-enabled') as HTMLInputElement;
 const musicVolumeInput = document.getElementById('music-volume') as HTMLInputElement;
 const musicVolumeValue = document.getElementById('music-volume-value') as HTMLOutputElement;
 const musicMutedInput = document.getElementById('music-muted') as HTMLInputElement;
@@ -118,8 +122,10 @@ interface PersistedSettings {
     timeScale: number;
     paused: boolean;
     shadows: boolean;
+    orbitLines: boolean;
     musicVolume: number;
     musicMuted: boolean;
+    simulationDate?: string;
 }
 
 function isQualityPreset(value: unknown): value is QualityPreset {
@@ -138,10 +144,14 @@ function readPersistedSettings(): Partial<PersistedSettings> {
                 : undefined,
             paused: typeof parsed.paused === 'boolean' ? parsed.paused : undefined,
             shadows: typeof parsed.shadows === 'boolean' ? parsed.shadows : undefined,
+            orbitLines: typeof parsed.orbitLines === 'boolean' ? parsed.orbitLines : undefined,
             musicVolume: typeof parsed.musicVolume === 'number' && Number.isFinite(parsed.musicVolume)
                 ? Math.min(100, Math.max(0, Math.round(parsed.musicVolume)))
                 : undefined,
             musicMuted: typeof parsed.musicMuted === 'boolean' ? parsed.musicMuted : undefined,
+            simulationDate: typeof parsed.simulationDate === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(parsed.simulationDate)
+                ? parsed.simulationDate
+                : undefined,
         };
     } catch (error) {
         console.warn('[Settings] Could not read saved settings:', error);
@@ -155,8 +165,10 @@ function currentPanelSettings(): PersistedSettings {
         timeScale: Math.pow(10, Number(timeScaleInput.value)),
         paused: pausedInput.checked,
         shadows: shadowsInput.checked,
+        orbitLines: orbitLinesInput.checked,
         musicVolume: Number(musicVolumeInput.value),
         musicMuted: musicMutedInput.checked,
+        simulationDate: simulationDateInput.value || undefined,
     };
 }
 
@@ -190,6 +202,70 @@ function applyMusicVolumePercent(percent: number): void {
 function updateTimeScaleDisplay(scale: number): void {
     timeScaleValue.value = formatTimeScale(scale);
     timeScaleValue.textContent = formatTimeScale(scale);
+}
+
+/** Civil UTC date YYYY-MM-DD → Julian Date at 0h (matches C++ Ephemeris::JulianDateFromYmd). */
+function julianDateFromIsoDate(isoDate: string): number | undefined {
+    const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(isoDate);
+    if (!match) return undefined;
+    const year = Number(match[1]);
+    const month = Number(match[2]);
+    const day = Number(match[3]);
+    const a = Math.floor((14 - month) / 12);
+    const y = year + 4800 - a;
+    const m = month + 12 * a - 3;
+    const jdn = day + Math.floor((153 * m + 2) / 5) + 365 * y + Math.floor(y / 4)
+        - Math.floor(y / 100) + Math.floor(y / 400) - 32045;
+    return jdn - 0.5;
+}
+
+function isoDateFromJulianDate(jd: number): string {
+    const J = Math.floor(jd + 0.5);
+    const f = J + 1401 + Math.floor((Math.floor((4 * J + 274277) / 146097) * 3) / 4) - 38;
+    const e = 4 * f + 3;
+    const g = Math.floor((e % 1461) / 4);
+    const h = 5 * g + 2;
+    const day = Math.floor((h % 153) / 5) + 1;
+    const month = (Math.floor(h / 153) + 2) % 12 + 1;
+    const year = Math.floor(e / 1461) - 4716 + Math.floor((12 + 2 - month) / 12);
+    const mm = String(month).padStart(2, '0');
+    const dd = String(day).padStart(2, '0');
+    return `${year}-${mm}-${dd}`;
+}
+
+function isoDateUtcNow(): string {
+    const now = new Date();
+    const y = now.getUTCFullYear();
+    const m = String(now.getUTCMonth() + 1).padStart(2, '0');
+    const d = String(now.getUTCDate()).padStart(2, '0');
+    return `${y}-${m}-${d}`;
+}
+
+function julianDateUtcNow(): number {
+    return Date.now() / 86400000 + 2440587.5;
+}
+
+function applySimulationDateIso(isoDate: string, statusMessage?: string): void {
+    const jd = julianDateFromIsoDate(isoDate);
+    if (jd === undefined) {
+        settingsStatus.textContent = 'Invalid date';
+        return;
+    }
+    simulationDateInput.value = isoDate;
+    window.setSimulationEpoch?.(jd);
+    settingsStatus.textContent = statusMessage ?? `Date set to ${isoDate}`;
+    persistPanelSettings();
+}
+
+function syncSimulationDateFromRuntime(): void {
+    if (document.activeElement === simulationDateInput) {
+        return;
+    }
+    const jd = window.getSimulationEpoch?.();
+    if (jd === undefined || !Number.isFinite(jd)) {
+        return;
+    }
+    simulationDateInput.value = isoDateFromJulianDate(jd);
 }
 
 function qualityFromUrl(): QualityPreset | undefined {
@@ -245,6 +321,8 @@ Module(moduleConfig).then((instance) => {
     window.getTimeScale = instance.cwrap('GetTimeScale', 'number', []);
     window.setPaused = instance.cwrap('SetPaused', null, ['number']);
     window.getPaused = instance.cwrap('GetPaused', 'number', []);
+    window.setSimulationEpoch = instance.cwrap('SetSimulationEpoch', null, ['number']);
+    window.getSimulationEpoch = instance.cwrap('GetSimulationEpoch', 'number', []);
     window.setShadowQuality = instance.cwrap('SetShadowQuality', null, ['number']);
     window.getShadowQuality = instance.cwrap('GetShadowQuality', 'number', []);
     window.setTouchMovement = instance.cwrap('SetTouchMovement', null, ['number', 'number', 'number']);
@@ -261,6 +339,8 @@ Module(moduleConfig).then((instance) => {
     window.getNearestPlanetIndex = instance.cwrap('GetNearestPlanetIndex', 'number', []);
     window.getFocusedPlanetIndex = instance.cwrap('GetFocusedPlanetIndex', 'number', []);
     window.getPlanetSceneDistance = instance.cwrap('GetPlanetSceneDistance', 'number', ['number']);
+    window.setOrbitLines = instance.cwrap('SetOrbitLines', null, ['number']);
+    window.getOrbitLines = instance.cwrap('GetOrbitLines', 'number', []);
 
     const explorer = new PlanetExplorer(explorerPanel);
     void explorer.init({
@@ -305,21 +385,33 @@ Module(moduleConfig).then((instance) => {
     const timeScale = saved.timeScale ?? window.getTimeScale();
     const paused = saved.paused ?? Boolean(window.getPaused());
     const shadows = saved.shadows ?? true;
+    const orbitLines = saved.orbitLines ?? true;
     const musicVolumePercent = saved.musicVolume ?? Math.round((window.getMusicVolume?.() ?? 0.3) * 100);
     const musicMuted = saved.musicMuted ?? Boolean(window.getMusicMuted?.());
+    const simulationDate = saved.simulationDate
+        ?? (window.getSimulationEpoch ? isoDateFromJulianDate(window.getSimulationEpoch()) : isoDateUtcNow());
 
     qualitySelect.value = String(quality);
     timeScaleInput.value = String(Math.log10(timeScale));
     updateTimeScaleDisplay(timeScale);
+    simulationDateInput.value = simulationDate;
     pausedInput.checked = paused;
     shadowsInput.checked = shadows;
+    orbitLinesInput.checked = orbitLines;
     applyMusicVolumePercent(musicVolumePercent);
     musicMutedInput.checked = musicMuted;
 
     window.setQualityPreset(quality);
     window.setTimeScale(timeScale);
     window.setPaused(paused);
+    {
+        const jd = julianDateFromIsoDate(simulationDate);
+        if (jd !== undefined) {
+            window.setSimulationEpoch?.(jd);
+        }
+    }
     window.setShadowQuality(shadows ? (quality + 1) as ShadowQuality : 0);
+    window.setOrbitLines?.(orbitLines ? 1 : 0);
     window.setMusicMuted?.(musicMuted);
     if (!musicMuted) {
         window.setMusicVolume?.(musicVolumePercent / 100);
@@ -344,6 +436,22 @@ Module(moduleConfig).then((instance) => {
         persistPanelSettings();
     });
 
+    simulationDateSet.addEventListener('click', () => {
+        applySimulationDateIso(simulationDateInput.value);
+    });
+
+    simulationDateInput.addEventListener('change', () => {
+        applySimulationDateIso(simulationDateInput.value);
+    });
+
+    simulationDateNow.addEventListener('click', () => {
+        const iso = isoDateUtcNow();
+        simulationDateInput.value = iso;
+        window.setSimulationEpoch?.(julianDateUtcNow());
+        settingsStatus.textContent = `Date set to now (${iso} UTC)`;
+        persistPanelSettings();
+    });
+
     pausedInput.addEventListener('change', () => {
         window.setPaused?.(pausedInput.checked);
         settingsStatus.textContent = pausedInput.checked ? 'Animation paused' : 'Animation resumed';
@@ -354,6 +462,12 @@ Module(moduleConfig).then((instance) => {
         const preset = Number(qualitySelect.value) as QualityPreset;
         window.setShadowQuality?.(shadowsInput.checked ? (preset + 1) as ShadowQuality : 0);
         settingsStatus.textContent = shadowsInput.checked ? 'Shadows enabled' : 'Shadows disabled';
+        persistPanelSettings();
+    });
+
+    orbitLinesInput.addEventListener('change', () => {
+        window.setOrbitLines?.(orbitLinesInput.checked ? 1 : 0);
+        settingsStatus.textContent = orbitLinesInput.checked ? 'Orbit lines enabled' : 'Orbit lines disabled';
         persistPanelSettings();
     });
 
@@ -383,6 +497,7 @@ Module(moduleConfig).then((instance) => {
         timeScaleInput.value = '0';
         pausedInput.checked = false;
         shadowsInput.checked = true;
+        orbitLinesInput.checked = true;
         musicMutedInput.checked = false;
         updateTimeScaleDisplay(1);
         applyMusicVolumePercent(30);
@@ -390,8 +505,12 @@ Module(moduleConfig).then((instance) => {
         window.setTimeScale?.(1);
         window.setPaused?.(false);
         window.setShadowQuality?.(resetShadowQuality);
+        window.setOrbitLines?.(1);
         window.setMusicMuted?.(false);
         window.setMusicVolume?.(0.3);
+        const nowIso = isoDateUtcNow();
+        simulationDateInput.value = nowIso;
+        window.setSimulationEpoch?.(julianDateUtcNow());
         settingsStatus.textContent = 'Settings reset';
         persistPanelSettings();
     });
@@ -409,6 +528,7 @@ Module(moduleConfig).then((instance) => {
                 updateTimeScaleDisplay(runtimeScale);
             }
         }
+        syncSimulationDateFromRuntime();
         pausedInput.checked = Boolean(window.getPaused?.());
         shadowsInput.checked = (window.getShadowQuality?.() ?? 0) > 0;
         if (document.activeElement !== musicVolumeInput) {

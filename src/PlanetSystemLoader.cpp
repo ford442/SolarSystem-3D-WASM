@@ -49,7 +49,7 @@ std::function<void()> Application::MakePlanetInitFunc(const std::string& initTag
 }
 void Application::UpdatePlanetSystemLoading() {
 #ifdef __EMSCRIPTEN__
-    const glm::vec3 camPos = camera.GetPosition();
+    const glm::vec3 camPos = _camera.GetPosition();
     for (auto& manifest : _planetSystemManifests) {
         if (manifest.state == PlanetSystemManifest::State::READY) continue;
 

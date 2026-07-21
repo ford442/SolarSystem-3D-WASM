@@ -25,20 +25,55 @@ enum class ScaleMode : int {
     Realistic = 1
 };
 
+/** Wall seconds for one Earth orbit at timeScale == 1. */
+constexpr float kEarthOrbitSecondsAt1x = 120.0f;
+
 void SetScaleMode(ScaleMode mode);
 ScaleMode GetScaleMode();
 
-/** Offset from the Sun in scene units for the active scale mode. */
+/** Set the simulation epoch (Julian Date) and refresh ephemeris positions. */
+void SetJulianDate(double julianDate);
+double GetJulianDate();
+
+/** Advance ephemeris epoch and axial spin by scaled wall-clock seconds. */
+void Advance(float scaledDtSeconds);
+
+/** Reset to J2000.0 and zero axial spin (tests / deterministic restarts). */
+void ResetForTests();
+
+/**
+ * Current heliocentric offset from the Sun in scene units for the active scale mode.
+ * Direction from Standish/Keplerian ecliptic lon/lat at the current Julian date;
+ * radius from GetOrbitRadius (compressed art length or AU-scaled).
+ */
 glm::vec3 GetOffset(Body body);
 
 /** Semi-major axis in astronomical units (NASA fact-sheet averages). */
 float GetAuDistance(Body body);
 
-/** Current scene distance from the Sun (length of GetOffset). */
+/** Orbit radius in scene units (scale-mode aware; independent of anomaly). */
+float GetOrbitRadius(Body body);
+
+/** Alias of GetOrbitRadius — scene distance from the Sun. */
 float GetSceneDistance(Body body);
 
-/** Compressed-scene offset baked into the original art direction. */
+/** Compressed-scene offset baked into the original art direction (phase-0 reference). */
 glm::vec3 GetCompressedOffset(Body body);
+
+/** Accumulated axial spin in degrees (linear in sim time; negative = retrograde). */
+float GetAxialSpinDegrees(Body body);
+
+/** Orbital period in Earth days (NASA averages). Sun returns 0. */
+float GetOrbitalPeriodDays(Body body);
+
+/** Sidereal rotation period in Earth days; negative for retrograde rotators. */
+float GetSiderealRotationDays(Body body);
+
+/** Orbital inclination in degrees (NASA averages). */
+float GetInclinationDegrees(Body body);
+
+/** Map wall-scaled seconds for one full orbit of this body at timeScale==1. */
+float GetOrbitPeriodSecondsAt1x(Body body);
 
 /** Map manifest / UI name to body id; returns Sun for unknown names. */
 Body BodyFromName(const std::string& name);

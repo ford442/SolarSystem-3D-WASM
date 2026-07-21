@@ -1,36 +1,22 @@
 #include "Triton.h"
+#include "../SatelliteOrbit.h"
 
 Triton::Triton(const SatelliteInfo& satelliteInfo, std::shared_ptr<SpaceObject> parent) : Satellite(satelliteInfo, std::move(parent)),
     _diffuses(satelliteInfo.diffuseTextures), _normalMap(satelliteInfo.normalMap)
 {
 }
 
-void Triton::AdjustToParent(float timeScale) {
-    static float x = 0, y = 20, z = -37.5f;
-
-    static float circleRadius = 0.005f;
-    static float time = 0.0f;
-    static float velocity = 1.35f;
+void Triton::AdjustToParent(float /*timeScale*/) {
+    static float anomaly = -1.57079633f;
     static float rotationAngle = 0.0f;
-    static bool goUp = false;
+    constexpr float kOrbitRadius = 37.500000f;
+    constexpr float kPeriodDays = 5.877f;
 
-    if (timeScale > 0.0f) {
-        time += 0.0001f;
-        rotationAngle -= 4 *  0.0115f;
-        if (y >= 20.f)
-            goUp = false;
-        else if (y <= -20.f)
-            goUp = true;
-
-        if (goUp) y += 0.002;
-        else y -= 0.002;
-
-        x += circleRadius * glm::cos(velocity * time);
-        z += circleRadius * glm::sin(velocity * time);
-    }
+    SatelliteOrbit::AdvanceAnomaly(anomaly, kPeriodDays);
+    SatelliteOrbit::AdvanceSpin(rotationAngle, -2.76f);
 
     LoadIdentityModelMatrix();
-    Translate(_parent->GetPosition() + glm::vec3(x, y, z));
+    Translate(_parent->GetPosition() + SatelliteOrbit::Offset(kOrbitRadius, anomaly));
     Scale(glm::vec3(_earthSizeCoefficient));
     Rotate(-75, glm::vec3(0, 1, 0));
     Rotate(rotationAngle, glm::vec3(0, 1, 0));

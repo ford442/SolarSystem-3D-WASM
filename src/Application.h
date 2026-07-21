@@ -20,14 +20,6 @@
 using namespace irrklang;
 #endif
 
-namespace {
-    Camera camera(0.001f, 20000.f, 5.0f, 0.05f, glm::vec3(-134.0f, 0.0f, 0.0f)); // tuned for better nav
-    float lastX, lastY;
-    float starExposure = 8.0f, starGamma = 0.4545454f, starTemperatureInKelvin = 5778.0f;
-    double deltaTime = 0.0, lastFrame = 0.0;
-    bool isFirstMouse = true, isTimeRun = true, isRenderHints = true, isRenderPlanetStarDistances = true, isRenderSatelliteDistances = true, isVertSyncEnabled = true;
-}
-
 class Application {
 public:
     Application();
@@ -44,8 +36,30 @@ public:
     float GetMusicVolume() const;
     void SetMusicMuted(bool muted);
     bool GetMusicMuted() const;
+    void SetOrbitLinesEnabled(bool enabled);
+    bool GetOrbitLinesEnabled() const;
+    Camera& GetCamera() { return _camera; }
+    const Camera& GetCamera() const { return _camera; }
 
 private:
+    Camera _camera{0.001f, 20000.f, 5.0f, 0.05f, glm::vec3(-134.0f, 0.0f, 0.0f)};
+
+    float _lastX = 0.f;
+    float _lastY = 0.f;
+    bool _isFirstMouse = true;
+    double _deltaTime = 0.0;
+    double _lastFrame = 0.0;
+
+    float _starExposure = 8.0f;
+    float _starGamma = 0.4545454f;
+    float _starTemperatureInKelvin = 5778.0f;
+
+    bool _isRenderHints = true;
+    bool _isRenderPlanetStarDistances = true;
+    bool _isRenderSatelliteDistances = true;
+    bool _isVertSyncEnabled = true;
+    bool _orbitLinesEnabled = true;
+
     enum class AppState { LOADING, RUNNING };
     AppState _appState = AppState::LOADING;
     std::atomic<int> _resourcesPending{0};
@@ -92,6 +106,7 @@ private:
         _mainRingShader;
     std::unique_ptr<Shader> _hdrShader, _lensFlareShader, _starGlowShader;
     std::unique_ptr<LensFlare> _lensFlare;
+    std::unique_ptr<OrbitPathRenderer> _orbitPathRenderer;
     std::shared_ptr<Star> _sun;
     std::vector<RenderableSceneComponent> _renderableSceneComponents;
     std::vector<std::string> _backgroundSongPaths;
@@ -132,6 +147,7 @@ private:
     void ApplyRenderResources(uint16_t shadowResolution, bool enableHdr);
     void UpdateLOD();             // Central LOD manager: upgrade textures for nearest planets (WASM)
     void RenderPlanetProxyMarkers() const; // Show orbital markers for unloaded planets (WASM)
+    void RenderOrbitPaths() const;
     void StartSearchNearestPlanet();
     void UpdateSearchNearestPlanet(); // For Emscripten frame-based search
     void StartPlayBackgroundMusic();

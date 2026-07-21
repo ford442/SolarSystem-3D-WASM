@@ -18,14 +18,20 @@ echo "------------------------------------------------"
 SKIP_EMSDK=false
 
 # Parse arguments
+BUILD_TYPE="${CMAKE_BUILD_TYPE:-Release}"
 for arg in "$@"; do
     case $arg in
         --no-emsdk)
             SKIP_EMSDK=true
             shift
             ;;
+        --debug)
+            BUILD_TYPE=Debug
+            shift
+            ;;
     esac
 done
+echo "CMake build type: $BUILD_TYPE"
 
 if [ "$SKIP_EMSDK" = false ]; then
     if command -v emcc &> /dev/null; then
@@ -64,9 +70,13 @@ mkdir -p "$BUILD_DIR"
 # Get absolute path to the web directory for includes
 WEB_INCLUDE_DIR="$PROJECT_ROOT/web"
 
-# Run CMake
+# Run CMake (reconfigure when switching Debug↔Release; wipe build-web/ if flags look stale)
 echo "Running CMake configuration..."
-emcmake cmake -DCMAKE_CXX_FLAGS="-I/usr/local/include -I$WEB_INCLUDE_DIR" -B "$BUILD_DIR" "$PROJECT_ROOT"
+emcmake cmake \
+    -DCMAKE_BUILD_TYPE="$BUILD_TYPE" \
+    -DCMAKE_CXX_FLAGS="-I/usr/local/include -I$WEB_INCLUDE_DIR" \
+    -B "$BUILD_DIR" \
+    "$PROJECT_ROOT"
 
 # Build
 echo "Building project..."
@@ -118,5 +128,10 @@ if [ -f "SolarSystem.data" ]; then
     echo "Copied SolarSystem.data to web/public/"
 fi
 
+echo ""
+echo "Artifact sizes ($BUILD_TYPE):"
+if [ -f "$PROJECT_ROOT/web/public/SolarSystem.wasm" ]; then
+    wc -c "$PROJECT_ROOT/web/public/SolarSystem.wasm" "$PROJECT_ROOT/web/src/SolarSystem.js" 2>/dev/null || true
+fi
 echo ""
 echo "Build & Deployment Complete!"

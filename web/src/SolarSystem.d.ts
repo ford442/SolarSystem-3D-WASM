@@ -23,6 +23,11 @@ export type SetPaused = (paused: boolean) => void;
 /** Returns 1 while paused and 0 while running. */
 export type GetPaused = () => number;
 
+/** Set the simulation epoch as a Julian Date (fractional day allowed). */
+export type SetSimulationEpoch = (julianDate: number) => void;
+/** Read the active simulation Julian Date from the C++ runtime. */
+export type GetSimulationEpoch = () => number;
+
 export type ShadowQuality = 0 | 1 | 2 | 3;
 /** Set shadow quality: 0=off, 1=low, 2=medium, 3=full. */
 export type SetShadowQuality = (quality: ShadowQuality) => void;
@@ -47,6 +52,10 @@ export type GetOrbitScaleMode = () => OrbitScaleMode;
 export type GetNearestPlanetIndex = () => number;
 export type GetFocusedPlanetIndex = () => number;
 export type GetPlanetSceneDistance = (index: PlanetIndex) => number;
+
+/** Toggle faint heliocentric orbit path lines (1=on, 0=off). */
+export type SetOrbitLines = (enabled: number) => void;
+export type GetOrbitLines = () => number;
 
 export interface SolarSystemCwrap {
   (
@@ -84,6 +93,16 @@ export interface SolarSystemCwrap {
     returnType: 'number',
     argTypes: [],
   ): GetPaused;
+  (
+    ident: 'SetSimulationEpoch',
+    returnType: null,
+    argTypes: ['number'],
+  ): SetSimulationEpoch;
+  (
+    ident: 'GetSimulationEpoch',
+    returnType: 'number',
+    argTypes: [],
+  ): GetSimulationEpoch;
   (
     ident: 'SetShadowQuality',
     returnType: null,
@@ -164,6 +183,16 @@ export interface SolarSystemCwrap {
     returnType: 'number',
     argTypes: ['number'],
   ): GetPlanetSceneDistance;
+  (
+    ident: 'SetOrbitLines',
+    returnType: null,
+    argTypes: ['number'],
+  ): SetOrbitLines;
+  (
+    ident: 'GetOrbitLines',
+    returnType: 'number',
+    argTypes: [],
+  ): GetOrbitLines;
 }
 
 export interface SolarSystemModuleConfig {
@@ -185,6 +214,8 @@ export interface SolarSystemModule {
   _GetTimeScale: GetTimeScale;
   _SetPaused: SetPaused;
   _GetPaused: GetPaused;
+  _SetSimulationEpoch: SetSimulationEpoch;
+  _GetSimulationEpoch: GetSimulationEpoch;
   _SetShadowQuality: SetShadowQuality;
   _GetShadowQuality: GetShadowQuality;
   _SetTouchMovement: SetTouchMovement;
@@ -201,6 +232,8 @@ export interface SolarSystemModule {
   _GetNearestPlanetIndex: GetNearestPlanetIndex;
   _GetFocusedPlanetIndex: GetFocusedPlanetIndex;
   _GetPlanetSceneDistance: GetPlanetSceneDistance;
+  _SetOrbitLines: SetOrbitLines;
+  _GetOrbitLines: GetOrbitLines;
 }
 
 declare const SolarSystem: (
@@ -220,6 +253,8 @@ declare global {
     getTimeScale?: GetTimeScale;
     setPaused?: SetPaused;
     getPaused?: GetPaused;
+    setSimulationEpoch?: SetSimulationEpoch;
+    getSimulationEpoch?: GetSimulationEpoch;
     setShadowQuality?: SetShadowQuality;
     getShadowQuality?: GetShadowQuality;
     setTouchMovement?: SetTouchMovement;
@@ -236,6 +271,8 @@ declare global {
     getNearestPlanetIndex?: GetNearestPlanetIndex;
     getFocusedPlanetIndex?: GetFocusedPlanetIndex;
     getPlanetSceneDistance?: GetPlanetSceneDistance;
+    setOrbitLines?: SetOrbitLines;
+    getOrbitLines?: GetOrbitLines;
     onPlanetFocused?: (index: number) => void;
     __solarSystemAssetBase?: string;
   }

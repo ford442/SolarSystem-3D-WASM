@@ -14,17 +14,11 @@ Pluto::Pluto(const PlanetInfo& planetInfo, std::shared_ptr<Star> parentStar) : P
 #endif
 }
 
-void Pluto::AdjustToParent(float timeScale) {
-    static float rotationAngle = 0;
-
-    if (timeScale > 0.0f) {
-        rotationAngle += (4 * 0.0075f * timeScale) * timeScale;
-    }
-
+void Pluto::AdjustToParent(float /*timeScale*/) {
     LoadIdentityModelMatrix();
     Translate(_parentStar->GetPosition() + OrbitLayout::GetOffset(OrbitLayout::Body::Pluto));
     Scale(glm::vec3(_earthSizeCoefficient));
-    Rotate(rotationAngle, glm::vec3(0.0f, 1.0f, 0.0f));
+    Rotate(OrbitLayout::GetAxialSpinDegrees(OrbitLayout::Body::Pluto), glm::vec3(0.0f, 1.0f, 0.0f));
     UpdateModelMatrix();
 }
 

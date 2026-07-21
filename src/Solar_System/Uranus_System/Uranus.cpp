@@ -14,18 +14,12 @@ Uranus::Uranus(const PlanetInfo& planetInfo, std::shared_ptr<Star> parentStar) :
 #endif
 }
 
-void Uranus::AdjustToParent(float timeScale) {
-    static float rotationAngle = 0;
-
-    if (timeScale > 0.0f) {
-        rotationAngle += (2 * 0.009575f * timeScale) * timeScale;
-    }
-
+void Uranus::AdjustToParent(float /*timeScale*/) {
     LoadIdentityModelMatrix();
     Translate(_parentStar->GetPosition() + OrbitLayout::GetOffset(OrbitLayout::Body::Uranus));
     Scale(glm::vec3(_earthSizeCoefficient));
     Rotate(81.2f, glm::vec3(1, 0, 0));
-    Rotate(rotationAngle, glm::vec3(0, 1, 0));
+    Rotate(OrbitLayout::GetAxialSpinDegrees(OrbitLayout::Body::Uranus), glm::vec3(0.0f, 1.0f, 0.0f));
     UpdateModelMatrix();
 }
 

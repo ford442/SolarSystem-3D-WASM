@@ -14,18 +14,12 @@ Venus::Venus(const PlanetInfo& planetInfo, std::shared_ptr<Star> parentStar) : P
 #endif
 }
 
-void Venus::AdjustToParent(float timeScale) {
-    static float rotationAngle = 0;
-
-    if (timeScale > 0.0f) {
-        rotationAngle += (4 * 0.00075f * timeScale) * timeScale;
-    }
-
+void Venus::AdjustToParent(float /*timeScale*/) {
     LoadIdentityModelMatrix();
     Translate(_parentStar->GetPosition() + OrbitLayout::GetOffset(OrbitLayout::Body::Venus));
     Scale(glm::vec3(_earthSizeCoefficient));
     Rotate(177.3f, glm::vec3(0, 0, 1));
-    Rotate(-rotationAngle, glm::vec3(0.0f, 1.0f, 0.0f));
+    Rotate(OrbitLayout::GetAxialSpinDegrees(OrbitLayout::Body::Venus), glm::vec3(0.0f, 1.0f, 0.0f));
     UpdateModelMatrix();
 }
 

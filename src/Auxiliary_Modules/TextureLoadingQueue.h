@@ -59,6 +59,10 @@ public:
     int GetCategoryQueued(TextureLoadCategory category) const;
     int GetCategoryCompleted(TextureLoadCategory category) const;
 
+#ifdef SOLARSYSTEM_BUILD_TESTS
+    void ResetForTests();
+#endif
+
 private:
     TextureLoadingQueue() = default;
     ~TextureLoadingQueue() = default;

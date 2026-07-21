@@ -21,7 +21,8 @@ This file only records environment-specific facts for automated agents (e.g. Cur
 ## Build / lint / run (web)
 
 ```bash
-./build-web.sh                              # C++ → WASM (slow)
+./build-web.sh                              # C++ → WASM Release (slow)
+./build-web.sh --debug                      # Debug symbols (-O0 -g)
 cd web && npx tsc                           # TypeScript check (closest to lint)
 cd web && npm run dev                       # http://localhost:5173/solar-system/
 cd web && npm run preview                   # http://localhost:4173/solar-system/
@@ -29,6 +30,8 @@ cd web && npm run preview                   # http://localhost:4173/solar-system
 
 - Base path is `/solar-system/` — opening `/` alone 404s.
 - TypeScript hot-reloads in dev; C++ requires `./build-web.sh` + browser refresh.
+- Wipe `build-web/` when switching Debug↔Release or changing LTO/exception flags.
+- Emscripten flag model / Wasm exceptions fallback: [docs/plans/PORTING_GUIDE.md](docs/plans/PORTING_GUIDE.md) §3b.
 - No automated test suite; verification is manual (see [docs/plans/TESTING_GUIDE.md](docs/plans/TESTING_GUIDE.md)).
 
 ## Runtime assets in this environment

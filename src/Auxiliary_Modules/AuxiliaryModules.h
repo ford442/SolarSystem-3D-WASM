@@ -9,5 +9,6 @@
 #include "HDR.h"
 #include "TextRenderer.h"
 #include "LensFlare.h"
+#include "OrbitPathRenderer.h"
 
 #endif //SOLARSYSTEM_AUXILIARYMODULES_H

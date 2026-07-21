@@ -35,6 +35,12 @@ jobs:
       - name: Build native binary
         run: ./build.sh
 
+      - name: Build and run unit tests
+        run: |
+          cmake -G Ninja -DCMAKE_BUILD_TYPE=Release -DSOLARSYSTEM_BUILD_TESTS=ON -B build-test
+          cmake --build build-test --target SolarSystemTests
+          ctest --test-dir build-test --output-on-failure
+
       - name: Smoke test binary under Xvfb
         working-directory: ${{ github.workspace }}
         env:

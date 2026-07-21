@@ -19,4 +19,11 @@ public:
     // Returns true if the file is present in the Emscripten MEMFS (or native filesystem).
     // Useful for LOD decisions: only attempt high-res download if we want to try fetching it.
     static bool ResourceExists(const std::string& virtualPath);
+
+#ifdef SOLARSYSTEM_BUILD_TESTS
+    using TestDownloadHandler = std::function<void(const std::string& url, const std::string& virtualPath,
+                                                   std::function<void(bool)> callback)>;
+    static void SetTestDownloadHandler(TestDownloadHandler handler);
+    static void ClearTestDownloadHandler();
+#endif
 };

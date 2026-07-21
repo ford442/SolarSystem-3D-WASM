@@ -170,6 +170,16 @@
             </select>
           </label>
 
+          <label class="settings-row" for="simulation-date">
+            <span>Simulation date</span>
+            <input id="simulation-date" type="date" min="1800-01-01" max="2050-12-31" />
+          </label>
+          <div class="settings-date-actions">
+            <button id="simulation-date-set" class="settings-date-btn" type="button">Set date</button>
+            <button id="simulation-date-now" class="settings-date-btn" type="button">Now</button>
+          </div>
+          <small id="simulation-date-help">Heliocentric positions from Julian date (Standish approx.)</small>
+
           <label class="settings-slider" for="time-scale">
             <span>Time scale</span>
             <output id="time-scale-value" for="time-scale">1×</output>
@@ -193,6 +203,11 @@
           <label class="settings-switch" for="shadows-enabled">
             <span>Shadows</span>
             <input id="shadows-enabled" type="checkbox" checked />
+          </label>
+
+          <label class="settings-switch" for="orbit-lines-enabled">
+            <span>Orbit lines</span>
+            <input id="orbit-lines-enabled" type="checkbox" checked />
           </label>
 
           <label class="settings-slider" for="music-volume">

@@ -1,6 +1,16 @@
 #ifndef SOLARSYSTEM_SHADER_H
 #define SOLARSYSTEM_SHADER_H
 #include <GL/glew.h>
+#ifdef __EMSCRIPTEN__
+// Emscripten's glew/SDL_opengl declare DSA entry points that WebGL 2 does not
+// implement. Macro (not inline) so -flto cannot emit an unresolved import.
+#undef glBindTextureUnit
+#define glBindTextureUnit(unit, texture) \
+    do { \
+        glActiveTexture(GL_TEXTURE0 + (unit)); \
+        glBindTexture(GL_TEXTURE_2D, (texture)); \
+    } while (0)
+#endif
 #include <glm/glm.hpp>
 #include <string>
 #include <fstream>

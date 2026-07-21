@@ -1,0 +1,5 @@
+if(EXISTS "/root/SolarSystem-3D-WASM/build-test/tests/SolarSystemTests[1]_tests.cmake")
+  include("/root/SolarSystem-3D-WASM/build-test/tests/SolarSystemTests[1]_tests.cmake")
+else()
+  add_test(SolarSystemTests_NOT_BUILT SolarSystemTests_NOT_BUILT)
+endif()

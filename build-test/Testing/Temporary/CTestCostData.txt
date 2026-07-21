@@ -1,0 +1,40 @@
+SolarSystemTests_NOT_BUILT 0 0
+OrbitLayoutTest.BodyFromNameMapsKnownPlanets 5 0.00245435
+OrbitLayoutTest.BodyFromNameFallsBackToSun 5 0.00220997
+OrbitLayoutTest.CompressedModeUsesArtDirectionOffsets 3 0.00586378
+OrbitLayoutTest.RealisticModeScalesAlongCompressedDirection 3 0.00406807
+OrbitLayoutTest.SunOffsetIsZeroInBothModes 5 0.00318249
+QualitySettingsTest.DesktopPresetMapping 3 0.00545547
+QualitySettingsTest.MobileDowngradesMsaaOnFullPreset 3 0.0104057
+QualitySettingsTest.OutOfRangePresetUsesFullTier 3 0.0187751
+QualitySettingsTest.NativeTexturePathPrefersHighRes 3 0.0036177
+PlanetManifestLoaderTest.LoadsValidManifestWithVersion 3 0.0070252
+PlanetManifestLoaderTest.RejectsMalformedJson 3 0.00251386
+PlanetManifestLoaderTest.RejectsMissingRequiredFields 3 0.00441276
+PlanetManifestLoaderTest.RejectsInvalidActivationRadius 3 0.00221857
+PlanetManifestLoaderTest.RejectsUnknownInitTag 3 0.0062426
+TextureLoadingQueueTest.DedupesDuplicatePaths 3 0.00404119
+TextureLoadingQueueTest.LimitsConcurrentInFlightLoads 3 0.00552577
+TextureLoadingQueueTest.CancelPendingLoadBeforeStart 2 0.00659074
+TextureLoadingQueueTest.CancelInFlightLoadSuppressesSuccess 3 0.00229287
+OrbitLayoutTest.CompressedModeUsesArtDirectionOffsetsAtT0 1 0.012655
+OrbitLayoutTest.RealisticModeScalesOrbitRadius 2 0.00615709
+OrbitLayoutTest.SceneDistanceStableAcrossAdvance 2 0.00635972
+OrbitLayoutTest.MercuryCompletesOrbitFasterThanEarth 2 0.00478112
+OrbitLayoutTest.RelativeAngularSpeedOrdering 2 0.0127519
+OrbitLayoutTest.AxialSpinIsLinearAndRetrogradeForVenus 2 0.0060613
+OrbitLayoutTest.ResetForTestsUsesJ2000 1 0.0223385
+OrbitLayoutTest.CompressedModePlacesEarthFromEphemerisAtJ2000 1 0.0216241
+OrbitLayoutTest.SetJulianDateMovesPlanets 1 0.0107796
+OrbitLayoutTest.AdvanceUpdatesJulianDate 1 0.0127033
+EphemerisTest.JulianDateRoundTripYmd 0 0
+EphemerisTest.SunPositionIsZero 1 0.013749
+EphemerisTest.EarthNearMeanLongitudeAtJ2000 1 0.0379111
+EphemerisTest.MercuryNearMeanLongitudeAtJ2000 1 0.0378588
+EphemerisTest.MarsNearMeanLongitudeAtJ2000 0 0
+EphemerisTest.JupiterNearMeanLongitudeAtJ2000 1 0.0449691
+EphemerisTest.EarthAdvancesAboutOneDegreePerDay 1 0.0400058
+EphemerisTest.PlutoHasReasonableDistance 1 0.0311405
+---
+EphemerisTest.JulianDateRoundTripYmd
+EphemerisTest.MarsNearMeanLongitudeAtJ2000

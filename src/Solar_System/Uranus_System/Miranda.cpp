@@ -1,28 +1,22 @@
 #include "Miranda.h"
+#include "../SatelliteOrbit.h"
 
 Miranda::Miranda(const SatelliteInfo& satelliteInfo, std::shared_ptr<SpaceObject> parent) : Satellite(satelliteInfo, std::move(parent)),
     _diffuses(satelliteInfo.diffuseTextures), _normalMap(satelliteInfo.normalMap)
 {
 }
 
-void Miranda::AdjustToParent(float timeScale) {
-    static float y = 0, x = -34.8f;
-
-    static float circleRadius = 0.005f;
-    static float time = 0.0f;
-    static float velocity = 1.35f;
+void Miranda::AdjustToParent(float /*timeScale*/) {
+    static float anomaly = 3.14159265f;
     static float rotationAngle = 0.0f;
+    constexpr float kOrbitRadius = 34.800000f;
+    constexpr float kPeriodDays = 1.413f;
 
-    if (timeScale > 0.0f) {
-        time += 0.0001f;
-        rotationAngle -= 4 * 0.0115f;
-
-        y -= circleRadius * glm::cos(velocity * time);
-        x += circleRadius * glm::sin(velocity * time);
-    }
+    SatelliteOrbit::AdvanceAnomaly(anomaly, kPeriodDays);
+    SatelliteOrbit::AdvanceSpin(rotationAngle, -2.76f);
 
     LoadIdentityModelMatrix();
-    Translate(_parent->GetPosition() + glm::vec3(x, y, 0.0));
+    Translate(_parent->GetPosition() + SatelliteOrbit::OffsetXY(kOrbitRadius, anomaly));
     Scale(glm::vec3(_earthSizeCoefficient));
     Rotate(90, glm::vec3(0, 0, 1));
     Rotate(rotationAngle, glm::vec3(0, 1, 0));

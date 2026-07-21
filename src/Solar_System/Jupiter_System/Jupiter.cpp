@@ -14,18 +14,12 @@ Jupiter::Jupiter(const PlanetInfo& planetInfo, std::shared_ptr<Star> parentStar)
 #endif
 }
 
-void Jupiter::AdjustToParent(float timeScale) {
-    static float rotationAngle = 0;
-
-    if (timeScale > 0.0f) {
-        rotationAngle += (4 * 0.014f * timeScale) * timeScale;
-    }
-
+void Jupiter::AdjustToParent(float /*timeScale*/) {
     LoadIdentityModelMatrix();
     Translate(_parentStar->GetPosition() + OrbitLayout::GetOffset(OrbitLayout::Body::Jupiter));
     Scale(glm::vec3(_earthSizeCoefficient));
     Rotate(-3.1f, glm::vec3(0, 0, 1));
-    Rotate(rotationAngle, glm::vec3(0.0f, 1.0f, 0.0f));
+    Rotate(OrbitLayout::GetAxialSpinDegrees(OrbitLayout::Body::Jupiter), glm::vec3(0.0f, 1.0f, 0.0f));
     UpdateModelMatrix();
 }
 

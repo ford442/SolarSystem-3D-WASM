@@ -11,9 +11,11 @@
     "preview": "vite preview",
     "serve:mock-cdn": "node scripts/mock-asset-cdn.mjs",
     "verify:cross-origin": "node verify-cross-origin-fetch.js",
-    "test:textures": "node verify-textures.js"
+    "test:textures": "node verify-textures.js",
+    "test:smoke": "playwright test"
   },
   "devDependencies": {
+    "@playwright/test": "^1.61.1",
     "typescript": "~5.9.3",
     "vite": "^7.2.4"
   },

@@ -12,49 +12,15 @@ endif()
 
 # [PORTING NOTE]
 # For Emscripten build:
-# 1. Use emcmake cmake ...
-# 2. Add dependencies like: -s USE_GLFW=3 -s USE_SDL=2 -s USE_SDL_IMAGE=2 -s USE_FREETYPE=1
+# 1. Use emcmake cmake -DCMAKE_BUILD_TYPE=Release|Debug ...
+# 2. Port/link flags are applied once via target_compile_options / target_link_options below.
 # 3. irrKlang is NOT supported. Replace with SDL_mixer.
 # 4. Exclude unsupported libs (glew32, OpenGL32, mingw32) in if(EMSCRIPTEN) block.
+# See docs/plans/PORTING_GUIDE.md for Wasm exceptions fallback.
 
 if(EMSCRIPTEN)
     add_definitions(-D__EMSCRIPTEN__)
     add_definitions(-DSOLARSYSTEM_USE_SDL_MIXER)
-
-    # 1. Add SDL2_IMAGE_FORMATS here so it supports PNG/JPG
-    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -s USE_GLFW=3 -s USE_SDL=2 -s USE_SDL_IMAGE=2 -s SDL2_IMAGE_FORMATS='[\"png\",\"jpg\"]'")
-    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -s USE_SDL_MIXER=2 -s USE_FREETYPE=1")
-    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -s DISABLE_EXCEPTION_CATCHING=0")
-    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -s FULL_ES3=1")
-    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -s ALLOW_MEMORY_GROWTH=1")
-    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -s MAX_WEBGL_VERSION=2 -s MIN_WEBGL_VERSION=2")
-    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -s GL_ENABLE_GET_PROC_ADDRESS=1")
-    # Enable async support for WebResourceFetcher (emscripten_wget_data)
-    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -s ASYNCIFY=1")
-    
-    # Preload essential files. textures_low (~124 KB total) are small enough to embed so
-    # planets always have a visible texture even without a live asset server.
-    set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} --preload-file ${CMAKE_SOURCE_DIR}/resource/shaders@/resource/shaders")
-    set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} --preload-file ${CMAKE_SOURCE_DIR}/resource/planet_manifest.json@/resource/planet_manifest.json")
-    set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} --preload-file ${CMAKE_SOURCE_DIR}/resource/fonts@/resource/fonts")
-    set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} --preload-file ${CMAKE_SOURCE_DIR}/resource/icons@/resource/icons")
-    set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} --preload-file ${CMAKE_SOURCE_DIR}/resource/textures_low@/resource/textures_low")
-    # [NOTE] Sounds are excluded from the repo (LFS), so do not preload them to avoid build errors in CI/Sandbox.
-    # set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} --preload-file ${CMAKE_SOURCE_DIR}/resource/sounds@/resource/sounds")
-
-    set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -s ALLOW_MEMORY_GROWTH=1")
-    set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -s INITIAL_MEMORY=256MB")
-    set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -s MAXIMUM_MEMORY=1GB")
-    set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -s DISABLE_EXCEPTION_CATCHING=0")
-    set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -s ASYNCIFY=1")
-
-    # 2. Add it to Linker flags too, just to be safe
-    set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -s SDL2_IMAGE_FORMATS='[\"png\",\"jpg\"]'")
-
-    set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -s EXPORTED_RUNTIME_METHODS=['ccall','cwrap']")
-    set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -s EXPORTED_FUNCTIONS=['_main','_SetCameraPose','_SetQualityPreset','_GetQualityPreset','_SetTimeScale','_GetTimeScale','_SetPaused','_GetPaused','_SetShadowQuality','_GetShadowQuality','_SetTouchMovement','_AddTouchLook','_AddTouchZoom','_IsMobileWeb','_SetMusicVolume','_GetMusicVolume','_SetMusicMuted','_GetMusicMuted','_FocusPlanet','_SetOrbitScaleMode','_GetOrbitScaleMode','_GetNearestPlanetIndex','_GetFocusedPlanetIndex','_GetPlanetSceneDistance']")
-    set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -s MODULARIZE=1 -s EXPORT_ES6=1")
-    
     set(CMAKE_EXECUTABLE_SUFFIX ".js")
 endif()
 
@@ -111,6 +77,10 @@ set(SOLARSYSTEM_SOURCES
     src/Solar_System/Atmosphere.h
     src/Auxiliary_Modules/LensFlare.cpp
     src/Auxiliary_Modules/LensFlare.h
+    src/Auxiliary_Modules/OrbitPathRenderer.cpp
+    src/Auxiliary_Modules/OrbitPathRenderer.h
+    src/Auxiliary_Modules/Ephemeris.cpp
+    src/Auxiliary_Modules/Ephemeris.h
     src/Solar_System/Mercury/Mercury.cpp
     src/Solar_System/Mercury/Mercury.h
     src/Solar_System/Venus/Venus.cpp
@@ -220,8 +190,66 @@ if(WIN32)
 endif()
 
 if(EMSCRIPTEN)
+    # Port / shared settings — applied once to compile and once to link (no duplicates).
+    set(SOLAR_EM_PORT_FLAGS
+        "SHELL:-sUSE_GLFW=3"
+        "SHELL:-sUSE_SDL=2"
+        "SHELL:-sUSE_SDL_IMAGE=2"
+        "SHELL:-sSDL2_IMAGE_FORMATS=['png','jpg']"
+        "SHELL:-sUSE_SDL_MIXER=2"
+        "SHELL:-sUSE_FREETYPE=1"
+        "SHELL:-sFULL_ES3=1"
+        "SHELL:-sALLOW_MEMORY_GROWTH=1"
+        "SHELL:-sMAX_WEBGL_VERSION=2"
+        "SHELL:-sMIN_WEBGL_VERSION=2"
+        "SHELL:-sGL_ENABLE_GET_PROC_ADDRESS=1"
+        # ASYNCIFY required for WebResourceFetcher (emscripten_wget_data).
+        # Native -fwasm-exceptions is incompatible with ASYNCIFY=1 (emcc warning);
+        # keep the JS exception path so try/catch still works.
+        "SHELL:-sASYNCIFY=1"
+        "SHELL:-sDISABLE_EXCEPTION_CATCHING=0"
+    )
+
+    # Link-only: memory, preloads, module shape, JS interop.
+    # EMSCRIPTEN_KEEPALIVE on Application.cpp exports; only _main listed here.
+    # textures_low (~124 KB) preloaded so planets stay visible without a live asset server.
+    # Sounds are LFS-excluded — do not preload (CI/sandbox).
+    set(SOLAR_EM_LINK_FLAGS
+        "SHELL:-sINITIAL_MEMORY=256MB"
+        "SHELL:-sMAXIMUM_MEMORY=1GB"
+        "SHELL:--preload-file ${CMAKE_SOURCE_DIR}/resource/shaders@/resource/shaders"
+        "SHELL:--preload-file ${CMAKE_SOURCE_DIR}/resource/planet_manifest.json@/resource/planet_manifest.json"
+        "SHELL:--preload-file ${CMAKE_SOURCE_DIR}/resource/fonts@/resource/fonts"
+        "SHELL:--preload-file ${CMAKE_SOURCE_DIR}/resource/icons@/resource/icons"
+        "SHELL:--preload-file ${CMAKE_SOURCE_DIR}/resource/textures_low@/resource/textures_low"
+        "SHELL:-sMODULARIZE=1"
+        "SHELL:-sEXPORT_ES6=1"
+        "SHELL:-sEXPORTED_RUNTIME_METHODS=['ccall','cwrap']"
+        "SHELL:-sEXPORTED_FUNCTIONS=['_main']"
+    )
+
+    if(CMAKE_BUILD_TYPE STREQUAL "Debug")
+        set(SOLAR_EM_COMPILE_OPT_FLAGS -O0 -g)
+        set(SOLAR_EM_LINK_OPT_FLAGS -O0 -g "SHELL:-sASSERTIONS=1")
+    else()
+        # Release (default) and RelWithDebInfo / empty CMAKE_BUILD_TYPE.
+        # Do not enable --closure 1: it strips EM_ASM tables this app needs for
+        # window.updateLoadingProgress / mobile detection / similar bridges.
+        set(SOLAR_EM_COMPILE_OPT_FLAGS -O3 -flto)
+        set(SOLAR_EM_LINK_OPT_FLAGS -O3 -flto)
+    endif()
+
+    target_compile_options(${PROJECT_NAME} PRIVATE
+        ${SOLAR_EM_PORT_FLAGS}
+        ${SOLAR_EM_COMPILE_OPT_FLAGS}
+    )
+    target_link_options(${PROJECT_NAME} PRIVATE
+        ${SOLAR_EM_PORT_FLAGS}
+        ${SOLAR_EM_LINK_FLAGS}
+        ${SOLAR_EM_LINK_OPT_FLAGS}
+    )
+
     # Emscripten provides GLFW, SDL2, SDL_image, SDL_mixer, and FreeType via ports
-    # Link assimp (needs to be built separately or available)
     target_link_libraries(${PROJECT_NAME}
         ${CMAKE_SOURCE_DIR}/external/assimp/build-wasm/lib/libassimp.a
         z
@@ -260,4 +288,10 @@ else()
         Freetype::Freetype
         assimp::assimp
     )
+endif()
+
+option(SOLARSYSTEM_BUILD_TESTS "Build native unit tests" OFF)
+if(SOLARSYSTEM_BUILD_TESTS AND NOT EMSCRIPTEN)
+    enable_testing()
+    add_subdirectory(tests)
 endif()

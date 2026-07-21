@@ -106,6 +106,41 @@ The code uses `nv_dds` to load DDS files:
 *   `std::ifstream` in `nv_dds.cpp` works transparently with Emscripten's virtual filesystem
 *   WebGL 2 supports compressed texture formats via extensions
 
+## 3b. Emscripten build flags (CMake)
+
+Flags live in named lists in `CMakeLists.txt` and are applied **once** via
+`target_compile_options` / `target_link_options` (no duplicated `-s` settings).
+
+| Config | Opts |
+| :--- | :--- |
+| **Release** (default via `./build-web.sh`) | `-O3 -flto` (no `--closure 1` — breaks `EM_ASM` bridges) |
+| **Debug** (`./build-web.sh --debug`) | `-O0 -g`, link `-sASSERTIONS=1` |
+
+Other important settings: `ASYNCIFY=1` (for `emscripten_wget_data`), `ALLOW_MEMORY_GROWTH=1`,
+`INITIAL_MEMORY=256MB` / `MAXIMUM_MEMORY=1GB`, `MODULARIZE=1` + `EXPORT_ES6=1`.
+JS control surface uses `EMSCRIPTEN_KEEPALIVE` in `Application.cpp`; CMake only lists
+`EXPORTED_FUNCTIONS=['_main']` plus `EXPORTED_RUNTIME_METHODS=['ccall','cwrap']`.
+
+### Native Wasm exceptions
+
+This project needs **`ASYNCIFY=1`** for `emscripten_wget_data`. Emscripten 6.x reports
+`ASYNCIFY=1 is not compatible with -fwasm-exceptions`, so Release/Debug web builds keep
+the JS exception path: **`-sDISABLE_EXCEPTION_CATCHING=0`** (applied once on compile and link).
+
+If ASYNCIFY is ever removed (e.g. JSPI migration), revisit `-fwasm-exceptions` for smaller/faster
+exception code. Browser floor for Wasm exceptions: Chrome 95+, Firefox 100+, Safari 15.2+.
+
+### Artifact size baseline (2026-07-21)
+
+Measured on this tree before/after the flag cleanup (Release):
+
+| Artifact | Before (no `-O`, duplicated `-s`) | After (`-O3 -flto`, deduped flags) |
+| :--- | ---: | ---: |
+| `SolarSystem.wasm` | 12 373 268 B | 3 874 669 B (−69%) |
+| `SolarSystem.js` | 569 186 B | 191 040 B (−66%) |
+
+Wipe `build-web/` when switching Debug↔Release or changing LTO/exception flags.
+
 ## 4. Platform-Specific Code
 
 The codebase uses `#ifdef __EMSCRIPTEN__` to conditionally compile platform-specific code:

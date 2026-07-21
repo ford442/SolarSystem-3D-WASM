@@ -1,29 +1,23 @@
 #include "Iapetus.h"
+#include "../SatelliteOrbit.h"
 
 Iapetus::Iapetus(const SatelliteInfo& satelliteInfo, std::shared_ptr<SpaceObject> parent) : Satellite(satelliteInfo, std::move(parent)),
     _diffuses(satelliteInfo.diffuseTextures), _normalMap(satelliteInfo.normalMap)
 {
 }
 
-void Iapetus::AdjustToParent(float timeScale) {
-    static float x = 0.f, z = -96.5f;
-
-    static float circleRadius = 0.005f;
-    static float time = 0.0f;
-    static float velocity = 0.43f;
+void Iapetus::AdjustToParent(float /*timeScale*/) {
+    static float anomaly = -1.57079633f;
     static float rotationAngle = 0.0f;
+    constexpr float kOrbitRadius = 96.500000f;
+    constexpr float kPeriodDays = 79.32f;
 
-    if (timeScale > 0.0f) {
-        time += 0.0001f;
-        rotationAngle -= 4 * 0.0115f;
-
-        x += circleRadius * glm::cos(velocity * time);
-        z += circleRadius * glm::sin(velocity * time);
-    }
+    SatelliteOrbit::AdvanceAnomaly(anomaly, kPeriodDays);
+    SatelliteOrbit::AdvanceSpin(rotationAngle, -2.76f);
 
     LoadIdentityModelMatrix();
-    Translate(_parent->GetPosition() + glm::vec3(x, 0.0f, z));
-    Scale(glm::vec3(0.115288));
+    Translate(_parent->GetPosition() + SatelliteOrbit::Offset(kOrbitRadius, anomaly));
+    Scale(glm::vec3(_earthSizeCoefficient));
     Rotate(rotationAngle, glm::vec3(0, 1, 0));
     UpdateModelMatrix();
 }

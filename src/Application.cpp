@@ -5,6 +5,7 @@
 #include "Auxiliary_Modules/WebResourceFetcher.h"
 #include "Auxiliary_Modules/TextureLoadingQueue.h"
 #include "Solar_System/OrbitLayout.h"
+#include "Auxiliary_Modules/Ephemeris.h"
 #include <SDL_image.h>
 #include <algorithm>
 #include <array>
@@ -30,6 +31,7 @@ float gTimeScale = 1.0f;
 bool gTimePaused = false;
 bool gAdvanceStep = false;
 int gShadowQuality = 3; // 0=off, 1=low, 2=medium, 3=full
+float gSimDeltaSeconds = 0.0f;
 
 #ifdef __EMSCRIPTEN__
 extern "C" {
@@ -38,8 +40,10 @@ extern "C" {
     // migrate those structured values to embind instead of adding pointer-based
     // C exports; these scalar settings remain simpler as cwrap calls.
     EMSCRIPTEN_KEEPALIVE void SetCameraPose(float x, float y, float z, float yaw, float pitch) {
-        camera.SetPosition(glm::vec3(x, y, z));
-        camera.SetYawPitch(yaw, pitch);
+        if (!activeApplication) return;
+        Camera& cam = activeApplication->GetCamera();
+        cam.SetPosition(glm::vec3(x, y, z));
+        cam.SetYawPitch(yaw, pitch);
     }
     EMSCRIPTEN_KEEPALIVE void SetQualityPreset(int preset) {
         g_qualityPreset = (preset < 0 ? 0 : preset > 2 ? 2 : preset);
@@ -62,6 +66,12 @@ extern "C" {
     EMSCRIPTEN_KEEPALIVE int GetPaused() {
         return gTimePaused ? 1 : 0;
     }
+    EMSCRIPTEN_KEEPALIVE void SetSimulationEpoch(double julianDate) {
+        OrbitLayout::SetJulianDate(julianDate);
+    }
+    EMSCRIPTEN_KEEPALIVE double GetSimulationEpoch() {
+        return OrbitLayout::GetJulianDate();
+    }
     EMSCRIPTEN_KEEPALIVE void SetShadowQuality(int quality) {
         if (activeApplication) {
             activeApplication->ApplyShadowQuality(quality);
@@ -78,11 +88,13 @@ extern "C" {
         g_touchVertical = glm::clamp(vertical, -1.0f, 1.0f);
     }
     EMSCRIPTEN_KEEPALIVE void AddTouchLook(float deltaX, float deltaY) {
-        camera.ProcessMouseMovement(deltaX, deltaY);
+        if (activeApplication) {
+            activeApplication->GetCamera().ProcessMouseMovement(deltaX, deltaY);
+        }
     }
     EMSCRIPTEN_KEEPALIVE void AddTouchZoom(float delta) {
-        if (std::abs(delta) > 0.0001f) {
-            camera.ProcessMouseScroll(delta);
+        if (activeApplication && std::abs(delta) > 0.0001f) {
+            activeApplication->GetCamera().ProcessMouseScroll(delta);
         }
     }
     EMSCRIPTEN_KEEPALIVE int IsMobileWeb() {
@@ -129,6 +141,14 @@ extern "C" {
         idx = std::clamp(idx, 0, 9);
         return OrbitLayout::GetSceneDistance(static_cast<OrbitLayout::Body>(idx));
     }
+    EMSCRIPTEN_KEEPALIVE void SetOrbitLines(int enabled) {
+        if (activeApplication) {
+            activeApplication->SetOrbitLinesEnabled(enabled != 0);
+        }
+    }
+    EMSCRIPTEN_KEEPALIVE int GetOrbitLines() {
+        return activeApplication && activeApplication->GetOrbitLinesEnabled() ? 1 : 0;
+    }
 }
 #endif
 
@@ -148,6 +168,8 @@ Application::Application() : _fpsHandler(240) {
 void Application::InitSystems() {
     ios_base::sync_with_stdio(false);
     cin.tie(nullptr);
+
+    OrbitLayout::SetJulianDate(Ephemeris::JulianDateNowUtc());
 
     glfwSetErrorCallback(glfwErrorCallback);
 
@@ -211,6 +233,7 @@ void Application::InitSystems() {
               << "x MSAA, context provides " << actualSamples << " samples" << std::endl;
 #endif
 
+    glfwSetWindowUserPointer(_mainWindow, this);
     glfwSetFramebufferSizeCallback(_mainWindow, FramebufferSizeCallback);
     glfwSetCursorPosCallback(_mainWindow, MouseCallback);
     glfwSetScrollCallback(_mainWindow, ScrollCallback);
@@ -307,10 +330,16 @@ void Application::RunOneFrame() {
     }
 
     const double currentFrame = glfwGetTime();
-    deltaTime = currentFrame - lastFrame;
-    lastFrame = currentFrame;
+    _deltaTime = currentFrame - _lastFrame;
+    _lastFrame = currentFrame;
 
-    camera.UpdateTransition(deltaTime);
+    gSimDeltaSeconds = gTimePaused ? 0.0f : static_cast<float>(_deltaTime) * gTimeScale;
+    OrbitLayout::Advance(gSimDeltaSeconds);
+#ifdef __EMSCRIPTEN__
+    RefreshPlanetProxyPositions();
+#endif
+
+    _camera.UpdateTransition(_deltaTime);
 
     glBindFramebuffer(GL_FRAMEBUFFER, 0);
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
@@ -320,6 +349,7 @@ void Application::RunOneFrame() {
     UpdateLOD();
     ConfigureMainShaders();
     _skyBox->Render(*_mainSkyBoxShader);
+    RenderOrbitPaths();
     RenderStarCorona();
     ProcessSceneComponentsRendering();
 #ifdef __EMSCRIPTEN__
@@ -327,9 +357,9 @@ void Application::RunOneFrame() {
 #endif
     RenderStarEffects();
 
-    if (isRenderPlanetStarDistances || isRenderSatelliteDistances)
+    if (_isRenderPlanetStarDistances || _isRenderSatelliteDistances)
         RenderPlanetSatelliteStarDistances();
-    if (isRenderHints)
+    if (_isRenderHints)
         RenderHints();
 
     // Process texture loading queue
@@ -376,7 +406,7 @@ void Application::UpdateLoadingProgress() {
 
 
 void Application::InitSceneObjects() {
-    camera.SetAspect(static_cast<float>(_displayWidth) / static_cast<float>(_displayHeight));
+    _camera.SetAspect(static_cast<float>(_displayWidth) / static_cast<float>(_displayHeight));
     const auto qualitySettings = GetQualitySettings(
         gShadowQuality == 0 ? g_qualityPreset : gShadowQuality - 1, g_isMobileWeb);
     _shadowMapFBO = make_unique<ShadowMapFBO>(qualitySettings.shadowResolution, qualitySettings.shadowResolution);
@@ -412,6 +442,7 @@ void Application::InitSceneObjects() {
                 FlareSprite{false, 2.25, 0.2, 3},
                 FlareSprite{false, 2.75, 2.0, 7}
             }});
+    _orbitPathRenderer = make_unique<OrbitPathRenderer>();
 
     InitSongList();
     InitStarSystem();
@@ -473,40 +504,40 @@ void Application::LoadWindowIcon() const {
 }
 
 void Application::ProcessInput(GLFWwindow* window) {
-    static float movementSpeed = camera.GetMovementSpeed();
+    static float movementSpeed = _camera.GetMovementSpeed();
 
-    if (isFirstMouse) {
-        lastX = 0;
-        lastY = 0;
-        isFirstMouse = false;
+    if (_isFirstMouse) {
+        _lastX = 0;
+        _lastY = 0;
+        _isFirstMouse = false;
     }
 
-    float xPos = lastX, yPos = lastY;
+    float xPos = _lastX, yPos = _lastY;
     float shiftIncrease = 1.0f, yScroll = 0;
 
     if (glfwGetKey(window, GLFW_KEY_LEFT_SHIFT) == GLFW_PRESS) {
-        shiftIncrease = 4 * camera.GetMovementSpeed();
+        shiftIncrease = 4 * _camera.GetMovementSpeed();
     }
     if (glfwGetKey(window, GLFW_KEY_ESCAPE) == GLFW_PRESS) {
         glfwSetWindowShouldClose(window, true);
     }
     if (glfwGetKey(window, GLFW_KEY_W) == GLFW_PRESS) {
-        camera.ProcessKeyboard(CameraVector::FORWARD, deltaTime * shiftIncrease);
+        _camera.ProcessKeyboard(CameraVector::FORWARD, _deltaTime * shiftIncrease);
     }
     if (glfwGetKey(window, GLFW_KEY_S) == GLFW_PRESS) {
-        camera.ProcessKeyboard(CameraVector::BACKWARD, deltaTime * shiftIncrease);
+        _camera.ProcessKeyboard(CameraVector::BACKWARD, _deltaTime * shiftIncrease);
     }
     if (glfwGetKey(window, GLFW_KEY_A) == GLFW_PRESS) {
-        camera.ProcessKeyboard(CameraVector::LEFT, deltaTime * shiftIncrease);
+        _camera.ProcessKeyboard(CameraVector::LEFT, _deltaTime * shiftIncrease);
     }
     if (glfwGetKey(window, GLFW_KEY_D) == GLFW_PRESS) {
-        camera.ProcessKeyboard(CameraVector::RIGHT, deltaTime * shiftIncrease);
+        _camera.ProcessKeyboard(CameraVector::RIGHT, _deltaTime * shiftIncrease);
     }
     if (glfwGetKey(window, GLFW_KEY_SPACE) == GLFW_PRESS) {
-        camera.ProcessKeyboard(CameraVector::WORLD_UP, deltaTime * shiftIncrease);
+        _camera.ProcessKeyboard(CameraVector::WORLD_UP, _deltaTime * shiftIncrease);
     }
     if (glfwGetKey(window, GLFW_KEY_C) == GLFW_PRESS) {
-        camera.ProcessKeyboard(CameraVector::WORLD_DOWN, deltaTime * shiftIncrease);
+        _camera.ProcessKeyboard(CameraVector::WORLD_DOWN, _deltaTime * shiftIncrease);
     }
     
     if (glfwGetKey(window, GLFW_KEY_PAGE_UP) == GLFW_PRESS) {
@@ -525,146 +556,143 @@ void Application::ProcessInput(GLFWwindow* window) {
     }
     if (glfwGetKey(window, GLFW_KEY_1) == GLFW_PRESS) {
         movementSpeed = glm::clamp(movementSpeed + 0.01f, 0.0f, 150.f);
-        camera.SetMovementSpeed(movementSpeed);
+        _camera.SetMovementSpeed(movementSpeed);
     }
     if (glfwGetKey(window, GLFW_KEY_2) == GLFW_PRESS) {
         movementSpeed = glm::clamp(movementSpeed - 0.01f, 0.0f, 150.f);
-        camera.SetMovementSpeed(movementSpeed);
+        _camera.SetMovementSpeed(movementSpeed);
     }
     if (glfwGetKey(window, GLFW_KEY_3) == GLFW_PRESS) {
-        starExposure = glm::clamp(starExposure + 0.1f, 0.0f, 20.f);
+        _starExposure = glm::clamp(_starExposure + 0.1f, 0.0f, 20.f);
     }
     if (glfwGetKey(window, GLFW_KEY_4) == GLFW_PRESS) {
-        starExposure = glm::clamp(starExposure - 0.1f, 0.0f, 20.f);
+        _starExposure = glm::clamp(_starExposure - 0.1f, 0.0f, 20.f);
     }
     if (glfwGetKey(window, GLFW_KEY_5) == GLFW_PRESS) {
-        starGamma = glm::clamp(starGamma + 0.01f, 0.0f, 2.f);
+        _starGamma = glm::clamp(_starGamma + 0.01f, 0.0f, 2.f);
     }
     if (glfwGetKey(window, GLFW_KEY_6) == GLFW_PRESS) {
-        starGamma = glm::clamp(starGamma - 0.01f, 0.0f, 2.f);
+        _starGamma = glm::clamp(_starGamma - 0.01f, 0.0f, 2.f);
     }
     if (glfwGetKey(window, GLFW_KEY_7) == GLFW_PRESS) {
-        starTemperatureInKelvin = glm::clamp(starTemperatureInKelvin + 15.0f, 800.f, 30000.f);
+        _starTemperatureInKelvin = glm::clamp(_starTemperatureInKelvin + 15.0f, 800.f, 30000.f);
     }
     if (glfwGetKey(window, GLFW_KEY_8) == GLFW_PRESS) {
-        starTemperatureInKelvin = glm::clamp(starTemperatureInKelvin - 15.0f, 800.f, 30000.f);
+        _starTemperatureInKelvin = glm::clamp(_starTemperatureInKelvin - 15.0f, 800.f, 30000.f);
     }
     if (glfwGetKey(window, GLFW_KEY_LEFT) == GLFW_PRESS) {
         xPos -= 1;
-        float xOffset = xPos - lastX;
-        lastX = xPos;
-        camera.ProcessMouseMovement(xOffset, 0);
+        float xOffset = xPos - _lastX;
+        _lastX = xPos;
+        _camera.ProcessMouseMovement(xOffset, 0);
     }
     if (glfwGetKey(window, GLFW_KEY_RIGHT) == GLFW_PRESS) {
         xPos += 1;
-        float xOffset = xPos - lastX;
-        lastX = xPos;
-        camera.ProcessMouseMovement(xOffset, 0);
+        float xOffset = xPos - _lastX;
+        _lastX = xPos;
+        _camera.ProcessMouseMovement(xOffset, 0);
     }
     if (glfwGetKey(window, GLFW_KEY_UP) == GLFW_PRESS) {
         yPos -= 1;
-        float yOffset = lastY - yPos; 
-        lastY = yPos;
-        camera.ProcessMouseMovement(0, yOffset);
+        float yOffset = _lastY - yPos; 
+        _lastY = yPos;
+        _camera.ProcessMouseMovement(0, yOffset);
     }
     if (glfwGetKey(window, GLFW_KEY_DOWN) == GLFW_PRESS) {
         yPos += 1;
-        float yOffset = lastY - yPos; 
-        lastY = yPos;
-        camera.ProcessMouseMovement(0, yOffset);
+        float yOffset = _lastY - yPos; 
+        _lastY = yPos;
+        _camera.ProcessMouseMovement(0, yOffset);
     }
     if (glfwGetKey(window, GLFW_KEY_V) == GLFW_PRESS) {
         yScroll += 0.16f;
-        camera.ProcessMouseScroll(yScroll);
+        _camera.ProcessMouseScroll(yScroll);
     }
     if (glfwGetKey(window, GLFW_KEY_B) == GLFW_PRESS) {
         yScroll -= 0.16f;
-        camera.ProcessMouseScroll(yScroll);
+        _camera.ProcessMouseScroll(yScroll);
     }
 
 #ifdef __EMSCRIPTEN__
     if (g_touchForward > 0.01f) {
-        camera.ProcessKeyboard(CameraVector::FORWARD, static_cast<float>(deltaTime) * g_touchForward);
+        _camera.ProcessKeyboard(CameraVector::FORWARD, static_cast<float>(_deltaTime) * g_touchForward);
     } else if (g_touchForward < -0.01f) {
-        camera.ProcessKeyboard(CameraVector::BACKWARD, static_cast<float>(deltaTime) * -g_touchForward);
+        _camera.ProcessKeyboard(CameraVector::BACKWARD, static_cast<float>(_deltaTime) * -g_touchForward);
     }
     if (g_touchRight > 0.01f) {
-        camera.ProcessKeyboard(CameraVector::RIGHT, static_cast<float>(deltaTime) * g_touchRight);
+        _camera.ProcessKeyboard(CameraVector::RIGHT, static_cast<float>(_deltaTime) * g_touchRight);
     } else if (g_touchRight < -0.01f) {
-        camera.ProcessKeyboard(CameraVector::LEFT, static_cast<float>(deltaTime) * -g_touchRight);
+        _camera.ProcessKeyboard(CameraVector::LEFT, static_cast<float>(_deltaTime) * -g_touchRight);
     }
     if (g_touchVertical > 0.01f) {
-        camera.ProcessKeyboard(CameraVector::WORLD_UP, static_cast<float>(deltaTime) * g_touchVertical);
+        _camera.ProcessKeyboard(CameraVector::WORLD_UP, static_cast<float>(_deltaTime) * g_touchVertical);
     } else if (g_touchVertical < -0.01f) {
-        camera.ProcessKeyboard(CameraVector::WORLD_DOWN, static_cast<float>(deltaTime) * -g_touchVertical);
+        _camera.ProcessKeyboard(CameraVector::WORLD_DOWN, static_cast<float>(_deltaTime) * -g_touchVertical);
     }
 #endif
 
-    glfwSetCursorPos(window, lastX, lastY);
+    glfwSetCursorPos(window, _lastX, _lastY);
 }
 
 void Application::FramebufferSizeCallback(GLFWwindow*, int width, int height) {
     glViewport(0, 0, width, height);
 }
 
-void Application::MouseCallback(GLFWwindow*, double xPos, double yPos) {
-    if (isFirstMouse) {
-        lastX = xPos;
-        lastY = yPos;
-        isFirstMouse = false;
+void Application::MouseCallback(GLFWwindow* window, double xPos, double yPos) {
+    auto* app = static_cast<Application*>(glfwGetWindowUserPointer(window));
+    if (!app) return;
+
+    if (app->_isFirstMouse) {
+        app->_lastX = static_cast<float>(xPos);
+        app->_lastY = static_cast<float>(yPos);
+        app->_isFirstMouse = false;
     }
 
-    float xOffset = xPos - lastX;
-    float yOffset = lastY - yPos; 
+    float xOffset = static_cast<float>(xPos) - app->_lastX;
+    float yOffset = app->_lastY - static_cast<float>(yPos);
 
-    lastX = xPos;
-    lastY = yPos;
+    app->_lastX = static_cast<float>(xPos);
+    app->_lastY = static_cast<float>(yPos);
 
-    camera.ProcessMouseMovement(xOffset, yOffset);
+    app->_camera.ProcessMouseMovement(xOffset, yOffset);
 }
 
-void Application::ScrollCallback(GLFWwindow*, double, double yOffset) {
-    camera.ProcessMouseScroll(yOffset);
+void Application::ScrollCallback(GLFWwindow* window, double, double yOffset) {
+    auto* app = static_cast<Application*>(glfwGetWindowUserPointer(window));
+    if (!app) return;
+    app->_camera.ProcessMouseScroll(static_cast<float>(yOffset));
 }
 
-void Application::KeyCallback(GLFWwindow*, int key, int, int action, int) {
-    if (key == GLFW_KEY_F && action == GLFW_PRESS) {
-        isTimeRun = !isTimeRun;
-    }
+void Application::KeyCallback(GLFWwindow* window, int key, int, int action, int) {
+    auto* app = static_cast<Application*>(glfwGetWindowUserPointer(window));
+    if (!app) return;
+
     if (key == GLFW_KEY_Z && action == GLFW_PRESS) {
-        isRenderPlanetStarDistances = !isRenderPlanetStarDistances;
+        app->_isRenderPlanetStarDistances = !app->_isRenderPlanetStarDistances;
     }
     if (key == GLFW_KEY_X && action == GLFW_PRESS) {
-        isRenderSatelliteDistances = !isRenderSatelliteDistances;
+        app->_isRenderSatelliteDistances = !app->_isRenderSatelliteDistances;
     }
     if (key == GLFW_KEY_TAB && action == GLFW_PRESS) {
-        isRenderHints = !isRenderHints;
+        app->_isRenderHints = !app->_isRenderHints;
     }
     if (key == GLFW_KEY_F1 && action == GLFW_PRESS) {
-        isVertSyncEnabled = !isVertSyncEnabled;
-        VertSync(isVertSyncEnabled);
+        app->_isVertSyncEnabled = !app->_isVertSyncEnabled;
+        VertSync(app->_isVertSyncEnabled);
     }
 
     if (action == GLFW_PRESS) {
-        // Planet focus presets (smooth transition) - using known fixed positions
-        auto doFocus = [&](glm::vec3 p, float r) {
-            glm::vec3 offset = glm::normalize(glm::vec3(0.7f, 0.3f, 0.7f)) * (r + 30.0f);
-            glm::vec3 tpos = p + offset;
-            glm::vec3 dir = glm::normalize(p - tpos);
-            float ty = glm::degrees(std::atan2(dir.z, dir.x));
-            float tp = glm::degrees(std::asin(dir.y));
-            camera.StartTransitionTo(tpos, ty, tp, 2.0f);
-        };
-        if (key == GLFW_KEY_F2) doFocus(glm::vec3(1500.f,0,350.f), 2.0f*0.38f); // merc approx
-        if (key == GLFW_KEY_F3) doFocus(glm::vec3(1125.f,0,-1340.f), 2.0f*0.95f); // venus
-        if (key == GLFW_KEY_F4) doFocus(glm::vec3(1900.f,0,0.f), 2.0f); // earth
-        if (key == GLFW_KEY_F5) doFocus(glm::vec3(-1732.f,0,1000.f), 2.0f*0.53f); // mars
-        if (key == GLFW_KEY_F6) doFocus(glm::vec3(1350.f,0,1737.f), 2.0f*9.14f); // jup approx
-        if (key == GLFW_KEY_F7) doFocus(glm::vec3(0.f,-100.f,2450.f), 2.0f*9.14f*5); // sat
-        if (key == GLFW_KEY_F8) doFocus(glm::vec3(0.f,0.f,-2650.f), 2.0f*4); // ura
-        if (key == GLFW_KEY_F9) doFocus(glm::vec3(-2900.f,0,0.f), 2.0f*4); // nep
-        if (key == GLFW_KEY_F10) doFocus(glm::vec3(2800.f,0,1757.f), 2.0f*1); // plu
-        if (key == GLFW_KEY_F11) { glm::vec3 p(0); doFocus(p, 10); }
+        // Planet focus presets (smooth transition to live orbital positions)
+        if (key == GLFW_KEY_F2) app->FocusPlanetByIndex(1);  // Mercury
+        if (key == GLFW_KEY_F3) app->FocusPlanetByIndex(2);  // Venus
+        if (key == GLFW_KEY_F4) app->FocusPlanetByIndex(3);  // Earth
+        if (key == GLFW_KEY_F5) app->FocusPlanetByIndex(4);  // Mars
+        if (key == GLFW_KEY_F6) app->FocusPlanetByIndex(5);  // Jupiter
+        if (key == GLFW_KEY_F7) app->FocusPlanetByIndex(6);  // Saturn
+        if (key == GLFW_KEY_F8) app->FocusPlanetByIndex(7);  // Uranus
+        if (key == GLFW_KEY_F9) app->FocusPlanetByIndex(8);  // Neptune
+        if (key == GLFW_KEY_F10) app->FocusPlanetByIndex(9); // Pluto
+        if (key == GLFW_KEY_F11) app->FocusPlanetByIndex(0); // Sun
 
         // Time scale / pause / step
         if (key == GLFW_KEY_EQUAL || key == GLFW_KEY_KP_ADD) {
@@ -727,6 +755,45 @@ void Application::ApplyOrbitScaleMode(int mode) {
               << " distances active" << std::endl;
 }
 
+void Application::SetOrbitLinesEnabled(bool enabled) {
+    _orbitLinesEnabled = enabled;
+}
+
+bool Application::GetOrbitLinesEnabled() const {
+    return _orbitLinesEnabled;
+}
+
+void Application::RenderOrbitPaths() const {
+    if (!_orbitLinesEnabled || !_orbitPathRenderer || !_sun) {
+        return;
+    }
+
+    glEnable(GL_BLEND);
+    glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+    glEnable(GL_DEPTH_TEST);
+    glDepthMask(GL_FALSE);
+
+    const glm::vec3 sunPos = _sun->GetPosition();
+    const glm::vec4 color(0.45f, 0.55f, 0.75f, 0.35f);
+
+    for (int i = 1; i <= 9; ++i) {
+        const auto body = static_cast<OrbitLayout::Body>(i);
+        const float radius = OrbitLayout::GetOrbitRadius(body);
+        if (radius < 0.001f) {
+            continue;
+        }
+
+        glm::mat4 model(1.0f);
+        model = glm::translate(model, sunPos);
+        model = glm::rotate(model, glm::radians(OrbitLayout::GetInclinationDegrees(body)), glm::vec3(1.0f, 0.0f, 0.0f));
+        model = glm::scale(model, glm::vec3(radius));
+        _orbitPathRenderer->Draw(_cameraProjection, _cameraView, model, color);
+    }
+
+    glDepthMask(GL_TRUE);
+    glDisable(GL_BLEND);
+}
+
 void Application::FocusPlanetByIndex(int idx) {
     idx = std::clamp(idx, 0, 9);
     _focusedPlanetIndex = idx;
@@ -756,7 +823,7 @@ void Application::FocusPlanetByIndex(int idx) {
     const glm::vec3 lookDir = glm::normalize(target - cameraPos);
     const float yaw = glm::degrees(std::atan2(lookDir.z, lookDir.x));
     const float pitch = glm::degrees(std::asin(lookDir.y));
-    camera.StartTransitionTo(cameraPos, yaw, pitch, 2.0f);
+    _camera.StartTransitionTo(cameraPos, yaw, pitch, 2.0f);
 
 #ifdef __EMSCRIPTEN__
     EM_ASM({
@@ -1019,7 +1086,7 @@ void Application::Dispose() {
 }
 
 float Application::CalculateSpaceObjectDistance(const SpaceObject* spaceObject) const {
-    return glm::distance(camera.GetPosition(), spaceObject->GetPosition());
+    return glm::distance(_camera.GetPosition(), spaceObject->GetPosition());
 }
 
 glm::vec3 Application::CurrentFpsColor() const {
@@ -1033,6 +1100,83 @@ glm::vec3 Application::CurrentFpsColor() const {
         return {0.239, 0.949, 0.45};
 }
 
+void Application::UpdateLOD() {
+#ifdef __EMSCRIPTEN__
+    if (_renderableSceneComponents.empty()) return;
+
+    const glm::vec3 camPos = _camera.GetPosition();
+
+    if (g_qualityPreset == 0) {
+        // Low preset: force downgrade/cancel every high-res scene texture and skip upgrades.
+        const glm::vec3 fakeFar = camPos + glm::vec3(100000.0f, 0.0f, 0.0f);
+        for (auto& rc : _renderableSceneComponents) {
+            if (rc.planet) rc.planet->LoadHighResIfClose(fakeFar);
+            for (auto& satellite : rc.satellites) satellite->LoadHighResIfClose(fakeFar);
+            if (rc.planetaryRing) rc.planetaryRing->LoadHighResIfClose(fakeFar);
+            if (rc.clouds) rc.clouds->LoadHighResIfClose(fakeFar);
+        }
+        return;
+    }
+
+    // Call on *all* ready planets: far ones will downgrade if loaded + past hysteresis;
+    // near ones will upgrade if appropriate.
+    for (auto& rc : _renderableSceneComponents) {
+        if (rc.planet) {
+            rc.planet->LoadHighResIfClose(camPos);
+        }
+        for (auto& satellite : rc.satellites) {
+            satellite->LoadHighResIfClose(camPos);
+        }
+        if (rc.planetaryRing) {
+            rc.planetaryRing->LoadHighResIfClose(camPos);
+        }
+        if (rc.clouds) {
+            rc.clouds->LoadHighResIfClose(camPos);
+        }
+    }
+#endif
+}
+
+void Application::ApplyQualityPreset(int preset) {
+    g_qualityPreset = std::clamp(preset, 0, 2);
+    const auto settings = GetQualitySettings(g_qualityPreset, g_isMobileWeb);
+
+    TextureLoadingQueue::GetInstance().SetMaxConcurrentLoads(settings.maxConcurrentTextureLoads);
+
+    if (gShadowQuality > 0) {
+        gShadowQuality = g_qualityPreset + 1;
+    }
+
+    ApplyRenderResources(settings.shadowResolution, settings.enableHdr);
+    LogQualityTier(settings, _hdrEnabled, gShadowQuality);
+}
+
+void Application::ApplyRenderResources(uint16_t shadowResolution, bool enableHdr) {
+    _hdrEnabled = enableHdr;
+
+    if (_shadowMapFBO && gShadowQuality > 0) {
+        _shadowMapFBO->Resize(shadowResolution, shadowResolution);
+    }
+
+    if (_hdr) {
+        _hdr->SetEnabled(enableHdr, _displayWidth, _displayHeight);
+    }
+}
+
+void Application::ApplyShadowQuality(int quality) {
+    gShadowQuality = std::clamp(quality, 0, 3);
+    if (gShadowQuality == 0) {
+        std::cout << "[Shadows] disabled" << std::endl;
+        return;
+    }
+
+    const auto settings = GetQualitySettings(gShadowQuality - 1, g_isMobileWeb);
+    if (_shadowMapFBO) {
+        _shadowMapFBO->Resize(settings.shadowResolution, settings.shadowResolution);
+    }
+    ApplyRenderResources(settings.shadowResolution, settings.enableHdr);
+    LogQualityTier(settings, _hdrEnabled, gShadowQuality);
+}
 
 Application::~Application() {
     if (activeApplication == this) {

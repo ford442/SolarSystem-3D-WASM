@@ -1,5 +1,7 @@
 #include "Application.h"
 #include "SimState.h"
+#include "Solar_System/OrbitLayout.h"
+#include "Auxiliary_Modules/Ephemeris.h"
 #include "Auxiliary_Modules/TextureLoadingQueue.h"
 #include <deque>
 #include <iomanip>
@@ -10,9 +12,32 @@
 using namespace std;
 
 void Application::ProcessSceneComponentsRendering() {
-    for (const auto& renderableSceneComponent : _renderableSceneComponents) {
-        ShadowMapPass(renderableSceneComponent);
-        RenderPass(renderableSceneComponent);
+    const float timeScale = gTimePaused ? 0.0f : gTimeScale;
+
+    for (auto& component : _renderableSceneComponents) {
+        // Place bodies once per frame (shadow + color passes only render).
+        component.planet->AdjustToParent(timeScale);
+        for (const auto& satellite : component.satellites) {
+            satellite->AdjustToParent(timeScale);
+        }
+        if (component.clouds) {
+            component.clouds->AdjustToParent(timeScale);
+        }
+        for (const auto& renderableAtmosphere : component.atmospheres) {
+            renderableAtmosphere.atmosphere->AdjustToParent();
+        }
+        if (component.planetaryRing) {
+            component.planetaryRing->AdjustToParent();
+        }
+
+        // Shadow frustum tracks the planet's current heliocentric position.
+        const float extent = component.planet->GetRadius() * 3.0f;
+        const glm::mat4 lightProjection = glm::ortho(-extent, extent, -extent, extent, _camera.GetNear(), _camera.GetFar());
+        const glm::mat4 lightView = glm::lookAt(_sun->GetPosition(), component.planet->GetPosition(), glm::vec3(0.0f, 1.0f, 0.0f));
+        component.lightSpaceMatrix = lightProjection * lightView;
+
+        ShadowMapPass(component);
+        RenderPass(component);
     }
 }
 
@@ -33,12 +58,10 @@ void Application::ShadowMapPass(const RenderableSceneComponent& component) {
     _shadowMapShader->SetMat4("lightSpaceMatrix", component.lightSpaceMatrix);
 
     component.planet->SetShader(*_shadowMapShader);
-    component.planet->AdjustToParent(gTimePaused ? 0.0f : gTimeScale);
     component.planet->Render();
 
     for (const auto& satellite : component.satellites) {
         satellite->SetShader(*_shadowMapShader);
-        satellite->AdjustToParent(gTimePaused ? 0.0f : gTimeScale);
         satellite->Render();
     }
 
@@ -53,12 +76,10 @@ void Application::RenderPass(const RenderableSceneComponent& component) {
     ConfigureMainPlanetShader(component);
 
     component.planet->SetShader(*_mainPlanetShader);
-    component.planet->AdjustToParent(gTimePaused ? 0.0f : gTimeScale);
     component.planet->Render();
 
     for (const auto& satellite : component.satellites) {
         satellite->SetShader(*_mainPlanetShader);
-        satellite->AdjustToParent(gTimePaused ? 0.0f : gTimeScale);
         satellite->Render();
     }
 
@@ -82,7 +103,7 @@ void Application::RenderAtmospheres(const std::vector<RenderableAtmosphere>& ren
         _mainAtmosphereShader->SetMat4("lightSpaceMatrix", lightSpaceMatrix);
 
         for (const auto& renderableAtmosphere : renderableAtmospheres) {
-            _mainAtmosphereShader->SetVec3("camPosition", camera.GetPosition() - renderableAtmosphere.atmosphere->GetPosition());
+            _mainAtmosphereShader->SetVec3("camPosition", _camera.GetPosition() - renderableAtmosphere.atmosphere->GetPosition());
             _mainAtmosphereShader->SetVec3("lightPos", _sun->GetPosition() - renderableAtmosphere.atmosphere->GetPosition());
             _mainAtmosphereShader->SetVec3("mieTint", renderableAtmosphere.atmosphere->GetMieTint());
             _mainAtmosphereShader->SetFloat("SCALE_H_FACTOR", renderableAtmosphere.hScaleFactor);
@@ -106,7 +127,6 @@ void Application::RenderAtmospheres(const std::vector<RenderableAtmosphere>& ren
             if (CalculateSpaceObjectDistance(renderableAtmosphere.atmosphere.get()) <= renderableAtmosphere.atmosphere->GetAtmosphereOuterBoundary())
                 glFrontFace(GL_CW);
 
-            renderableAtmosphere.atmosphere->AdjustToParent();
             renderableAtmosphere.atmosphere->Render();
 
             glFrontFace(GL_CCW);
@@ -126,7 +146,6 @@ void Application::RenderClouds(Clouds* renderableClouds, const glm::mat4& lightS
 
         _mainCloudsShader->Use();
         _mainCloudsShader->SetMat4("lightSpaceMatrix", lightSpaceMatrix);
-        renderableClouds->AdjustToParent(gTimePaused ? 0.0f : gTimeScale);
         renderableClouds->Render();
 
         glEnable(GL_CULL_FACE);
@@ -143,7 +162,6 @@ void Application::RenderPlanetaryRing(const Shader& shader, PlanetaryRing* plane
         shader.Use();
         shader.SetMat4("lightSpaceMatrix", lightSpaceMatrix);
         planetaryRing->SetShader(shader);
-        planetaryRing->AdjustToParent();
         planetaryRing->Render();
 
         glDisable(GL_BLEND);
@@ -231,7 +249,7 @@ void Application::RenderStarEffects() const {
 
     optional<RingCameraInfo> ringCameraInfo;
     if (nearestPlanetaryRing) {
-        ringCameraInfo = {camera.GetPosition(), nearestPlanetaryRing->GetPosition(), nearestPlanetaryRing->GetRingNormal(),
+        ringCameraInfo = {_camera.GetPosition(), nearestPlanetaryRing->GetPosition(), nearestPlanetaryRing->GetRingNormal(),
                           glm::vec2(nearestPlanetaryRing->GetInnerRadius(), nearestPlanetaryRing->GetOuterRadius()),
                           nearestPlanetaryRing->GetRingTexture()};
     }
@@ -241,14 +259,14 @@ void Application::RenderStarEffects() const {
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
         glEnable(GL_BLEND);
         glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
-        _sun->RenderGlow(_cameraProjection, _cameraView, camera.GetFrontVector() - camera.GetRightVector(), camera.GetAspect(),
-                         CalculateSpaceObjectDistance(_sun.get()), ringCameraInfo, starTemperatureInKelvin);
+        _sun->RenderGlow(_cameraProjection, _cameraView, _camera.GetFrontVector() - _camera.GetRightVector(), _camera.GetAspect(),
+                         CalculateSpaceObjectDistance(_sun.get()), ringCameraInfo, _starTemperatureInKelvin);
     } else {
         glBindFramebuffer(GL_FRAMEBUFFER, 0);
         glEnable(GL_BLEND);
         glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
-        _sun->RenderGlow(_cameraProjection, _cameraView, camera.GetFrontVector() - camera.GetRightVector(), camera.GetAspect(),
-                         CalculateSpaceObjectDistance(_sun.get()), ringCameraInfo, starTemperatureInKelvin);
+        _sun->RenderGlow(_cameraProjection, _cameraView, _camera.GetFrontVector() - _camera.GetRightVector(), _camera.GetAspect(),
+                         CalculateSpaceObjectDistance(_sun.get()), ringCameraInfo, _starTemperatureInKelvin);
     }
 
     glBindFramebuffer(GL_FRAMEBUFFER, 0);
@@ -258,12 +276,12 @@ void Application::RenderStarEffects() const {
 
     if (_hdrEnabled && _hdr && _hdr->IsEnabled()) {
         glBlendFunc(GL_ONE, GL_ONE);
-        _hdr->Render(starExposure, starGamma);
+        _hdr->Render(_starExposure, _starGamma);
     }
 
     glBlendFunc(GL_ONE, GL_ONE);
     float intensity = glm::min(_sun->GetCurrentGlowSize() * _sun->GetVisibility(), 1.0f);
-    _lensFlare->Render(_cameraProjection, _cameraView, _sun->GetPosition(), glm::vec3(1.0), camera.GetAspect(), 0.1, intensity, ringCameraInfo);
+    _lensFlare->Render(_cameraProjection, _cameraView, _sun->GetPosition(), glm::vec3(1.0), _camera.GetAspect(), 0.1, intensity, ringCameraInfo);
 
     glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
     glDisable(GL_BLEND);
@@ -276,15 +294,15 @@ void Application::RenderPlanetSatelliteStarDistances() const {
     glEnable(GL_BLEND);
     glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
 
-    if (isRenderPlanetStarDistances)
+    if (_isRenderPlanetStarDistances)
         RenderSpaceObjectDistance(_sun.get());
 
     for(const auto& renderableComponentPS : _renderableSceneComponents) {
-        if (isRenderPlanetStarDistances) {
+        if (_isRenderPlanetStarDistances) {
             RenderSpaceObjectDistance(renderableComponentPS.planet.get());
         }
 
-        if (isRenderSatelliteDistances) {
+        if (_isRenderSatelliteDistances) {
             for(const auto& satellite : renderableComponentPS.satellites) {
                 RenderSpaceObjectDistance(satellite.get());
             }
@@ -354,15 +372,21 @@ void Application::RenderHints() const {
     timeRunHint.emplace_back(L"Time (P:pause, +/-:scale, .:step): ");
     std::wstringstream wss;
     wss << (gTimePaused ? L"paused" : L"run") << L" x" << static_cast<int>(gTimeScale);
-    timeRunHint.emplace_back( wss.str() );
+    int year = 0;
+    int month = 0;
+    int day = 0;
+    Ephemeris::YmdFromJulianDate(OrbitLayout::GetJulianDate(), year, month, day);
+    wss << L" | " << year << L'-' << std::setfill(L'0') << std::setw(2) << month
+        << L'-' << std::setw(2) << day;
+    timeRunHint.emplace_back(wss.str());
 
     deque<wstring> planetStarHint;
     planetStarHint.emplace_back(L"Planet/Star distances(Z): ");
-    planetStarHint.emplace_back((isRenderPlanetStarDistances) ? L"On" : L"Off");
+    planetStarHint.emplace_back((_isRenderPlanetStarDistances) ? L"On" : L"Off");
 
     deque<wstring> satelliteHint;
     satelliteHint.emplace_back(L"Satellite distances(X): ");
-    satelliteHint.emplace_back((isRenderSatelliteDistances) ? L"On" : L"Off");
+    satelliteHint.emplace_back((_isRenderSatelliteDistances) ? L"On" : L"Off");
 
 #ifdef __EMSCRIPTEN__
     // Indicate low-res start + high-res streaming (visual in streaming-progress + on-screen when active)
@@ -372,7 +396,7 @@ void Application::RenderHints() const {
 
     deque<wstring> cameraSpeedHint;
     cameraSpeedHint.emplace_back(L"Camera speed(1/2): ");
-    cameraSpeedHint.emplace_back(to_wstring(camera.GetMovementSpeed()));
+    cameraSpeedHint.emplace_back(to_wstring(_camera.GetMovementSpeed()));
 
     deque<wstring> smoothCameraHint;
     smoothCameraHint.emplace_back(L"Smooth camera(Arrows)");
@@ -388,21 +412,21 @@ void Application::RenderHints() const {
 
     deque<wstring> starExposureHint;
     starExposureHint.emplace_back(L"Star Exposure(3/4): ");
-    starExposureHint.emplace_back(to_wstring(starExposure));
+    starExposureHint.emplace_back(to_wstring(_starExposure));
 
     deque<wstring> starGammaHint;
     starGammaHint.emplace_back(L"Star Gamma(5/6): ");
-    starGammaHint.emplace_back(to_wstring(starGamma));
+    starGammaHint.emplace_back(to_wstring(_starGamma));
 
     deque<wstring> starTemperatureHint;
     stringstream  starTemperatureStream;
-    starTemperatureStream << fixed << setprecision(0) << starTemperatureInKelvin;
+    starTemperatureStream << fixed << setprecision(0) << _starTemperatureInKelvin;
     string starTemperatureStr = starTemperatureStream.str();
     starTemperatureHint.emplace_back(wstring(L"Star Temperature(7/8): ").append(make_move_iterator(starTemperatureStr.begin()),
                                                                                 make_move_iterator(starTemperatureStr.end())));
     deque<wstring> vertSyncHint;
     vertSyncHint.emplace_back(L"Vert Sync(F1): ");
-    vertSyncHint.emplace_back((isVertSyncEnabled) ? L"On" : L"Off");
+    vertSyncHint.emplace_back((_isVertSyncEnabled) ? L"On" : L"Off");
 
     deque<wstring> textHints;
     textHints.emplace_back(L"Text hints(TAB)");
@@ -490,12 +514,12 @@ void Application::RenderTextureLoadingProgress() const {
 }
 
 void Application::ConfigureMainShaders() {
-    static const double zCoef = 2.0 / glm::log2(camera.GetFar() + 1.0);
+    static const double zCoef = 2.0 / glm::log2(_camera.GetFar() + 1.0);
 
-    static const glm::mat4 skyBoxProjection = glm::perspective(glm::radians(45.0f), camera.GetAspect(), camera.GetNear(), camera.GetFar());
+    static const glm::mat4 skyBoxProjection = glm::perspective(glm::radians(45.0f), _camera.GetAspect(), _camera.GetNear(), _camera.GetFar());
 
-    _cameraProjection = camera.GetProjectionMatrix();
-    _cameraView = camera.GetViewMatrix();
+    _cameraProjection = _camera.GetProjectionMatrix();
+    _cameraView = _camera.GetViewMatrix();
 
     _mainSkyBoxShader->Use();
     _mainSkyBoxShader->SetMat4("view", glm::mat4(glm::mat3(_cameraView)));
@@ -509,7 +533,7 @@ void Application::ConfigureMainShaders() {
     _mainStarShader->Use();
     _mainStarShader->SetMat4("projection", _cameraProjection);
     _mainStarShader->SetMat4("view", _cameraView);
-    _mainStarShader->SetVec3("centerDir", glm::normalize(camera.GetPosition() - _sun->GetPosition()));
+    _mainStarShader->SetVec3("centerDir", glm::normalize(_camera.GetPosition() - _sun->GetPosition()));
     _mainStarShader->SetVec3("shiftStarColor", _sun->GetShiftColor());
     _mainStarShader->SetVec3("colorMult", glm::vec3(0.96862745, 0.58039215, 0.235294117) * _sun->GetShiftColor());
     _mainStarShader->SetFloat("sunTemperatureInKelvin", _sun->GetStarTemperatureInKelvin());
@@ -524,8 +548,8 @@ void Application::ConfigureMainShaders() {
     _mainCoronaStarShader->SetMat4("projection", _cameraProjection);
     _mainCoronaStarShader->SetMat4("view", _cameraView);
     _mainCoronaStarShader->SetVec3("center", _sun->GetPosition());
-    _mainCoronaStarShader->SetVec3("cameraRight", camera.GetRightVector());
-    _mainCoronaStarShader->SetVec3("cameraUp", camera.GetUpVector());
+    _mainCoronaStarShader->SetVec3("cameraRight", _camera.GetRightVector());
+    _mainCoronaStarShader->SetVec3("cameraUp", _camera.GetUpVector());
     _mainCoronaStarShader->SetVec3("starShiftColor", _sun->GetShiftColor());
     _mainCoronaStarShader->SetFloat("zCoef", zCoef);
     _mainCoronaStarShader->SetFloat("maxSize", 7.1);
@@ -535,10 +559,10 @@ void Application::ConfigureMainShaders() {
     _mainPlanetShader->Use();
     _mainPlanetShader->SetMat4("projection", _cameraProjection);
     _mainPlanetShader->SetMat4("view", _cameraView);
-    _mainPlanetShader->SetVec3("viewPos", camera.GetPosition());
+    _mainPlanetShader->SetVec3("viewPos", _camera.GetPosition());
     _mainPlanetShader->SetVec3("lightPos", _sun->GetPosition());
     _mainPlanetShader->SetVec3("starGlowTint", _sun->GetGlowTintMult());
-    _mainPlanetShader->SetFloat("farPlane", camera.GetFar());
+    _mainPlanetShader->SetFloat("farPlane", _camera.GetFar());
     _mainPlanetShader->SetFloat("zCoef", zCoef);
     _mainPlanetShader->SetFloat("bias", 0.0005);
     _mainPlanetShader->SetInt("shadowMap", 6);
@@ -547,7 +571,7 @@ void Application::ConfigureMainShaders() {
     _mainAtmosphereShader->Use();
     _mainAtmosphereShader->SetMat4("projection", _cameraProjection);
     _mainAtmosphereShader->SetMat4("view", _cameraView);
-    _mainAtmosphereShader->SetFloat("farPlane", camera.GetFar());
+    _mainAtmosphereShader->SetFloat("farPlane", _camera.GetFar());
     _mainAtmosphereShader->SetFloat("zCoef", zCoef);
     _mainAtmosphereShader->SetFloat("bias", 0.001);
     _mainAtmosphereShader->SetInt("shadowMap", 11);
@@ -556,9 +580,9 @@ void Application::ConfigureMainShaders() {
     _mainCloudsShader->Use();
     _mainCloudsShader->SetMat4("projection", _cameraProjection);
     _mainCloudsShader->SetMat4("view", _cameraView);
-    _mainCloudsShader->SetVec3("viewPos", camera.GetPosition());
+    _mainCloudsShader->SetVec3("viewPos", _camera.GetPosition());
     _mainCloudsShader->SetVec3("lightPos", _sun->GetPosition());
-    _mainCloudsShader->SetFloat("farPlane", camera.GetFar());
+    _mainCloudsShader->SetFloat("farPlane", _camera.GetFar());
     _mainCloudsShader->SetFloat("zCoef", zCoef);
     _mainCloudsShader->SetFloat("bias", 0.001);
     _mainCloudsShader->SetInt("shadowMap", 8);
@@ -568,7 +592,7 @@ void Application::ConfigureMainShaders() {
     _mainRingShader->SetMat4("projection", _cameraProjection);
     _mainRingShader->SetMat4("view", _cameraView);
     _mainRingShader->SetVec3("lightPos", _sun->GetPosition());
-    _mainRingShader->SetVec3("camPos", camera.GetPosition());
+    _mainRingShader->SetVec3("camPos", _camera.GetPosition());
     _mainRingShader->SetVec3("starGlowTint", _sun->GetGlowTintMult());
     _mainRingShader->SetFloat("zCoef", zCoef);
     _mainRingShader->SetFloat("bias", 0.001);

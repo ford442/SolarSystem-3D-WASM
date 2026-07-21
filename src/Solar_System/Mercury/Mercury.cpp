@@ -14,17 +14,11 @@ Mercury::Mercury(const PlanetInfo& planetInfo, std::shared_ptr<Star> parentStar)
 #endif
 }
 
-void Mercury::AdjustToParent(float timeScale) {
-    static float rotationAngle = 0;
-
-    if (timeScale > 0.0f) {
-        rotationAngle += (4 * 0.00075f * timeScale) * timeScale;
-    }
-
+void Mercury::AdjustToParent(float /*timeScale*/) {
     LoadIdentityModelMatrix();
     Translate(_parentStar->GetPosition() + OrbitLayout::GetOffset(OrbitLayout::Body::Mercury));
     Scale(glm::vec3(_earthSizeCoefficient));
-    Rotate(rotationAngle, glm::vec3(0.0f, 1.0f, 0.0f));
+    Rotate(OrbitLayout::GetAxialSpinDegrees(OrbitLayout::Body::Mercury), glm::vec3(0.0f, 1.0f, 0.0f));
     UpdateModelMatrix();
 }
 

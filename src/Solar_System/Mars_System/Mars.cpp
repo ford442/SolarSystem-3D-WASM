@@ -14,18 +14,12 @@ Mars::Mars(const PlanetInfo& planetInfo, std::shared_ptr<Star> parentStar) : Pla
 #endif
 }
 
-void Mars::AdjustToParent(float timeScale) {
-    static float rotationAngle = 0;
-
-    if (timeScale > 0.0f) {
-        rotationAngle += (0.0065f * timeScale) * timeScale;
-    }
-
+void Mars::AdjustToParent(float /*timeScale*/) {
     LoadIdentityModelMatrix();
     Translate(_parentStar->GetPosition() + OrbitLayout::GetOffset(OrbitLayout::Body::Mars));
-    Rotate(-25.2f, glm::vec3(0, 0, 1));
     Scale(glm::vec3(_earthSizeCoefficient));
-    Rotate(rotationAngle, glm::vec3(0.0f, 1.0f, 0.0f));
+    Rotate(-25.2f, glm::vec3(0, 0, 1));
+    Rotate(OrbitLayout::GetAxialSpinDegrees(OrbitLayout::Body::Mars), glm::vec3(0.0f, 1.0f, 0.0f));
     UpdateModelMatrix();
 }
 

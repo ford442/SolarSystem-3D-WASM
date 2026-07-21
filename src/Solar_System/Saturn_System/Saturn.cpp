@@ -14,19 +14,13 @@ _normalMap(planetInfo.normalMap)
 #endif
 }
 
-void Saturn::AdjustToParent(float timeScale) {
-    static float rotationAngle = 0;
-
-    if (timeScale > 0.0f) {
-        rotationAngle += (4 * 0.0125f * timeScale) * timeScale;
-    }
-
+void Saturn::AdjustToParent(float /*timeScale*/) {
     LoadIdentityModelMatrix();
     Translate(_parentStar->GetPosition() + OrbitLayout::GetOffset(OrbitLayout::Body::Saturn));
     Scale(glm::vec3(_earthSizeCoefficient));
     Rotate(-26.7f, glm::vec3(0, 0, 1));
     Rotate(-15.f, glm::vec3(1, 0, 0));
-    Rotate(rotationAngle, glm::vec3(0.0f, 1.0f, 0.0f));
+    Rotate(OrbitLayout::GetAxialSpinDegrees(OrbitLayout::Body::Saturn), glm::vec3(0.0f, 1.0f, 0.0f));
     UpdateModelMatrix();
 }
 

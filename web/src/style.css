@@ -155,14 +155,50 @@ input {
   font-size: 0.95rem;
 }
 
-.settings-row select {
+.settings-row select,
+.settings-row input[type="date"] {
   min-width: 128px;
   min-height: 42px;
-  padding: 7px 36px 7px 11px;
+  padding: 7px 11px;
   color: #f7fbff;
   background: #101d2d;
   border: 1px solid rgba(137, 209, 255, 0.38);
   border-radius: 8px;
+  color-scheme: dark;
+}
+
+.settings-row select {
+  padding: 7px 36px 7px 11px;
+}
+
+.settings-date-actions {
+  display: flex;
+  gap: 8px;
+  margin: -4px 0 4px;
+}
+
+.settings-date-btn {
+  flex: 1;
+  min-height: 40px;
+  color: #dcecf5;
+  background: rgba(255, 255, 255, 0.07);
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  border-radius: 8px;
+  cursor: pointer;
+  touch-action: manipulation;
+}
+
+.settings-date-btn:hover {
+  background: rgba(255, 255, 255, 0.13);
+}
+
+#time-scale-help,
+#music-volume-help,
+#simulation-date-help {
+  display: block;
+  margin-bottom: 8px;
+  color: #a9bac8;
+  font-size: 0.75rem;
 }
 
 .settings-slider output {
@@ -185,14 +221,6 @@ input {
   margin: -5px 0 -3px;
   accent-color: #55c8f5;
   cursor: pointer;
-}
-
-#time-scale-help,
-#music-volume-help {
-  display: block;
-  margin-bottom: 8px;
-  color: #a9bac8;
-  font-size: 0.75rem;
 }
 
 .settings-switch {
@@ -407,7 +435,8 @@ input {
   .settings-row,
   .settings-slider,
   .settings-switch,
-  .settings-reset {
+  .settings-reset,
+  .settings-date-btn {
     min-height: 48px;
   }
 }

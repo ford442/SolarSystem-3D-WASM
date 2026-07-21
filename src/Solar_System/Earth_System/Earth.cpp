@@ -16,18 +16,12 @@ Earth::Earth(const PlanetInfo& planetInfo, std::shared_ptr<Star> parentStar) : P
 #endif
 }
 
-void Earth::AdjustToParent(float timeScale) {
-    static float rotationAngle = 0;
-
-    if (timeScale > 0.0f) {
-        rotationAngle += (0.0075f * timeScale) * timeScale;
-    }
-
+void Earth::AdjustToParent(float /*timeScale*/) {
     LoadIdentityModelMatrix();
     Translate(_parentStar->GetPosition() + OrbitLayout::GetOffset(OrbitLayout::Body::Earth));
     Scale(glm::vec3(_earthSizeCoefficient));
     Rotate(-23.4f, glm::vec3(0, 0, 1));
-    Rotate(rotationAngle, glm::vec3(0.0f, 1.0f, 0.0f));
+    Rotate(OrbitLayout::GetAxialSpinDegrees(OrbitLayout::Body::Earth), glm::vec3(0.0f, 1.0f, 0.0f));
     UpdateModelMatrix();
 }
 

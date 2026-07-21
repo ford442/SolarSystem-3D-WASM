@@ -170,7 +170,27 @@ bool WebResourceFetcher::ResourceExists(const std::string& virtualPath) {
 
 #else
 
+#ifdef SOLARSYSTEM_BUILD_TESTS
+namespace {
+WebResourceFetcher::TestDownloadHandler g_testDownloadHandler;
+}
+
+void WebResourceFetcher::SetTestDownloadHandler(TestDownloadHandler handler) {
+    g_testDownloadHandler = std::move(handler);
+}
+
+void WebResourceFetcher::ClearTestDownloadHandler() {
+    g_testDownloadHandler = nullptr;
+}
+#endif
+
 void WebResourceFetcher::DownloadFile(const std::string& url, const std::string& virtualPath, std::function<void(bool)> callback) {
+#ifdef SOLARSYSTEM_BUILD_TESTS
+    if (g_testDownloadHandler) {
+        g_testDownloadHandler(url, virtualPath, std::move(callback));
+        return;
+    }
+#endif
     std::cout << "Downloading (native stub): " << url << std::endl;
     if (callback) callback(true);
 }

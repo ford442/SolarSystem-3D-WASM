@@ -1,0 +1,143 @@
+name: Web build
+
+on:
+  pull_request:
+    branches:
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: web-build-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  unit-tests:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Install build tools
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends build-essential cmake ninja-build
+
+      - name: Configure and build unit tests
+        run: |
+          cmake -G Ninja -DCMAKE_BUILD_TYPE=Release -DSOLARSYSTEM_BUILD_TESTS=ON -B build-test
+          cmake --build build-test --target SolarSystemTests
+
+      - name: Run unit tests
+        run: ctest --test-dir build-test --output-on-failure
+
+  build-web:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      BUILD_JOBS: 4
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+
+      - name: Set up Emscripten
+        uses: emscripten-core/setup-emsdk@v16
+        with:
+          version: 6.0.0
+          actions-cache-folder: emsdk-cache
+
+      - name: Restore Assimp WASM build cache
+        uses: actions/cache@v4
+        id: assimp-cache
+        with:
+          path: external/assimp/build-wasm/
+          key: assimp-wasm-6.0.0-${{ hashFiles('setup_web_dependencies.sh') }}
+          restore-keys: |
+            assimp-wasm-6.0.0-
+
+      - name: Build WebAssembly
+        run: ./build-web.sh --no-emsdk
+
+      - name: Install frontend dependencies
+        working-directory: web
+        run: npm ci
+
+      - name: Typecheck and bundle
+        working-directory: web
+        run: npx tsc && npx vite build
+
+      - name: Install Playwright Chromium
+        working-directory: web
+        run: npx playwright install --with-deps chromium
+
+      - name: Start preview server
+        run: |
+          cd web
+          npm run preview -- --host 127.0.0.1 > "$RUNNER_TEMP/solar-preview.log" 2>&1 &
+          echo $! > "$RUNNER_TEMP/solar-preview.pid"
+          for attempt in {1..30}; do
+            if curl --fail --silent --show-error http://127.0.0.1:4173/solar-system/ > /dev/null; then
+              exit 0
+            fi
+            sleep 1
+          done
+          cat "$RUNNER_TEMP/solar-preview.log"
+          exit 1
+
+      - name: Run smoke test
+        working-directory: web
+        env:
+          SMOKE_TEST_URL: http://127.0.0.1:4173/solar-system/
+        run: npm run test:smoke
+
+      - name: Stop preview server
+        if: always()
+        run: |
+          if [ -f "$RUNNER_TEMP/solar-preview.pid" ]; then
+            kill "$(cat "$RUNNER_TEMP/solar-preview.pid")" || true
+          fi
+
+      - name: Upload production bundle
+        uses: actions/upload-artifact@v4
+        with:
+          name: web-dist
+          path: web/dist/
+          retention-days: 7
+
+  build-threejs-companion:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: web/threejs/package-lock.json
+
+      - name: Build Three.js companion
+        working-directory: web/threejs
+        run: npm ci && npm run build
+
+      - name: Upload companion bundle
+        uses: actions/upload-artifact@v4
+        with:
+          name: threejs-dist
+          path: web/threejs/dist/
+          retention-days: 7

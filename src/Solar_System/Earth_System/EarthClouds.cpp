@@ -1,4 +1,5 @@
 #include "EarthClouds.h"
+#include "../../SimState.h"
 
 EarthClouds::EarthClouds(const CloudsInfo& cloudsInfo, std::shared_ptr<SpaceObject> parent) : Clouds(cloudsInfo, std::move(parent))
 {
@@ -6,11 +7,12 @@ EarthClouds::EarthClouds(const CloudsInfo& cloudsInfo, std::shared_ptr<SpaceObje
                         "resource/textures/Earth_Clouds_Diffuse.dds", "EarthClouds");
 }
 
-void EarthClouds::AdjustToParent(float timeScale) {
+void EarthClouds::AdjustToParent(float /*timeScale*/) {
     static float rotationAngle = 0;
-
-    if (timeScale > 0.0f) {
-        rotationAngle += (1.25 * 0.015) * timeScale;
+    // ~1.125 deg/s at 1x preserves prior ~0.01875 deg/frame @ 60fps look.
+    constexpr float kSpinDegPerSimSecond = 1.125f;
+    if (gSimDeltaSeconds > 0.0f) {
+        rotationAngle += kSpinDegPerSimSecond * gSimDeltaSeconds;
     }
 
     LoadIdentityModelMatrix();

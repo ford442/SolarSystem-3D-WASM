@@ -1,8 +1,4 @@
-#include "Application.h"
 #include "QualitySettings.h"
-#include "SimState.h"
-#include "Auxiliary_Modules/TextureLoadingQueue.h"
-#include <algorithm>
 #include <cstring>
 #include <iomanip>
 #include <iostream>
@@ -100,80 +96,3 @@ int ReadInitialQualityPreset() {
 }
 #endif
 
-void Application::UpdateLOD() {
-#ifdef __EMSCRIPTEN__
-    if (_renderableSceneComponents.empty()) return;
-
-    const glm::vec3 camPos = camera.GetPosition();
-
-    if (g_qualityPreset == 0) {
-        // Low preset: force downgrade/cancel every high-res scene texture and skip upgrades.
-        const glm::vec3 fakeFar = camPos + glm::vec3(100000.0f, 0.0f, 0.0f);
-        for (auto& rc : _renderableSceneComponents) {
-            if (rc.planet) rc.planet->LoadHighResIfClose(fakeFar);
-            for (auto& satellite : rc.satellites) satellite->LoadHighResIfClose(fakeFar);
-            if (rc.planetaryRing) rc.planetaryRing->LoadHighResIfClose(fakeFar);
-            if (rc.clouds) rc.clouds->LoadHighResIfClose(fakeFar);
-        }
-        return;
-    }
-
-    // Call on *all* ready planets: far ones will downgrade if loaded + past hysteresis;
-    // near ones will upgrade if appropriate.
-    for (auto& rc : _renderableSceneComponents) {
-        if (rc.planet) {
-            rc.planet->LoadHighResIfClose(camPos);
-        }
-        for (auto& satellite : rc.satellites) {
-            satellite->LoadHighResIfClose(camPos);
-        }
-        if (rc.planetaryRing) {
-            rc.planetaryRing->LoadHighResIfClose(camPos);
-        }
-        if (rc.clouds) {
-            rc.clouds->LoadHighResIfClose(camPos);
-        }
-    }
-#endif
-}
-
-void Application::ApplyQualityPreset(int preset) {
-    g_qualityPreset = std::clamp(preset, 0, 2);
-    const auto settings = GetQualitySettings(g_qualityPreset, g_isMobileWeb);
-
-    TextureLoadingQueue::GetInstance().SetMaxConcurrentLoads(settings.maxConcurrentTextureLoads);
-
-    if (gShadowQuality > 0) {
-        gShadowQuality = g_qualityPreset + 1;
-    }
-
-    ApplyRenderResources(settings.shadowResolution, settings.enableHdr);
-    LogQualityTier(settings, _hdrEnabled, gShadowQuality);
-}
-
-void Application::ApplyRenderResources(uint16_t shadowResolution, bool enableHdr) {
-    _hdrEnabled = enableHdr;
-
-    if (_shadowMapFBO && gShadowQuality > 0) {
-        _shadowMapFBO->Resize(shadowResolution, shadowResolution);
-    }
-
-    if (_hdr) {
-        _hdr->SetEnabled(enableHdr, _displayWidth, _displayHeight);
-    }
-}
-
-void Application::ApplyShadowQuality(int quality) {
-    gShadowQuality = std::clamp(quality, 0, 3);
-    if (gShadowQuality == 0) {
-        std::cout << "[Shadows] disabled" << std::endl;
-        return;
-    }
-
-    const auto settings = GetQualitySettings(gShadowQuality - 1, g_isMobileWeb);
-    if (_shadowMapFBO) {
-        _shadowMapFBO->Resize(settings.shadowResolution, settings.shadowResolution);
-    }
-    ApplyRenderResources(settings.shadowResolution, settings.enableHdr);
-    LogQualityTier(settings, _hdrEnabled, gShadowQuality);
-}

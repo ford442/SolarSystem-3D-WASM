@@ -1,0 +1,16 @@
+/root/SolarSystem-3D-WASM/build-test/CMakeFiles/SolarSystem.dir
+/root/SolarSystem-3D-WASM/build-test/CMakeFiles/test.dir
+/root/SolarSystem-3D-WASM/build-test/CMakeFiles/edit_cache.dir
+/root/SolarSystem-3D-WASM/build-test/CMakeFiles/rebuild_cache.dir
+/root/SolarSystem-3D-WASM/build-test/tests/CMakeFiles/SolarSystemTests.dir
+/root/SolarSystem-3D-WASM/build-test/tests/CMakeFiles/test.dir
+/root/SolarSystem-3D-WASM/build-test/tests/CMakeFiles/edit_cache.dir
+/root/SolarSystem-3D-WASM/build-test/tests/CMakeFiles/rebuild_cache.dir
+/root/SolarSystem-3D-WASM/build-test/_deps/googletest-build/CMakeFiles/test.dir
+/root/SolarSystem-3D-WASM/build-test/_deps/googletest-build/CMakeFiles/edit_cache.dir
+/root/SolarSystem-3D-WASM/build-test/_deps/googletest-build/CMakeFiles/rebuild_cache.dir
+/root/SolarSystem-3D-WASM/build-test/_deps/googletest-build/googletest/CMakeFiles/gtest.dir
+/root/SolarSystem-3D-WASM/build-test/_deps/googletest-build/googletest/CMakeFiles/gtest_main.dir
+/root/SolarSystem-3D-WASM/build-test/_deps/googletest-build/googletest/CMakeFiles/test.dir
+/root/SolarSystem-3D-WASM/build-test/_deps/googletest-build/googletest/CMakeFiles/edit_cache.dir
+/root/SolarSystem-3D-WASM/build-test/_deps/googletest-build/googletest/CMakeFiles/rebuild_cache.dir

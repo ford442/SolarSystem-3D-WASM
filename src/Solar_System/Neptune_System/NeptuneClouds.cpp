@@ -1,4 +1,5 @@
 #include "NeptuneClouds.h"
+#include "../../SimState.h"
 
 NeptuneClouds::NeptuneClouds(const CloudsInfo& cloudsInfo, std::shared_ptr<SpaceObject> parent) : Clouds(cloudsInfo, std::move(parent))
 {
@@ -6,11 +7,11 @@ NeptuneClouds::NeptuneClouds(const CloudsInfo& cloudsInfo, std::shared_ptr<Space
                         "resource/textures/Neptune_Clouds_Diffuse.dds", "NeptuneClouds");
 }
 
-void NeptuneClouds::AdjustToParent(float timeScale) {
+void NeptuneClouds::AdjustToParent(float /*timeScale*/) {
     static float rotationAngle = 0;
-
-    if (timeScale > 0.0f) {
-        rotationAngle += (8 *  0.01) * timeScale;
+    constexpr float kSpinDegPerSimSecond = 4.8f; // ~8*0.01 per frame @ 60fps
+    if (gSimDeltaSeconds > 0.0f) {
+        rotationAngle += kSpinDegPerSimSecond * gSimDeltaSeconds;
     }
 
     LoadIdentityModelMatrix();

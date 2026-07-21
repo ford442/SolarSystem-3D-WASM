@@ -1,0 +1,560 @@
+Start testing: Jul 21 12:03 CEST
+----------------------------------------------------------
+1/33 Testing: OrbitLayoutTest.BodyFromNameMapsKnownPlanets
+1/33 Test: OrbitLayoutTest.BodyFromNameMapsKnownPlanets
+Command: "/root/SolarSystem-3D-WASM/build-test/tests/SolarSystemTests" "--gtest_filter=OrbitLayoutTest.BodyFromNameMapsKnownPlanets" "--gtest_also_run_disabled_tests"
+Directory: /root/SolarSystem-3D-WASM/build-test/tests
+"OrbitLayoutTest.BodyFromNameMapsKnownPlanets" start time: Jul 21 12:03 CEST
+Output:
+----------------------------------------------------------
+Running main() from /root/SolarSystem-3D-WASM/build-test/_deps/googletest-src/googletest/src/gtest_main.cc
+Note: Google Test filter = OrbitLayoutTest.BodyFromNameMapsKnownPlanets
+[==========] Running 1 test from 1 test suite.
+[----------] Global test environment set-up.
+[----------] 1 test from OrbitLayoutTest
+[ RUN      ] OrbitLayoutTest.BodyFromNameMapsKnownPlanets
+[       OK ] OrbitLayoutTest.BodyFromNameMapsKnownPlanets (0 ms)
+[----------] 1 test from OrbitLayoutTest (0 ms total)
+
+[----------] Global test environment tear-down
+[==========] 1 test from 1 test suite ran. (3 ms total)
+[  PASSED  ] 1 test.
+<end of output>
+Test time =   0.01 sec
+----------------------------------------------------------
+Test Passed.
+"OrbitLayoutTest.BodyFromNameMapsKnownPlanets" end time: Jul 21 12:03 CEST
+"OrbitLayoutTest.BodyFromNameMapsKnownPlanets" time elapsed: 00:00:00
+----------------------------------------------------------
+
+2/33 Testing: OrbitLayoutTest.BodyFromNameFallsBackToSun
+2/33 Test: OrbitLayoutTest.BodyFromNameFallsBackToSun
+Command: "/root/SolarSystem-3D-WASM/build-test/tests/SolarSystemTests" "--gtest_filter=OrbitLayoutTest.BodyFromNameFallsBackToSun" "--gtest_also_run_disabled_tests"
+Directory: /root/SolarSystem-3D-WASM/build-test/tests
+"OrbitLayoutTest.BodyFromNameFallsBackToSun" start time: Jul 21 12:03 CEST
+Output:
+----------------------------------------------------------
+Running main() from /root/SolarSystem-3D-WASM/build-test/_deps/googletest-src/googletest/src/gtest_main.cc
+Note: Google Test filter = OrbitLayoutTest.BodyFromNameFallsBackToSun
+[==========] Running 1 test from 1 test suite.
+[----------] Global test environment set-up.
+[----------] 1 test from OrbitLayoutTest
+[ RUN      ] OrbitLayoutTest.BodyFromNameFallsBackToSun
+[       OK ] OrbitLayoutTest.BodyFromNameFallsBackToSun (0 ms)
+[----------] 1 test from OrbitLayoutTest (0 ms total)
+
+[----------] Global test environment tear-down
+[==========] 1 test from 1 test suite ran. (0 ms total)
+[  PASSED  ] 1 test.
+<end of output>
+Test time =   0.01 sec
+----------------------------------------------------------
+Test Passed.
+"OrbitLayoutTest.BodyFromNameFallsBackToSun" end time: Jul 21 12:03 CEST
+"OrbitLayoutTest.BodyFromNameFallsBackToSun" time elapsed: 00:00:00
+----------------------------------------------------------
+
+3/33 Testing: OrbitLayoutTest.ResetForTestsUsesJ2000
+3/33 Test: OrbitLayoutTest.ResetForTestsUsesJ2000
+Command: "/root/SolarSystem-3D-WASM/build-test/tests/SolarSystemTests" "--gtest_filter=OrbitLayoutTest.ResetForTestsUsesJ2000" "--gtest_also_run_disabled_tests"
+Directory: /root/SolarSystem-3D-WASM/build-test/tests
+"OrbitLayoutTest.ResetForTestsUsesJ2000" start time: Jul 21 12:03 CEST
+Output:
+----------------------------------------------------------
+Running main() from /root/SolarSystem-3D-WASM/build-test/_deps/googletest-src/googletest/src/gtest_main.cc
+Note: Google Test filter = OrbitLayoutTest.ResetForTestsUsesJ2000
+[==========] Running 1 test from 1 test suite.
+[----------] Global test environment set-up.
+[----------] 1 test from OrbitLayoutTest
+[ RUN      ] OrbitLayoutTest.ResetForTestsUsesJ2000
+[       OK ] OrbitLayoutTest.ResetForTestsUsesJ2000 (0 ms)
+[----------] 1 test from OrbitLayoutTest (0 ms total)
+
+[----------] Global test environment tear-down
+[==========] 1 test from 1 test suite ran. (0 ms total)
+[  PASSED  ] 1 test.
+<end of output>
+Test time =   0.02 sec
+----------------------------------------------------------
+Test Passed.
+"OrbitLayoutTest.ResetForTestsUsesJ2000" end time: Jul 21 12:03 CEST
+"OrbitLayoutTest.ResetForTestsUsesJ2000" time elapsed: 00:00:00
+----------------------------------------------------------
+
+4/33 Testing: OrbitLayoutTest.CompressedModePlacesEarthFromEphemerisAtJ2000
+4/33 Test: OrbitLayoutTest.CompressedModePlacesEarthFromEphemerisAtJ2000
+Command: "/root/SolarSystem-3D-WASM/build-test/tests/SolarSystemTests" "--gtest_filter=OrbitLayoutTest.CompressedModePlacesEarthFromEphemerisAtJ2000" "--gtest_also_run_disabled_tests"
+Directory: /root/SolarSystem-3D-WASM/build-test/tests
+"OrbitLayoutTest.CompressedModePlacesEarthFromEphemerisAtJ2000" start time: Jul 21 12:03 CEST
+Output:
+----------------------------------------------------------
+Running main() from /root/SolarSystem-3D-WASM/build-test/_deps/googletest-src/googletest/src/gtest_main.cc
+Note: Google Test filter = OrbitLayoutTest.CompressedModePlacesEarthFromEphemerisAtJ2000
+[==========] Running 1 test from 1 test suite.
+[----------] Global test environment set-up.
+[----------] 1 test from OrbitLayoutTest
+[ RUN      ] OrbitLayoutTest.CompressedModePlacesEarthFromEphemerisAtJ2000
+[       OK ] OrbitLayoutTest.CompressedModePlacesEarthFromEphemerisAtJ2000 (0 ms)
+[----------] 1 test from OrbitLayoutTest (3 ms total)
+
+[----------] Global test environment tear-down
+[==========] 1 test from 1 test suite ran. (11 ms total)
+[  PASSED  ] 1 test.
+<end of output>
+Test time =   0.02 sec
+----------------------------------------------------------
+Test Passed.
+"OrbitLayoutTest.CompressedModePlacesEarthFromEphemerisAtJ2000" end time: Jul 21 12:03 CEST
+"OrbitLayoutTest.CompressedModePlacesEarthFromEphemerisAtJ2000" time elapsed: 00:00:00
+----------------------------------------------------------
+
+5/33 Testing: OrbitLayoutTest.RealisticModeScalesOrbitRadius
+5/33 Test: OrbitLayoutTest.RealisticModeScalesOrbitRadius
+Command: "/root/SolarSystem-3D-WASM/build-test/tests/SolarSystemTests" "--gtest_filter=OrbitLayoutTest.RealisticModeScalesOrbitRadius" "--gtest_also_run_disabled_tests"
+Directory: /root/SolarSystem-3D-WASM/build-test/tests
+"OrbitLayoutTest.RealisticModeScalesOrbitRadius" start time: Jul 21 12:03 CEST
+Output:
+----------------------------------------------------------
+Running main() from /root/SolarSystem-3D-WASM/build-test/_deps/googletest-src/googletest/src/gtest_main.cc
+Note: Google Test filter = OrbitLayoutTest.RealisticModeScalesOrbitRadius
+[==========] Running 1 test from 1 test suite.
+[----------] Global test environment set-up.
+[----------] 1 test from OrbitLayoutTest
+[ RUN      ] OrbitLayoutTest.RealisticModeScalesOrbitRadius
+[       OK ] OrbitLayoutTest.RealisticModeScalesOrbitRadius (0 ms)
+[----------] 1 test from OrbitLayoutTest (0 ms total)
+
+[----------] Global test environment tear-down
+[==========] 1 test from 1 test suite ran. (0 ms total)
+[  PASSED  ] 1 test.
+<end of output>
+Test time =   0.01 sec
+----------------------------------------------------------
+Test Passed.
+"OrbitLayoutTest.RealisticModeScalesOrbitRadius" end time: Jul 21 12:03 CEST
+"OrbitLayoutTest.RealisticModeScalesOrbitRadius" time elapsed: 00:00:00
+----------------------------------------------------------
+
+6/33 Testing: OrbitLayoutTest.SunOffsetIsZeroInBothModes
+6/33 Test: OrbitLayoutTest.SunOffsetIsZeroInBothModes
+Command: "/root/SolarSystem-3D-WASM/build-test/tests/SolarSystemTests" "--gtest_filter=OrbitLayoutTest.SunOffsetIsZeroInBothModes" "--gtest_also_run_disabled_tests"
+Directory: /root/SolarSystem-3D-WASM/build-test/tests
+"OrbitLayoutTest.SunOffsetIsZeroInBothModes" start time: Jul 21 12:03 CEST
+Output:
+----------------------------------------------------------
+Running main() from /root/SolarSystem-3D-WASM/build-test/_deps/googletest-src/googletest/src/gtest_main.cc
+Note: Google Test filter = OrbitLayoutTest.SunOffsetIsZeroInBothModes
+[==========] Running 1 test from 1 test suite.
+[----------] Global test environment set-up.
+[----------] 1 test from OrbitLayoutTest
+[ RUN      ] OrbitLayoutTest.SunOffsetIsZeroInBothModes
+[       OK ] OrbitLayoutTest.SunOffsetIsZeroInBothModes (0 ms)
+[----------] 1 test from OrbitLayoutTest (0 ms total)
+
+[----------] Global test environment tear-down
+[==========] 1 test from 1 test suite ran. (4 ms total)
+[  PASSED  ] 1 test.
+<end of output>
+Test time =   0.02 sec
+----------------------------------------------------------
+Test Passed.
+"OrbitLayoutTest.SunOffsetIsZeroInBothModes" end time: Jul 21 12:03 CEST
+"OrbitLayoutTest.SunOffsetIsZeroInBothModes" time elapsed: 00:00:00
+----------------------------------------------------------
+
+7/33 Testing: OrbitLayoutTest.SceneDistanceStableAcrossAdvance
+7/33 Test: OrbitLayoutTest.SceneDistanceStableAcrossAdvance
+Command: "/root/SolarSystem-3D-WASM/build-test/tests/SolarSystemTests" "--gtest_filter=OrbitLayoutTest.SceneDistanceStableAcrossAdvance" "--gtest_also_run_disabled_tests"
+Directory: /root/SolarSystem-3D-WASM/build-test/tests
+"OrbitLayoutTest.SceneDistanceStableAcrossAdvance" start time: Jul 21 12:03 CEST
+Output:
+----------------------------------------------------------
+Running main() from /root/SolarSystem-3D-WASM/build-test/_deps/googletest-src/googletest/src/gtest_main.cc
+Note: Google Test filter = OrbitLayoutTest.SceneDistanceStableAcrossAdvance
+[==========] Running 1 test from 1 test suite.
+[----------] Global test environment set-up.
+[----------] 1 test from OrbitLayoutTest
+[ RUN      ] OrbitLayoutTest.SceneDistanceStableAcrossAdvance
+[       OK ] OrbitLayoutTest.SceneDistanceStableAcrossAdvance (0 ms)
+[----------] 1 test from OrbitLayoutTest (0 ms total)
+
+[----------] Global test environment tear-down
+[==========] 1 test from 1 test suite ran. (4 ms total)
+[  PASSED  ] 1 test.
+<end of output>
+Test time =   0.01 sec
+----------------------------------------------------------
+Test Passed.
+"OrbitLayoutTest.SceneDistanceStableAcrossAdvance" end time: Jul 21 12:03 CEST
+"OrbitLayoutTest.SceneDistanceStableAcrossAdvance" time elapsed: 00:00:00
+----------------------------------------------------------
+
+8/33 Testing: OrbitLayoutTest.MercuryCompletesOrbitFasterThanEarth
+8/33 Test: OrbitLayoutTest.MercuryCompletesOrbitFasterThanEarth
+Command: "/root/SolarSystem-3D-WASM/build-test/tests/SolarSystemTests" "--gtest_filter=OrbitLayoutTest.MercuryCompletesOrbitFasterThanEarth" "--gtest_also_run_disabled_tests"
+Directory: /root/SolarSystem-3D-WASM/build-test/tests
+"OrbitLayoutTest.MercuryCompletesOrbitFasterThanEarth" start time: Jul 21 12:03 CEST
+Output:
+----------------------------------------------------------
+Running main() from /root/SolarSystem-3D-WASM/build-test/_deps/googletest-src/googletest/src/gtest_main.cc
+Note: Google Test filter = OrbitLayoutTest.MercuryCompletesOrbitFasterThanEarth
+[==========] Running 1 test from 1 test suite.
+[----------] Global test environment set-up.
+[----------] 1 test from OrbitLayoutTest
+[ RUN      ] OrbitLayoutTest.MercuryCompletesOrbitFasterThanEarth
+[       OK ] OrbitLayoutTest.MercuryCompletesOrbitFasterThanEarth (0 ms)
+[----------] 1 test from OrbitLayoutTest (0 ms total)
+
+[----------] Global test environment tear-down
+[==========] 1 test from 1 test suite ran. (0 ms total)
+[  PASSED  ] 1 test.
+<end of output>
+Test time =   0.01 sec
+----------------------------------------------------------
+Test Passed.
+"OrbitLayoutTest.MercuryCompletesOrbitFasterThanEarth" end time: Jul 21 12:03 CEST
+"OrbitLayoutTest.MercuryCompletesOrbitFasterThanEarth" time elapsed: 00:00:00
+----------------------------------------------------------
+
+9/33 Testing: OrbitLayoutTest.SetJulianDateMovesPlanets
+9/33 Test: OrbitLayoutTest.SetJulianDateMovesPlanets
+Command: "/root/SolarSystem-3D-WASM/build-test/tests/SolarSystemTests" "--gtest_filter=OrbitLayoutTest.SetJulianDateMovesPlanets" "--gtest_also_run_disabled_tests"
+Directory: /root/SolarSystem-3D-WASM/build-test/tests
+"OrbitLayoutTest.SetJulianDateMovesPlanets" start time: Jul 21 12:03 CEST
+Output:
+----------------------------------------------------------
+Running main() from /root/SolarSystem-3D-WASM/build-test/_deps/googletest-src/googletest/src/gtest_main.cc
+Note: Google Test filter = OrbitLayoutTest.SetJulianDateMovesPlanets
+[==========] Running 1 test from 1 test suite.
+[----------] Global test environment set-up.
+[----------] 1 test from OrbitLayoutTest
+[ RUN      ] OrbitLayoutTest.SetJulianDateMovesPlanets
+[       OK ] OrbitLayoutTest.SetJulianDateMovesPlanets (0 ms)
+[----------] 1 test from OrbitLayoutTest (0 ms total)
+
+[----------] Global test environment tear-down
+[==========] 1 test from 1 test suite ran. (1 ms total)
+[  PASSED  ] 1 test.
+<end of output>
+Test time =   0.01 sec
+----------------------------------------------------------
+Test Passed.
+"OrbitLayoutTest.SetJulianDateMovesPlanets" end time: Jul 21 12:03 CEST
+"OrbitLayoutTest.SetJulianDateMovesPlanets" time elapsed: 00:00:00
+----------------------------------------------------------
+
+10/33 Testing: OrbitLayoutTest.RelativeAngularSpeedOrdering
+10/33 Test: OrbitLayoutTest.RelativeAngularSpeedOrdering
+Command: "/root/SolarSystem-3D-WASM/build-test/tests/SolarSystemTests" "--gtest_filter=OrbitLayoutTest.RelativeAngularSpeedOrdering" "--gtest_also_run_disabled_tests"
+Directory: /root/SolarSystem-3D-WASM/build-test/tests
+"OrbitLayoutTest.RelativeAngularSpeedOrdering" start time: Jul 21 12:03 CEST
+Output:
+----------------------------------------------------------
+Running main() from /root/SolarSystem-3D-WASM/build-test/_deps/googletest-src/googletest/src/gtest_main.cc
+Note: Google Test filter = OrbitLayoutTest.RelativeAngularSpeedOrdering
+[==========] Running 1 test from 1 test suite.
+[----------] Global test environment set-up.
+[----------] 1 test from OrbitLayoutTest
+[ RUN      ] OrbitLayoutTest.RelativeAngularSpeedOrdering
+[       OK ] OrbitLayoutTest.RelativeAngularSpeedOrdering (0 ms)
+[----------] 1 test from OrbitLayoutTest (3 ms total)
+
+[----------] Global test environment tear-down
+[==========] 1 test from 1 test suite ran. (11 ms total)
+[  PASSED  ] 1 test.
+<end of output>
+Test time =   0.03 sec
+----------------------------------------------------------
+Test Passed.
+"OrbitLayoutTest.RelativeAngularSpeedOrdering" end time: Jul 21 12:03 CEST
+"OrbitLayoutTest.RelativeAngularSpeedOrdering" time elapsed: 00:00:00
+----------------------------------------------------------
+
+11/33 Testing: OrbitLayoutTest.AxialSpinIsLinearAndRetrogradeForVenus
+11/33 Test: OrbitLayoutTest.AxialSpinIsLinearAndRetrogradeForVenus
+Command: "/root/SolarSystem-3D-WASM/build-test/tests/SolarSystemTests" "--gtest_filter=OrbitLayoutTest.AxialSpinIsLinearAndRetrogradeForVenus" "--gtest_also_run_disabled_tests"
+Directory: /root/SolarSystem-3D-WASM/build-test/tests
+"OrbitLayoutTest.AxialSpinIsLinearAndRetrogradeForVenus" start time: Jul 21 12:03 CEST
+Output:
+----------------------------------------------------------
+Running main() from /root/SolarSystem-3D-WASM/build-test/_deps/googletest-src/googletest/src/gtest_main.cc
+Note: Google Test filter = OrbitLayoutTest.AxialSpinIsLinearAndRetrogradeForVenus
+[==========] Running 1 test from 1 test suite.
+[----------] Global test environment set-up.
+[----------] 1 test from OrbitLayoutTest
+[ RUN      ] OrbitLayoutTest.AxialSpinIsLinearAndRetrogradeForVenus
+[       OK ] OrbitLayoutTest.AxialSpinIsLinearAndRetrogradeForVenus (0 ms)
+[----------] 1 test from OrbitLayoutTest (1 ms total)
+
+[----------] Global test environment tear-down
+[==========] 1 test from 1 test suite ran. (2 ms total)
+[  PASSED  ] 1 test.
+<end of output>
+Test time =   0.01 sec
+----------------------------------------------------------
+Test Passed.
+"OrbitLayoutTest.AxialSpinIsLinearAndRetrogradeForVenus" end time: Jul 21 12:03 CEST
+"OrbitLayoutTest.AxialSpinIsLinearAndRetrogradeForVenus" time elapsed: 00:00:00
+----------------------------------------------------------
+
+12/33 Testing: OrbitLayoutTest.AdvanceUpdatesJulianDate
+12/33 Test: OrbitLayoutTest.AdvanceUpdatesJulianDate
+Command: "/root/SolarSystem-3D-WASM/build-test/tests/SolarSystemTests" "--gtest_filter=OrbitLayoutTest.AdvanceUpdatesJulianDate" "--gtest_also_run_disabled_tests"
+Directory: /root/SolarSystem-3D-WASM/build-test/tests
+"OrbitLayoutTest.AdvanceUpdatesJulianDate" start time: Jul 21 12:03 CEST
+Output:
+----------------------------------------------------------
+Running main() from /root/SolarSystem-3D-WASM/build-test/_deps/googletest-src/googletest/src/gtest_main.cc
+Note: Google Test filter = OrbitLayoutTest.AdvanceUpdatesJulianDate
+[==========] Running 1 test from 1 test suite.
+[----------] Global test environment set-up.
+[----------] 1 test from OrbitLayoutTest
+[ RUN      ] OrbitLayoutTest.AdvanceUpdatesJulianDate
+[       OK ] OrbitLayoutTest.AdvanceUpdatesJulianDate (0 ms)
+[----------] 1 test from OrbitLayoutTest (0 ms total)
+
+[----------] Global test environment tear-down
+[==========] 1 test from 1 test suite ran. (1 ms total)
+[  PASSED  ] 1 test.
+<end of output>
+Test time =   0.01 sec
+----------------------------------------------------------
+Test Passed.
+"OrbitLayoutTest.AdvanceUpdatesJulianDate" end time: Jul 21 12:03 CEST
+"OrbitLayoutTest.AdvanceUpdatesJulianDate" time elapsed: 00:00:00
+----------------------------------------------------------
+
+13/33 Testing: EphemerisTest.JulianDateRoundTripYmd
+13/33 Test: EphemerisTest.JulianDateRoundTripYmd
+Command: "/root/SolarSystem-3D-WASM/build-test/tests/SolarSystemTests" "--gtest_filter=EphemerisTest.JulianDateRoundTripYmd" "--gtest_also_run_disabled_tests"
+Directory: /root/SolarSystem-3D-WASM/build-test/tests
+"EphemerisTest.JulianDateRoundTripYmd" start time: Jul 21 12:03 CEST
+Output:
+----------------------------------------------------------
+Running main() from /root/SolarSystem-3D-WASM/build-test/_deps/googletest-src/googletest/src/gtest_main.cc
+Note: Google Test filter = EphemerisTest.JulianDateRoundTripYmd
+[==========] Running 1 test from 1 test suite.
+[----------] Global test environment set-up.
+[----------] 1 test from EphemerisTest
+[ RUN      ] EphemerisTest.JulianDateRoundTripYmd
+/root/SolarSystem-3D-WASM/tests/test_ephemeris.cpp:28: Failure
+The difference between Ephemeris::JulianDateFromYmd(2000, 1, 1) and 2451544.5 is 0.5, which exceeds 1e-6, where
+Ephemeris::JulianDateFromYmd(2000, 1, 1) evaluates to 2451545,
+2451544.5 evaluates to 2451544.5, and
+1e-6 evaluates to 9.9999999999999995e-07.
+
+[  FAILED  ] EphemerisTest.JulianDateRoundTripYmd (0 ms)
+[----------] 1 test from EphemerisTest (3 ms total)
+
+[----------] Global test environment tear-down
+[==========] 1 test from 1 test suite ran. (7 ms total)
+[  PASSED  ] 0 tests.
+[  FAILED  ] 1 test, listed below:
+[  FAILED  ] EphemerisTest.JulianDateRoundTripYmd
+
+ 1 FAILED TEST
+<end of output>
+Test time =   0.02 sec
+----------------------------------------------------------
+Test Failed.
+"EphemerisTest.JulianDateRoundTripYmd" end time: Jul 21 12:03 CEST
+"EphemerisTest.JulianDateRoundTripYmd" time elapsed: 00:00:00
+----------------------------------------------------------
+
+14/33 Testing: EphemerisTest.SunPositionIsZero
+14/33 Test: EphemerisTest.SunPositionIsZero
+Command: "/root/SolarSystem-3D-WASM/build-test/tests/SolarSystemTests" "--gtest_filter=EphemerisTest.SunPositionIsZero" "--gtest_also_run_disabled_tests"
+Directory: /root/SolarSystem-3D-WASM/build-test/tests
+"EphemerisTest.SunPositionIsZero" start time: Jul 21 12:03 CEST
+Output:
+----------------------------------------------------------
+Running main() from /root/SolarSystem-3D-WASM/build-test/_deps/googletest-src/googletest/src/gtest_main.cc
+Note: Google Test filter = EphemerisTest.SunPositionIsZero
+[==========] Running 1 test from 1 test suite.
+[----------] Global test environment set-up.
+[----------] 1 test from EphemerisTest
+[ RUN      ] EphemerisTest.SunPositionIsZero
+[       OK ] EphemerisTest.SunPositionIsZero (0 ms)
+[----------] 1 test from EphemerisTest (0 ms total)
+
+[----------] Global test environment tear-down
+[==========] 1 test from 1 test suite ran. (0 ms total)
+[  PASSED  ] 1 test.
+<end of output>
+Test time =   0.01 sec
+----------------------------------------------------------
+Test Passed.
+"EphemerisTest.SunPositionIsZero" end time: Jul 21 12:03 CEST
+"EphemerisTest.SunPositionIsZero" time elapsed: 00:00:00
+----------------------------------------------------------
+
+15/33 Testing: EphemerisTest.EarthNearMeanLongitudeAtJ2000
+15/33 Test: EphemerisTest.EarthNearMeanLongitudeAtJ2000
+Command: "/root/SolarSystem-3D-WASM/build-test/tests/SolarSystemTests" "--gtest_filter=EphemerisTest.EarthNearMeanLongitudeAtJ2000" "--gtest_also_run_disabled_tests"
+Directory: /root/SolarSystem-3D-WASM/build-test/tests
+"EphemerisTest.EarthNearMeanLongitudeAtJ2000" start time: Jul 21 12:03 CEST
+Output:
+----------------------------------------------------------
+Running main() from /root/SolarSystem-3D-WASM/build-test/_deps/googletest-src/googletest/src/gtest_main.cc
+Note: Google Test filter = EphemerisTest.EarthNearMeanLongitudeAtJ2000
+[==========] Running 1 test from 1 test suite.
+[----------] Global test environment set-up.
+[----------] 1 test from EphemerisTest
+[ RUN      ] EphemerisTest.EarthNearMeanLongitudeAtJ2000
+[       OK ] EphemerisTest.EarthNearMeanLongitudeAtJ2000 (0 ms)
+[----------] 1 test from EphemerisTest (0 ms total)
+
+[----------] Global test environment tear-down
+[==========] 1 test from 1 test suite ran. (20 ms total)
+[  PASSED  ] 1 test.
+<end of output>
+Test time =   0.04 sec
+----------------------------------------------------------
+Test Passed.
+"EphemerisTest.EarthNearMeanLongitudeAtJ2000" end time: Jul 21 12:03 CEST
+"EphemerisTest.EarthNearMeanLongitudeAtJ2000" time elapsed: 00:00:00
+----------------------------------------------------------
+
+16/33 Testing: EphemerisTest.MercuryNearMeanLongitudeAtJ2000
+16/33 Test: EphemerisTest.MercuryNearMeanLongitudeAtJ2000
+Command: "/root/SolarSystem-3D-WASM/build-test/tests/SolarSystemTests" "--gtest_filter=EphemerisTest.MercuryNearMeanLongitudeAtJ2000" "--gtest_also_run_disabled_tests"
+Directory: /root/SolarSystem-3D-WASM/build-test/tests
+"EphemerisTest.MercuryNearMeanLongitudeAtJ2000" start time: Jul 21 12:03 CEST
+Output:
+----------------------------------------------------------
+Running main() from /root/SolarSystem-3D-WASM/build-test/_deps/googletest-src/googletest/src/gtest_main.cc
+Note: Google Test filter = EphemerisTest.MercuryNearMeanLongitudeAtJ2000
+[==========] Running 1 test from 1 test suite.
+[----------] Global test environment set-up.
+[----------] 1 test from EphemerisTest
+[ RUN      ] EphemerisTest.MercuryNearMeanLongitudeAtJ2000
+[       OK ] EphemerisTest.MercuryNearMeanLongitudeAtJ2000 (0 ms)
+[----------] 1 test from EphemerisTest (0 ms total)
+
+[----------] Global test environment tear-down
+[==========] 1 test from 1 test suite ran. (15 ms total)
+[  PASSED  ] 1 test.
+<end of output>
+Test time =   0.04 sec
+----------------------------------------------------------
+Test Passed.
+"EphemerisTest.MercuryNearMeanLongitudeAtJ2000" end time: Jul 21 12:03 CEST
+"EphemerisTest.MercuryNearMeanLongitudeAtJ2000" time elapsed: 00:00:00
+----------------------------------------------------------
+
+17/33 Testing: EphemerisTest.MarsNearMeanLongitudeAtJ2000
+17/33 Test: EphemerisTest.MarsNearMeanLongitudeAtJ2000
+Command: "/root/SolarSystem-3D-WASM/build-test/tests/SolarSystemTests" "--gtest_filter=EphemerisTest.MarsNearMeanLongitudeAtJ2000" "--gtest_also_run_disabled_tests"
+Directory: /root/SolarSystem-3D-WASM/build-test/tests
+"EphemerisTest.MarsNearMeanLongitudeAtJ2000" start time: Jul 21 12:03 CEST
+Output:
+----------------------------------------------------------
+Running main() from /root/SolarSystem-3D-WASM/build-test/_deps/googletest-src/googletest/src/gtest_main.cc
+Note: Google Test filter = EphemerisTest.MarsNearMeanLongitudeAtJ2000
+[==========] Running 1 test from 1 test suite.
+[----------] Global test environment set-up.
+[----------] 1 test from EphemerisTest
+[ RUN      ] EphemerisTest.MarsNearMeanLongitudeAtJ2000
+/root/SolarSystem-3D-WASM/tests/test_ephemeris.cpp:67: Failure
+Expected: (AngleDiffDeg(lon, -4.55343205)) < (2.0), actual: 4.0017346741669826 vs 2
+
+[  FAILED  ] EphemerisTest.MarsNearMeanLongitudeAtJ2000 (0 ms)
+[----------] 1 test from EphemerisTest (0 ms total)
+
+[----------] Global test environment tear-down
+[==========] 1 test from 1 test suite ran. (0 ms total)
+[  PASSED  ] 0 tests.
+[  FAILED  ] 1 test, listed below:
+[  FAILED  ] EphemerisTest.MarsNearMeanLongitudeAtJ2000
+
+ 1 FAILED TEST
+<end of output>
+Test time =   0.03 sec
+----------------------------------------------------------
+Test Failed.
+"EphemerisTest.MarsNearMeanLongitudeAtJ2000" end time: Jul 21 12:03 CEST
+"EphemerisTest.MarsNearMeanLongitudeAtJ2000" time elapsed: 00:00:00
+----------------------------------------------------------
+
+18/33 Testing: EphemerisTest.JupiterNearMeanLongitudeAtJ2000
+18/33 Test: EphemerisTest.JupiterNearMeanLongitudeAtJ2000
+Command: "/root/SolarSystem-3D-WASM/build-test/tests/SolarSystemTests" "--gtest_filter=EphemerisTest.JupiterNearMeanLongitudeAtJ2000" "--gtest_also_run_disabled_tests"
+Directory: /root/SolarSystem-3D-WASM/build-test/tests
+"EphemerisTest.JupiterNearMeanLongitudeAtJ2000" start time: Jul 21 12:03 CEST
+Output:
+----------------------------------------------------------
+Running main() from /root/SolarSystem-3D-WASM/build-test/_deps/googletest-src/googletest/src/gtest_main.cc
+Note: Google Test filter = EphemerisTest.JupiterNearMeanLongitudeAtJ2000
+[==========] Running 1 test from 1 test suite.
+[----------] Global test environment set-up.
+[----------] 1 test from EphemerisTest
+[ RUN      ] EphemerisTest.JupiterNearMeanLongitudeAtJ2000
+[       OK ] EphemerisTest.JupiterNearMeanLongitudeAtJ2000 (0 ms)
+[----------] 1 test from EphemerisTest (0 ms total)
+
+[----------] Global test environment tear-down
+[==========] 1 test from 1 test suite ran. (9 ms total)
+[  PASSED  ] 1 test.
+<end of output>
+Test time =   0.04 sec
+----------------------------------------------------------
+Test Passed.
+"EphemerisTest.JupiterNearMeanLongitudeAtJ2000" end time: Jul 21 12:03 CEST
+"EphemerisTest.JupiterNearMeanLongitudeAtJ2000" time elapsed: 00:00:00
+----------------------------------------------------------
+
+19/33 Testing: EphemerisTest.EarthAdvancesAboutOneDegreePerDay
+19/33 Test: EphemerisTest.EarthAdvancesAboutOneDegreePerDay
+Command: "/root/SolarSystem-3D-WASM/build-test/tests/SolarSystemTests" "--gtest_filter=EphemerisTest.EarthAdvancesAboutOneDegreePerDay" "--gtest_also_run_disabled_tests"
+Directory: /root/SolarSystem-3D-WASM/build-test/tests
+"EphemerisTest.EarthAdvancesAboutOneDegreePerDay" start time: Jul 21 12:03 CEST
+Output:
+----------------------------------------------------------
+Running main() from /root/SolarSystem-3D-WASM/build-test/_deps/googletest-src/googletest/src/gtest_main.cc
+Note: Google Test filter = EphemerisTest.EarthAdvancesAboutOneDegreePerDay
+[==========] Running 1 test from 1 test suite.
+[----------] Global test environment set-up.
+[----------] 1 test from EphemerisTest
+[ RUN      ] EphemerisTest.EarthAdvancesAboutOneDegreePerDay
+[       OK ] EphemerisTest.EarthAdvancesAboutOneDegreePerDay (0 ms)
+[----------] 1 test from EphemerisTest (0 ms total)
+
+[----------] Global test environment tear-down
+[==========] 1 test from 1 test suite ran. (0 ms total)
+[  PASSED  ] 1 test.
+<end of output>
+Test time =   0.04 sec
+----------------------------------------------------------
+Test Passed.
+"EphemerisTest.EarthAdvancesAboutOneDegreePerDay" end time: Jul 21 12:03 CEST
+"EphemerisTest.EarthAdvancesAboutOneDegreePerDay" time elapsed: 00:00:00
+----------------------------------------------------------
+
+20/33 Testing: EphemerisTest.PlutoHasReasonableDistance
+20/33 Test: EphemerisTest.PlutoHasReasonableDistance
+Command: "/root/SolarSystem-3D-WASM/build-test/tests/SolarSystemTests" "--gtest_filter=EphemerisTest.PlutoHasReasonableDistance" "--gtest_also_run_disabled_tests"
+Directory: /root/SolarSystem-3D-WASM/build-test/tests
+"EphemerisTest.PlutoHasReasonableDistance" start time: Jul 21 12:03 CEST
+Output:
+----------------------------------------------------------
+Running main() from /root/SolarSystem-3D-WASM/build-test/_deps/googletest-src/googletest/src/gtest_main.cc
+Note: Google Test filter = EphemerisTest.PlutoHasReasonableDistance
+[==========] Running 1 test from 1 test suite.
+[----------] Global test environment set-up.
+[----------] 1 test from EphemerisTest
+[ RUN      ] EphemerisTest.PlutoHasReasonableDistance
+[       OK ] EphemerisTest.PlutoHasReasonableDistance (0 ms)
+[----------] 1 test from EphemerisTest (0 ms total)
+
+[----------] Global test environment tear-down
+[==========] 1 test from 1 test suite ran. (0 ms total)
+[  PASSED  ] 1 test.
+<end of output>
+Test time =   0.03 sec
+----------------------------------------------------------
+Test Passed.
+"EphemerisTest.PlutoHasReasonableDistance" end time: Jul 21 12:03 CEST
+"EphemerisTest.PlutoHasReasonableDistance" time elapsed: 00:00:00
+----------------------------------------------------------
+
+End testing: Jul 21 12:03 CEST

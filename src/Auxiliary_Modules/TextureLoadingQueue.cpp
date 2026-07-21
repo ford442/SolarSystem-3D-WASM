@@ -209,3 +209,23 @@ void TextureLoadingQueue::CancelLoad(const std::string& path) {
         std::cout << "[TextureLoadingQueue] Cancel requested for " << path << std::endl;
     }
 }
+
+#ifdef SOLARSYSTEM_BUILD_TESTS
+void TextureLoadingQueue::ResetForTests() {
+    while (!_queue.empty()) {
+        _queue.pop();
+    }
+    _activeLoads = 0;
+    _maxConcurrentLoads = 2;
+    _memoryBackpressureActive = false;
+    _currentPath.clear();
+    _pendingPaths.clear();
+    _cancelledPaths.clear();
+    _totalQueued = 0;
+    _totalCompleted = 0;
+    _totalFailed = 0;
+    _totalCancelled = 0;
+    _categoryQueued = {};
+    _categoryCompleted = {};
+}
+#endif

@@ -10,7 +10,7 @@ void Application::InitStarSystem() {
 
     _starGlowShader = make_unique<Shader>("resource/shaders/starGlow.vs", "resource/shaders/starGlow.fs");
     StarInfo sunInfo(*_sphereModel, *_mainStarShader, *_starGlowShader, TextureImage2D("resource/textures_low/Star_Spectrum_Low.dds"),
-                     starTemperatureInKelvin, 696342.0, glm::vec3(0.99607843, 0.890196078, 0.725490196), L"Sun", L"Солнце");
+                     _starTemperatureInKelvin, 696342.0, glm::vec3(0.99607843, 0.890196078, 0.725490196), L"Sun", L"Солнце");
     _sun = make_shared<Sun>(sunInfo);
 
 #ifdef __EMSCRIPTEN__
@@ -36,7 +36,7 @@ void Application::InitMercury(const MeshHolder& sphereModel) {
             }, TextureImage2D(GetTexturePath(TexturePaths::Mercury::Normal.low, TexturePaths::Mercury::Normal.high)), L"Mercury", L"Меркурий", TextureImage2D(GetTexturePath(TexturePaths::Mercury::Specular.low, TexturePaths::Mercury::Specular.high)));
     shared_ptr<Planet> mercury = make_shared<Mercury>(mercuryInfo, _sun);
 
-    const glm::mat4 lightProjection = glm::ortho(-mercury->GetRadius() * 3.0f, mercury->GetRadius() * 3.0f, -mercury->GetRadius() * 3.0f, mercury->GetRadius() * 3.0f, camera.GetNear(), camera.GetFar());
+    const glm::mat4 lightProjection = glm::ortho(-mercury->GetRadius() * 3.0f, mercury->GetRadius() * 3.0f, -mercury->GetRadius() * 3.0f, mercury->GetRadius() * 3.0f, _camera.GetNear(), _camera.GetFar());
     const glm::mat4 lightView = glm::lookAt(_sun->GetPosition(), mercury->GetPosition() - _sun->GetPosition(), glm::vec3(0.0, 1.0, 0.0));
     const glm::mat4 lightSpaceMatrix = lightProjection * lightView;
 
@@ -56,7 +56,7 @@ void Application::InitVenus(const MeshHolder& sphereModel) {
     AtmosphereInfo venusAtmosphereInfo(sphereModel, *_mainAtmosphereShader, 1.1, glm::vec3(203/255.f, 158/255.f, 69/255.), venus->GetRadius() - 0.00007, 1.995);
     unique_ptr<Atmosphere> venusAtmosphere = make_unique<Atmosphere>(venusAtmosphereInfo, venus);
 
-    const glm::mat4 lightProjection = glm::ortho(-venus->GetRadius() * 3.0f, venus->GetRadius() * 3.0f, -venus->GetRadius() * 3.0f, venus->GetRadius() * 3.0f, camera.GetNear(), camera.GetFar());
+    const glm::mat4 lightProjection = glm::ortho(-venus->GetRadius() * 3.0f, venus->GetRadius() * 3.0f, -venus->GetRadius() * 3.0f, venus->GetRadius() * 3.0f, _camera.GetNear(), _camera.GetFar());
     const glm::mat4 lightView = glm::lookAt(_sun->GetPosition(), venus->GetPosition() - _sun->GetPosition(), glm::vec3(0.0, 1.0, 0.0));
     const glm::mat4 lightSpaceMatrix = lightProjection * lightView;
 
@@ -93,7 +93,7 @@ void Application::InitEarthSystem(const MeshHolder& sphereModel) {
                                TextureImage2D("resource/textures_low/Earth_Clouds_Normal_Low.dds"));
     unique_ptr<Clouds> earthClouds = make_unique<EarthClouds>(earthCloudsInfo, earth);
 
-    const glm::mat4 lightProjection = glm::ortho(-earth->GetRadius() * 3.0f, earth->GetRadius() * 3.0f, -earth->GetRadius() * 3.0f, earth->GetRadius() * 3.0f, camera.GetNear(), camera.GetFar());
+    const glm::mat4 lightProjection = glm::ortho(-earth->GetRadius() * 3.0f, earth->GetRadius() * 3.0f, -earth->GetRadius() * 3.0f, earth->GetRadius() * 3.0f, _camera.GetNear(), _camera.GetFar());
     const glm::mat4 lightView = glm::lookAt(_sun->GetPosition(), earth->GetPosition() - _sun->GetPosition(), glm::vec3(0.0, 1.0, 0.0));
     const glm::mat4 lightSpaceMatrix = lightProjection * lightView;
 
@@ -130,7 +130,7 @@ void Application::InitMarsSystem(const MeshHolder& sphereModel) {
     AtmosphereInfo marsAtmosphereInfo(sphereModel, *_mainAtmosphereShader, 0.583, glm::vec3(0.976, 0.302, 0.208), mars->GetRadius() - 0.00007, 1.113);
     unique_ptr<Atmosphere> marsAtmosphere = make_unique<Atmosphere>(marsAtmosphereInfo, mars);
 
-    const glm::mat4 lightProjection = glm::ortho(-mars->GetRadius() * 3.0f, mars->GetRadius() * 3.0f, -mars->GetRadius() * 3.0f, mars->GetRadius() * 3.0f, camera.GetNear(),
+    const glm::mat4 lightProjection = glm::ortho(-mars->GetRadius() * 3.0f, mars->GetRadius() * 3.0f, -mars->GetRadius() * 3.0f, mars->GetRadius() * 3.0f, _camera.GetNear(),
                                                  glm::length(_sun->GetPosition() - mars->GetPosition()) + 50.f);
     const glm::mat4 lightView = glm::lookAt(_sun->GetPosition(), mars->GetPosition() - _sun->GetPosition(), glm::vec3(0.0, 1.0, 0.0));
     const glm::mat4 lightSpaceMatrix = lightProjection * lightView;
@@ -171,7 +171,7 @@ void Application::InitJupiterSystem(const MeshHolder& sphereModel) {
     AtmosphereInfo jupiterAtmosphereInfo(sphereModel, *_mainAtmosphereShader, 11.4, glm::vec3(153.f/255, 139.f/255, 120.f/255), jupiter->GetRadius() - 0.00007, 23.35);
     unique_ptr<Atmosphere> jupiterAtmosphere = make_unique<Atmosphere>(jupiterAtmosphereInfo, jupiter);
 
-    const glm::mat4 lightProjection = glm::ortho(-jupiter->GetRadius() * 3.0f, jupiter->GetRadius() * 3.0f, -jupiter->GetRadius() * 3.0f, jupiter->GetRadius() * 3.0f, camera.GetNear(), camera.GetFar());
+    const glm::mat4 lightProjection = glm::ortho(-jupiter->GetRadius() * 3.0f, jupiter->GetRadius() * 3.0f, -jupiter->GetRadius() * 3.0f, jupiter->GetRadius() * 3.0f, _camera.GetNear(), _camera.GetFar());
     const glm::mat4 lightView = glm::lookAt(_sun->GetPosition(), jupiter->GetPosition() - _sun->GetPosition(), glm::vec3(0.0, 1.0, 0.0));
     const glm::mat4 lightSpaceMatrix = lightProjection * lightView;
 
@@ -230,7 +230,7 @@ void Application::InitSaturnSystem(const MeshHolder& sphereModel) {
                                        glm::vec3(0.36862745, 0.0666667, 0.0196078)); 
     unique_ptr<Atmosphere> titanAtmosphere = make_unique<Atmosphere>(titanAtmosphereInfo, titan);
 
-    const glm::mat4 lightProjection = glm::ortho(-saturn->GetRadius() * 3.0f, saturn->GetRadius() * 3.0f, -saturn->GetRadius() * 3.0f, saturn->GetRadius() * 3.0f, camera.GetNear(), camera.GetFar());
+    const glm::mat4 lightProjection = glm::ortho(-saturn->GetRadius() * 3.0f, saturn->GetRadius() * 3.0f, -saturn->GetRadius() * 3.0f, saturn->GetRadius() * 3.0f, _camera.GetNear(), _camera.GetFar());
     const glm::mat4 lightView = glm::lookAt(_sun->GetPosition(), saturn->GetPosition() - _sun->GetPosition(), glm::vec3(0.0, 1.0, 0.0));
     const glm::mat4 lightSpaceMatrix = lightProjection * lightView;
 
@@ -290,7 +290,7 @@ void Application::InitUranusSystem(const MeshHolder& sphereModel) {
     AtmosphereInfo uranusAtmosphereInfo(sphereModel, *_mainAtmosphereShader, 4.0, glm::vec3(45.f/255, 101.f/255, 114.f/255), uranus->GetRadius() - 0.00007, 8.1);
     unique_ptr<Atmosphere> uranusAtmosphere = make_unique<Atmosphere>(uranusAtmosphereInfo, uranus);
 
-    const glm::mat4 lightProjection = glm::ortho(-uranus->GetRadius() * 3.0f, uranus->GetRadius() * 3.0f, -uranus->GetRadius() * 3.0f, uranus->GetRadius() * 3.0f, camera.GetNear(), camera.GetFar());
+    const glm::mat4 lightProjection = glm::ortho(-uranus->GetRadius() * 3.0f, uranus->GetRadius() * 3.0f, -uranus->GetRadius() * 3.0f, uranus->GetRadius() * 3.0f, _camera.GetNear(), _camera.GetFar());
     const glm::mat4 lightView = glm::lookAt(_sun->GetPosition(), uranus->GetPosition() - _sun->GetPosition(), glm::vec3(0.0, 1.0, 0.0));
     const glm::mat4 lightSpaceMatrix = lightProjection * lightView;
 
@@ -329,7 +329,7 @@ void Application::InitNeptuneSystem(const MeshHolder& sphereModel) {
     AtmosphereInfo neptuneAtmosphereInfo(sphereModel, *_mainAtmosphereShader, 3.9, glm::vec3(62.f/255, 92.f/255, 169.f/255), neptune->GetRadius() - 0.00007, 7.9);
     unique_ptr<Atmosphere> neptuneAtmosphere = make_unique<Atmosphere>(neptuneAtmosphereInfo, neptune);
 
-    const glm::mat4 lightProjection = glm::ortho(-neptune->GetRadius() * 3.0f, neptune->GetRadius() * 3.0f, -neptune->GetRadius() * 3.0f, neptune->GetRadius() * 3.0f, camera.GetNear(), camera.GetFar());
+    const glm::mat4 lightProjection = glm::ortho(-neptune->GetRadius() * 3.0f, neptune->GetRadius() * 3.0f, -neptune->GetRadius() * 3.0f, neptune->GetRadius() * 3.0f, _camera.GetNear(), _camera.GetFar());
     const glm::mat4 lightView = glm::lookAt(_sun->GetPosition(), neptune->GetPosition() - _sun->GetPosition(), glm::vec3(0.0, 1.0, 0.0));
     const glm::mat4 lightSpaceMatrix = lightProjection * lightView;
 
@@ -363,7 +363,7 @@ void Application::InitPlutoSystem(const MeshHolder& sphereModel) {
                                        glm::vec3(35.f/255, 52.f/255, 220.f/255));
     unique_ptr<Atmosphere> plutoAtmosphere = make_unique<Atmosphere>(plutoAtmosphereInfo, pluto);
 
-    const glm::mat4 lightProjection = glm::ortho(-pluto->GetRadius() * 3.0f, pluto->GetRadius() * 3.0f, -pluto->GetRadius() * 3.0f, pluto->GetRadius() * 3.0f, camera.GetNear(), camera.GetFar());
+    const glm::mat4 lightProjection = glm::ortho(-pluto->GetRadius() * 3.0f, pluto->GetRadius() * 3.0f, -pluto->GetRadius() * 3.0f, pluto->GetRadius() * 3.0f, _camera.GetNear(), _camera.GetFar());
     const glm::mat4 lightView = glm::lookAt(_sun->GetPosition(), pluto->GetPosition() - _sun->GetPosition(), glm::vec3(0.0, 1.0, 0.0));
     const glm::mat4 lightSpaceMatrix = lightProjection * lightView;
 

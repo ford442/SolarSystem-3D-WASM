@@ -468,12 +468,45 @@ not grow the live WebGL texture count because `ReloadTexture` deletes the textur
 Retreating while a request is active should instead log cancellation at 90 world units (the 1.8x
 hysteresis boundary), and the progress overlay must still settle.
 
-`.github/workflows/texture-verification.yml` runs this gate for every pull request targeting
-`main`. CI installs Emscripten and Puppeteer's Chrome, builds WASM with
-`./build-web.sh --no-emsdk`, builds and serves the Vite production bundle, waits for port 4173,
-and invokes `npm run test:textures`. Chrome is launched headlessly with
-`--use-gl=angle`, `--use-angle=swiftshader`, and `--enable-unsafe-swiftshader`, so the WebGL 2
-check does not require a hardware GPU on the runner.
+**CI gates for pull requests to `main`:**
+
+- `.github/workflows/web-build.yml` — fast compile gate. Installs Emscripten 6.0.0, runs
+  `./build-web.sh --no-emsdk`, then `npx tsc && npx vite build` in `web/`. Fails on WASM link
+  errors, broken `--preload-file` paths, `EXPORTED_FUNCTIONS` mismatches, or TypeScript/Vite
+  issues. Uploads `web/dist` as a build artifact. A parallel job builds `web/threejs`.
+  The `unit-tests` job runs GoogleTest via `ctest`. The `build-web` job also serves the Vite
+  production bundle and runs `npm run test:smoke` (Playwright) to verify WASM boot, exported JS
+  helpers, and staged-loading reactions to `window.setCameraPose`.
+- `.github/workflows/native-linux-build.yml` — native binary smoke test plus the same GoogleTest
+  suite (`ctest` after `-DSOLARSYSTEM_BUILD_TESTS=ON`).
+- `.github/workflows/texture-verification.yml` — runtime texture regression gate. Also builds
+  WASM and the Vite bundle, then starts the preview server on port 4173 and invokes
+  `npm run test:textures` via Puppeteer/Chrome. Chrome is launched headlessly with
+  `--use-gl=angle`, `--use-angle=swiftshader`, and `--enable-unsafe-swiftshader`, so the WebGL 2
+  check does not require a hardware GPU on the runner.
+
+### Automated tests (local)
+
+**Native C++ unit tests** (GoogleTest, behind `SOLARSYSTEM_BUILD_TESTS`):
+
+```bash
+cmake -G Ninja -DCMAKE_BUILD_TYPE=Release -DSOLARSYSTEM_BUILD_TESTS=ON -B build-test
+cmake --build build-test --target SolarSystemTests
+ctest --test-dir build-test --output-on-failure
+```
+
+Coverage today: `OrbitLayout`, `QualitySettings`, `PlanetManifestLoader`, and
+`TextureLoadingQueue` enqueue/dedup/cancel logic.
+
+**Web smoke test** (Playwright, production bundle):
+
+```bash
+./build-web.sh --no-emsdk
+cd web && npm ci && npx tsc && npx vite build
+npx playwright install chromium
+npm run preview -- --host 127.0.0.1 &
+SMOKE_TEST_URL=http://127.0.0.1:4173/solar-system/ npm run test:smoke
+```
 
 ### 11. Verification Commands / JS Helpers
 - Teleport list (approximate centers):
