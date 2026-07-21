@@ -7,8 +7,8 @@ from, and does not replace, the C++/Emscripten WebGL 2 renderer.
 
 - Phase 0: complete — Vite/TypeScript, `WebGPURenderer`, WebGL fallback, procedural Earth.
 - Phase 1: complete — shared orbital JSON, DDS→KTX2 pipeline, Mercury through Mars,
-  focus presets, OrbitControls, and damped WASD flight.
-- Next: low→high texture streaming, labels/proxies for outer planets, and simplified effects.
+  focus presets, OrbitControls, damped WASD flight, and distance-driven low→high texture LOD.
+- Next: labels/proxies for outer planets and simplified effects.
 - WebXR spike: on the **WebGLRenderer** fallback, Three's `VRButton` is attached (`renderer.xr.enabled`). The primary WASM app owns the full immersive-vr path — see `docs/plans/WEBXR_PLAN.md`.
 
 ## Run
@@ -44,22 +44,34 @@ the JSON values remain in C++ world units so a future shared generator can consu
 
 ## KTX2 assets
 
-By default textures load from the local Vite path:
+Low-tier textures always load from the bundled Vite path:
 
 ```text
 /solar-system/webgpu/textures/ktx2/<name>.ktx2
 ```
 
-Point the same build at a CORS-enabled CDN or object-storage prefix with:
+High-tier textures load when the camera is within 50 scene units (downgrade beyond 100 units).
+By default the companion looks for local high stubs at:
+
+```text
+/solar-system/webgpu/textures/ktx2/high/<name>.ktx2
+```
+
+Point high-tier fetches at a CORS-enabled CDN or object-storage prefix with:
 
 ```bash
 VITE_KTX2_BASE=https://cdn.example.com/solar-system/ktx2/ npm run dev
 ```
 
+When `VITE_KTX2_BASE` is set, low textures still come from the bundled `textures/ktx2/`
+path while upgrades fetch from the CDN prefix above.
+
 Generate or refresh the local stubs:
 
 ```bash
-npm run assets:transcode
+npm run assets:transcode        # low tier from resource/textures_low
+npm run assets:transcode:high   # high tier from resource/textures (or dev 128×128 stubs)
+npm run assets:transcode:all    # both tiers
 ```
 
 Convert arbitrary legacy DDS files (DXT1, DXT3, DXT5, or 32-bit RGBA) with:
@@ -67,7 +79,8 @@ Convert arbitrary legacy DDS files (DXT1, DXT3, DXT5, or 32-bit RGBA) with:
 ```bash
 node scripts/transcode-dds-to-ktx2.mjs \
   ../../../resource/textures/Mercury_Diffuse.dds \
-  --output public/textures/ktx2
+  --tier high \
+  --output public/textures/ktx2/high
 ```
 
 The script preserves existing BC compression blocks when possible and writes standards-based KTX2.

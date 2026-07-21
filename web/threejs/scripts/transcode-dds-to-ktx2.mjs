@@ -1,4 +1,4 @@
-import { mkdir, readFile, writeFile } from 'node:fs/promises';
+import { access, mkdir, readFile, writeFile } from 'node:fs/promises';
 import { basename, dirname, extname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import {
@@ -16,22 +16,44 @@ import {
 const scriptDirectory = dirname(fileURLToPath(import.meta.url));
 const projectRoot = resolve(scriptDirectory, '..');
 const repositoryRoot = resolve(projectRoot, '../..');
-const defaultInputs = [
-  'Mercury_Diffuse_Low.dds',
-  'Venus_Diffuse_Low.dds',
-  'Earth_Day_Diffuse_Low.dds',
-  'Mars_Diffuse_Low.dds',
-].map((name) => resolve(repositoryRoot, 'resource/textures_low', name));
 
 function readOption(name) {
   const index = process.argv.indexOf(name);
   return index >= 0 ? process.argv[index + 1] : undefined;
 }
 
-const outputDirectory = resolve(projectRoot, readOption('--output') ?? 'public/textures/ktx2');
-const cliInputs = process.argv.slice(2).filter((value, index, args) =>
-  !value.startsWith('--') && args[index - 1] !== '--output');
+const tier = readOption('--tier') === 'high' ? 'high' : 'low';
+const outputDirectory = resolve(
+  projectRoot,
+  readOption('--output') ?? (tier === 'high' ? 'public/textures/ktx2/high' : 'public/textures/ktx2'),
+);
+
+const lowDefaults = [
+  'Mercury_Diffuse_Low.dds',
+  'Venus_Diffuse_Low.dds',
+  'Earth_Day_Diffuse_Low.dds',
+  'Mars_Diffuse_Low.dds',
+].map((name) => resolve(repositoryRoot, 'resource/textures_low', name));
+
+const highDefaults = [
+  'Mercury_Diffuse.dds',
+  'Venus_Diffuse.dds',
+  'Earth_Day_Diffuse.dds',
+  'Mars_Diffuse.dds',
+].map((name) => resolve(repositoryRoot, 'resource/textures', name));
+
+const defaultInputs = tier === 'high' ? highDefaults : lowDefaults;
+const cliInputs = process.argv
+  .slice(2)
+  .filter((value, index, args) => !value.startsWith('--') && args[index - 1] !== '--output' && args[index - 1] !== '--tier');
 const inputs = cliInputs.length > 0 ? cliInputs.map((path) => resolve(path)) : defaultInputs;
+
+const devHighPalette = {
+  Mercury_Diffuse: [0xc9, 0xb8, 0x9f],
+  Venus_Diffuse: [0xe2, 0xb0, 0x66],
+  Earth_Day_Diffuse: [0x4f, 0x9a, 0xd9],
+  Mars_Diffuse: [0xc9, 0x63, 0x42],
+};
 
 function fourCC(view, offset) {
   return String.fromCharCode(view.getUint8(offset), view.getUint8(offset + 1), view.getUint8(offset + 2), view.getUint8(offset + 3));
@@ -123,12 +145,77 @@ function createKTX2(dds) {
   return write(container);
 }
 
+function createSyntheticDds(width, height, rgb) {
+  const pixels = new Uint8Array(width * height * 4);
+  for (let y = 0; y < height; y++) {
+    for (let x = 0; x < width; x++) {
+      const checker = ((x >> 4) ^ (y >> 4)) & 1;
+      const index = (y * width + x) * 4;
+      const mix = checker ? 1 : 0.72;
+      pixels[index] = Math.round(rgb[0] * mix);
+      pixels[index + 1] = Math.round(rgb[1] * mix);
+      pixels[index + 2] = Math.round(rgb[2] * mix);
+      pixels[index + 3] = 255;
+    }
+  }
+
+  const header = new Uint8Array(128);
+  const view = new DataView(header.buffer);
+  view.setUint32(0, 0x20534444, true);
+  view.setUint32(4, 124, true);
+  view.setUint32(8, 0xa1007, true);
+  view.setUint32(12, height, true);
+  view.setUint32(16, width, true);
+  view.setUint32(20, width * height * 4, true);
+  view.setUint32(28, 1, true);
+  view.setUint32(76, 32, true);
+  view.setUint32(80, 0x41, true);
+  view.setUint32(88, 32, true);
+  view.setUint32(92, 0x00ff0000, true);
+  view.setUint32(96, 0x0000ff00, true);
+  view.setUint32(100, 0x000000ff, true);
+  view.setUint32(104, 0xff000000, true);
+
+  return new Uint8Array([...header, ...pixels]);
+}
+
+async function fileExists(path) {
+  try {
+    await access(path);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+async function resolveInputPath(input) {
+  if (await fileExists(input)) {
+    return input;
+  }
+
+  if (tier !== 'high') {
+    throw new Error(`Missing DDS input: ${input}`);
+  }
+
+  const stem = basename(input, extname(input));
+  const palette = devHighPalette[stem];
+  if (!palette) {
+    throw new Error(`Missing high-res DDS input and no dev palette for ${stem}`);
+  }
+
+  console.warn(`[transcode] ${input} missing — generating 128×128 dev high stub`);
+  return createSyntheticDds(128, 128, palette);
+}
+
 await mkdir(outputDirectory, { recursive: true });
-for (const input of inputs) {
-  if (extname(input).toLowerCase() !== '.dds') throw new Error(`Expected a .dds input: ${input}`);
-  const dds = parseDDS(new Uint8Array(await readFile(input)));
-  const outputName = basename(input, extname(input)).replace(/_Low$/, '') + '.ktx2';
+for (const inputPath of inputs) {
+  const resolved = await resolveInputPath(inputPath);
+  const bytes = resolved instanceof Uint8Array ? resolved : new Uint8Array(await readFile(resolved));
+  const dds = parseDDS(bytes);
+  const stem = basename(inputPath, extname(inputPath)).replace(/_Low$/, '');
+  const outputName = `${stem}.ktx2`;
   const output = resolve(outputDirectory, outputName);
   await writeFile(output, createKTX2(dds));
-  console.log(`${input} -> ${output} (${dds.width}x${dds.height}, ${dds.levels.length} mip level(s))`);
+  const sourceLabel = typeof resolved === 'string' ? resolved : `${stem} (synthetic dev high)`;
+  console.log(`${sourceLabel} -> ${output} (${dds.width}x${dds.height}, ${dds.levels.length} mip level(s))`);
 }
