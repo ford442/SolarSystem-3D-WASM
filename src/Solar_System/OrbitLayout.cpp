@@ -1,6 +1,6 @@
 #include "OrbitLayout.h"
 
-#include "Auxiliary_Modules/Ephemeris.h"
+#include "../Auxiliary_Modules/Ephemeris.h"
 
 #include <algorithm>
 #include <cmath>

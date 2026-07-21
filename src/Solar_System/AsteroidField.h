@@ -2,7 +2,7 @@
 #define SOLARSYSTEM_ASTEROIDFIELD_H
 
 #include "AsteroidOrbit.h"
-#include "Auxiliary_Modules/Shader.h"
+#include "../Auxiliary_Modules/Shader.h"
 #include <glm/glm.hpp>
 #include <memory>
 #include <vector>
