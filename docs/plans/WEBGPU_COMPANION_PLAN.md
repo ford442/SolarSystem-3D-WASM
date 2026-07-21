@@ -46,7 +46,7 @@ A full WebGPU port of the custom C++ renderer (Emdawnwebgpu / webgpu.h / WGSL) w
 - [x] Load KTX2 from local stubs or `VITE_KTX2_BASE` CDN/object-storage prefix.
 - [x] Render Mercury, Venus, Earth, and Mars with labels and smooth focus presets.
 - [x] Add OrbitControls plus damped WASD/Space/C flight approximating the C++ camera feel.
-- [ ] Add distance-driven low→high texture replacement after production KTX2 assets are published.
+- [x] Add distance-driven low→high texture replacement after production KTX2 assets are published.
 
 **Exit criteria:** Inner planets render with low→high res swap on approach.
 
@@ -161,5 +161,6 @@ Alternative: long-lived branch `feature/webgpu-companion` if folder pollution is
 |------|---------|-------|
 | 2026-06-22 | 0 | Scaffold `web/threejs/`: Vite+TS, WebGPURenderer+WebGL fallback, single textured Earth sphere (procedural canvas), OrbitControls, sun light. Local dev verified. No C++ changes. README + plan log updated. |
 | 2026-07-14 | 1 | Shared inner-planet orbital JSON, DDS→KTX2 conversion and local stubs, CDN-aware KTX2Loader, Mercury–Mars scene, focus presets, and damped flight controls. No C++ changes. |
+| 2026-07-21 | 1b | Distance-driven low→high KTX2 LOD in `web/threejs/src/textureLod.ts` (50u upgrade / 100u downgrade, single in-flight load, texture dispose). Dual-tier transcode (`--tier high`), `VITE_KTX2_BASE` for production high-res CDN, dev 128×128 high stubs. No C++ changes. |
 
 _Update this table at the end of each work session._

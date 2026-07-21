@@ -5,7 +5,9 @@
   "type": "module",
   "scripts": {
     "assets:prepare": "node scripts/prepare-assets.mjs",
-    "assets:transcode": "node scripts/transcode-dds-to-ktx2.mjs",
+    "assets:transcode": "node scripts/transcode-dds-to-ktx2.mjs --tier low",
+    "assets:transcode:high": "node scripts/transcode-dds-to-ktx2.mjs --tier high",
+    "assets:transcode:all": "npm run assets:transcode && npm run assets:transcode:high",
     "dev": "npm run assets:prepare && vite",
     "build": "npm run assets:prepare && tsc && vite build",
     "preview": "vite preview"

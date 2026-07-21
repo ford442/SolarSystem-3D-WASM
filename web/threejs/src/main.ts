@@ -5,6 +5,11 @@ import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { KTX2Loader } from 'three/addons/loaders/KTX2Loader.js';
 import { VRButton } from 'three/addons/webxr/VRButton.js';
 import orbitalParametersJson from './data/orbital-parameters.json';
+import {
+  PlanetTextureLodManager,
+  type PlanetTextureLodTarget,
+  type TextureTier,
+} from './textureLod';
 
 interface OrbitalBody {
   id: string;
@@ -27,6 +32,7 @@ interface PlanetView {
   mesh: THREE.Mesh<THREE.SphereGeometry, THREE.MeshPhongMaterial>;
   label: HTMLElement;
   visualRadius: number;
+  textureTarget: PlanetTextureLodTarget;
 }
 
 interface CameraTransition {
@@ -46,8 +52,9 @@ const focusElement = requiredElement('focus-presets');
 const textureStatusElement = requiredElement('texture-status');
 const canvas = requiredCanvas('scene');
 
-const textureBase = withTrailingSlash(
-  import.meta.env.VITE_KTX2_BASE?.trim() || `${import.meta.env.BASE_URL}textures/ktx2/`,
+const lowTextureBase = withTrailingSlash(`${import.meta.env.BASE_URL}textures/ktx2/`);
+const highTextureBase = withTrailingSlash(
+  import.meta.env.VITE_KTX2_BASE?.trim() || `${import.meta.env.BASE_URL}textures/ktx2/high/`,
 );
 const transcoderBase = withTrailingSlash(`${import.meta.env.BASE_URL}basis/`);
 const scene = new THREE.Scene();
@@ -60,12 +67,15 @@ camera.position.set(0, 1250, 3600);
 let renderer: CompanionRenderer;
 let controls: OrbitControls;
 let ktx2Loader: KTX2Loader;
+let textureLodManager: PlanetTextureLodManager;
 let cameraTransition: CameraTransition | null = null;
 const planets: PlanetView[] = [];
 const pressedKeys = new Set<string>();
 const cameraVelocity = new THREE.Vector3();
 const timer = new THREE.Timer();
 timer.connect(document);
+
+const tierCounts: Record<TextureTier, number> = { low: 0, high: 0 };
 
 async function init(): Promise<void> {
   const rendererResult = await createRenderer(canvas);
@@ -92,6 +102,16 @@ async function init(): Promise<void> {
     .setWorkerLimit(2)
     .detectSupport(renderer);
 
+  textureLodManager = new PlanetTextureLodManager(ktx2Loader, () => {
+    tierCounts.low = 0;
+    tierCounts.high = 0;
+    for (const planet of planets) {
+      const tier = textureLodManager.getActiveTier(planet.parameters.id);
+      tierCounts[tier]++;
+    }
+    updateTextureStatus();
+  });
+
   addLighting();
   addStarfield();
   createSolarSystem();
@@ -99,10 +119,9 @@ async function init(): Promise<void> {
   bindInput();
   onResize();
 
-  infoElement.textContent = `Phase 1 · ${rendererResult.backend} · 4 inner planets`;
-  textureStatusElement.textContent = `KTX2 base: ${textureBase}`;
+  infoElement.textContent = `Phase 1 · ${rendererResult.backend} · 4 inner planets · texture LOD`;
+  updateTextureStatus();
 
-  // WebXR spike on the classic WebGLRenderer path (see docs/plans/WEBXR_PLAN.md).
   if (renderer instanceof THREE.WebGLRenderer) {
     renderer.xr.enabled = true;
     const vrButton = VRButton.createButton(renderer);
@@ -114,7 +133,8 @@ async function init(): Promise<void> {
   console.info('[threejs-companion] Phase 1 ready', {
     backend: rendererResult.backend,
     orbitalSource: orbitalParameters.source,
-    textureBase,
+    lowTextureBase,
+    highTextureBase,
   });
 }
 
@@ -182,10 +202,24 @@ function createSolarSystem(): void {
     label.textContent = parameters.name;
     label.addEventListener('click', () => focusPlanet(parameters.id));
     document.body.appendChild(label);
-    planets.push({ parameters, mesh, label, visualRadius });
 
-    void loadPlanetTexture(parameters, material);
+    const textureTarget: PlanetTextureLodTarget = {
+      id: parameters.id,
+      name: parameters.name,
+      mesh,
+      worldPosition: mesh.position,
+      lowUrl: textureUrl(parameters.texture, lowTextureBase),
+      highUrl: textureUrl(parameters.texture, highTextureBase),
+    };
+
+    const planet: PlanetView = { parameters, mesh, label, visualRadius, textureTarget };
+    planets.push(planet);
+    textureLodManager.register(textureTarget);
   }
+}
+
+function textureUrl(fileName: string, base: string): string {
+  return new URL(fileName, new URL(base, window.location.href)).toString();
 }
 
 function addOrbitGuide(radius: number): void {
@@ -198,30 +232,10 @@ function addOrbitGuide(radius: number): void {
   scene.add(new THREE.Line(geometry, new THREE.LineBasicMaterial({ color: 0x25314a, transparent: true, opacity: 0.45 })));
 }
 
-async function loadPlanetTexture(parameters: OrbitalBody, material: THREE.MeshPhongMaterial): Promise<void> {
-  const url = new URL(parameters.texture, new URL(textureBase, window.location.href)).toString();
-  try {
-    const texture = await ktx2Loader.loadAsync(url);
-    texture.colorSpace = THREE.SRGBColorSpace;
-    texture.anisotropy = 4;
-    material.map = texture;
-    material.color.set(0xffffff);
-    material.needsUpdate = true;
-    console.info(`[texture] ${parameters.name} KTX2 loaded`, url);
-    updateTextureProgress();
-  } catch (error) {
-    console.warn(`[texture] ${parameters.name} KTX2 unavailable; retaining color stub.`, url, error);
-    updateTextureProgress(true);
-  }
-}
-
-let texturesSettled = 0;
-let textureFailures = 0;
-function updateTextureProgress(failed = false): void {
-  texturesSettled++;
-  if (failed) textureFailures++;
-  const failureText = textureFailures > 0 ? ` · ${textureFailures} color fallback` : '';
-  textureStatusElement.textContent = `KTX2 ${texturesSettled}/${orbitalParameters.bodies.length}${failureText}`;
+function updateTextureStatus(): void {
+  const highBaseLabel = import.meta.env.VITE_KTX2_BASE?.trim() ? 'CDN high' : 'local high';
+  textureStatusElement.textContent =
+    `LOD low ${tierCounts.low} · high ${tierCounts.high} · ${highBaseLabel}: ${highTextureBase}`;
 }
 
 function createFocusPresets(): void {
@@ -326,6 +340,7 @@ function animate(now: number): void {
   if (!cameraTransition) updateFlyCamera(deltaSeconds);
   for (const planet of planets) planet.mesh.rotation.y += planet.parameters.rotationRate * deltaSeconds * 60;
   controls.update();
+  textureLodManager.update(camera, planets.map((planet) => planet.textureTarget));
   updateLabels();
   renderer.render(scene, camera);
 }
