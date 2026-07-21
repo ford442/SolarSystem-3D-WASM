@@ -18,7 +18,6 @@ struct BodyData {
     float siderealRotationDays; // negative => retrograde
 };
 
-constexpr float kAuToSceneUnits = 1900.0f; // 1 AU ≈ Earth's compressed orbit radius
 constexpr float kEarthYearDays = 365.25f;
 
 // NASA fact-sheet averages for periods/inclination/sidereal day.
@@ -129,6 +128,46 @@ float GetAuDistance(Body body) {
     return kBodies[bodyIndex(body)].auDistance;
 }
 
+float AuToSceneDistance(float au) {
+    if (au <= 0.0f) {
+        return 0.0f;
+    }
+    if (g_scaleMode == ScaleMode::Realistic) {
+        return au * kAuToSceneUnits;
+    }
+
+    // Piecewise-linear remap through planet compressed orbit radii so the
+    // main belt (and comets) sit between Mars and Jupiter in art scale.
+    struct Key {
+        float au;
+        float scene;
+    };
+    const Key keys[] = {
+        {GetAuDistance(Body::Mercury), glm::length(GetCompressedOffset(Body::Mercury))},
+        {GetAuDistance(Body::Venus), glm::length(GetCompressedOffset(Body::Venus))},
+        {GetAuDistance(Body::Earth), glm::length(GetCompressedOffset(Body::Earth))},
+        {GetAuDistance(Body::Mars), glm::length(GetCompressedOffset(Body::Mars))},
+        {GetAuDistance(Body::Jupiter), glm::length(GetCompressedOffset(Body::Jupiter))},
+        {GetAuDistance(Body::Saturn), glm::length(GetCompressedOffset(Body::Saturn))},
+        {GetAuDistance(Body::Uranus), glm::length(GetCompressedOffset(Body::Uranus))},
+        {GetAuDistance(Body::Neptune), glm::length(GetCompressedOffset(Body::Neptune))},
+        {GetAuDistance(Body::Pluto), glm::length(GetCompressedOffset(Body::Pluto))},
+    };
+    constexpr int keyCount = static_cast<int>(sizeof(keys) / sizeof(keys[0]));
+
+    if (au <= keys[0].au) {
+        return keys[0].scene * (au / keys[0].au);
+    }
+    for (int i = 0; i < keyCount - 1; ++i) {
+        if (au <= keys[i + 1].au) {
+            const float t = (au - keys[i].au) / (keys[i + 1].au - keys[i].au);
+            return keys[i].scene + t * (keys[i + 1].scene - keys[i].scene);
+        }
+    }
+    const Key& last = keys[keyCount - 1];
+    return last.scene * (au / last.au);
+}
+
 float GetOrbitalPeriodDays(Body body) {
     return kBodies[bodyIndex(body)].orbitalPeriodDays;
 }
@@ -145,7 +184,7 @@ float GetOrbitRadius(Body body) {
     if (g_scaleMode == ScaleMode::Compressed) {
         return glm::length(compressed);
     }
-    return GetAuDistance(body) * kAuToSceneUnits;
+    return AuToSceneDistance(GetAuDistance(body));
 }
 
 float GetSceneDistance(Body body) {

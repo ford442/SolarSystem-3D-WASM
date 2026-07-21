@@ -352,6 +352,7 @@ void Application::RunOneFrame() {
     RenderOrbitPaths();
     RenderStarCorona();
     ProcessSceneComponentsRendering();
+    RenderAsteroidField();
 #ifdef __EMSCRIPTEN__
     RenderPlanetProxyMarkers();
 #endif
@@ -443,6 +444,11 @@ void Application::InitSceneObjects() {
                 FlareSprite{false, 2.75, 2.0, 7}
             }});
     _orbitPathRenderer = make_unique<OrbitPathRenderer>();
+    {
+        const auto asteroidQuality = GetQualitySettings(g_qualityPreset, g_isMobileWeb);
+        _asteroidField = make_unique<AsteroidField>(AsteroidField::kDefaultSeed,
+                                                    asteroidQuality.asteroidInstanceCount);
+    }
 
     InitSongList();
     InitStarSystem();
@@ -751,6 +757,9 @@ void Application::ApplyOrbitScaleMode(int mode) {
     const auto scaleMode = mode == 1 ? OrbitLayout::ScaleMode::Realistic : OrbitLayout::ScaleMode::Compressed;
     OrbitLayout::SetScaleMode(scaleMode);
     RefreshPlanetProxyPositions();
+    if (_asteroidField) {
+        _asteroidField->Update(0.0f); // rebuild instance matrices for new AU→scene mapping
+    }
     std::cout << "[OrbitScale] " << (scaleMode == OrbitLayout::ScaleMode::Realistic ? "realistic" : "compressed")
               << " distances active" << std::endl;
 }
@@ -792,6 +801,20 @@ void Application::RenderOrbitPaths() const {
 
     glDepthMask(GL_TRUE);
     glDisable(GL_BLEND);
+}
+
+void Application::RenderAsteroidField() {
+    if (!_asteroidField || !_sun) {
+        return;
+    }
+
+    _asteroidField->Update(gSimDeltaSeconds);
+
+    static const float zCoef = static_cast<float>(2.0 / glm::log2(_camera.GetFar() + 1.0));
+    _asteroidField->Render(_cameraProjection, _cameraView,
+                           _sun->GetPosition(), _camera.GetPosition(),
+                           _camera.GetRightVector(), _camera.GetUpVector(),
+                           zCoef);
 }
 
 void Application::FocusPlanetByIndex(int idx) {
@@ -1148,6 +1171,9 @@ void Application::ApplyQualityPreset(int preset) {
     }
 
     ApplyRenderResources(settings.shadowResolution, settings.enableHdr);
+    if (_asteroidField) {
+        _asteroidField->SetInstanceCount(settings.asteroidInstanceCount);
+    }
     LogQualityTier(settings, _hdrEnabled, gShadowQuality);
 }
 

@@ -15,7 +15,7 @@ Canonical architecture reference for contributors. For build commands and deploy
 
 The web build adds async resource loading, staged planet initialization, and distance-based texture LOD. The native build loads everything synchronously at startup with full-resolution textures only.
 
-**Graphics features:** atmospheric scattering, PCF/ray-traced shadows, cloud shadows, lens flare, HDR, normal mapping, planetary rings.
+**Graphics features:** atmospheric scattering, PCF/ray-traced shadows, cloud shadows, lens flare, HDR, normal mapping, planetary rings, instanced main-belt asteroid field + comet tails.
 
 ---
 

@@ -28,6 +28,13 @@ enum class ScaleMode : int {
 /** Wall seconds for one Earth orbit at timeScale == 1. */
 constexpr float kEarthOrbitSecondsAt1x = 120.0f;
 
+/** 1 AU in scene units (matches Earth's compressed orbit radius). */
+constexpr float kAuToSceneUnits = 1900.0f;
+
+/** Main-belt semi-major axis range in AU (approximate). */
+constexpr float kMainBeltInnerAu = 2.1f;
+constexpr float kMainBeltOuterAu = 3.3f;
+
 void SetScaleMode(ScaleMode mode);
 ScaleMode GetScaleMode();
 
@@ -50,6 +57,13 @@ glm::vec3 GetOffset(Body body);
 
 /** Semi-major axis in astronomical units (NASA fact-sheet averages). */
 float GetAuDistance(Body body);
+
+/**
+ * Map a heliocentric AU distance to scene units for the active scale mode.
+ * Realistic: au * kAuToSceneUnits.
+ * Compressed: piecewise-linear through planet art orbit radii.
+ */
+float AuToSceneDistance(float au);
 
 /** Orbit radius in scene units (scale-mode aware; independent of anomaly). */
 float GetOrbitRadius(Body body);
