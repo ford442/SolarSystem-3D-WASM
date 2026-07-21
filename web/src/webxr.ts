@@ -80,12 +80,19 @@ export async function initWebXr(options: {
   const xr = navigator.xr;
   if (!xr || typeof xr.isSessionSupported !== 'function') {
     enterVrButton.hidden = true;
+    console.log('[WebXR] navigator.xr unavailable — staying 2D');
     return null;
   }
 
+  console.log('[WebXR] Checking immersive-vr support…');
   let supported = false;
   try {
-    supported = await xr.isSessionSupported('immersive-vr');
+    supported = await Promise.race([
+      xr.isSessionSupported('immersive-vr'),
+      new Promise<boolean>((resolve) => {
+        window.setTimeout(() => resolve(false), 2000);
+      }),
+    ]);
   } catch (error) {
     console.warn('[WebXR] isSessionSupported failed:', error);
     enterVrButton.hidden = true;
@@ -94,6 +101,7 @@ export async function initWebXr(options: {
 
   if (!supported) {
     enterVrButton.hidden = true;
+    console.log('[WebXR] immersive-vr not supported — staying 2D');
     return null;
   }
 
