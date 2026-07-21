@@ -195,6 +195,12 @@ extern "C" {
     EMSCRIPTEN_KEEPALIVE float GetCameraPositionZ() {
         return activeApplication ? activeApplication->GetCamera().GetPosition().z : 0.0f;
     }
+    EMSCRIPTEN_KEEPALIVE float GetCameraYaw() {
+        return activeApplication ? activeApplication->GetCamera().GetYaw() : -90.0f;
+    }
+    EMSCRIPTEN_KEEPALIVE float GetCameraPitch() {
+        return activeApplication ? activeApplication->GetCamera().GetPitch() : 0.0f;
+    }
 }
 #endif
 

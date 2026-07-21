@@ -140,7 +140,10 @@
         <div id="explorer-body-list" class="explorer-body-list" role="listbox" aria-label="Celestial bodies"></div>
 
         <article id="planet-info-card" class="planet-info-card" hidden>
-          <h2 id="planet-info-title" class="planet-info-title">Earth</h2>
+          <div id="planet-info-header" class="planet-info-header">
+            <h2 id="planet-info-title" class="planet-info-title">Earth</h2>
+            <button id="planet-info-dismiss" class="planet-info-dismiss" type="button" aria-label="Dismiss info card">×</button>
+          </div>
           <p id="planet-info-summary" class="planet-info-summary"></p>
           <dl id="planet-info-facts" class="planet-info-facts"></dl>
         </article>
@@ -231,6 +234,7 @@
           </label>
 
           <button id="settings-reset" class="settings-reset" type="button">Reset settings</button>
+          <button id="copy-view-link" class="settings-share" type="button">Copy link to this view</button>
           <button id="enter-vr" class="settings-vr" type="button" hidden>Enter VR</button>
           <button id="exit-vr" class="settings-vr settings-vr-exit" type="button" hidden>Exit VR</button>
         </fieldset>

@@ -8,6 +8,7 @@ import Module, {
 import { initTouchControls, isMobileLikeDevice } from './touchControls'
 import { PlanetExplorer } from './planetExplorer'
 import { initWebXr } from './webxr'
+import { copyShareableLink, parseDeepLinkFromUrl } from './deepLink'
 
 // Emscripten 6 prefers resizable WebAssembly buffers when the browser exposes
 // toResizableBuffer(). Current Chrome DOM/WebGL APIs reject views backed by
@@ -47,6 +48,7 @@ const musicVolumeInput = document.getElementById('music-volume') as HTMLInputEle
 const musicVolumeValue = document.getElementById('music-volume-value') as HTMLOutputElement;
 const musicMutedInput = document.getElementById('music-muted') as HTMLInputElement;
 const settingsReset = document.getElementById('settings-reset') as HTMLButtonElement;
+const copyViewLinkButton = document.getElementById('copy-view-link') as HTMLButtonElement;
 const settingsStatus = document.getElementById('settings-status') as HTMLElement;
 const enterVrButton = document.getElementById('enter-vr') as HTMLButtonElement;
 const exitVrButton = document.getElementById('exit-vr') as HTMLButtonElement;
@@ -271,15 +273,25 @@ function syncSimulationDateFromRuntime(): void {
     simulationDateInput.value = isoDateFromJulianDate(jd);
 }
 
-function qualityFromUrl(): QualityPreset | undefined {
-    const params = new URLSearchParams(window.location.search);
-    const value = params.get('quality') ?? params.get('q');
-    if (!value) return undefined;
-    const normalized = value.toLowerCase();
-    if (normalized === 'low' || normalized === '0') return 0;
-    if (normalized === 'medium' || normalized === 'med' || normalized === '1') return 1;
-    if (normalized === 'full' || normalized === '2') return 2;
-    return undefined;
+function deepLinkReaders() {
+    return {
+        getQualityPreset: () => (window.getQualityPreset?.() ?? 2) as QualityPreset,
+        getTimeScale: () => window.getTimeScale?.() ?? 1,
+        getPaused: () => window.getPaused?.() ?? 0,
+        getSimulationEpoch: () => window.getSimulationEpoch?.() ?? 0,
+        getOrbitScaleMode: () => (window.getOrbitScaleMode?.() ?? 0) as OrbitScaleMode,
+        getShadowQuality: () => window.getShadowQuality?.() ?? 0,
+        getOrbitLines: () => window.getOrbitLines?.() ?? 0,
+        getFocusedPlanetIndex: () => window.getFocusedPlanetIndex?.() ?? -1,
+        getCameraPosition: () => ({
+            x: window.getCameraPositionX?.() ?? 0,
+            y: window.getCameraPositionY?.() ?? 0,
+            z: window.getCameraPositionZ?.() ?? 0,
+        }),
+        getCameraYaw: () => window.getCameraYaw?.() ?? -90,
+        getCameraPitch: () => window.getCameraPitch?.() ?? 0,
+        isoDateFromJulianDate,
+    };
 }
 
 function setPanelCollapsed(collapsed: boolean): void {
@@ -360,7 +372,10 @@ Module(moduleConfig).then((instance) => {
     window.getCameraPositionX = instance.cwrap('GetCameraPositionX', 'number', []);
     window.getCameraPositionY = instance.cwrap('GetCameraPositionY', 'number', []);
     window.getCameraPositionZ = instance.cwrap('GetCameraPositionZ', 'number', []);
+    window.getCameraYaw = instance.cwrap('GetCameraYaw', 'number', []);
+    window.getCameraPitch = instance.cwrap('GetCameraPitch', 'number', []);
 
+    const deepLink = parseDeepLinkFromUrl();
     const explorer = new PlanetExplorer(explorerPanel);
     void explorer.init({
         focusPlanet: window.focusPlanet,
@@ -369,6 +384,9 @@ Module(moduleConfig).then((instance) => {
         getPlanetSceneDistance: window.getPlanetSceneDistance,
         getOrbitScaleMode: () => (window.getOrbitScaleMode?.() ?? 0) as OrbitScaleMode,
         setOrbitScaleMode: window.setOrbitScaleMode,
+    }, {
+        skipPlanetRestore: deepLink.planet !== undefined || deepLink.camera !== undefined,
+        initialOrbitScale: deepLink.orbitScale,
     }).catch((error: unknown) => {
         console.error('Failed to initialize planet explorer:', error);
     });
@@ -447,18 +465,19 @@ Module(moduleConfig).then((instance) => {
     });
 
     const saved = readPersistedSettings();
-    // An explicit URL preset wins for shareable links. On mobile, default to low
-    // when nothing was saved. Otherwise restore the user's choice.
+    // URL params win for shareable links, then localStorage, then defaults.
     const defaultQuality: QualityPreset = isMobileDevice ? 0 : 2;
-    const quality = qualityFromUrl() ?? saved.quality ?? defaultQuality;
-    const timeScale = saved.timeScale ?? window.getTimeScale();
-    const paused = saved.paused ?? Boolean(window.getPaused());
-    const shadows = saved.shadows ?? true;
-    const orbitLines = saved.orbitLines ?? true;
+    const quality = deepLink.quality ?? saved.quality ?? defaultQuality;
+    const timeScale = deepLink.timeScale ?? saved.timeScale ?? window.getTimeScale();
+    const paused = deepLink.paused ?? saved.paused ?? Boolean(window.getPaused());
+    const shadows = deepLink.shadows ?? saved.shadows ?? true;
+    const orbitLines = deepLink.orbitLines ?? saved.orbitLines ?? true;
     const musicVolumePercent = saved.musicVolume ?? Math.round((window.getMusicVolume?.() ?? 0.3) * 100);
     const musicMuted = saved.musicMuted ?? Boolean(window.getMusicMuted?.());
-    const simulationDate = saved.simulationDate
+    const simulationDate = deepLink.simulationDate
+        ?? saved.simulationDate
         ?? (window.getSimulationEpoch ? isoDateFromJulianDate(window.getSimulationEpoch()) : isoDateUtcNow());
+    const orbitScale = deepLink.orbitScale;
 
     qualitySelect.value = String(quality);
     timeScaleInput.value = String(Math.log10(timeScale));
@@ -473,6 +492,9 @@ Module(moduleConfig).then((instance) => {
     window.setQualityPreset(quality);
     window.setTimeScale(timeScale);
     window.setPaused(paused);
+    if (orbitScale === 0 || orbitScale === 1) {
+        window.setOrbitScaleMode?.(orbitScale);
+    }
     {
         const jd = julianDateFromIsoDate(simulationDate);
         if (jd !== undefined) {
@@ -485,6 +507,22 @@ Module(moduleConfig).then((instance) => {
     if (!musicMuted) {
         window.setMusicVolume?.(musicVolumePercent / 100);
     }
+
+    if (deepLink.camera) {
+        window.setCameraPose?.(
+            deepLink.camera.x,
+            deepLink.camera.y,
+            deepLink.camera.z,
+            deepLink.camera.yaw,
+            deepLink.camera.pitch,
+        );
+    } else if (deepLink.planet !== undefined) {
+        window.focusPlanet?.(deepLink.planet);
+    }
+    if (deepLink.planet !== undefined) {
+        explorer.applyDeepLinkPlanet(deepLink.planet, { focusCamera: false });
+    }
+
     settingsFieldset.disabled = false;
     settingsStatus.textContent = 'Controls ready';
     persistPanelSettings();
@@ -557,6 +595,17 @@ Module(moduleConfig).then((instance) => {
         }
         settingsStatus.textContent = musicMutedInput.checked ? 'Music muted' : 'Music unmuted';
         persistPanelSettings();
+    });
+
+    copyViewLinkButton.addEventListener('click', () => {
+        void copyShareableLink(deepLinkReaders())
+            .then(() => {
+                settingsStatus.textContent = 'View link copied to clipboard';
+            })
+            .catch((error: unknown) => {
+                console.warn('[DeepLink] copy failed:', error);
+                settingsStatus.textContent = 'Could not copy link';
+            });
     });
 
     settingsReset.addEventListener('click', () => {

@@ -252,6 +252,23 @@ input {
   background: rgba(255, 255, 255, 0.13);
 }
 
+.settings-share {
+  width: 100%;
+  min-height: 44px;
+  margin-top: 8px;
+  color: #e8f7ff;
+  background: rgba(30, 90, 130, 0.35);
+  border: 1px solid rgba(120, 200, 255, 0.35);
+  border-radius: 8px;
+  cursor: pointer;
+  touch-action: manipulation;
+  font-weight: 600;
+}
+
+.settings-share:hover {
+  background: rgba(40, 110, 160, 0.45);
+}
+
 .settings-vr {
   width: 100%;
   min-height: 44px;
@@ -402,9 +419,42 @@ input {
   border-radius: 10px;
 }
 
+.planet-info-card.is-focused {
+  border-color: rgba(137, 209, 255, 0.45);
+  box-shadow: 0 0 0 1px rgba(137, 209, 255, 0.12);
+}
+
+.planet-info-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
 .planet-info-title {
-  margin: 0 0 8px;
+  margin: 0;
   font-size: 1.2rem;
+  line-height: 1.25;
+}
+
+.planet-info-dismiss {
+  flex: 0 0 auto;
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  color: #c7e9ff;
+  font-size: 1.4rem;
+  line-height: 1;
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(137, 209, 255, 0.2);
+  border-radius: 8px;
+  cursor: pointer;
+  touch-action: manipulation;
+}
+
+.planet-info-dismiss:hover {
+  background: rgba(255, 255, 255, 0.12);
 }
 
 .planet-info-summary {
@@ -463,6 +513,7 @@ input {
   .settings-slider,
   .settings-switch,
   .settings-reset,
+  .settings-share,
   .settings-date-btn {
     min-height: 48px;
   }
