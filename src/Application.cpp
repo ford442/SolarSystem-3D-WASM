@@ -9,11 +9,12 @@
 #include <SDL_image.h>
 #include <algorithm>
 #include <array>
-#include <fstream>
-#include <random>
 #include <cstring>
+#include <fstream>
 #include <iomanip>
 #include <iostream>
+#include <random>
+#include <glm/gtc/type_ptr.hpp>
 
 using namespace std;
 
@@ -148,6 +149,51 @@ extern "C" {
     }
     EMSCRIPTEN_KEEPALIVE int GetOrbitLines() {
         return activeApplication && activeApplication->GetOrbitLinesEnabled() ? 1 : 0;
+    }
+
+    // --- WebXR stereo control surface ---
+    EMSCRIPTEN_KEEPALIVE void SetXrSessionActive(int active) {
+        if (!activeApplication) {
+            return;
+        }
+        activeApplication->SetXrActive(active != 0);
+        if (active) {
+            emscripten_pause_main_loop();
+        } else {
+            emscripten_resume_main_loop();
+        }
+    }
+    EMSCRIPTEN_KEEPALIVE void SetXrEyeCount(int count) {
+        if (activeApplication) {
+            activeApplication->SetXrEyeCount(count);
+        }
+    }
+    EMSCRIPTEN_KEEPALIVE void SetXrEyeViewport(int eye, int x, int y, int width, int height) {
+        if (activeApplication) {
+            activeApplication->SetXrEyeViewport(eye, x, y, width, height);
+        }
+    }
+    EMSCRIPTEN_KEEPALIVE float* GetXrMatrixScratch() {
+        return activeApplication ? activeApplication->GetXrMatrixScratch() : nullptr;
+    }
+    EMSCRIPTEN_KEEPALIVE void CommitXrEyeMatrices(int eye) {
+        if (activeApplication) {
+            activeApplication->CommitXrEyeMatrices(eye);
+        }
+    }
+    EMSCRIPTEN_KEEPALIVE void RunXrFrame() {
+        if (activeApplication) {
+            activeApplication->RunOneFrame();
+        }
+    }
+    EMSCRIPTEN_KEEPALIVE float GetCameraPositionX() {
+        return activeApplication ? activeApplication->GetCamera().GetPosition().x : 0.0f;
+    }
+    EMSCRIPTEN_KEEPALIVE float GetCameraPositionY() {
+        return activeApplication ? activeApplication->GetCamera().GetPosition().y : 0.0f;
+    }
+    EMSCRIPTEN_KEEPALIVE float GetCameraPositionZ() {
+        return activeApplication ? activeApplication->GetCamera().GetPosition().z : 0.0f;
     }
 }
 #endif
@@ -308,7 +354,12 @@ void Application::RunOneFrame() {
     _fpsHandler.RunFrameTimer();
 
     if (_appState == AppState::LOADING) {
-        glBindFramebuffer(GL_FRAMEBUFFER, 0);
+#ifdef __EMSCRIPTEN__
+        if (!_xr.active)
+#endif
+        {
+            glBindFramebuffer(GL_FRAMEBUFFER, 0);
+        }
         glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
         glClear(GL_COLOR_BUFFER_BIT);
         
@@ -321,7 +372,12 @@ void Application::RunOneFrame() {
              _appState = AppState::RUNNING;
         }
 
-        glfwSwapBuffers(_mainWindow);
+#ifdef __EMSCRIPTEN__
+        if (!_xr.active)
+#endif
+        {
+            glfwSwapBuffers(_mainWindow);
+        }
         glfwPollEvents();
 #ifndef __EMSCRIPTEN__
         _fpsHandler.WaitForFrameTimer();
@@ -341,29 +397,32 @@ void Application::RunOneFrame() {
 
     _camera.UpdateTransition(_deltaTime);
 
-    glBindFramebuffer(GL_FRAMEBUFFER, 0);
-    glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-
     ProcessInput(_mainWindow);
     UpdatePlanetSystemLoading();
     UpdateLOD();
-    ConfigureMainShaders();
-    _skyBox->Render(*_mainSkyBoxShader);
-    RenderOrbitPaths();
-    RenderStarCorona();
-    ProcessSceneComponentsRendering();
-    RenderAsteroidField();
+
 #ifdef __EMSCRIPTEN__
-    RenderPlanetProxyMarkers();
+    if (_xr.active) {
+        RenderXrStereoFrame();
+        TextureLoadingQueue::GetInstance().ProcessQueue();
+#ifdef SOLARSYSTEM_USE_SDL_MIXER
+        UpdateBackgroundMusic();
 #endif
-    RenderStarEffects();
+        UpdateSearchNearestPlanet();
+        glfwPollEvents();
+        return;
+    }
+#endif
+
+    glBindFramebuffer(GL_FRAMEBUFFER, 0);
+    glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+    RenderFrameContent();
 
     if (_isRenderPlanetStarDistances || _isRenderSatelliteDistances)
         RenderPlanetSatelliteStarDistances();
     if (_isRenderHints)
         RenderHints();
 
-    // Process texture loading queue
     TextureLoadingQueue::GetInstance().ProcessQueue();
     RenderTextureLoadingProgress();
 
@@ -379,6 +438,23 @@ void Application::RunOneFrame() {
 
 #ifndef __EMSCRIPTEN__
     _fpsHandler.WaitForFrameTimer();
+#endif
+}
+
+void Application::RenderFrameContent() {
+    ConfigureMainShaders();
+    _skyBox->Render(*_mainSkyBoxShader);
+    RenderOrbitPaths();
+    RenderStarCorona();
+    ProcessSceneComponentsRendering();
+    RenderAsteroidField();
+#ifdef __EMSCRIPTEN__
+    if (!_xr.active) {
+        RenderPlanetProxyMarkers();
+        RenderStarEffects();
+    }
+#else
+    RenderStarEffects();
 #endif
 }
 
@@ -1203,6 +1279,64 @@ void Application::ApplyShadowQuality(int quality) {
     ApplyRenderResources(settings.shadowResolution, settings.enableHdr);
     LogQualityTier(settings, _hdrEnabled, gShadowQuality);
 }
+
+#ifdef __EMSCRIPTEN__
+void Application::SetXrActive(bool active) {
+    _xr.active = active;
+    _xr.currentEye = 0;
+    if (!active) {
+        _xr.eyeCount = 0;
+        glBindFramebuffer(GL_FRAMEBUFFER, 0);
+        glViewport(0, 0, _displayWidth, _displayHeight);
+        glDisable(GL_SCISSOR_TEST);
+    }
+    std::cout << "[WebXR] session " << (active ? "active" : "inactive") << std::endl;
+}
+
+void Application::SetXrEyeCount(int count) {
+    _xr.eyeCount = std::clamp(count, 0, 2);
+}
+
+void Application::SetXrEyeViewport(int eye, int x, int y, int width, int height) {
+    if (eye < 0 || eye > 1) {
+        return;
+    }
+    auto& e = _xr.eyes[eye];
+    e.viewportX = x;
+    e.viewportY = y;
+    e.viewportWidth = std::max(width, 1);
+    e.viewportHeight = std::max(height, 1);
+}
+
+float* Application::GetXrMatrixScratch() {
+    return _xr.matrixScratch;
+}
+
+void Application::CommitXrEyeMatrices(int eye) {
+    if (eye < 0 || eye > 1) {
+        return;
+    }
+    auto& e = _xr.eyes[eye];
+    std::memcpy(glm::value_ptr(e.view), _xr.matrixScratch, 16 * sizeof(float));
+    std::memcpy(glm::value_ptr(e.projection), _xr.matrixScratch + 16, 16 * sizeof(float));
+}
+
+void Application::RenderXrStereoFrame() {
+    // JS has already bound the XRWebGLLayer framebuffer and cleared it.
+    const int eyes = std::clamp(_xr.eyeCount, 0, 2);
+    for (int eye = 0; eye < eyes; ++eye) {
+        _xr.currentEye = eye;
+        const auto& e = _xr.eyes[eye];
+        glViewport(e.viewportX, e.viewportY, e.viewportWidth, e.viewportHeight);
+        glEnable(GL_SCISSOR_TEST);
+        glScissor(e.viewportX, e.viewportY, e.viewportWidth, e.viewportHeight);
+        glClear(GL_DEPTH_BUFFER_BIT);
+        glDisable(GL_SCISSOR_TEST);
+        RenderFrameContent();
+    }
+    _xr.currentEye = 0;
+}
+#endif
 
 Application::~Application() {
     if (activeApplication == this) {

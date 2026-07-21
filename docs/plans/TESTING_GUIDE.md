@@ -382,6 +382,8 @@ http://localhost:4173/solar-system/?quality=full
 
 `window.setQualityPreset(0|1|2)` changes LOD, shadow resolution, and queue concurrency at runtime. Reload with the corresponding URL to change MSAA.
 
+**WebXR:** Entering VR forces the **medium** preset (or keeps **low**). Because MSAA is fixed at context creation, launch with `?quality=medium` (or low) before clicking **Enter VR** for the best headset framerate. See [WEBXR_PLAN.md](WEBXR_PLAN.md).
+
 #### Measurable medium-vs-full check
 
 1. Open each URL in a fresh tab and confirm the `[Quality]` console line:

@@ -168,6 +168,7 @@ set(SOLARSYSTEM_SOURCES
     src/Solar_System/AsteroidOrbit.h
     src/Solar_System/AsteroidField.cpp
     src/Solar_System/AsteroidField.h
+    src/XrState.h
 )
 
 if(WIN32)
@@ -228,7 +229,7 @@ if(EMSCRIPTEN)
         "SHELL:--preload-file ${CMAKE_SOURCE_DIR}/resource/textures_low@/resource/textures_low"
         "SHELL:-sMODULARIZE=1"
         "SHELL:-sEXPORT_ES6=1"
-        "SHELL:-sEXPORTED_RUNTIME_METHODS=['ccall','cwrap']"
+        "SHELL:-sEXPORTED_RUNTIME_METHODS=['ccall','cwrap','HEAPF32']"
         "SHELL:-sEXPORTED_FUNCTIONS=['_main']"
     )
 

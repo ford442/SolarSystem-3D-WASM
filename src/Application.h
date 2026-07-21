@@ -6,6 +6,7 @@
 #include "Solar_System/AsteroidField.h"
 #include "Solar_System/SolarSystem.h"
 #include "SystemModules.h"
+#include "XrState.h"
 #include <atomic>
 #include <functional>
 #include <unordered_set>
@@ -26,7 +27,15 @@ public:
     Application();
     ~Application();
     void Exec();
-    void RunOneFrame(); // For Emscripten main loop
+    void RunOneFrame(); // For Emscripten main loop / XR RAF
+#ifdef __EMSCRIPTEN__
+    void SetXrActive(bool active);
+    bool IsXrActive() const { return _xr.active; }
+    void SetXrEyeCount(int count);
+    void SetXrEyeViewport(int eye, int x, int y, int width, int height);
+    float* GetXrMatrixScratch();
+    void CommitXrEyeMatrices(int eye);
+#endif
     void ApplyQualityPreset(int preset);
     void ApplyShadowQuality(int quality);
     void ApplyOrbitScaleMode(int mode);
@@ -60,6 +69,10 @@ private:
     bool _isRenderSatelliteDistances = true;
     bool _isVertSyncEnabled = true;
     bool _orbitLinesEnabled = true;
+
+#ifdef __EMSCRIPTEN__
+    XrFrameState _xr;
+#endif
 
     enum class AppState { LOADING, RUNNING };
     AppState _appState = AppState::LOADING;
@@ -151,6 +164,10 @@ private:
     void RenderPlanetProxyMarkers() const; // Show orbital markers for unloaded planets (WASM)
     void RenderOrbitPaths() const;
     void RenderAsteroidField();
+    void RenderFrameContent(); // Sky → planets → effects (one eye / mono)
+#ifdef __EMSCRIPTEN__
+    void RenderXrStereoFrame();
+#endif
     void StartSearchNearestPlanet();
     void UpdateSearchNearestPlanet(); // For Emscripten frame-based search
     void StartPlayBackgroundMusic();

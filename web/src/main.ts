@@ -7,6 +7,7 @@ import Module, {
 } from './SolarSystem.js'
 import { initTouchControls, isMobileLikeDevice } from './touchControls'
 import { PlanetExplorer } from './planetExplorer'
+import { initWebXr } from './webxr'
 
 // Emscripten 6 prefers resizable WebAssembly buffers when the browser exposes
 // toResizableBuffer(). Current Chrome DOM/WebGL APIs reject views backed by
@@ -47,6 +48,8 @@ const musicVolumeValue = document.getElementById('music-volume-value') as HTMLOu
 const musicMutedInput = document.getElementById('music-muted') as HTMLInputElement;
 const settingsReset = document.getElementById('settings-reset') as HTMLButtonElement;
 const settingsStatus = document.getElementById('settings-status') as HTMLElement;
+const enterVrButton = document.getElementById('enter-vr') as HTMLButtonElement;
+const exitVrButton = document.getElementById('exit-vr') as HTMLButtonElement;
 const explorerPanel = document.getElementById('explorer-panel') as HTMLElement;
 const deployedBaseUrl = new URL(import.meta.env.BASE_URL, window.location.href);
 const isMobileDevice = isMobileLikeDevice();
@@ -297,6 +300,12 @@ for (const eventName of ['pointerdown', 'pointerup', 'click', 'keydown', 'keyup'
 
 const moduleConfig: SolarSystemModuleConfig = {
     canvas: canvas,
+    // Request an XR-compatible context up front so makeXRCompatible() can succeed.
+    contextAttributes: {
+        xrCompatible: true,
+        majorVersion: 2,
+        minorVersion: 0,
+    },
     // Keep Emscripten runtime artifacts under the deployed Vite base path.
     locateFile: (path: string, prefix: string) => {
         if (path.endsWith('.wasm') || path.endsWith('.data')) {
@@ -342,6 +351,16 @@ Module(moduleConfig).then((instance) => {
     window.setOrbitLines = instance.cwrap('SetOrbitLines', null, ['number']);
     window.getOrbitLines = instance.cwrap('GetOrbitLines', 'number', []);
 
+    window.setXrSessionActive = instance.cwrap('SetXrSessionActive', null, ['number']);
+    window.setXrEyeCount = instance.cwrap('SetXrEyeCount', null, ['number']);
+    window.setXrEyeViewport = instance.cwrap('SetXrEyeViewport', null, ['number', 'number', 'number', 'number', 'number']);
+    window.getXrMatrixScratch = instance.cwrap('GetXrMatrixScratch', 'number', []);
+    window.commitXrEyeMatrices = instance.cwrap('CommitXrEyeMatrices', null, ['number']);
+    window.runXrFrame = instance.cwrap('RunXrFrame', null, []);
+    window.getCameraPositionX = instance.cwrap('GetCameraPositionX', 'number', []);
+    window.getCameraPositionY = instance.cwrap('GetCameraPositionY', 'number', []);
+    window.getCameraPositionZ = instance.cwrap('GetCameraPositionZ', 'number', []);
+
     const explorer = new PlanetExplorer(explorerPanel);
     void explorer.init({
         focusPlanet: window.focusPlanet,
@@ -375,6 +394,56 @@ Module(moduleConfig).then((instance) => {
                 window.addTouchZoom?.(delta);
             },
         },
+    });
+
+    void initWebXr({
+        canvas,
+        enterVrButton,
+        exitVrButton,
+        overlayRoots: [settingsPanel, explorerPanel],
+        bindings: {
+            setTouchMovement: (forward, right, vertical) => {
+                window.setTouchMovement?.(forward, right, vertical);
+            },
+            addTouchLook: (deltaX, deltaY) => {
+                window.addTouchLook?.(deltaX, deltaY);
+            },
+            setQualityPreset: (preset) => {
+                window.setQualityPreset?.(preset);
+            },
+            getQualityPreset: () => window.getQualityPreset?.() ?? 2,
+            getCameraPosition: () => ({
+                x: window.getCameraPositionX?.() ?? 0,
+                y: window.getCameraPositionY?.() ?? 0,
+                z: window.getCameraPositionZ?.() ?? 0,
+            }),
+            setXrSessionActive: (active) => {
+                window.setXrSessionActive?.(active ? 1 : 0);
+            },
+            setXrEyeCount: (count) => {
+                window.setXrEyeCount?.(count);
+            },
+            setXrEyeViewport: (eye, x, y, w, h) => {
+                window.setXrEyeViewport?.(eye, x, y, w, h);
+            },
+            commitXrEyeMatrices: (eye) => {
+                window.commitXrEyeMatrices?.(eye);
+            },
+            getXrMatrixScratchPtr: () => window.getXrMatrixScratch?.() ?? 0,
+            runXrFrame: () => {
+                window.runXrFrame?.();
+            },
+            getHeapF32: () => instance.HEAPF32,
+        },
+    }).then((controller) => {
+        if (controller) {
+            console.log('[WebXR] Enter VR control ready');
+        } else {
+            console.log('[WebXR] immersive-vr unavailable — staying 2D');
+        }
+    }).catch((error: unknown) => {
+        console.warn('[WebXR] init failed:', error);
+        enterVrButton.hidden = true;
     });
 
     const saved = readPersistedSettings();

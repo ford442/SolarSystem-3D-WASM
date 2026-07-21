@@ -3,6 +3,7 @@ import * as THREE from 'three';
 import { WebGPURenderer } from 'three/webgpu';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { KTX2Loader } from 'three/addons/loaders/KTX2Loader.js';
+import { VRButton } from 'three/addons/webxr/VRButton.js';
 import orbitalParametersJson from './data/orbital-parameters.json';
 
 interface OrbitalBody {
@@ -100,6 +101,15 @@ async function init(): Promise<void> {
 
   infoElement.textContent = `Phase 1 · ${rendererResult.backend} · 4 inner planets`;
   textureStatusElement.textContent = `KTX2 base: ${textureBase}`;
+
+  // WebXR spike on the classic WebGLRenderer path (see docs/plans/WEBXR_PLAN.md).
+  if (renderer instanceof THREE.WebGLRenderer) {
+    renderer.xr.enabled = true;
+    const vrButton = VRButton.createButton(renderer);
+    vrButton.style.position = 'fixed';
+    document.body.appendChild(vrButton);
+  }
+
   renderer.setAnimationLoop(animate);
   console.info('[threejs-companion] Phase 1 ready', {
     backend: rendererResult.backend,
