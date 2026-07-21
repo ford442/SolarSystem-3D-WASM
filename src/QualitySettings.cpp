@@ -21,15 +21,15 @@ std::string GetTexturePath(const std::string& lowRes, const std::string& highRes
 QualityTierSettings GetQualitySettings(int preset, bool mobile) {
     if (mobile) {
         switch (preset) {
-            case 0: return {1024, 0, 0, false, "low"};
-            case 1: return {2048, 2, 0, true, "medium"};
-            default: return {3000, 2, 0, true, "full"};
+            case 0: return {1024, 0, 0, false, 400, "low"};
+            case 1: return {2048, 2, 0, true, 900, "medium"};
+            default: return {3000, 2, 0, true, 1400, "full"};
         }
     }
     switch (preset) {
-        case 0: return {1024, 0, 0, false, "low"};
-        case 1: return {2048, 2, 0, true, "medium"};
-        default: return {3000, 4, 4, true, "full"};
+        case 0: return {1024, 0, 0, false, 600, "low"};
+        case 1: return {2048, 2, 0, true, 1800, "medium"};
+        default: return {3000, 4, 4, true, 4000, "full"};
     }
 }
 
@@ -45,6 +45,7 @@ void LogQualityTier(const QualityTierSettings& settings, bool hdrEnabled, int sh
               << " | high-res concurrency=" << settings.maxConcurrentTextureLoads
               << " | LOD distance multiplier=" << (std::strcmp(settings.name, "medium") == 0 ? 1.5f : 1.0f)
               << " | MSAA=" << settings.requestedMsaaSamples << "x"
+              << " | asteroids=" << settings.asteroidInstanceCount
               << std::defaultfloat << std::endl;
 #ifdef __EMSCRIPTEN__
     std::cout << "[Quality] WebGL MSAA is fixed when the context is created; reload with ?quality="

@@ -10,6 +10,8 @@ external/
 # Build directories
 build/
 build-web/
+build-test*/
+build-check/
 
 # Emscripten output
 *.wasm

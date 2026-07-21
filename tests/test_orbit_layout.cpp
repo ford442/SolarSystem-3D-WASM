@@ -69,11 +69,28 @@ TEST_F(OrbitLayoutTest, RealisticModeScalesOrbitRadius) {
 
     EXPECT_TRUE(Near(OrbitLayout::GetAuDistance(OrbitLayout::Body::Earth), 1.0f));
 
-    const float expectedJupiterRadius = 5.203f * 1900.0f;
+    const float expectedJupiterRadius = 5.203f * OrbitLayout::kAuToSceneUnits;
     EXPECT_TRUE(Near(OrbitLayout::GetOrbitRadius(OrbitLayout::Body::Jupiter), expectedJupiterRadius));
     EXPECT_TRUE(Near(glm::length(OrbitLayout::GetOffset(OrbitLayout::Body::Jupiter)), expectedJupiterRadius, 1.0f));
     EXPECT_GT(OrbitLayout::GetOrbitRadius(OrbitLayout::Body::Jupiter),
               glm::length(OrbitLayout::GetCompressedOffset(OrbitLayout::Body::Jupiter)));
+}
+
+TEST_F(OrbitLayoutTest, AuToSceneDistanceRealisticIsLinear) {
+    OrbitLayout::SetScaleMode(OrbitLayout::ScaleMode::Realistic);
+    EXPECT_TRUE(Near(OrbitLayout::AuToSceneDistance(1.0f), OrbitLayout::kAuToSceneUnits));
+    EXPECT_TRUE(Near(OrbitLayout::AuToSceneDistance(2.5f), 2.5f * OrbitLayout::kAuToSceneUnits));
+}
+
+TEST_F(OrbitLayoutTest, AuToSceneDistanceCompressedPlacesBeltBetweenMarsAndJupiter) {
+    OrbitLayout::SetScaleMode(OrbitLayout::ScaleMode::Compressed);
+    const float marsR = OrbitLayout::GetOrbitRadius(OrbitLayout::Body::Mars);
+    const float jupiterR = OrbitLayout::GetOrbitRadius(OrbitLayout::Body::Jupiter);
+    const float beltInner = OrbitLayout::AuToSceneDistance(OrbitLayout::kMainBeltInnerAu);
+    const float beltOuter = OrbitLayout::AuToSceneDistance(OrbitLayout::kMainBeltOuterAu);
+    EXPECT_GT(beltInner, marsR);
+    EXPECT_LT(beltOuter, jupiterR);
+    EXPECT_GT(beltOuter, beltInner);
 }
 
 TEST_F(OrbitLayoutTest, SunOffsetIsZeroInBothModes) {

@@ -12,6 +12,7 @@ struct QualityTierSettings {
     int maxConcurrentTextureLoads;
     int requestedMsaaSamples;
     bool enableHdr;
+    int asteroidInstanceCount;
     const char* name;
 };
 

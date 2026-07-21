@@ -164,6 +164,10 @@ set(SOLARSYSTEM_SOURCES
     src/Solar_System/Earth_System/EarthClouds.h
     src/Solar_System/OrbitLayout.cpp
     src/Solar_System/OrbitLayout.h
+    src/Solar_System/AsteroidOrbit.cpp
+    src/Solar_System/AsteroidOrbit.h
+    src/Solar_System/AsteroidField.cpp
+    src/Solar_System/AsteroidField.h
 )
 
 if(WIN32)

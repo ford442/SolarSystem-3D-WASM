@@ -3,6 +3,7 @@
 #include "ApplicationTypes.h"
 #include "Auxiliary_Modules/AuxiliaryModules.h"
 #include "PlanetSystemManifest.h"
+#include "Solar_System/AsteroidField.h"
 #include "Solar_System/SolarSystem.h"
 #include "SystemModules.h"
 #include <atomic>
@@ -107,6 +108,7 @@ private:
     std::unique_ptr<Shader> _hdrShader, _lensFlareShader, _starGlowShader;
     std::unique_ptr<LensFlare> _lensFlare;
     std::unique_ptr<OrbitPathRenderer> _orbitPathRenderer;
+    std::unique_ptr<AsteroidField> _asteroidField;
     std::shared_ptr<Star> _sun;
     std::vector<RenderableSceneComponent> _renderableSceneComponents;
     std::vector<std::string> _backgroundSongPaths;
@@ -148,6 +150,7 @@ private:
     void UpdateLOD();             // Central LOD manager: upgrade textures for nearest planets (WASM)
     void RenderPlanetProxyMarkers() const; // Show orbital markers for unloaded planets (WASM)
     void RenderOrbitPaths() const;
+    void RenderAsteroidField();
     void StartSearchNearestPlanet();
     void UpdateSearchNearestPlanet(); // For Emscripten frame-based search
     void StartPlayBackgroundMusic();
