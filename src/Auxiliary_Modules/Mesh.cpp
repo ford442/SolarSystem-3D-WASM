@@ -108,8 +108,8 @@ void Mesh::Draw(const Shader& shader) const {
         else if (name == "texture_height")
             number = std::to_string(heightNumber++);
 
-        // Устанавливаем сэмплер на правильный текстурный блок
-        glUniform1i(glGetUniformLocation(shader.GetProgramId(), (name + number).c_str()), i);
+        // Sampler unit binding (location resolved/cached inside Shader)
+        shader.SetInt(name + number, static_cast<int>(i));
         glBindTexture(GL_TEXTURE_2D, _textures[i].id); // Связываем текстуру
     }
 

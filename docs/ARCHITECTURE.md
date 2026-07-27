@@ -293,7 +293,7 @@ See [README.md § Runtime asset hosting](../README.md#runtime-asset-hosting) for
 |--------|------|
 | `Application` | Scene graph, render passes, loading orchestration, quality presets |
 | `SystemModules.h` | Platform-conditional OpenGL/audio includes; `glBindTextureUnit` polyfill on WASM |
-| `Shader` | GLSL compile/link; `Set*Double` casts to float on WASM |
+| `Shader` | GLSL compile/link; lazy uniform-location cache; `Set*Double` casts to float on WASM |
 
 ### 7.2 Auxiliary
 
@@ -337,6 +337,8 @@ Rebuild WASM after C++ changes: `./build-web.sh` then refresh the browser.
 | Precision | N/A | `precision highp float;` in fragments |
 | Geometry/compute shaders | Allowed | **Not supported** |
 | Double uniforms | `glUniform1d` | Cast to float via `Shader` class |
+
+**Uniform locations:** `Shader::Set*` resolves each uniform name with `glGetUniformLocation` on first use and caches the `GLint` (including `-1` for missing names) in a per-program map. Subsequent sets reuse the cache — do not call `glGetUniformLocation` at render call sites. The cache is cleared when the program is deleted (`Release` / destructor). If a re-link path is added later, clear the cache after a successful `glLinkProgram`.
 
 ### 9.2 Threading
 

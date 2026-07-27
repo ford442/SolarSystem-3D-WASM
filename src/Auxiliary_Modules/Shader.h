@@ -16,6 +16,7 @@
 #include <fstream>
 #include <sstream>
 #include <iostream>
+#include <unordered_map>
 
 class Shader {
 public:
@@ -64,7 +65,10 @@ private:
     };
 
     size_t _shaderProgramID = 0;
-    
+    // Lazy cache: first Set*/lookup resolves glGetUniformLocation; -1 misses are cached too.
+    mutable std::unordered_map<std::string, GLint> _uniformLocationCache;
+
+    GLint GetUniformLocation(const std::string& name) const;
     void Release();
 
     static void CheckCompileErrors(size_t shader, ShaderType type, const std::string& path = "");
