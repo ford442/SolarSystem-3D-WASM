@@ -25,6 +25,16 @@ namespace {
     float g_touchForward = 0.0f;
     float g_touchRight = 0.0f;
     float g_touchVertical = 0.0f;
+
+    void NotifySettingsChanged(const char* field) {
+        EM_ASM({
+            if (typeof window.onSettingsChanged === 'function') {
+                window.onSettingsChanged(UTF8ToString($0));
+            }
+        }, field);
+    }
+#else
+    void NotifySettingsChanged(const char*) {}
 #endif
 }
 
@@ -51,24 +61,28 @@ extern "C" {
         if (activeApplication) {
             activeApplication->ApplyQualityPreset(g_qualityPreset);
         }
+        NotifySettingsChanged("quality");
     }
     EMSCRIPTEN_KEEPALIVE int GetQualityPreset() {
         return g_qualityPreset;
     }
     EMSCRIPTEN_KEEPALIVE void SetTimeScale(float scale) {
         gTimeScale = glm::clamp(scale, 0.01f, 10000.0f);
+        NotifySettingsChanged("timeScale");
     }
     EMSCRIPTEN_KEEPALIVE float GetTimeScale() {
         return gTimeScale;
     }
     EMSCRIPTEN_KEEPALIVE void SetPaused(bool paused) {
         gTimePaused = paused;
+        NotifySettingsChanged("paused");
     }
     EMSCRIPTEN_KEEPALIVE int GetPaused() {
         return gTimePaused ? 1 : 0;
     }
     EMSCRIPTEN_KEEPALIVE void SetSimulationEpoch(double julianDate) {
         OrbitLayout::SetJulianDate(julianDate);
+        NotifySettingsChanged("simulationEpoch");
     }
     EMSCRIPTEN_KEEPALIVE double GetSimulationEpoch() {
         return OrbitLayout::GetJulianDate();
@@ -79,6 +93,7 @@ extern "C" {
         } else {
             gShadowQuality = std::clamp(quality, 0, 3);
         }
+        NotifySettingsChanged("shadowQuality");
     }
     EMSCRIPTEN_KEEPALIVE int GetShadowQuality() {
         return gShadowQuality;
@@ -105,6 +120,7 @@ extern "C" {
         if (activeApplication) {
             activeApplication->SetMusicVolume(volume);
         }
+        NotifySettingsChanged("musicVolume");
     }
     EMSCRIPTEN_KEEPALIVE float GetMusicVolume() {
         return activeApplication ? activeApplication->GetMusicVolume() : 0.3f;
@@ -113,6 +129,7 @@ extern "C" {
         if (activeApplication) {
             activeApplication->SetMusicMuted(muted != 0);
         }
+        NotifySettingsChanged("musicMuted");
     }
     EMSCRIPTEN_KEEPALIVE int GetMusicMuted() {
         return activeApplication && activeApplication->GetMusicMuted() ? 1 : 0;
@@ -146,6 +163,7 @@ extern "C" {
         if (activeApplication) {
             activeApplication->SetOrbitLinesEnabled(enabled != 0);
         }
+        NotifySettingsChanged("orbitLines");
     }
     EMSCRIPTEN_KEEPALIVE int GetOrbitLines() {
         return activeApplication && activeApplication->GetOrbitLinesEnabled() ? 1 : 0;
@@ -634,6 +652,7 @@ void Application::ProcessInput(GLFWwindow* window) {
 #else
         _soundEngine->setSoundVolume(clamp(_soundEngine->getSoundVolume() + 0.01, 0.0, 1.0));
 #endif
+        NotifySettingsChanged("musicVolume");
     }
     if (glfwGetKey(window, GLFW_KEY_PAGE_DOWN) == GLFW_PRESS) {
 #ifdef SOLARSYSTEM_USE_SDL_MIXER
@@ -641,6 +660,7 @@ void Application::ProcessInput(GLFWwindow* window) {
 #else
         _soundEngine->setSoundVolume(clamp(_soundEngine->getSoundVolume() - 0.01, 0.0, 1.0));
 #endif
+        NotifySettingsChanged("musicVolume");
     }
     if (glfwGetKey(window, GLFW_KEY_1) == GLFW_PRESS) {
         movementSpeed = glm::clamp(movementSpeed + 0.01f, 0.0f, 150.f);
@@ -785,12 +805,15 @@ void Application::KeyCallback(GLFWwindow* window, int key, int, int action, int)
         // Time scale / pause / step
         if (key == GLFW_KEY_EQUAL || key == GLFW_KEY_KP_ADD) {
             gTimeScale = glm::clamp(gTimeScale * 2.0f, 0.01f, 10000.0f);
+            NotifySettingsChanged("timeScale");
         }
         if (key == GLFW_KEY_MINUS || key == GLFW_KEY_KP_SUBTRACT) {
             gTimeScale = glm::clamp(gTimeScale / 2.0f, 0.01f, 10000.0f);
+            NotifySettingsChanged("timeScale");
         }
         if (key == GLFW_KEY_P) {
             gTimePaused = !gTimePaused;
+            NotifySettingsChanged("paused");
         }
         if (key == GLFW_KEY_PERIOD) {
             gAdvanceStep = true;

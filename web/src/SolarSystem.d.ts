@@ -74,196 +74,198 @@ export type GetCameraYaw = () => number;
 export type GetCameraPitch = () => number;
 
 export interface SolarSystemCwrap {
+  // BEGIN GENERATED CWARP OVERLOADS
   (
     ident: 'SetCameraPose',
     returnType: null,
     argTypes: ['number', 'number', 'number', 'number', 'number'],
-  ): SetCameraPose;
+  ): (...args: number[]) => void;
   (
     ident: 'SetQualityPreset',
     returnType: null,
     argTypes: ['number'],
-  ): SetQualityPreset;
+  ): (...args: number[]) => void;
   (
     ident: 'GetQualityPreset',
     returnType: 'number',
     argTypes: [],
-  ): GetQualityPreset;
+  ): (...args: number[]) => number;
   (
     ident: 'SetTimeScale',
     returnType: null,
     argTypes: ['number'],
-  ): SetTimeScale;
+  ): (...args: number[]) => void;
   (
     ident: 'GetTimeScale',
     returnType: 'number',
     argTypes: [],
-  ): GetTimeScale;
+  ): (...args: number[]) => number;
   (
     ident: 'SetPaused',
     returnType: null,
     argTypes: ['number'],
-  ): SetPaused;
+  ): (...args: number[]) => void;
   (
     ident: 'GetPaused',
     returnType: 'number',
     argTypes: [],
-  ): GetPaused;
+  ): (...args: number[]) => number;
   (
     ident: 'SetSimulationEpoch',
     returnType: null,
     argTypes: ['number'],
-  ): SetSimulationEpoch;
+  ): (...args: number[]) => void;
   (
     ident: 'GetSimulationEpoch',
     returnType: 'number',
     argTypes: [],
-  ): GetSimulationEpoch;
+  ): (...args: number[]) => number;
   (
     ident: 'SetShadowQuality',
     returnType: null,
     argTypes: ['number'],
-  ): SetShadowQuality;
+  ): (...args: number[]) => void;
   (
     ident: 'GetShadowQuality',
     returnType: 'number',
     argTypes: [],
-  ): GetShadowQuality;
+  ): (...args: number[]) => number;
   (
     ident: 'SetTouchMovement',
     returnType: null,
     argTypes: ['number', 'number', 'number'],
-  ): SetTouchMovement;
+  ): (...args: number[]) => void;
   (
     ident: 'AddTouchLook',
     returnType: null,
     argTypes: ['number', 'number'],
-  ): AddTouchLook;
+  ): (...args: number[]) => void;
   (
     ident: 'AddTouchZoom',
     returnType: null,
     argTypes: ['number'],
-  ): AddTouchZoom;
+  ): (...args: number[]) => void;
   (
     ident: 'IsMobileWeb',
     returnType: 'number',
     argTypes: [],
-  ): () => number;
+  ): (...args: number[]) => number;
   (
     ident: 'SetMusicVolume',
     returnType: null,
     argTypes: ['number'],
-  ): SetMusicVolume;
+  ): (...args: number[]) => void;
   (
     ident: 'GetMusicVolume',
     returnType: 'number',
     argTypes: [],
-  ): GetMusicVolume;
+  ): (...args: number[]) => number;
   (
     ident: 'SetMusicMuted',
     returnType: null,
     argTypes: ['number'],
-  ): SetMusicMuted;
+  ): (...args: number[]) => void;
   (
     ident: 'GetMusicMuted',
     returnType: 'number',
     argTypes: [],
-  ): GetMusicMuted;
+  ): (...args: number[]) => number;
   (
     ident: 'FocusPlanet',
     returnType: null,
     argTypes: ['number'],
-  ): FocusPlanet;
+  ): (...args: number[]) => void;
   (
     ident: 'SetOrbitScaleMode',
     returnType: null,
     argTypes: ['number'],
-  ): SetOrbitScaleMode;
+  ): (...args: number[]) => void;
   (
     ident: 'GetOrbitScaleMode',
     returnType: 'number',
     argTypes: [],
-  ): GetOrbitScaleMode;
+  ): (...args: number[]) => number;
   (
     ident: 'GetNearestPlanetIndex',
     returnType: 'number',
     argTypes: [],
-  ): GetNearestPlanetIndex;
+  ): (...args: number[]) => number;
   (
     ident: 'GetFocusedPlanetIndex',
     returnType: 'number',
     argTypes: [],
-  ): GetFocusedPlanetIndex;
+  ): (...args: number[]) => number;
   (
     ident: 'GetPlanetSceneDistance',
     returnType: 'number',
     argTypes: ['number'],
-  ): GetPlanetSceneDistance;
+  ): (...args: number[]) => number;
   (
     ident: 'SetOrbitLines',
     returnType: null,
     argTypes: ['number'],
-  ): SetOrbitLines;
+  ): (...args: number[]) => void;
   (
     ident: 'GetOrbitLines',
     returnType: 'number',
     argTypes: [],
-  ): GetOrbitLines;
+  ): (...args: number[]) => number;
   (
     ident: 'SetXrSessionActive',
     returnType: null,
     argTypes: ['number'],
-  ): SetXrSessionActive;
+  ): (...args: number[]) => void;
   (
     ident: 'SetXrEyeCount',
     returnType: null,
     argTypes: ['number'],
-  ): SetXrEyeCount;
+  ): (...args: number[]) => void;
   (
     ident: 'SetXrEyeViewport',
     returnType: null,
     argTypes: ['number', 'number', 'number', 'number', 'number'],
-  ): SetXrEyeViewport;
+  ): (...args: number[]) => void;
   (
     ident: 'GetXrMatrixScratch',
     returnType: 'number',
     argTypes: [],
-  ): GetXrMatrixScratch;
+  ): (...args: number[]) => number;
   (
     ident: 'CommitXrEyeMatrices',
     returnType: null,
     argTypes: ['number'],
-  ): CommitXrEyeMatrices;
+  ): (...args: number[]) => void;
   (
     ident: 'RunXrFrame',
     returnType: null,
     argTypes: [],
-  ): RunXrFrame;
+  ): (...args: number[]) => void;
   (
     ident: 'GetCameraPositionX',
     returnType: 'number',
     argTypes: [],
-  ): GetCameraPositionComponent;
+  ): (...args: number[]) => number;
   (
     ident: 'GetCameraPositionY',
     returnType: 'number',
     argTypes: [],
-  ): GetCameraPositionComponent;
+  ): (...args: number[]) => number;
   (
     ident: 'GetCameraPositionZ',
     returnType: 'number',
     argTypes: [],
-  ): GetCameraPositionComponent;
+  ): (...args: number[]) => number;
   (
     ident: 'GetCameraYaw',
     returnType: 'number',
     argTypes: [],
-  ): GetCameraYaw;
+  ): (...args: number[]) => number;
   (
     ident: 'GetCameraPitch',
     returnType: 'number',
     argTypes: [],
-  ): GetCameraPitch;
+  ): (...args: number[]) => number;
+    // END GENERATED CWARP OVERLOADS
 }
 
 export interface SolarSystemModuleConfig {
@@ -323,47 +325,31 @@ export default SolarSystem;
 
 declare global {
   interface Window {
+    /** C++ loading progress callback (EM_ASM). */
     updateLoadingProgress?: (loaded: number, total: number) => void;
+    /** C++ LOD streaming progress callback (EM_ASM). */
     updateStreamingProgress?: (completed: number, total: number, active?: number) => void;
+    /** Console helper documented in AGENTS.md. */
     setCameraPose?: SetCameraPose;
-    setQualityPreset?: SetQualityPreset;
-    getQualityPreset?: GetQualityPreset;
-    setTimeScale?: SetTimeScale;
-    getTimeScale?: GetTimeScale;
-    setPaused?: SetPaused;
-    getPaused?: GetPaused;
-    setSimulationEpoch?: SetSimulationEpoch;
-    getSimulationEpoch?: GetSimulationEpoch;
-    setShadowQuality?: SetShadowQuality;
-    getShadowQuality?: GetShadowQuality;
-    setTouchMovement?: SetTouchMovement;
-    addTouchLook?: AddTouchLook;
-    addTouchZoom?: AddTouchZoom;
-    isMobileWeb?: () => number;
-    setMusicVolume?: SetMusicVolume;
-    getMusicVolume?: GetMusicVolume;
-    setMusicMuted?: SetMusicMuted;
-    getMusicMuted?: GetMusicMuted;
-    focusPlanet?: FocusPlanet;
-    setOrbitScaleMode?: SetOrbitScaleMode;
-    getOrbitScaleMode?: GetOrbitScaleMode;
-    getNearestPlanetIndex?: GetNearestPlanetIndex;
-    getFocusedPlanetIndex?: GetFocusedPlanetIndex;
-    getPlanetSceneDistance?: GetPlanetSceneDistance;
-    setOrbitLines?: SetOrbitLines;
-    getOrbitLines?: GetOrbitLines;
-    setXrSessionActive?: SetXrSessionActive;
-    setXrEyeCount?: SetXrEyeCount;
-    setXrEyeViewport?: SetXrEyeViewport;
-    getXrMatrixScratch?: GetXrMatrixScratch;
-    commitXrEyeMatrices?: CommitXrEyeMatrices;
-    runXrFrame?: RunXrFrame;
-    getCameraPositionX?: GetCameraPositionComponent;
-    getCameraPositionY?: GetCameraPositionComponent;
-    getCameraPositionZ?: GetCameraPositionComponent;
-    getCameraYaw?: GetCameraYaw;
-    getCameraPitch?: GetCameraPitch;
+    /** C++ planet focus callback (EM_ASM). */
     onPlanetFocused?: (index: number) => void;
+    /** C++ settings change callback (keyboard shortcuts / runtime toggles). */
+    onSettingsChanged?: (field:
+      | 'quality'
+      | 'timeScale'
+      | 'paused'
+      | 'shadowQuality'
+      | 'musicVolume'
+      | 'musicMuted'
+      | 'simulationEpoch'
+      | 'orbitLines'
+      | string) => void;
+    /** Runtime asset base URL for WebResourceFetcher. */
     __solarSystemAssetBase?: string;
+    /** Init config published before Module() — read by QualitySettings.cpp. */
+    __solarSystemInit?: {
+      qualityPreset: QualityPreset;
+      isMobileWeb: boolean;
+    };
   }
 }

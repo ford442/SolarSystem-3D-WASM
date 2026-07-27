@@ -12,7 +12,8 @@
     "serve:mock-cdn": "node scripts/mock-asset-cdn.mjs",
     "verify:cross-origin": "node verify-cross-origin-fetch.js",
     "test:textures": "node verify-textures.js",
-    "test:smoke": "playwright test"
+    "test:smoke": "playwright test",
+    "generate:wasm-exports": "node ../scripts/generate-wasm-exports.mjs"
   },
   "devDependencies": {
     "@playwright/test": "^1.61.1",
