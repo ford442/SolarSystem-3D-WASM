@@ -57,40 +57,27 @@ void LogQualityTier(const QualityTierSettings& settings, bool hdrEnabled, int sh
 bool ReadIsMobileWeb() {
     return EM_ASM_INT({
         try {
-            const ua = navigator.userAgent || '';
-            const mobileUa = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(ua);
-            const coarsePointer = window.matchMedia('(pointer: coarse)').matches;
-            const smallScreen = Math.min(window.screen.width, window.screen.height) <= 768;
-            return (mobileUa || (coarsePointer && smallScreen)) ? 1 : 0;
+            const init = window.__solarSystemInit;
+            if (init && typeof init.isMobileWeb === 'boolean') {
+                return init.isMobileWeb ? 1 : 0;
+            }
         } catch (error) {
-            console.warn('[Quality] Could not detect mobile device:', error);
-            return 0;
+            console.warn('[Quality] Could not read init config:', error);
         }
+        return 0;
     }) != 0;
 }
 
 int ReadInitialQualityPreset() {
     return EM_ASM_INT({
         try {
-            const params = new URLSearchParams(window.location.search);
-            const quality = params.get('quality') || params.get('q');
-            if (quality) {
-                const normalized = quality.toLowerCase();
-                if (normalized === 'low' || normalized === '0') return 0;
-                if (normalized === 'medium' || normalized === 'med' || normalized === '1') return 1;
-                if (normalized === 'full' || normalized === '2') return 2;
-            }
-
-            const ua = navigator.userAgent || '';
-            const mobileUa = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(ua);
-            const coarsePointer = window.matchMedia('(pointer: coarse)').matches;
-            const smallScreen = Math.min(window.screen.width, window.screen.height) <= 768;
-            if (mobileUa || (coarsePointer && smallScreen)) {
-                console.log('[Quality] Mobile device detected; defaulting to low preset');
-                return 0;
+            const init = window.__solarSystemInit;
+            if (init && typeof init.qualityPreset === 'number') {
+                const preset = Math.max(0, Math.min(2, init.qualityPreset | 0));
+                return preset;
             }
         } catch (error) {
-            console.warn('[Quality] Could not read URL preset:', error);
+            console.warn('[Quality] Could not read init config:', error);
         }
         return 2;
     });
