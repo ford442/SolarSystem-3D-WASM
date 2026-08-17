@@ -20,7 +20,6 @@ void MagneticFieldLineRenderer::AddBody(OrbitLayout::Body body, MagneticFieldLin
     }
     Batch batch;
     batch.body = body;
-    batch.params = params;
     batch.mesh = std::move(mesh);
     _batches.push_back(std::move(batch));
 }

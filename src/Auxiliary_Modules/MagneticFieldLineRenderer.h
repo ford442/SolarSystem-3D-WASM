@@ -31,7 +31,6 @@ public:
 private:
     struct Batch {
         OrbitLayout::Body body = OrbitLayout::Body::Sun;
-        MagneticFieldParams params;
         MagneticFieldLineMesh mesh;
     };
 
