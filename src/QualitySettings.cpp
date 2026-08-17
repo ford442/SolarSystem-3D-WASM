@@ -30,15 +30,15 @@ const char* TextureLodTierName(TextureLodTier tier) {
 QualityTierSettings GetQualitySettings(int preset, bool mobile) {
     if (mobile) {
         switch (preset) {
-            case 0: return {1024, 0, 0, false, 400, TextureLodTier::Low, "low"};
-            case 1: return {2048, 2, 0, true, 900, TextureLodTier::Mid, "medium"};
-            default: return {3000, 2, 0, true, 1400, TextureLodTier::High, "full"};
+            case 0: return {1024, 0, 0, false, false, 0, 400, TextureLodTier::Low, "low"};
+            case 1: return {2048, 2, 0, true, true, 1, 900, TextureLodTier::Mid, "medium"};
+            default: return {3000, 2, 0, true, true, 1, 1400, TextureLodTier::High, "full"};
         }
     }
     switch (preset) {
-        case 0: return {1024, 0, 0, false, 600, TextureLodTier::Low, "low"};
-        case 1: return {2048, 2, 0, true, 1800, TextureLodTier::Mid, "medium"};
-        default: return {3000, 4, 4, true, 4000, TextureLodTier::High, "full"};
+        case 0: return {1024, 0, 0, false, false, 0, 600, TextureLodTier::Low, "low"};
+        case 1: return {2048, 2, 0, true, true, 1, 1800, TextureLodTier::Mid, "medium"};
+        default: return {3000, 4, 4, true, true, 2, 4000, TextureLodTier::High, "full"};
     }
 }
 
@@ -55,6 +55,8 @@ void LogQualityTier(const QualityTierSettings& settings, bool hdrEnabled, int sh
                                   : "off")
               << " (~" << std::fixed << std::setprecision(1) << shadowMemoryMiB << " MiB depth)"
               << " | HDR=" << (hdrEnabled ? "on" : "off (direct composite)")
+              << " | field bloom="
+              << (settings.enableMagneticBloom ? (std::to_string(settings.magneticBloomPasses) + " pass") : "off")
               << " | high-res concurrency=" << settings.maxConcurrentTextureLoads
               << " | max texture LOD=" << TextureLodTierName(settings.maxTextureLodTier)
               << " | LOD distance multiplier=" << (std::strcmp(settings.name, "medium") == 0 ? 1.5f : 1.0f)

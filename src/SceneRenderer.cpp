@@ -447,6 +447,10 @@ void Application::RenderHints() const {
     deque<wstring> textHints;
     textHints.emplace_back(L"Text hints(TAB)");
 
+    deque<wstring> magneticHint;
+    magneticHint.emplace_back(L"Magnetic fields(M): ");
+    magneticHint.emplace_back(_magneticFieldsEnabled ? L"On" : L"Off");
+
     _textRenderer->ReverseRender(*_mainTextShader, _tmpStringCache, 0.99 * _displayWidth, 0.95 * _displayHeight, 0.35, textColor);
     _textRenderer->Render(*_mainTextShader, _fpsHintCache, 0.01 * _displayWidth, 0.95 * _displayHeight, 0.35, CurrentFpsColor());
     _textRenderer->Render(*_mainTextShader, _gpuHintCache, 0.01 * _displayWidth, 0.925 * _displayHeight, 0.35, textColor);
@@ -467,6 +471,7 @@ void Application::RenderHints() const {
     _textRenderer->Render(*_mainTextShader, starTemperatureHint, 0.01 * _displayWidth, 0.625 * _displayHeight, 0.35, textColor);
     _textRenderer->Render(*_mainTextShader, vertSyncHint, 0.01 * _displayWidth, 0.6 * _displayHeight, 0.35, textColor);
     _textRenderer->Render(*_mainTextShader, textHints, 0.01 * _displayWidth, 0.575 * _displayHeight, 0.35, textColor);
+    _textRenderer->Render(*_mainTextShader, magneticHint, 0.01 * _displayWidth, 0.55 * _displayHeight, 0.35, textColor);
 
     glDisable(GL_BLEND);
     glEnable(GL_DEPTH_TEST);
@@ -605,6 +610,10 @@ void Application::ConfigureMainShaders() {
     _mainCoronaStarShader->SetFloat("starRadius", _sun->GetStarRadius());
     _mainCoronaStarShader->SetFloat("deltaTime", glfwGetTime() * 0.002);
 
+    const float surfaceDim = _magneticFieldsEnabled ? 0.28f : 1.0f;
+    const float atmosphereDim = _magneticFieldsEnabled ? 0.40f : 1.0f;
+    const float ringDim = _magneticFieldsEnabled ? 0.35f : 1.0f;
+
     _mainPlanetShader->Use();
     _mainPlanetShader->SetMat4("projection", _cameraProjection);
     _mainPlanetShader->SetMat4("view", _cameraView);
@@ -614,6 +623,7 @@ void Application::ConfigureMainShaders() {
     _mainPlanetShader->SetFloat("farPlane", _camera.GetFar());
     _mainPlanetShader->SetFloat("zCoef", zCoef);
     _mainPlanetShader->SetFloat("bias", 0.0005);
+    _mainPlanetShader->SetFloat("uSurfaceDim", surfaceDim);
     _mainPlanetShader->SetInt("shadowMap", 6);
     glBindTextureUnit(6, _shadowMapFBO->GetShadowMap());
 
@@ -623,6 +633,7 @@ void Application::ConfigureMainShaders() {
     _mainAtmosphereShader->SetFloat("farPlane", _camera.GetFar());
     _mainAtmosphereShader->SetFloat("zCoef", zCoef);
     _mainAtmosphereShader->SetFloat("bias", 0.001);
+    _mainAtmosphereShader->SetFloat("uSurfaceDim", atmosphereDim);
     _mainAtmosphereShader->SetInt("shadowMap", 11);
     glBindTextureUnit(11, _shadowMapFBO->GetShadowMap());
 
@@ -634,6 +645,7 @@ void Application::ConfigureMainShaders() {
     _mainCloudsShader->SetFloat("farPlane", _camera.GetFar());
     _mainCloudsShader->SetFloat("zCoef", zCoef);
     _mainCloudsShader->SetFloat("bias", 0.001);
+    _mainCloudsShader->SetFloat("uSurfaceDim", surfaceDim);
     _mainCloudsShader->SetInt("shadowMap", 8);
     glBindTextureUnit(8, _shadowMapFBO->GetShadowMap());
 
@@ -645,6 +657,7 @@ void Application::ConfigureMainShaders() {
     _mainRingShader->SetVec3("starGlowTint", _sun->GetGlowTintMult());
     _mainRingShader->SetFloat("zCoef", zCoef);
     _mainRingShader->SetFloat("bias", 0.001);
+    _mainRingShader->SetFloat("uSurfaceDim", ringDim);
     _mainRingShader->SetInt("shadowMap", 5);
     glBindTextureUnit(5, _shadowMapFBO->GetShadowMap());
 }

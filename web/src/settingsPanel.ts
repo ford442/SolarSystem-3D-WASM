@@ -73,7 +73,11 @@ function readPersistedSettings(): Partial<PersistedSettings> {
             paused: typeof parsed.paused === 'boolean' ? parsed.paused : undefined,
             shadows: typeof parsed.shadows === 'boolean' ? parsed.shadows : undefined,
             orbitLines: typeof parsed.orbitLines === 'boolean' ? parsed.orbitLines : undefined,
-            magneticFields: typeof parsed.magneticFields === 'boolean' ? parsed.magneticFields : undefined,
+            magneticFields: typeof parsed.magneticFields === 'boolean'
+                ? parsed.magneticFields
+                : typeof parsed.magneticFieldMode === 'boolean'
+                    ? parsed.magneticFieldMode
+                    : undefined,
             musicVolume: typeof parsed.musicVolume === 'number' && Number.isFinite(parsed.musicVolume)
                 ? Math.min(100, Math.max(0, Math.round(parsed.musicVolume)))
                 : undefined,
@@ -219,6 +223,7 @@ export function initSettingsPanel(options: SettingsPanelInitOptions): void {
                 orbitLinesInput.checked = runtime.getOrbitLines();
                 break;
             case 'magneticFields':
+            case 'magneticFieldMode':
                 magneticFieldsInput.checked = runtime.getMagneticFields();
                 break;
         }

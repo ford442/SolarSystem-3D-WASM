@@ -25,6 +25,7 @@ uniform float farPlane;
 uniform float ambientFactor;
 uniform float bias; // For shadows
 uniform float yRotation; // For fake cloud shadows
+uniform float uSurfaceDim;
 
 uniform bool hasNightTexture;
 uniform bool hasSpecularMap;
@@ -266,5 +267,5 @@ void main() {
     else
         lighting = ambient + shadow * diffuseColor;
 
-    fragColor = vec4(lighting, 1.0);
+    fragColor = vec4(lighting * uSurfaceDim, 1.0);
 }

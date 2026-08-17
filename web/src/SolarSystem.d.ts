@@ -59,6 +59,9 @@ export type GetOrbitLines = () => number;
 /** Toggle magnetic field ribbon overlay (1=on, 0=off). */
 export type SetMagneticFields = (enabled: number) => void;
 export type GetMagneticFields = () => number;
+/** Issue #107 aliases for Set/GetMagneticFields. */
+export type SetMagneticFieldMode = SetMagneticFields;
+export type GetMagneticFieldMode = GetMagneticFields;
 
 export type SetXrSessionActive = (active: number) => void;
 export type SetXrEyeCount = (count: number) => void;
@@ -224,6 +227,16 @@ export interface SolarSystemCwrap {
     argTypes: [],
   ): (...args: number[]) => number;
   (
+    ident: 'SetMagneticFieldMode',
+    returnType: null,
+    argTypes: ['number'],
+  ): (...args: number[]) => void;
+  (
+    ident: 'GetMagneticFieldMode',
+    returnType: 'number',
+    argTypes: [],
+  ): (...args: number[]) => number;
+  (
     ident: 'SetXrSessionActive',
     returnType: null,
     argTypes: ['number'],
@@ -330,6 +343,8 @@ export interface SolarSystemModule {
   _GetOrbitLines: GetOrbitLines;
   _SetMagneticFields: SetMagneticFields;
   _GetMagneticFields: GetMagneticFields;
+  _SetMagneticFieldMode: SetMagneticFieldMode;
+  _GetMagneticFieldMode: GetMagneticFieldMode;
 }
 
 declare const SolarSystem: (
@@ -360,6 +375,7 @@ declare global {
       | 'simulationEpoch'
       | 'orbitLines'
       | 'magneticFields'
+      | 'magneticFieldMode'
       | string) => void;
     /** Runtime asset base URL for WebResourceFetcher. */
     __solarSystemAssetBase?: string;

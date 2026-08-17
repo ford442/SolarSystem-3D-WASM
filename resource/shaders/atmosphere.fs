@@ -19,6 +19,7 @@ uniform sampler2D ringDiffuse;
 uniform sampler2D shadowMap;
 uniform float farPlane;
 uniform float bias; // For shadows
+uniform float uSurfaceDim;
 uniform float earthSizeCoefficient;
 uniform bool isUseToneMapping;
 uniform bool isNearbyPlanetaryRing;
@@ -312,7 +313,7 @@ void main() {
 
     vec3 I = colorInScatter(eye, dir, e, l);
 
-    fragColor = vec4(I /** (1.0 - shadow)*/, 1.0);
+    fragColor = vec4(I * uSurfaceDim /** (1.0 - shadow)*/, 1.0);
 
     if (isUseToneMapping)
         fragColor.rgb = acesFilm(fragColor.rgb);

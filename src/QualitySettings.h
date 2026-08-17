@@ -18,6 +18,8 @@ struct QualityTierSettings {
     int maxConcurrentTextureLoads;
     int requestedMsaaSamples;
     bool enableHdr;
+    bool enableMagneticBloom;
+    int magneticBloomPasses;
     int asteroidInstanceCount;
     TextureLodTier maxTextureLodTier;
     const char* name;

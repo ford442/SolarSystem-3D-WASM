@@ -413,19 +413,22 @@ Settings → **Magnetic fields** (default off; persisted like orbit lines). Deep
 
 Console: `[MagneticField] Built field-line ribbons for quality preset N`.
 
-| Preset | Bodies with ribbons |
-|--------|---------------------|
-| low | Sun only (toroidal + fast flow) |
-| medium | Sun, Earth, Jupiter, Uranus |
-| full | + Mercury, Saturn, Neptune |
+| Preset | Bodies with ribbons | Bloom |
+|--------|---------------------|-------|
+| low | Sun only (toroidal + fast flow) | off |
+| medium | Sun, Earth, Jupiter, Uranus | half-res, 1 blur pass |
+| full | + Mercury, Saturn, Neptune | half-res, 2 blur passes (1 on mobile) |
 
 Venus/Mars/Pluto/moons stay omitted.
 
 Manual:
-1. `?quality=medium&fields=1` — approach Earth: cyan tilted dipole; approach Sun: orange equatorial torus, faster pulse.
-2. Teleport to Jupiter / Uranus and confirm tilt (Uranus extreme).
-3. Toggle off — ribbons disappear; FPS on Medium should stay similar to orbit-lines-on (static VBO, shader animation only).
-4. Native unit tests: `test_magnetic_field.cpp` (dipole polarity, torus \(B_\phi\), monotonic arc length, catalog gating).
+1. `?quality=medium&fields=1` — approach Earth: cyan tilted dipole with a soft glow; planet disk is dimmed; orbit lines are faint. Approach Sun: orange equatorial torus, faster pulse, visible twist; Sun itself stays bright.
+2. Teleport to Jupiter / Uranus and confirm tilt (Uranus extreme teal). Close-up: planet disk occludes ribbons; glow should not punch through the near face.
+3. `?quality=low&fields=1` — Sun ribbons only, no bloom halo.
+4. Settings checkbox persists across reload (`localStorage` key `solar-system.settings.v1` → `magneticFields`).
+5. Press **M** — checkbox and overlay update together (`onSettingsChanged('magneticFields')` / `'magneticFieldMode'`). `Module.GetMagneticFieldMode()` matches `GetMagneticFields()`.
+6. Toggle off — ribbons disappear, planet brightness and orbit-line alpha restore; orbit-lines / shadows / quality controls still work.
+7. Native unit tests: `test_magnetic_field.cpp` (dipole polarity, torus \(B_\phi\), monotonic arc length, catalog gating) and `test_quality_settings.cpp` (bloom flags per preset).
 
 ### 7. Streaming UI + Throttled Progress
 - Streaming phase uses overlay (`#streaming-progress` / `#streaming-text`) + bar.

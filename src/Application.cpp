@@ -168,13 +168,23 @@ extern "C" {
     EMSCRIPTEN_KEEPALIVE int GetOrbitLines() {
         return activeApplication && activeApplication->GetOrbitLinesEnabled() ? 1 : 0;
     }
-    EMSCRIPTEN_KEEPALIVE void SetMagneticFields(int enabled) {
+    void ApplyMagneticFieldMode(int enabled) {
         if (activeApplication) {
             activeApplication->SetMagneticFieldsEnabled(enabled != 0);
         }
         NotifySettingsChanged("magneticFields");
+        NotifySettingsChanged("magneticFieldMode");
+    }
+    EMSCRIPTEN_KEEPALIVE void SetMagneticFields(int enabled) {
+        ApplyMagneticFieldMode(enabled);
     }
     EMSCRIPTEN_KEEPALIVE int GetMagneticFields() {
+        return activeApplication && activeApplication->GetMagneticFieldsEnabled() ? 1 : 0;
+    }
+    EMSCRIPTEN_KEEPALIVE void SetMagneticFieldMode(int enabled) {
+        ApplyMagneticFieldMode(enabled);
+    }
+    EMSCRIPTEN_KEEPALIVE int GetMagneticFieldMode() {
         return activeApplication && activeApplication->GetMagneticFieldsEnabled() ? 1 : 0;
     }
 
@@ -478,10 +488,10 @@ void Application::RenderFrameContent() {
     ConfigureMainShaders();
     _skyBox->Render(*_mainSkyBoxShader);
     RenderOrbitPaths();
-    RenderMagneticFields();
     RenderStarCorona();
     ProcessSceneComponentsRendering();
     RenderAsteroidField();
+    RenderMagneticFields();
 #ifdef __EMSCRIPTEN__
     if (!_xr.active) {
         RenderPlanetProxyMarkers();
@@ -555,6 +565,11 @@ void Application::InitSceneObjects() {
             }});
     _orbitPathRenderer = make_unique<OrbitPathRenderer>();
     _magneticFieldRenderer = make_unique<MagneticFieldLineRenderer>();
+    {
+        const auto fieldQuality = GetQualitySettings(g_qualityPreset, g_isMobileWeb);
+        _magneticFieldBloom = make_unique<MagneticFieldBloom>(_displayWidth, _displayHeight,
+                                                              fieldQuality.enableMagneticBloom);
+    }
     {
         const auto asteroidQuality = GetQualitySettings(g_qualityPreset, g_isMobileWeb);
         _asteroidField = make_unique<AsteroidField>(AsteroidField::kDefaultSeed,
@@ -826,6 +841,11 @@ void Application::KeyCallback(GLFWwindow* window, int key, int, int action, int)
             gTimePaused = !gTimePaused;
             NotifySettingsChanged("paused");
         }
+        if (key == GLFW_KEY_M) {
+            app->SetMagneticFieldsEnabled(!app->GetMagneticFieldsEnabled());
+            NotifySettingsChanged("magneticFields");
+            NotifySettingsChanged("magneticFieldMode");
+        }
         if (key == GLFW_KEY_PERIOD) {
             gAdvanceStep = true;
         }
@@ -948,64 +968,86 @@ void Application::EnsureMagneticFieldsBuilt() {
     std::cout << "[MagneticField] Built field-line ribbons for quality preset " << g_qualityPreset << std::endl;
 }
 
-void Application::RenderMagneticFields() const {
+void Application::RenderMagneticFields() {
     if (!_magneticFieldsEnabled || !_magneticFieldRenderer || _magneticFieldRenderer->Empty()) {
         return;
     }
-
-    glEnable(GL_BLEND);
-    glBlendFunc(GL_SRC_ALPHA, GL_ONE);
-    glEnable(GL_DEPTH_TEST);
-    glDepthMask(GL_FALSE);
-    glDisable(GL_CULL_FACE);
-    glEnable(GL_POLYGON_OFFSET_FILL);
-    glPolygonOffset(-1.0f, -1.0f);
 
     const float zCoef = static_cast<float>(2.0 / glm::log2(_camera.GetFar() + 1.0));
     const float now = static_cast<float>(glfwGetTime());
     const glm::vec3 camPos = _camera.GetPosition();
 
-    auto drawBody = [&](OrbitLayout::Body body, const MagneticFieldParams& params, const glm::vec3& position,
-                        const glm::mat4& rotation, float radius) {
-        if (!params.enabled || radius < 1.0e-4f) {
-            return;
+    auto drawBodies = [&](float ribbonWidthScale, float opacityScale) {
+        auto drawBody = [&](OrbitLayout::Body body, const MagneticFieldParams& params, const glm::vec3& position,
+                            const glm::mat4& rotation, float radius) {
+            if (!params.enabled || radius < 1.0e-4f) {
+                return;
+            }
+            glm::mat4 model(1.0f);
+            model = glm::translate(model, position);
+            model *= rotation;
+            model = glm::rotate(model, glm::radians(params.dipoleTiltDeg), glm::vec3(1.0f, 0.0f, 0.0f));
+            model = glm::scale(model, glm::vec3(radius));
+            _magneticFieldRenderer->Draw(_cameraProjection, _cameraView, model, params, body, camPos, zCoef, now,
+                                         ribbonWidthScale, opacityScale);
+        };
+
+        if (_sun) {
+            const MagneticFieldParams sunParams =
+                MagneticFieldCatalog::ParamsForBody(OrbitLayout::Body::Sun, g_qualityPreset);
+            // Mesh is scaled 0.5 × sphere radius (~2) ≈ 1 unit; inflate so the torus is readable.
+            const float sunRadius = 28.0f;
+            drawBody(OrbitLayout::Body::Sun, sunParams, _sun->GetPosition(), glm::mat4(1.0f), sunRadius);
         }
-        glm::mat4 model(1.0f);
-        model = glm::translate(model, position);
-        model *= rotation;
-        model = glm::rotate(model, glm::radians(params.dipoleTiltDeg), glm::vec3(1.0f, 0.0f, 0.0f));
-        model = glm::scale(model, glm::vec3(radius));
-        _magneticFieldRenderer->Draw(_cameraProjection, _cameraView, model, params, body, camPos, zCoef, now);
+
+        for (const auto& component : _renderableSceneComponents) {
+            if (!component.planet) {
+                continue;
+            }
+            const std::wstring& wideName = component.planet->GetEngName();
+            const std::string name(wideName.begin(), wideName.end());
+            const OrbitLayout::Body body = OrbitLayout::BodyFromName(name);
+            if (body == OrbitLayout::Body::Sun) {
+                continue;
+            }
+            const MagneticFieldParams params = MagneticFieldCatalog::ParamsForBody(body, g_qualityPreset);
+            if (!params.enabled) {
+                continue;
+            }
+            const float radius = std::max(component.planet->GetRadius(), 0.5f);
+            drawBody(body, params, component.planet->GetPosition(), component.planet->GetRotationMatrix(), radius);
+        }
     };
 
-    if (_sun) {
-        const MagneticFieldParams sunParams = MagneticFieldCatalog::ParamsForBody(OrbitLayout::Body::Sun, g_qualityPreset);
-        // Mesh is scaled 0.5 × sphere radius (~2) ≈ 1 unit; inflate so the torus is readable.
-        const float sunRadius = 28.0f;
-        drawBody(OrbitLayout::Body::Sun, sunParams, _sun->GetPosition(), glm::mat4(1.0f), sunRadius);
-    }
+    auto bindRibbonState = []() {
+        glEnable(GL_BLEND);
+        glBlendFunc(GL_SRC_ALPHA, GL_ONE);
+        glEnable(GL_DEPTH_TEST);
+        glDepthMask(GL_FALSE);
+        glDisable(GL_CULL_FACE);
+        glEnable(GL_POLYGON_OFFSET_FILL);
+        glPolygonOffset(-1.0f, -1.0f);
+    };
 
-    for (const auto& component : _renderableSceneComponents) {
-        if (!component.planet) {
-            continue;
+    bindRibbonState();
+    drawBodies(1.0f, 1.0f);
+
+    const auto quality = GetQualitySettings(g_qualityPreset, g_isMobileWeb);
+    if (_magneticFieldBloom && quality.enableMagneticBloom) {
+        _magneticFieldBloom->Resize(_displayWidth, _displayHeight);
+        if (_magneticFieldBloom->IsEnabled()) {
+            _magneticFieldBloom->BeginCapture();
+            bindRibbonState();
+            drawBodies(2.0f, 1.35f);
+            const float intensity = g_isMobileWeb ? 0.48f : (quality.magneticBloomPasses >= 2 ? 0.82f : 0.62f);
+            _magneticFieldBloom->BlurAndComposite(quality.magneticBloomPasses, intensity);
         }
-        const std::wstring& wideName = component.planet->GetEngName();
-        const std::string name(wideName.begin(), wideName.end());
-        const OrbitLayout::Body body = OrbitLayout::BodyFromName(name);
-        if (body == OrbitLayout::Body::Sun) {
-            continue;
-        }
-        const MagneticFieldParams params = MagneticFieldCatalog::ParamsForBody(body, g_qualityPreset);
-        if (!params.enabled) {
-            continue;
-        }
-        const float radius = std::max(component.planet->GetRadius(), 0.5f);
-        drawBody(body, params, component.planet->GetPosition(), component.planet->GetRotationMatrix(), radius);
     }
 
     glDisable(GL_POLYGON_OFFSET_FILL);
     glDepthMask(GL_TRUE);
     glEnable(GL_CULL_FACE);
+    glEnable(GL_DEPTH_TEST);
     glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
     glDisable(GL_BLEND);
 }
@@ -1021,7 +1063,8 @@ void Application::RenderOrbitPaths() const {
     glDepthMask(GL_FALSE);
 
     const glm::vec3 sunPos = _sun->GetPosition();
-    const glm::vec4 color(0.45f, 0.55f, 0.75f, 0.35f);
+    const float orbitAlpha = _magneticFieldsEnabled ? 0.08f : 0.35f;
+    const glm::vec4 color(0.45f, 0.55f, 0.75f, orbitAlpha);
 
     for (int i = 1; i <= 9; ++i) {
         const auto body = static_cast<OrbitLayout::Body>(i);
@@ -1428,6 +1471,10 @@ void Application::ApplyRenderResources(uint16_t shadowResolution, bool enableHdr
 
     if (_hdr) {
         _hdr->SetEnabled(enableHdr, _displayWidth, _displayHeight);
+    }
+    if (_magneticFieldBloom) {
+        const auto bloomSettings = GetQualitySettings(g_qualityPreset, g_isMobileWeb);
+        _magneticFieldBloom->SetEnabled(bloomSettings.enableMagneticBloom, _displayWidth, _displayHeight);
     }
 }
 

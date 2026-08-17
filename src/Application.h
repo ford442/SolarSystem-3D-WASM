@@ -129,6 +129,7 @@ private:
     std::unique_ptr<LensFlare> _lensFlare;
     std::unique_ptr<OrbitPathRenderer> _orbitPathRenderer;
     std::unique_ptr<MagneticFieldLineRenderer> _magneticFieldRenderer;
+    std::unique_ptr<MagneticFieldBloom> _magneticFieldBloom;
     std::unique_ptr<AsteroidField> _asteroidField;
     std::shared_ptr<Star> _sun;
     std::vector<RenderableSceneComponent> _renderableSceneComponents;
@@ -172,7 +173,7 @@ private:
     void RenderPlanetProxyMarkers() const; // Show orbital markers for unloaded planets (WASM)
     void RenderOrbitPaths() const;
     void EnsureMagneticFieldsBuilt();
-    void RenderMagneticFields() const;
+    void RenderMagneticFields();
     void RenderAsteroidField();
     void RenderFrameContent(); // Sky → planets → effects (one eye / mono)
 #ifdef __EMSCRIPTEN__

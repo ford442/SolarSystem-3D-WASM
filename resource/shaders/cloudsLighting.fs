@@ -19,6 +19,7 @@ uniform vec3 viewPos;
 uniform float farPlane;
 uniform float ambientFactor;
 uniform float bias; // For shadows
+uniform float uSurfaceDim;
 // uniform bool isNearbyPlanetaryRing; // Not used in the scene, but if desired, it can be implemented as in shader planet.fs
 
 out vec4 fragColor;
@@ -105,5 +106,5 @@ void main() {
         ambient *= 0.1;
 
     vec3 lighting = ambient + shadow * diffuse;
-    fragColor = vec4(lighting, 1.0f);
+    fragColor = vec4(lighting * uSurfaceDim, 1.0f);
 }

@@ -28,7 +28,8 @@ export type SettingsChangeField =
     | 'musicMuted'
     | 'simulationEpoch'
     | 'orbitLines'
-    | 'magneticFields';
+    | 'magneticFields'
+    | 'magneticFieldMode';
 
 export interface CameraPose {
     x: number;
@@ -72,6 +73,8 @@ export interface SolarSystemRuntime {
     getOrbitLines(): boolean;
     setMagneticFields(enabled: boolean): void;
     getMagneticFields(): boolean;
+    setMagneticFieldMode(enabled: boolean): void;
+    getMagneticFieldMode(): boolean;
     setXrSessionActive(active: boolean): void;
     setXrEyeCount(count: number): void;
     setXrEyeViewport(eye: number, x: number, y: number, width: number, height: number): void;
@@ -124,6 +127,8 @@ export function createSolarSystemRuntime(instance: SolarSystemModule): SolarSyst
         getOrbitLines: () => cwrap('GetOrbitLines', 'number', [])() !== 0,
         setMagneticFields: (enabled) => cwrap('SetMagneticFields', null, ['number'])(enabled ? 1 : 0),
         getMagneticFields: () => cwrap('GetMagneticFields', 'number', [])() !== 0,
+        setMagneticFieldMode: (enabled) => cwrap('SetMagneticFieldMode', null, ['number'])(enabled ? 1 : 0),
+        getMagneticFieldMode: () => cwrap('GetMagneticFieldMode', 'number', [])() !== 0,
         setXrSessionActive: (active) => cwrap('SetXrSessionActive', null, ['number'])(active ? 1 : 0),
         setXrEyeCount: cwrap('SetXrEyeCount', null, ['number']),
         setXrEyeViewport: cwrap('SetXrEyeViewport', null, ['number', 'number', 'number', 'number', 'number']),

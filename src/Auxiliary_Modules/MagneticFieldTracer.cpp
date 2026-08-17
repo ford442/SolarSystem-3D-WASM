@@ -1,5 +1,6 @@
 #include "MagneticFieldTracer.h"
 
+#include "MagneticFieldModel.h"
 #include <algorithm>
 #include <cmath>
 #include <glm/common.hpp>
@@ -17,33 +18,12 @@ constexpr float kMinB = 1.0e-7f;
 constexpr float kStartRadius = 1.08f;
 constexpr float kInnerStop = 1.02f;
 constexpr float kStep = 0.045f;
+constexpr int kMaxSeeds = 64;
+constexpr int kMinSamplesPerLine = 8;
+constexpr int kMaxSamplesPerLine = 256;
 
-glm::vec3 DipoleB(const glm::vec3& r, float moment) {
-    const glm::vec3 m(0.0f, moment, 0.0f);
-    const float r2 = glm::dot(r, r);
-    if (r2 < 1.0e-8f) {
-        return glm::vec3(0.0f);
-    }
-    const float r1 = std::sqrt(r2);
-    const float r5 = r2 * r2 * r1;
-    return (3.0f * glm::dot(m, r) * r - m * r2) / r5;
-}
-
-glm::vec3 ToroidalB(const glm::vec3& r, const MagneticFieldParams& params) {
-    if (params.toroidalStrength <= 0.0f) {
-        return glm::vec3(0.0f);
-    }
-    const float rho = std::sqrt(r.x * r.x + r.z * r.z);
-    if (rho < 1.0e-5f) {
-        return glm::vec3(0.0f);
-    }
-    const float dr = rho - params.torusRadiusScale;
-    const float w = 0.38f;
-    const float h = 0.50f;
-    const float envelope = std::exp(-(dr * dr) / (w * w)) * std::exp(-(r.y * r.y) / (h * h));
-    const glm::vec3 ePhi(-r.z / rho, 0.0f, r.x / rho);
-    return ePhi * (params.toroidalStrength * envelope);
-}
+constexpr float kColatitudesDeg[] = {18.0f, 35.0f, 52.0f, 68.0f};
+constexpr int kRingCount = static_cast<int>(sizeof(kColatitudesDeg) / sizeof(kColatitudesDeg[0]));
 
 glm::vec3 NormalizeB(const glm::vec3& b) {
     const float len = glm::length(b);
@@ -68,11 +48,14 @@ glm::vec3 Rk4Step(const glm::vec3& p, float h, const MagneticFieldParams& params
 void TraceDirection(const glm::vec3& seed, float direction, const MagneticFieldParams& params,
                     std::vector<MagneticFieldSample>& out) {
     glm::vec3 p = seed;
-    const int maxSteps = std::max(8, params.samplesPerLine);
+    const int maxSteps = std::clamp(params.samplesPerLine, kMinSamplesPerLine, kMaxSamplesPerLine);
     const float h = kStep * direction;
     const float rMax = std::max(2.0f, params.extentScale);
 
     for (int i = 0; i < maxSteps; ++i) {
+        if (glm::length(EvaluateB(p, params)) < kMinB) {
+            break;
+        }
         const glm::vec3 next = Rk4Step(p, h, params);
         if (!std::isfinite(next.x) || !std::isfinite(next.y) || !std::isfinite(next.z)) {
             break;
@@ -94,7 +77,7 @@ void TraceDirection(const glm::vec3& seed, float direction, const MagneticFieldP
 } // namespace
 
 glm::vec3 EvaluateB(const glm::vec3& position, const MagneticFieldParams& params) {
-    return DipoleB(position, params.dipoleMoment) + ToroidalB(position, params);
+    return MagneticFieldModel::SampleField(position, params);
 }
 
 std::vector<MagneticFieldLine> Trace(const MagneticFieldParams& params) {
@@ -103,25 +86,27 @@ std::vector<MagneticFieldLine> Trace(const MagneticFieldParams& params) {
         return lines;
     }
 
-    const int seeds = std::max(4, params.seedCount);
-    const int lonCount = std::max(4, static_cast<int>(std::ceil(std::sqrt(static_cast<float>(seeds)))));
-    const int latCount = std::max(2, (seeds + lonCount - 1) / lonCount);
+    MagneticFieldParams clamped = params;
+    clamped.seedCount = std::clamp(params.seedCount, 0, kMaxSeeds);
+    clamped.samplesPerLine = std::clamp(params.samplesPerLine, kMinSamplesPerLine, kMaxSamplesPerLine);
 
-    for (int j = 0; j < latCount; ++j) {
-        const float latFrac = (latCount == 1) ? 0.0f : static_cast<float>(j) / static_cast<float>(latCount - 1);
-        const float lat = glm::mix(-68.0f, 68.0f, latFrac) * (static_cast<float>(M_PI) / 180.0f);
+    const int seeds = clamped.seedCount;
+    const int lonCount = std::max(3, static_cast<int>(std::ceil(static_cast<float>(seeds) / static_cast<float>(kRingCount))));
+
+    for (int ring = 0; ring < kRingCount; ++ring) {
+        const float colat = kColatitudesDeg[ring] * (static_cast<float>(M_PI) / 180.0f);
+        const float sinC = std::sin(colat);
+        const float cosC = std::cos(colat);
         for (int i = 0; i < lonCount; ++i) {
             if (static_cast<int>(lines.size()) >= seeds) {
                 break;
             }
             const float lon = (static_cast<float>(i) / static_cast<float>(lonCount)) * glm::two_pi<float>();
-            const glm::vec3 seed(
-                kStartRadius * std::cos(lat) * std::cos(lon),
-                kStartRadius * std::sin(lat),
-                kStartRadius * std::cos(lat) * std::sin(lon));
+            const glm::vec3 seed(kStartRadius * sinC * std::cos(lon), kStartRadius * cosC,
+                                 kStartRadius * sinC * std::sin(lon));
 
             std::vector<MagneticFieldSample> backward;
-            TraceDirection(seed, -1.0f, params, backward);
+            TraceDirection(seed, -1.0f, clamped, backward);
             std::reverse(backward.begin(), backward.end());
 
             MagneticFieldLine line;
@@ -129,7 +114,7 @@ std::vector<MagneticFieldLine> Trace(const MagneticFieldParams& params) {
             MagneticFieldSample origin;
             origin.position = seed;
             line.samples.push_back(origin);
-            TraceDirection(seed, 1.0f, params, line.samples);
+            TraceDirection(seed, 1.0f, clamped, line.samples);
 
             if (line.samples.size() < 3) {
                 continue;
@@ -147,6 +132,9 @@ std::vector<MagneticFieldLine> Trace(const MagneticFieldParams& params) {
                 }
             }
             lines.push_back(std::move(line));
+        }
+        if (static_cast<int>(lines.size()) >= seeds) {
+            break;
         }
     }
 

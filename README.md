@@ -67,7 +67,7 @@ The project is an animated 3D scene with a model of the Solar System.
 - 💡 Lens flare
 - 🎵 Background music
 - ⚙️ FreeType status hints plus a browser settings panel for quality, time control, pause,
-  and shadows
+  shadows, and magnetic field ribbons
 - ⚙️ Using 3D models with `obj` extension for planets, satellites, planetary rings, etc.
 
 <h2 id="documentation">Documentation</h2>
@@ -187,6 +187,12 @@ requiring URL parameters. Quality, time scale, pause, and shadow preferences are
 `localStorage` and restored on the next visit. An explicit `?quality=low|medium|full` URL value
 still overrides the saved quality for shareable test links. The panel uses 44-48 px controls and
 collapses on small screens so it remains practical on touch devices.
+
+**Magnetic fields** (off by default, also `?fields=1` or the **M** key) draws educational
+dipole / toroidal ribbons. While the mode is on, planet surfaces dim so the lines read clearly
+and orbit paths fade (they stay available via the Orbit lines checkbox). Medium and Full add
+a half-resolution plasma bloom; Low keeps the Sun’s field only and skips bloom. Values are
+visual, not SI magnetosphere physics. The toggle persists in `localStorage` like orbit lines.
 
 <h2 id="runtime-asset-hosting">Runtime asset hosting</h2>
 

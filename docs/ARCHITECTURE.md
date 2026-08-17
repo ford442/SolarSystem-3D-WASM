@@ -344,12 +344,13 @@ See [README.md § Runtime asset hosting](../README.md#runtime-asset-hosting) for
 |--------|------|
 | `Camera`, `FPS_Handler` | First-person navigation |
 | `ShadowMapFBO` | PCF / ray-traced shadows |
-| `HDR`, `LensFlare` | Post-processing |
+| `HDR`, `LensFlare` | Post-processing (star glow only) |
+| `MagneticFieldBloom` | Half-res field-line bloom (not the star HDR FBO) |
 | `TextureImage2D` | DDS load, reload, mip level management |
 | `WebResourceFetcher` | `DownloadFile` (async) + `Fetch` (sync) — WASM only |
 | `TextureLoadingQueue` | Serialized high-res LOD downloads |
 | `OrbitPathRenderer` | Faint heliocentric `GL_LINE_LOOP` guides |
-| `MagneticFieldTracer` / `MagneticFieldLineRenderer` | Optional dipole+toroidal ribbons (static VBO, GPU flow) |
+| `MagneticFieldTracer` / `MagneticFieldLineRenderer` / `MagneticFieldBloom` | Optional dipole+toroidal ribbons (static VBO, GPU flow, half-res bloom on Medium+) |
 
 ### 7.3 Scene objects
 
@@ -357,7 +358,7 @@ Inheritance: `SpaceObject` → `Transformable` → `Planet` / `Satellite` / `Sta
 
 Each planet system lives in `src/Solar_System/<Name>_System/`. `SolarSystem.h` aggregates includes. Atmospheres, clouds, and rings are separate render components.
 
-**Magnetic field params:** `MagneticFieldParams` on `SpaceObject` (set in `StarSystemFactory.cpp` via `MagneticFieldCatalog::IntrinsicParamsForBody`). Values are visual/educational — not SI magnetosphere physics. `ParamsForBody(body, quality)` adds seed/sample scaling and quality enable gates for the ribbon renderer. `Application::ForEachEnabledMagneticField` walks the Sun, loaded planets, and satellites whose `enabled` flag is set. Satellites default to disabled.
+**Magnetic field params:** `MagneticFieldParams` on `SpaceObject` (set in `StarSystemFactory.cpp` via `MagneticFieldCatalog::IntrinsicParamsForBody`). Values are visual/educational — not SI magnetosphere physics. `ParamsForBody(body, quality)` adds seed/sample scaling and quality enable gates for the ribbon renderer. `Application::ForEachEnabledMagneticField` walks the Sun, loaded planets, and satellites whose `enabled` flag is set. Satellites default to disabled. Magnetic mode (`SetMagneticFields` / alias `SetMagneticFieldMode`, settings **M**) dims planet/cloud/atmosphere/ring shaders via `uSurfaceDim` and fades orbit paths; the Sun is left at full brightness.
 
 ---
 

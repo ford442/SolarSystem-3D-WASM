@@ -31,6 +31,8 @@ export const GENERATED_CWRAP_STUBS = `
         getOrbitLines: cwrap('GetOrbitLines', 'number', []) as () => number,
         setMagneticFields: cwrap('SetMagneticFields', null, ['number']),
         getMagneticFields: cwrap('GetMagneticFields', 'number', []) as () => number,
+        setMagneticFieldMode: cwrap('SetMagneticFieldMode', null, ['number']),
+        getMagneticFieldMode: cwrap('GetMagneticFieldMode', 'number', []) as () => number,
         setXrSessionActive: cwrap('SetXrSessionActive', null, ['number']),
         setXrEyeCount: cwrap('SetXrEyeCount', null, ['number']),
         setXrEyeViewport: cwrap('SetXrEyeViewport', null, ['number', 'number', 'number', 'number', 'number']),
@@ -44,4 +46,4 @@ export const GENERATED_CWRAP_STUBS = `
         getCameraPitch: cwrap('GetCameraPitch', 'number', []) as () => number,
 `;
 
-export const EXPORT_COUNT = 40;
+export const EXPORT_COUNT = 42;

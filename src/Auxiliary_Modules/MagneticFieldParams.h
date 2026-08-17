@@ -10,6 +10,10 @@
  * magnetosphere physics. Field names used by the tracer/renderer map from the
  * data-model issue as: axisTiltDeg → dipoleTiltDeg, fieldStrength →
  * dipoleMoment, fieldExtentMultiplier → extentScale.
+ *
+ * SampleField / Trace use unit magnetic space (radius = 1, axis = +Y).
+ * dipoleTiltDeg is applied as a model-matrix Rx at draw time, not baked
+ * into traced vertices.
  */
 struct MagneticFieldParams {
     bool enabled = false;

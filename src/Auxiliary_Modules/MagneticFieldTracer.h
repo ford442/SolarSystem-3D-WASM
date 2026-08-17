@@ -15,7 +15,8 @@ struct MagneticFieldLine {
 
 namespace MagneticFieldTracer {
 
-/** Evaluate B in the magnetic-axis frame (Y = magnetic axis, body radius = 1). */
+/** Evaluate B in the magnetic-axis frame (Y = magnetic axis, body radius = 1).
+ *  Thin wrapper around MagneticFieldModel::SampleField. */
 glm::vec3 EvaluateB(const glm::vec3& position, const MagneticFieldParams& params);
 
 /**

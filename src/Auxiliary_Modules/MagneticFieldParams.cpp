@@ -34,14 +34,15 @@ MagneticFieldParams IntrinsicParamsForBody(OrbitLayout::Body body) {
             p.enabled = true;
             p.dipoleMoment = 0.55f;
             p.dipoleTiltDeg = 7.25f;
-            p.toroidalStrength = 2.4f;
-            p.torusRadiusScale = 1.55f;
-            p.extentScale = 7.5f;
-            p.seedCount = 24;
-            p.samplesPerLine = 80;
-            p.ribbonWidth = 0.045f;
-            p.flowSpeed = 2.6f;
-            p.color = {1.0f, 0.62f, 0.18f};
+            p.toroidalStrength = 2.85f;
+            p.torusRadiusScale = 1.62f;
+            p.extentScale = 8.2f;
+            p.seedCount = 28;
+            p.samplesPerLine = 88;
+            p.ribbonWidth = 0.055f;
+            p.flowSpeed = 3.1f;
+            p.opacity = 0.92f;
+            p.color = {1.0f, 0.52f, 0.10f};
             break;
         case OrbitLayout::Body::Mercury:
             p.enabled = true;
@@ -50,31 +51,32 @@ MagneticFieldParams IntrinsicParamsForBody(OrbitLayout::Body body) {
             p.extentScale = 2.4f;
             p.seedCount = 8;
             p.samplesPerLine = 48;
-            p.ribbonWidth = 0.05f;
+            p.ribbonWidth = 0.04f;
             p.flowSpeed = 0.45f;
-            p.color = {0.55f, 0.7f, 0.85f};
+            p.opacity = 0.70f;
+            p.color = {0.60f, 0.72f, 0.82f};
             break;
         case OrbitLayout::Body::Earth:
             p.enabled = true;
             p.dipoleMoment = 1.0f;
             p.dipoleTiltDeg = 11.0f;
             p.extentScale = 4.2f;
-            p.seedCount = 16;
+            p.seedCount = 18;
             p.samplesPerLine = 64;
-            p.ribbonWidth = 0.05f;
-            p.flowSpeed = 1.1f;
-            p.color = {0.28f, 0.78f, 1.0f};
+            p.ribbonWidth = 0.055f;
+            p.flowSpeed = 1.15f;
+            p.color = {0.22f, 0.80f, 1.0f};
             break;
         case OrbitLayout::Body::Jupiter:
             p.enabled = true;
             p.dipoleMoment = 1.6f;
             p.dipoleTiltDeg = 10.0f;
-            p.extentScale = 5.5f;
-            p.seedCount = 16;
-            p.samplesPerLine = 64;
-            p.ribbonWidth = 0.04f;
-            p.flowSpeed = 1.6f;
-            p.color = {0.55f, 0.85f, 1.0f};
+            p.extentScale = 6.2f;
+            p.seedCount = 20;
+            p.samplesPerLine = 72;
+            p.ribbonWidth = 0.048f;
+            p.flowSpeed = 1.7f;
+            p.color = {0.62f, 0.88f, 1.0f};
             break;
         case OrbitLayout::Body::Saturn:
             p.enabled = true;
@@ -83,20 +85,21 @@ MagneticFieldParams IntrinsicParamsForBody(OrbitLayout::Body body) {
             p.extentScale = 4.0f;
             p.seedCount = 12;
             p.samplesPerLine = 56;
-            p.ribbonWidth = 0.04f;
+            p.ribbonWidth = 0.042f;
             p.flowSpeed = 1.0f;
-            p.color = {0.75f, 0.85f, 1.0f};
+            p.color = {0.85f, 0.82f, 0.65f};
             break;
         case OrbitLayout::Body::Uranus:
             p.enabled = true;
             p.dipoleMoment = 0.85f;
             p.dipoleTiltDeg = 59.0f;
-            p.extentScale = 3.8f;
-            p.seedCount = 16;
-            p.samplesPerLine = 64;
-            p.ribbonWidth = 0.05f;
-            p.flowSpeed = 0.95f;
-            p.color = {0.45f, 0.95f, 0.85f};
+            p.extentScale = 4.3f;
+            p.seedCount = 20;
+            p.samplesPerLine = 72;
+            p.ribbonWidth = 0.07f;
+            p.flowSpeed = 1.05f;
+            p.opacity = 0.92f;
+            p.color = {0.18f, 1.0f, 0.72f};
             break;
         case OrbitLayout::Body::Neptune:
             p.enabled = true;
@@ -105,9 +108,9 @@ MagneticFieldParams IntrinsicParamsForBody(OrbitLayout::Body body) {
             p.extentScale = 3.8f;
             p.seedCount = 12;
             p.samplesPerLine = 56;
-            p.ribbonWidth = 0.05f;
+            p.ribbonWidth = 0.055f;
             p.flowSpeed = 0.95f;
-            p.color = {0.4f, 0.65f, 1.0f};
+            p.color = {0.28f, 0.48f, 1.0f};
             break;
         default:
             p.enabled = false;

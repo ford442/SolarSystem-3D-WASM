@@ -12,5 +12,6 @@
 #include "OrbitPathRenderer.h"
 #include "MagneticFieldLineMesh.h"
 #include "MagneticFieldLineRenderer.h"
+#include "MagneticFieldBloom.h"
 
 #endif //SOLARSYSTEM_AUXILIARYMODULES_H

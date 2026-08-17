@@ -15,6 +15,7 @@ set(SOLARSYSTEM_TEST_SOURCES
     ${CMAKE_SOURCE_DIR}/src/Solar_System/AsteroidOrbit.cpp
     ${CMAKE_SOURCE_DIR}/src/Auxiliary_Modules/Ephemeris.cpp
     ${CMAKE_SOURCE_DIR}/src/Auxiliary_Modules/MagneticFieldParams.cpp
+    ${CMAKE_SOURCE_DIR}/src/Auxiliary_Modules/MagneticFieldModel.cpp
     ${CMAKE_SOURCE_DIR}/src/Auxiliary_Modules/MagneticFieldTracer.cpp
     ${CMAKE_SOURCE_DIR}/src/QualitySettings.cpp
     ${CMAKE_SOURCE_DIR}/src/Auxiliary_Modules/PlanetManifestLoader.cpp

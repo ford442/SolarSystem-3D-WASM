@@ -12,6 +12,7 @@ uniform vec3 starGlowTint;
 uniform float planetRadius;
 uniform float zCoef;
 uniform float bias; // For shadows
+uniform float uSurfaceDim;
 
 uniform vec3 camPos;
 
@@ -142,7 +143,7 @@ void main() {
 
     if (shadow > 0.0) { // The ring is obscured by the parent planet
         ringColor.rgb *= 1.0 - shadow;
-        fragColor = ringColor;
+        fragColor = vec4(ringColor.rgb * uSurfaceDim, ringColor.a);
         return;
     }
 
@@ -167,5 +168,5 @@ void main() {
         ringColor.rgb *= backLit0 * starGlowTint * starGlowTint; // Star glow tint^2
     }
 
-    fragColor = ringColor;
+    fragColor = vec4(ringColor.rgb * uSurfaceDim, ringColor.a);
 }

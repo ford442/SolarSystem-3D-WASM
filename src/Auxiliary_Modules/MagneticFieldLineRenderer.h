@@ -26,7 +26,7 @@ public:
      */
     void Draw(const glm::mat4& projection, const glm::mat4& view, const glm::mat4& model,
               const MagneticFieldParams& params, OrbitLayout::Body body, const glm::vec3& cameraPosition,
-              float zCoef, float timeSeconds) const;
+              float zCoef, float timeSeconds, float ribbonWidthScale = 1.0f, float opacityScale = 1.0f) const;
 
 private:
     struct Batch {
