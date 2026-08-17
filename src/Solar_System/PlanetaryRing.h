@@ -32,7 +32,7 @@ protected:
     glm::vec3 _upVector = glm::vec3(0, 1, 0), _ringNormal;
 
     void UpdateRingNormal();
-    void ConfigureDiffuseLOD(const std::string& lowPath, const std::string& highPath, const std::string& label);
+    void ConfigureDiffuseLOD(const std::string& lowPath, const std::string& midPath, const std::string& highPath, const std::string& label);
 
 private:
     TextureLODController _diffuseLOD;

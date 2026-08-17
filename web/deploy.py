@@ -20,7 +20,7 @@ PROJECT_ROOT = WEB_DIR.parent
 DEFAULT_APP_SOURCE = WEB_DIR / "dist"
 DEFAULT_ASSET_SOURCE = PROJECT_ROOT / "resource"
 DEFAULT_MANIFEST = DEFAULT_ASSET_SOURCE / "asset-manifest.json"
-ASSET_DIRECTORIES = ("textures", "textures_low", "sounds")
+ASSET_DIRECTORIES = ("textures", "textures_low", "textures_mid", "sounds")
 
 
 def env(name: str, default: str | None = None) -> str | None:
@@ -43,6 +43,11 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--app-remote", default=env("DEPLOY_APP_REMOTE"))
     parser.add_argument("--asset-remote", default=env("DEPLOY_ASSET_REMOTE"))
     parser.add_argument("--dry-run", action="store_true", help="validate and print without connecting")
+    parser.add_argument(
+        "--update-manifest",
+        action="store_true",
+        help="Fill sha256 digests for existing local asset-manifest files before upload",
+    )
     args = parser.parse_args()
 
     if not args.host and not args.dry_run:
@@ -64,9 +69,35 @@ def sha256(path: Path) -> str:
     return digest.hexdigest()
 
 
-def load_and_validate_manifest(manifest_path: Path, asset_root: Path) -> dict:
+def fill_manifest_checksums(manifest: dict, asset_root: Path) -> int:
+    """Set sha256 for every manifest entry whose file exists on disk. Returns update count."""
+    updated = 0
+    for asset in manifest.get("files", []):
+        relative = PurePosixPath(asset["path"])
+        if relative.is_absolute() or ".." in relative.parts:
+            raise ValueError(f"Unsafe manifest path: {relative}")
+        local_path = asset_root.joinpath(*relative.parts)
+        if not local_path.is_file():
+            continue
+        digest = sha256(local_path)
+        if asset.get("sha256") != digest:
+            asset["sha256"] = digest
+            updated += 1
+    return updated
+
+
+def load_and_validate_manifest(
+    manifest_path: Path, asset_root: Path, *, update_checksums: bool = False
+) -> dict:
     with manifest_path.open(encoding="utf-8") as source:
         manifest = json.load(source)
+
+    if update_checksums:
+        updated = fill_manifest_checksums(manifest, asset_root)
+        with manifest_path.open("w", encoding="utf-8") as sink:
+            json.dump(manifest, sink, indent=2)
+            sink.write("\n")
+        print(f"Updated {updated} sha256 entries in {manifest_path}")
 
     missing: list[str] = []
     for asset in manifest.get("files", []):
@@ -138,8 +169,12 @@ def upload_assets(
     manifest_path: Path,
     remote_root: str,
     dry_run: bool,
+    *,
+    update_manifest: bool = False,
 ) -> None:
-    load_and_validate_manifest(manifest_path, asset_root)
+    load_and_validate_manifest(
+        manifest_path, asset_root, update_checksums=update_manifest
+    )
     for directory in ASSET_DIRECTORIES:
         local_directory = asset_root / directory
         if not local_directory.is_dir():
@@ -188,6 +223,7 @@ def main() -> None:
                 args.manifest.resolve(),
                 args.asset_remote,
                 args.dry_run,
+                update_manifest=args.update_manifest,
             )
         print("Deployment complete.")
     finally:

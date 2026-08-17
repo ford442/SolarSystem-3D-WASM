@@ -28,19 +28,56 @@ SolarSystem-3D-WASM/
 │   ├── Auxiliary_Modules/      # Engine subsystems (Shader, Camera, LOD queue, …)
 │   └── Solar_System/           # Celestial bodies by system (Earth_System/, …)
 ├── resource/                   # Runtime assets
+│   ├── planets.catalog.json    # **Canonical** body metadata (edit this)
+│   ├── planets.catalog.schema.json
+│   ├── planet_manifest.json    # GENERATED staged-loading systems
 │   ├── shaders/                # GLSL (preloaded into WASM VFS)
 │   ├── textures/               # High-res DDS (hosted at deploy time, not all in git)
 │   ├── textures_low/           # Low-res DDS + 4×4 placeholders (committed)
+│   ├── textures_mid/           # Mid-tier LOD DDS (placeholders + deploy artifacts)
 │   ├── models/, fonts/, icons/, sounds/
 │   └── asset-manifest.json     # Inventory + optional SHA-256 checksums
 ├── web/                        # Vite + TypeScript frontend
 │   ├── src/main.ts             # WASM bootstrap, progress UI, asset base URL
-│   └── public/                 # SolarSystem.wasm, .data, bundled placeholders
+│   ├── public/planet_facts.json  # GENERATED explorer facts
+│   └── threejs/src/data/orbital-parameters.json  # GENERATED companion orbits
+├── scripts/generate-planet-metadata.mjs
 ├── build-web.sh                # Emscripten build + artifact deploy
 └── docs/
     ├── ARCHITECTURE.md         # This file
     └── plans/                  # Testing guide, porting guide, future plans
 ```
+
+### 2.1 Canonical planet metadata flow
+
+Planet-related data used to live in several hand-edited files. The **single source of truth** is now:
+
+`resource/planets.catalog.json` (schema: `resource/planets.catalog.schema.json`)
+
+```
+resource/planets.catalog.json
+            │
+            ▼
+  scripts/generate-planet-metadata.mjs
+     ├─► web/public/planet_facts.json              → planet explorer panel
+     ├─► web/threejs/src/data/orbital-parameters.json → Three.js companion
+     └─► resource/planet_manifest.json             → staged loading (WASM)
+
+resource/asset-manifest.json  ◄──  web/deploy.py --update-manifest  (fill sha256)
+```
+
+| Command | Purpose |
+|---------|---------|
+| `npm run generate:planet-metadata` (from `web/`) | Regenerate JSON outputs |
+| `npm run generate:planet-metadata:check` | CI: fail if outputs drift |
+| `node scripts/generate-planet-metadata.mjs --write-checksums` | Fill asset-manifest sha256 for files present on disk |
+| `python3 web/deploy.py assets --update-manifest …` | Hash + upload assets |
+
+**Index convention:** focus body indices are **Sun = 0 … Pluto = 9**, matching `OrbitLayout::Body` and explorer `planet_facts.json`. Do not renumber without updating C++ enum / ephemeris tables.
+
+**Do not hand-edit** generated JSON (`planet_facts.json`, `planet_manifest.json`, `orbital-parameters.json`). Edit the catalog and re-run codegen. C++ per-body render classes and `OrbitLayout` physics tables are still hand-maintained (optional future: generated `OrbitLayoutBodies.generated.inc`).
+
+**Adding metadata for a new focus body:** edit `planets.catalog.json` (facts, orbit offset, system assets, initTag on allowlist), run codegen, then implement the C++ `Init*System` if the body should render.
 
 ---
 
@@ -165,15 +202,19 @@ Desktop: all manifests are empty; `InitStarSystem()` creates every planet immedi
 
 ### 4.3 Layer 3 — LOD texture streaming
 
-After a planet is `READY`, it renders with **low-res** textures (`GetTexturePath` returns `textures_low/` on WASM). Each frame, `UpdateLOD()` calls `planet->LoadHighResIfClose(cameraPos)`:
+After a planet is `READY`, it renders with **low-res** textures (`GetTexturePath` returns `textures_low/` on WASM). Each frame, `UpdateLOD()` calls `planet->LoadHighResIfClose(cameraPos)`, which drives per-map `TextureLODController` instances:
 
 | Condition | Action |
 |-----------|--------|
-| Distance < 50 units (`_lodThreshold`) | Queue high-res textures via `TextureLoadingQueue` |
-| Distance > 100 units (2× threshold) | Downgrade back to low-res |
-| `g_qualityPreset == 0` | Force low-res, no upgrades |
+| Distance < T (`_lodThreshold`, medium uses T/1.5) | Queue **mid** textures (`textures_mid/*_Mid.dds`) when preset allows |
+| Distance < 0.5×T and preset is **full** | Queue **high** textures (`textures/*`) after mid is resident |
+| Distance > T | Downgrade high → mid |
+| Distance > 2×T | Downgrade mid → low |
+| Preset **low** (`maxTextureLodTier=Low`) | Force low; cancel in-flight upgrades |
+| Preset **medium** | Cap at mid (never fetches full 8K) |
+| Preset **full** | Allow mid then high |
 
-High-res loads are serialized (one in-flight), deduplicated, cancellable on rapid camera movement, and reported through `window.updateStreamingProgress(completed, total, active)`.
+Loads are deduplicated, cancellable on camera retreat, concurrency-capped by quality preset, and reported through `window.updateStreamingProgress(completed, total, active, tierCode)` (`tierCode`: 0 generic, 1 mid, 2 high).
 
 **Mipmap safety:** `nv_dds` + `TextureImage2D` always set `GL_TEXTURE_BASE_LEVEL=0` and `GL_TEXTURE_MAX_LEVEL` to the last uploaded mip level. Incomplete mip chains cause black textures on WebGL 2.
 
@@ -227,9 +268,11 @@ RenderTextureLoadingProgress()
 
 ```
 Planet READY with low-res texture
-    → LoadHighResIfClose(cameraPos)
-    → distance < 50u → TextureLoadingQueue::Enqueue(highResPath)
-    → TextureImage2D::ReloadTexture(highResPath)
+    → LoadHighResIfClose(cameraPos) / TextureLODController::Update
+    → distance < T → queue textures_mid/*_Mid.dds (medium + full)
+    → distance < 0.5T and full → queue textures/*.dds
+    → TextureImage2D::ReloadTexture(path)
+    → retreat: high→mid→low with hysteresis; cancel in-flight jobs
     → render passes rebind GetTexture() each frame (hot-swap safe)
 ```
 
@@ -305,12 +348,16 @@ See [README.md § Runtime asset hosting](../README.md#runtime-asset-hosting) for
 | `TextureImage2D` | DDS load, reload, mip level management |
 | `WebResourceFetcher` | `DownloadFile` (async) + `Fetch` (sync) — WASM only |
 | `TextureLoadingQueue` | Serialized high-res LOD downloads |
+| `OrbitPathRenderer` | Faint heliocentric `GL_LINE_LOOP` guides |
+| `MagneticFieldTracer` / `MagneticFieldLineRenderer` | Optional dipole+toroidal ribbons (static VBO, GPU flow) |
 
 ### 7.3 Scene objects
 
 Inheritance: `SpaceObject` → `Transformable` → `Planet` / `Satellite` / `Star`.
 
 Each planet system lives in `src/Solar_System/<Name>_System/`. `SolarSystem.h` aggregates includes. Atmospheres, clouds, and rings are separate render components.
+
+**Magnetic field params:** `MagneticFieldParams` on `SpaceObject` (set in `StarSystemFactory.cpp` via `MagneticFieldCatalog::IntrinsicParamsForBody`). Values are visual/educational — not SI magnetosphere physics. `ParamsForBody(body, quality)` adds seed/sample scaling and quality enable gates for the ribbon renderer. `Application::ForEachEnabledMagneticField` walks the Sun, loaded planets, and satellites whose `enabled` flag is set. Satellites default to disabled.
 
 ---
 

@@ -48,6 +48,10 @@ public:
     bool GetMusicMuted() const;
     void SetOrbitLinesEnabled(bool enabled);
     bool GetOrbitLinesEnabled() const;
+    void SetMagneticFieldsEnabled(bool enabled);
+    bool GetMagneticFieldsEnabled() const;
+    void ForEachEnabledMagneticField(
+        const std::function<void(const SpaceObject& object, const MagneticFieldParams& params)>& fn) const;
     Camera& GetCamera() { return _camera; }
     const Camera& GetCamera() const { return _camera; }
 
@@ -69,6 +73,9 @@ private:
     bool _isRenderSatelliteDistances = true;
     bool _isVertSyncEnabled = true;
     bool _orbitLinesEnabled = true;
+    bool _magneticFieldsEnabled = false;
+    bool _magneticFieldsBuilt = false;
+    int _magneticFieldsQuality = -1;
 
 #ifdef __EMSCRIPTEN__
     XrFrameState _xr;
@@ -121,6 +128,7 @@ private:
     std::unique_ptr<Shader> _hdrShader, _lensFlareShader, _starGlowShader;
     std::unique_ptr<LensFlare> _lensFlare;
     std::unique_ptr<OrbitPathRenderer> _orbitPathRenderer;
+    std::unique_ptr<MagneticFieldLineRenderer> _magneticFieldRenderer;
     std::unique_ptr<AsteroidField> _asteroidField;
     std::shared_ptr<Star> _sun;
     std::vector<RenderableSceneComponent> _renderableSceneComponents;
@@ -163,6 +171,8 @@ private:
     void UpdateLOD();             // Central LOD manager: upgrade textures for nearest planets (WASM)
     void RenderPlanetProxyMarkers() const; // Show orbital markers for unloaded planets (WASM)
     void RenderOrbitPaths() const;
+    void EnsureMagneticFieldsBuilt();
+    void RenderMagneticFields() const;
     void RenderAsteroidField();
     void RenderFrameContent(); // Sky → planets → effects (one eye / mono)
 #ifdef __EMSCRIPTEN__

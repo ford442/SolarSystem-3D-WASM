@@ -10,34 +10,46 @@ void ExpectTier(const QualityTierSettings& settings,
                 int requestedMsaaSamples,
                 bool enableHdr,
                 int asteroidInstanceCount,
+                TextureLodTier maxTextureLodTier,
                 const char* name) {
     EXPECT_EQ(settings.shadowResolution, shadowResolution);
     EXPECT_EQ(settings.maxConcurrentTextureLoads, maxConcurrentTextureLoads);
     EXPECT_EQ(settings.requestedMsaaSamples, requestedMsaaSamples);
     EXPECT_EQ(settings.enableHdr, enableHdr);
     EXPECT_EQ(settings.asteroidInstanceCount, asteroidInstanceCount);
+    EXPECT_EQ(settings.maxTextureLodTier, maxTextureLodTier);
     EXPECT_STREQ(settings.name, name);
 }
 
 } // namespace
 
 TEST(QualitySettingsTest, DesktopPresetMapping) {
-    ExpectTier(GetQualitySettings(0, false), 1024, 0, 0, false, 600, "low");
-    ExpectTier(GetQualitySettings(1, false), 2048, 2, 0, true, 1800, "medium");
-    ExpectTier(GetQualitySettings(2, false), 3000, 4, 4, true, 4000, "full");
+    ExpectTier(GetQualitySettings(0, false), 1024, 0, 0, false, 600, TextureLodTier::Low, "low");
+    ExpectTier(GetQualitySettings(1, false), 2048, 2, 0, true, 1800, TextureLodTier::Mid, "medium");
+    ExpectTier(GetQualitySettings(2, false), 3000, 4, 4, true, 4000, TextureLodTier::High, "full");
 }
 
 TEST(QualitySettingsTest, MobileDowngradesMsaaOnFullPreset) {
-    ExpectTier(GetQualitySettings(2, true), 3000, 2, 0, true, 1400, "full");
+    ExpectTier(GetQualitySettings(2, true), 3000, 2, 0, true, 1400, TextureLodTier::High, "full");
 }
 
 TEST(QualitySettingsTest, MobileScalesAsteroidCountsDown) {
-    ExpectTier(GetQualitySettings(0, true), 1024, 0, 0, false, 400, "low");
-    ExpectTier(GetQualitySettings(1, true), 2048, 2, 0, true, 900, "medium");
+    ExpectTier(GetQualitySettings(0, true), 1024, 0, 0, false, 400, TextureLodTier::Low, "low");
+    ExpectTier(GetQualitySettings(1, true), 2048, 2, 0, true, 900, TextureLodTier::Mid, "medium");
 }
 
 TEST(QualitySettingsTest, OutOfRangePresetUsesFullTier) {
-    ExpectTier(GetQualitySettings(99, false), 3000, 4, 4, true, 4000, "full");
+    ExpectTier(GetQualitySettings(99, false), 3000, 4, 4, true, 4000, TextureLodTier::High, "full");
+}
+
+TEST(QualitySettingsTest, GetMaxTextureLodTierFollowsPreset) {
+    g_qualityPreset = 0;
+    g_isMobileWeb = false;
+    EXPECT_EQ(GetMaxTextureLodTier(), TextureLodTier::Low);
+    g_qualityPreset = 1;
+    EXPECT_EQ(GetMaxTextureLodTier(), TextureLodTier::Mid);
+    g_qualityPreset = 2;
+    EXPECT_EQ(GetMaxTextureLodTier(), TextureLodTier::High);
 }
 
 #ifndef __EMSCRIPTEN__

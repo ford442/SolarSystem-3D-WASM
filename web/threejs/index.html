@@ -7,12 +7,12 @@
     <title>Solar System (Three.js / WebGPU companion)</title>
   </head>
   <body>
-    <canvas id="scene" aria-label="Interactive inner solar system"></canvas>
+    <canvas id="scene" aria-label="Interactive solar system companion (Sun to Jupiter)"></canvas>
     <section class="hud" aria-label="Companion renderer controls">
-      <h1>Inner Solar System · Companion</h1>
+      <h1 id="companion-title">Solar System · Companion</h1>
       <p id="info">Initializing renderer…</p>
       <p id="texture-status">Preparing KTX2 textures…</p>
-      <p class="hint">Drag to orbit · wheel to zoom · WASD + Space/C to glide</p>
+      <p class="hint">Drag to orbit · wheel to zoom · WASD + Space/C to glide · proxies = not fully implemented</p>
       <nav id="focus-presets" aria-label="Camera focus presets"></nav>
     </section>
     <script type="module" src="/src/main.ts"></script>

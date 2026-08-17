@@ -4,7 +4,8 @@
 Full-resolution planet textures (e.g. 16384x8192) exceed GL_MAX_TEXTURE_SIZE on
 many browsers and were causing black orbs after LOD reload. This script builds
 a deployable tree of BC3/DXT5 DDS files capped at 8192 px with a full mip
-chain, plus optional textures_low placeholders for staged loading.
+chain, plus optional textures_low / textures_mid variants for staged loading
+and three-tier LOD streaming.
 
 Requirements:
   Microsoft texconv (DirectXTex). Run scripts/install_texconv.sh to download
@@ -45,6 +46,7 @@ PROJECT_ROOT = Path(__file__).resolve().parents[1]
 DEFAULT_INPUT = PROJECT_ROOT / "resource" / "textures"
 DEFAULT_OUTPUT = PROJECT_ROOT / "resource" / "textures_web"
 DEFAULT_LOW_RES = PROJECT_ROOT / "resource" / "textures_low"
+DEFAULT_MID_RES = PROJECT_ROOT / "resource" / "textures_mid"
 
 # Runtime high-res paths referenced by the C++ LOD system and staged loading.
 GAME_TEXTURE_MANIFEST = (
@@ -204,6 +206,18 @@ def low_res_name(relative_path: Path) -> Path:
     return relative_path.with_name(f"{relative_path.stem}_Low{relative_path.suffix}")
 
 
+def mid_res_name(relative_path: Path) -> Path:
+    return relative_path.with_name(f"{relative_path.stem}_Mid{relative_path.suffix}")
+
+
+def mid_res_max_for(relative_path: Path, default_max: int) -> int:
+    """Normals/specular use a smaller mid tier than diffuse maps."""
+    stem = relative_path.stem.lower()
+    if "normal" in stem or "specular" in stem:
+        return min(default_max, 512)
+    return default_max
+
+
 def should_skip(source: Path, output: Path, force: bool) -> bool:
     if force or not output.is_file():
         return False
@@ -259,11 +273,14 @@ def process_file(
     output_dir: Path,
     low_res_dir: Optional[Path],
     low_res_max_size: int,
+    mid_res_dir: Optional[Path],
+    mid_res_max_size: int,
     max_size: int,
     texconv: Path,
     force: bool,
     dry_run: bool,
     build_low_res: bool,
+    build_mid_res: bool,
 ) -> list[JobResult]:
     results: list[JobResult] = []
     relative = source.relative_to(input_dir)
@@ -355,40 +372,104 @@ def process_file(
                     output_size=read_dds_info(low_target) if low_target.is_file() else None,
                 )
             )
-            return results
-
-        try:
-            produced_low = run_texconv(
-                texconv=texconv,
-                source=low_source,
-                output_dir=low_target.parent,
-                max_size=low_res_max_size,
-                resize=low_resize,
-                dry_run=dry_run,
-            )
-            final_low = low_target
-            if produced_low != low_target and not dry_run:
-                produced_low.rename(low_target)
-            out_low = read_dds_info(final_low) if final_low.is_file() and not dry_run else None
-            results.append(
-                JobResult(
+        else:
+            try:
+                produced_low = run_texconv(
+                    texconv=texconv,
                     source=low_source,
-                    output=final_low,
-                    action="low-resize" if low_resize else "low-remipmap",
-                    source_size=low_info,
-                    output_size=out_low,
+                    output_dir=low_target.parent,
+                    max_size=low_res_max_size,
+                    resize=low_resize,
+                    dry_run=dry_run,
                 )
-            )
-        except RuntimeError as exc:
+                final_low = low_target
+                if produced_low != low_target and not dry_run:
+                    produced_low.rename(low_target)
+                out_low = read_dds_info(final_low) if final_low.is_file() and not dry_run else None
+                results.append(
+                    JobResult(
+                        source=low_source,
+                        output=final_low,
+                        action="low-resize" if low_resize else "low-remipmap",
+                        source_size=low_info,
+                        output_size=out_low,
+                    )
+                )
+            except RuntimeError as exc:
+                results.append(
+                    JobResult(
+                        source=low_source,
+                        output=low_target,
+                        action="error",
+                        source_size=low_info,
+                        error=str(exc),
+                    )
+                )
+
+    if build_mid_res and mid_res_dir is not None:
+        mid_target = mid_res_dir / mid_res_name(relative)
+        mid_target.parent.mkdir(parents=True, exist_ok=True)
+        mid_source = target if target.is_file() else source
+        mid_cap = mid_res_max_for(relative, mid_res_max_size)
+        try:
+            mid_info = read_dds_info(mid_source)
+        except ValueError as exc:
             results.append(
                 JobResult(
-                    source=low_source,
-                    output=low_target,
+                    source=mid_source,
+                    output=mid_target,
                     action="error",
-                    source_size=low_info,
+                    source_size=DdsInfo(0, 0),
                     error=str(exc),
                 )
             )
+            return results
+
+        mid_resize = mid_info.max_dimension > mid_cap
+        if should_skip(mid_source, mid_target, force):
+            results.append(
+                JobResult(
+                    source=mid_source,
+                    output=mid_target,
+                    action="skip-mid",
+                    source_size=mid_info,
+                    output_size=read_dds_info(mid_target) if mid_target.is_file() else None,
+                )
+            )
+        else:
+            try:
+                produced_mid = run_texconv(
+                    texconv=texconv,
+                    source=mid_source,
+                    output_dir=mid_target.parent,
+                    max_size=mid_cap,
+                    resize=mid_resize,
+                    dry_run=dry_run,
+                )
+                final_mid = mid_target
+                if produced_mid != mid_target and not dry_run:
+                    # texconv writes source basename; rename to *_Mid.dds
+                    produced_mid.rename(mid_target)
+                out_mid = read_dds_info(final_mid) if final_mid.is_file() and not dry_run else None
+                results.append(
+                    JobResult(
+                        source=mid_source,
+                        output=final_mid,
+                        action="mid-resize" if mid_resize else "mid-remipmap",
+                        source_size=mid_info,
+                        output_size=out_mid,
+                    )
+                )
+            except RuntimeError as exc:
+                results.append(
+                    JobResult(
+                        source=mid_source,
+                        output=mid_target,
+                        action="error",
+                        source_size=mid_info,
+                        error=str(exc),
+                    )
+                )
 
     return results
 
@@ -421,6 +502,17 @@ def parse_args() -> argparse.Namespace:
         help="Skip generating textures_low variants",
     )
     parser.add_argument(
+        "--mid-res-dir",
+        type=Path,
+        default=DEFAULT_MID_RES,
+        help=f"Optional mid-res LOD output tree (default: {DEFAULT_MID_RES})",
+    )
+    parser.add_argument(
+        "--no-mid-res",
+        action="store_true",
+        help="Skip generating textures_mid variants",
+    )
+    parser.add_argument(
         "--max-size",
         type=int,
         default=8192,
@@ -431,6 +523,12 @@ def parse_args() -> argparse.Namespace:
         type=int,
         default=512,
         help="Maximum width/height for textures_low (default: 512)",
+    )
+    parser.add_argument(
+        "--mid-res-max-size",
+        type=int,
+        default=1024,
+        help="Maximum width/height for textures_mid diffuse maps (default: 1024; normals/specular cap at 512)",
     )
     parser.add_argument(
         "--texconv",
@@ -498,6 +596,7 @@ def main() -> int:
     input_dir = args.input_dir.resolve()
     output_dir = args.output_dir.resolve()
     low_res_dir = None if args.no_low_res else args.low_res_dir.resolve()
+    mid_res_dir = None if args.no_mid_res else args.mid_res_dir.resolve()
 
     if not input_dir.is_dir():
         print(f"Input directory not found: {input_dir}", file=sys.stderr)
@@ -524,6 +623,8 @@ def main() -> int:
     print(f"output:  {output_dir}")
     if low_res_dir is not None:
         print(f"low-res: {low_res_dir} (max {args.low_res_max_size}px)")
+    if mid_res_dir is not None:
+        print(f"mid-res: {mid_res_dir} (max {args.mid_res_max_size}px diffuse)")
     print(f"files:   {len(sources)}")
     print(f"max size: {args.max_size}px")
     if args.dry_run:
@@ -539,11 +640,14 @@ def main() -> int:
                 output_dir,
                 low_res_dir,
                 args.low_res_max_size,
+                mid_res_dir,
+                args.mid_res_max_size,
                 args.max_size,
                 texconv,
                 args.force,
                 args.dry_run,
                 low_res_dir is not None,
+                mid_res_dir is not None,
             )
             for source in sources
         ]

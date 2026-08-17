@@ -39,7 +39,8 @@ protected:
     float _radius = 2.0; // Radius of the earth 3d model in Blender
     float _earthSizeCoefficient;
     void ConfigureDiffuseLOD(TextureImage2D& diffuse, const std::string& lowPath,
-                             const std::string& highPath, const std::string& label);
+                             const std::string& midPath, const std::string& highPath,
+                             const std::string& label);
 
 private:
     TextureLODController _diffuseLOD;

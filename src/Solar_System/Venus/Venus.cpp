@@ -1,11 +1,15 @@
 #include "Venus.h"
-#include "../../Auxiliary_Modules/TextureLoadingQueue.h"
+#include <glm/glm.hpp>
 #include "../OrbitLayout.h"
 
 Venus::Venus(const PlanetInfo& planetInfo, std::shared_ptr<Star> parentStar) : Planet(planetInfo, std::move(parentStar)), _diffuses(planetInfo.diffuseTextures),
     _normalMap(planetInfo.normalMap)
 {
     Translate(_parentStar->GetPosition() + OrbitLayout::GetOffset(OrbitLayout::Body::Venus));
+    _diffuseLOD.Configure(_diffuses.at(0), TexturePaths::Venus::Diffuse.low, TexturePaths::Venus::Diffuse.mid,
+                     TexturePaths::Venus::Diffuse.high, "Venus_Diffuse", TextureLoadCategory::Planet);
+    _normalLOD.Configure(_normalMap, TexturePaths::Venus::Normal.low, TexturePaths::Venus::Normal.mid,
+                     TexturePaths::Venus::Normal.high, "Venus_Normal", TextureLoadCategory::Planet);
 #ifdef __EMSCRIPTEN__
     _isHighResLoaded = false;
     _isHighResLoading = false;
@@ -39,67 +43,15 @@ void Venus::Render() const {
 }
 
 void Venus::LoadHighResIfClose(const glm::vec3& cameraPos) {
-    float distance = glm::length(cameraPos - GetPosition());
+    const float distance = glm::length(cameraPos - GetPosition());
     const float lodThreshold = GetEffectiveLODThreshold();
     _lastCameraDistance = distance;
 
-    if (_isHighResLoaded) {
-        if (distance > lodThreshold * 2.0f) {
-            std::cout << "[LOD] Camera distance to Venus: " << distance << " units. Downgrading high-res to low-res..." << std::endl;
-            _diffuses.at(0).ReloadTexture(_diffuseLowPath);
-            _normalMap.ReloadTexture(_normalLowPath);
-            _isHighResLoaded = false;
-            _isHighResLoading = false;
-            _highResTexturesLoaded = 0;
-            _highResTexturesProcessed = 0;
-            std::cout << "[LOD] Venus high-res textures downgraded (VRAM freed)" << std::endl;
-            return;
-        }
-        return;
-    }
+    _diffuseLOD.Update(cameraPos, GetPosition(), lodThreshold);
+    _normalLOD.Update(cameraPos, GetPosition(), lodThreshold);
 
-#ifdef __EMSCRIPTEN__
-    if (g_qualityPreset == 0) return; // Low preset: never load high-res
-#endif
-
-    if (_isHighResLoading) {
-        if (distance > lodThreshold * 1.8f) {
-            std::cout << "[LOD] Camera moved away from Venus during load (dist=" << distance << ") — deprioritizing." << std::endl;
-            auto& queue = TextureLoadingQueue::GetInstance();
-            queue.CancelLoad(_diffuseHighPath);
-            queue.CancelLoad(_normalHighPath);
-            _isHighResLoading = false;
-            return;
-        }
-        return;
-    }
-
-    if (distance < lodThreshold) {
-        std::cout << "[LOD] Camera distance to Venus: " << distance << " units. Queueing high-res textures..." << std::endl;
-        _isHighResLoading = true;
-        _highResTexturesLoaded = 0;
-        _highResTexturesProcessed = 0;
-        _highResLoadProgress = 0.0f;
-
-        auto& queue = TextureLoadingQueue::GetInstance();
-        auto onLoaded = [this](bool success) {
-            _highResTexturesProcessed++;
-            if (success) _highResTexturesLoaded++;
-            _highResLoadProgress = _highResTexturesLoaded / (float)_highResTextureCount;
-            if (_highResTexturesProcessed == _highResTextureCount) {
-                _isHighResLoaded = (_highResTexturesLoaded == _highResTextureCount);
-                _isHighResLoading = false;
-                if (_highResTexturesLoaded == _highResTextureCount) {
-                    std::cout << "[LOD] Venus high-res textures loaded successfully" << std::endl;
-                } else {
-                    std::cout << "[LOD] Venus high-res attempt finished (some or all failed, keeping low-res permanently)" << std::endl;
-                }
-            }
-        };
-
-        queue.QueueTextureLoad(_diffuseHighPath, "Venus_Diffuse_High", &_diffuses.at(0), onLoaded);
-        queue.QueueTextureLoad(_normalHighPath, "Venus_Normal_High", &_normalMap, onLoaded);
-    }
+    _isHighResLoading = _diffuseLOD.IsLoading() || _normalLOD.IsLoading();
+    _isHighResLoaded = _diffuseLOD.GetResidentTier() == TextureLodTier::High && _normalLOD.GetResidentTier() == TextureLodTier::High;
 }
 
 void Venus::UnloadHighResIfFar(const glm::vec3& cameraPos) {

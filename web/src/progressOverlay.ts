@@ -36,7 +36,7 @@ export function initProgressOverlay(elements: ProgressOverlayElements): void {
         }
     }
 
-    function updateStreamingProgress(completed: number, total: number, active = 0): void {
+    function updateStreamingProgress(completed: number, total: number, active = 0, tierCode = 0): void {
         if (total <= 0) {
             streamingProgress.style.display = 'none';
             return;
@@ -44,10 +44,12 @@ export function initProgressOverlay(elements: ProgressOverlayElements): void {
         streamingProgress.style.display = 'block';
         const pct = total > 0 ? Math.round((completed / total) * 100) : 0;
         const activeSuffix = active > 0 ? `, ${active} active` : '';
+        const tierLabel =
+            tierCode === 1 ? 'Mid-res upgrade' : tierCode === 2 ? 'High-res upgrade' : 'Texture upgrade';
         if (streamingText) {
-            streamingText.textContent = `High-res upgrade: ${completed}/${total} (${pct}%${activeSuffix})`;
+            streamingText.textContent = `${tierLabel}: ${completed}/${total} (${pct}%${activeSuffix})`;
         } else {
-            streamingProgress.textContent = `High-res upgrade: ${completed}/${total}`;
+            streamingProgress.textContent = `${tierLabel}: ${completed}/${total}`;
         }
         if (streamingBar) {
             streamingBar.style.width = `${pct}%`;

@@ -1,11 +1,17 @@
 #include "Pluto.h"
-#include "../../Auxiliary_Modules/TextureLoadingQueue.h"
+#include <glm/glm.hpp>
 #include "../OrbitLayout.h"
 
 Pluto::Pluto(const PlanetInfo& planetInfo, std::shared_ptr<Star> parentStar) : Planet(planetInfo, std::move(parentStar)), _diffuses(planetInfo.diffuseTextures),
     _normalMap(planetInfo.normalMap), _specular(planetInfo.specularTexture)
 {
     Translate(_parentStar->GetPosition() + OrbitLayout::GetOffset(OrbitLayout::Body::Pluto));
+    _diffuseLOD.Configure(_diffuses.at(0), TexturePaths::Pluto::Diffuse.low, TexturePaths::Pluto::Diffuse.mid,
+                     TexturePaths::Pluto::Diffuse.high, "Pluto_Diffuse", TextureLoadCategory::Planet);
+    _normalLOD.Configure(_normalMap, TexturePaths::Pluto::Normal.low, TexturePaths::Pluto::Normal.mid,
+                     TexturePaths::Pluto::Normal.high, "Pluto_Normal", TextureLoadCategory::Planet);
+    _specularLOD.Configure(_specular, TexturePaths::Pluto::Specular.low, TexturePaths::Pluto::Specular.mid,
+                     TexturePaths::Pluto::Specular.high, "Pluto_Specular", TextureLoadCategory::Planet);
 #ifdef __EMSCRIPTEN__
     _isHighResLoaded = false;
     _isHighResLoading = false;
@@ -40,71 +46,16 @@ void Pluto::Render() const {
 }
 
 void Pluto::LoadHighResIfClose(const glm::vec3& cameraPos) {
-    float distance = glm::length(cameraPos - GetPosition());
+    const float distance = glm::length(cameraPos - GetPosition());
     const float lodThreshold = GetEffectiveLODThreshold();
     _lastCameraDistance = distance;
 
-    if (_isHighResLoaded) {
-        if (distance > lodThreshold * 2.0f) {
-            std::cout << "[LOD] Camera distance to Pluto: " << distance << " units. Downgrading high-res to low-res..." << std::endl;
-            _diffuses.at(0).ReloadTexture(_diffuseLowPath);
-            _normalMap.ReloadTexture(_normalLowPath);
-            _specular.ReloadTexture(_specularLowPath);
-            _isHighResLoaded = false;
-            _isHighResLoading = false;
-            _highResTexturesLoaded = 0;
-            _highResTexturesProcessed = 0;
-            std::cout << "[LOD] Pluto high-res textures downgraded (VRAM freed)" << std::endl;
-            return;
-        }
-        if (_isHighResLoading) return;
-        return;
-    }
+    _diffuseLOD.Update(cameraPos, GetPosition(), lodThreshold);
+    _normalLOD.Update(cameraPos, GetPosition(), lodThreshold);
+    _specularLOD.Update(cameraPos, GetPosition(), lodThreshold);
 
-#ifdef __EMSCRIPTEN__
-    if (g_qualityPreset == 0) return; // Low preset: never load high-res
-#endif
-
-    if (_isHighResLoading) {
-        if (distance > lodThreshold * 1.8f) {
-            std::cout << "[LOD] Camera moved away from Pluto during load (dist=" << distance << ") — deprioritizing." << std::endl;
-            auto& queue = TextureLoadingQueue::GetInstance();
-            queue.CancelLoad(_diffuseHighPath);
-            queue.CancelLoad(_normalHighPath);
-            queue.CancelLoad(_specularHighPath);
-            _isHighResLoading = false;
-            return;
-        }
-        return;
-    }
-
-    if (distance < lodThreshold) {
-        std::cout << "[LOD] Camera distance to Pluto: " << distance << " units. Queueing high-res textures..." << std::endl;
-        _isHighResLoading = true;
-        _highResTexturesLoaded = 0;
-        _highResTexturesProcessed = 0;
-        _highResLoadProgress = 0.0f;
-
-        auto& queue = TextureLoadingQueue::GetInstance();
-        auto onLoaded = [this](bool success) {
-            _highResTexturesProcessed++;
-            if (success) _highResTexturesLoaded++;
-            _highResLoadProgress = _highResTexturesLoaded / (float)_highResTextureCount;
-            if (_highResTexturesProcessed == _highResTextureCount) {
-                _isHighResLoaded = (_highResTexturesLoaded == _highResTextureCount);
-                _isHighResLoading = false;
-                if (_highResTexturesLoaded == _highResTextureCount) {
-                    std::cout << "[LOD] Pluto high-res textures loaded successfully" << std::endl;
-                } else {
-                    std::cout << "[LOD] Pluto high-res attempt finished (some or all failed, keeping low-res permanently)" << std::endl;
-                }
-            }
-        };
-
-        queue.QueueTextureLoad(_diffuseHighPath, "Pluto_Diffuse_High", &_diffuses.at(0), onLoaded);
-        queue.QueueTextureLoad(_normalHighPath, "Pluto_Normal_High", &_normalMap, onLoaded);
-        queue.QueueTextureLoad(_specularHighPath, "Pluto_Specular_High", &_specular, onLoaded);
-    }
+    _isHighResLoading = _diffuseLOD.IsLoading() || _normalLOD.IsLoading() || _specularLOD.IsLoading();
+    _isHighResLoaded = _diffuseLOD.GetResidentTier() == TextureLodTier::High && _normalLOD.GetResidentTier() == TextureLodTier::High && _specularLOD.GetResidentTier() == TextureLodTier::High;
 }
 
 void Pluto::UnloadHighResIfFar(const glm::vec3& cameraPos) {

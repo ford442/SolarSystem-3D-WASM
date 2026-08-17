@@ -13,7 +13,10 @@
     "verify:cross-origin": "node verify-cross-origin-fetch.js",
     "test:textures": "node verify-textures.js",
     "test:smoke": "playwright test",
-    "generate:wasm-exports": "node ../scripts/generate-wasm-exports.mjs"
+    "generate:wasm-exports": "node ../scripts/generate-wasm-exports.mjs",
+    "generate:planet-metadata": "node ../scripts/generate-planet-metadata.mjs",
+    "generate:planet-metadata:check": "node ../scripts/generate-planet-metadata.mjs --check",
+    "prebuild": "npm run generate:planet-metadata"
   },
   "devDependencies": {
     "@playwright/test": "^1.61.1",

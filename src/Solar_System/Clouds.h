@@ -22,7 +22,7 @@ public:
 
 protected:
     TextureImage2D _diffuse, _normal;
-    void ConfigureDiffuseLOD(const std::string& lowPath, const std::string& highPath, const std::string& label);
+    void ConfigureDiffuseLOD(const std::string& lowPath, const std::string& midPath, const std::string& highPath, const std::string& label);
 
 private:
     TextureLODController _diffuseLOD;

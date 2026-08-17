@@ -1,6 +1,7 @@
 #ifndef SOLARSYSTEM_SATURN_H
 #define SOLARSYSTEM_SATURN_H
 #include "../Planet.h"
+#include "../../Auxiliary_Modules/TextureLODController.h"
 
 class Saturn : public Planet {
 public:
@@ -14,15 +15,8 @@ private:
     std::vector<TextureImage2D> _diffuses;
     TextureImage2D _normalMap;
 
-    std::string _diffuseLowPath = TexturePaths::Saturn::Diffuse.low;
-    std::string _diffuseHighPath = TexturePaths::Saturn::Diffuse.high;
-    std::string _normalLowPath = TexturePaths::Saturn::Normal.low;
-    std::string _normalHighPath = TexturePaths::Saturn::Normal.high;
-
-    float _highResLoadProgress = 0.0f;
-    int _highResTexturesLoaded = 0;
-    int _highResTexturesProcessed = 0;
-    const int _highResTextureCount = 2;
+    TextureLODController _diffuseLOD;
+    TextureLODController _normalLOD;
 };
 
-#endif //SOLARSYSTEM_SATURN_H
+#endif //Saturn

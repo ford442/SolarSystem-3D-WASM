@@ -478,16 +478,25 @@ void Application::RenderTextureLoadingProgress() const {
     const int completed = queue.GetTotalProcessed();
     const int total     = queue.GetTotalQueued();
     const int active    = queue.GetActiveLoadCount();
+    const std::string& currentPath = queue.GetCurrentLoadingPath();
+    // 0=generic, 1=mid, 2=high — mirrors streaming UI labels in progressOverlay.ts
+    int tierCode = 0;
+    if (currentPath.find("textures_mid/") != std::string::npos) {
+        tierCode = 1;
+    } else if (currentPath.find("textures/") != std::string::npos &&
+               currentPath.find("textures_low/") == std::string::npos) {
+        tierCode = 2;
+    }
 
 #ifdef __EMSCRIPTEN__
     EM_ASM({
         if (typeof window.updateStreamingProgress === 'function') {
-            window.updateStreamingProgress($0, $1, $2);
+            window.updateStreamingProgress($0, $1, $2, $3);
         }
         if (typeof window.updateLoadingProgress === 'function' && $1 > 0) {
             window.updateLoadingProgress($0, $1);
         }
-    }, completed, total, active);
+    }, completed, total, active, tierCode);
 #endif
 
     if (queued == 0) {
@@ -505,18 +514,28 @@ void Application::RenderTextureLoadingProgress() const {
     _mainTextShader->SetMat4("projection", textProjection);
     _mainTextShader->SetBool("is3D", false);
 
-    // Build hint string with progress counters, e.g. "High-res upgrade (2/5)"
+    // Build hint string with progress counters, e.g. "Mid-res upgrade (2/5)"
     // Throttled render (via static) to avoid per-frame spam; visual is brief.
     static int lastCompleted = -1;
     static int lastTotal = -1;
     static int lastActive = -1;
+    static int lastTier = -1;
     static int frameCounter = 0;
     frameCounter = (frameCounter + 1) % 10;
-    if (frameCounter == 0 || completed != lastCompleted || total != lastTotal || active != lastActive) {
+    if (frameCounter == 0 || completed != lastCompleted || total != lastTotal || active != lastActive ||
+        tierCode != lastTier) {
         lastCompleted = completed;
         lastTotal = total;
         lastActive = active;
-        std::wstring hint = L"High-res upgrade (" + std::to_wstring(completed) + L"/" + std::to_wstring(total) + L")";
+        lastTier = tierCode;
+        const wchar_t* tierLabel = L"Texture upgrade";
+        if (tierCode == 1) {
+            tierLabel = L"Mid-res upgrade";
+        } else if (tierCode == 2) {
+            tierLabel = L"High-res upgrade";
+        }
+        std::wstring hint = std::wstring(tierLabel) + L" (" + std::to_wstring(completed) + L"/" +
+                            std::to_wstring(total) + L")";
         if (active > 0) {
             hint += L" [" + std::to_wstring(active) + L" active]";
         }

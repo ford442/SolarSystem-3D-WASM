@@ -30,8 +30,9 @@ void PlanetaryRing::UpdateRingNormal() {
     _ringNormal = glm::vec3(GetRotationMatrix() * glm::vec4(_upVector, 1.0));
 }
 
-void PlanetaryRing::ConfigureDiffuseLOD(const std::string& lowPath, const std::string& highPath, const std::string& label) {
-    _diffuseLOD.Configure(_ringTexture, lowPath, highPath, label, TextureLoadCategory::Ring);
+void PlanetaryRing::ConfigureDiffuseLOD(const std::string& lowPath, const std::string& midPath,
+                                       const std::string& highPath, const std::string& label) {
+    _diffuseLOD.Configure(_ringTexture, lowPath, midPath, highPath, label, TextureLoadCategory::Ring);
 }
 
 void PlanetaryRing::LoadHighResIfClose(const glm::vec3& cameraPosition) {

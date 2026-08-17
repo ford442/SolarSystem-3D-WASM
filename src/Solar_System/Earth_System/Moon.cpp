@@ -5,6 +5,7 @@ Moon::Moon(const SatelliteInfo& satelliteInfo, std::shared_ptr<SpaceObject> pare
     _diffuses(satelliteInfo.diffuseTextures), _normalMap(satelliteInfo.normalMap)
 {
     ConfigureDiffuseLOD(_diffuses.at(0), TexturePaths::Moon::Diffuse.low,
+                        TexturePaths::Moon::Diffuse.mid,
                         TexturePaths::Moon::Diffuse.high, "Moon");
 }
 

@@ -75,6 +75,7 @@ The project is an animated 3D scene with a model of the Solar System.
 | Document | Purpose |
 |----------|---------|
 | [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) | **Canonical** system design: loading layers, LOD, asset URLs, module map |
+| [resource/planets.catalog.json](resource/planets.catalog.json) | **Canonical** planet metadata (facts, staged load, companion); run `npm run generate:planet-metadata` |
 | [docs/plans/PORTING_GUIDE.md](docs/plans/PORTING_GUIDE.md) | Emscripten port history and CMake/WebGL details |
 | [docs/CROSS_ORIGIN_HEADERS.md](docs/CROSS_ORIGIN_HEADERS.md) | COEP/CORS/CORP header matrix and CDN setup |
 | [docs/plans/TESTING_GUIDE.md](docs/plans/TESTING_GUIDE.md) | Manual verification (staged loading, LOD, teleport helpers) |
@@ -205,6 +206,7 @@ https://assets.example.com/solar-system/2026.07.0/
     │       ├── NegativeX.dds
     │       └── …
     ├── textures_low/
+    ├── textures_mid/
     │   ├── Earth_Day_Diffuse_Low.dds
     │   └── Main_SkyBox/          # 4×4 placeholders (committed; skybox fallback)
     └── sounds/
@@ -279,6 +281,7 @@ the manifest the completion marker for a release (adapt the endpoint/profile fla
 ASSET_URI=s3://solar-system-assets/solar-system/2026.07.0/resource
 aws s3 sync resource/textures/ "$ASSET_URI/textures/" --cache-control 'public,max-age=31536000,immutable'
 aws s3 sync resource/textures_low/ "$ASSET_URI/textures_low/" --cache-control 'public,max-age=31536000,immutable'
+aws s3 sync resource/textures_mid/ "$ASSET_URI/textures_mid/" --cache-control 'public,max-age=31536000,immutable'
 aws s3 sync resource/sounds/ "$ASSET_URI/sounds/" --cache-control 'public,max-age=31536000,immutable'
 aws s3 cp resource/asset-manifest.json "$ASSET_URI/asset-manifest.json" --cache-control 'public,max-age=31536000,immutable'
 ```
@@ -315,7 +318,7 @@ export SOLAR_DEPLOY_ASSET_REMOTE=public_html/solar-assets/2026.07.0/resource
 
 cd web
 python3 deploy.py app       # uploads dist/ only
-python3 deploy.py assets    # uploads resource/{textures,textures_low,sounds} + manifest
+python3 deploy.py assets    # uploads resource/{textures,textures_low,textures_mid,sounds} + manifest
 # Or publish both explicitly:
 python3 deploy.py all
 ```

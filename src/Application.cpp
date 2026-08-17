@@ -168,6 +168,15 @@ extern "C" {
     EMSCRIPTEN_KEEPALIVE int GetOrbitLines() {
         return activeApplication && activeApplication->GetOrbitLinesEnabled() ? 1 : 0;
     }
+    EMSCRIPTEN_KEEPALIVE void SetMagneticFields(int enabled) {
+        if (activeApplication) {
+            activeApplication->SetMagneticFieldsEnabled(enabled != 0);
+        }
+        NotifySettingsChanged("magneticFields");
+    }
+    EMSCRIPTEN_KEEPALIVE int GetMagneticFields() {
+        return activeApplication && activeApplication->GetMagneticFieldsEnabled() ? 1 : 0;
+    }
 
     // --- WebXR stereo control surface ---
     EMSCRIPTEN_KEEPALIVE void SetXrSessionActive(int active) {
@@ -469,6 +478,7 @@ void Application::RenderFrameContent() {
     ConfigureMainShaders();
     _skyBox->Render(*_mainSkyBoxShader);
     RenderOrbitPaths();
+    RenderMagneticFields();
     RenderStarCorona();
     ProcessSceneComponentsRendering();
     RenderAsteroidField();
@@ -544,6 +554,7 @@ void Application::InitSceneObjects() {
                 FlareSprite{false, 2.75, 2.0, 7}
             }});
     _orbitPathRenderer = make_unique<OrbitPathRenderer>();
+    _magneticFieldRenderer = make_unique<MagneticFieldLineRenderer>();
     {
         const auto asteroidQuality = GetQualitySettings(g_qualityPreset, g_isMobileWeb);
         _asteroidField = make_unique<AsteroidField>(AsteroidField::kDefaultSeed,
@@ -875,6 +886,124 @@ void Application::SetOrbitLinesEnabled(bool enabled) {
 
 bool Application::GetOrbitLinesEnabled() const {
     return _orbitLinesEnabled;
+}
+
+void Application::SetMagneticFieldsEnabled(bool enabled) {
+    _magneticFieldsEnabled = enabled;
+    if (enabled) {
+        EnsureMagneticFieldsBuilt();
+    }
+}
+
+bool Application::GetMagneticFieldsEnabled() const {
+    return _magneticFieldsEnabled;
+}
+
+void Application::ForEachEnabledMagneticField(
+    const std::function<void(const SpaceObject& object, const MagneticFieldParams& params)>& fn) const {
+    if (!fn) {
+        return;
+    }
+    if (_sun && _sun->HasMagneticField()) {
+        fn(*_sun, _sun->GetMagneticField());
+    }
+    for (const auto& component : _renderableSceneComponents) {
+        if (component.planet && component.planet->HasMagneticField()) {
+            fn(*component.planet, component.planet->GetMagneticField());
+        }
+        for (const auto& satellite : component.satellites) {
+            if (satellite && satellite->HasMagneticField()) {
+                fn(*satellite, satellite->GetMagneticField());
+            }
+        }
+    }
+}
+
+void Application::EnsureMagneticFieldsBuilt() {
+    if (!_magneticFieldRenderer) {
+        return;
+    }
+    if (_magneticFieldsBuilt && _magneticFieldsQuality == g_qualityPreset) {
+        return;
+    }
+
+    _magneticFieldRenderer->Clear();
+    static constexpr OrbitLayout::Body kFieldBodies[] = {
+        OrbitLayout::Body::Sun,
+        OrbitLayout::Body::Mercury,
+        OrbitLayout::Body::Earth,
+        OrbitLayout::Body::Jupiter,
+        OrbitLayout::Body::Saturn,
+        OrbitLayout::Body::Uranus,
+        OrbitLayout::Body::Neptune,
+    };
+    for (const auto body : kFieldBodies) {
+        const MagneticFieldParams params = MagneticFieldCatalog::ParamsForBody(body, g_qualityPreset);
+        _magneticFieldRenderer->AddBody(body, params);
+    }
+    _magneticFieldsBuilt = true;
+    _magneticFieldsQuality = g_qualityPreset;
+    std::cout << "[MagneticField] Built field-line ribbons for quality preset " << g_qualityPreset << std::endl;
+}
+
+void Application::RenderMagneticFields() const {
+    if (!_magneticFieldsEnabled || !_magneticFieldRenderer || _magneticFieldRenderer->Empty()) {
+        return;
+    }
+
+    glEnable(GL_BLEND);
+    glBlendFunc(GL_ONE, GL_ONE);
+    glEnable(GL_DEPTH_TEST);
+    glDepthMask(GL_FALSE);
+    glDisable(GL_CULL_FACE);
+
+    const float zCoef = static_cast<float>(2.0 / glm::log2(_camera.GetFar() + 1.0));
+    const float now = static_cast<float>(glfwGetTime());
+    const glm::vec3 camPos = _camera.GetPosition();
+
+    auto drawBody = [&](OrbitLayout::Body body, const glm::vec3& position, const glm::mat4& rotation,
+                        float radius, float dipoleTiltDeg) {
+        if (radius < 1.0e-4f) {
+            return;
+        }
+        glm::mat4 model(1.0f);
+        model = glm::translate(model, position);
+        model *= rotation;
+        model = glm::rotate(model, glm::radians(dipoleTiltDeg), glm::vec3(1.0f, 0.0f, 0.0f));
+        model = glm::scale(model, glm::vec3(radius));
+        _magneticFieldRenderer->Draw(_cameraProjection, _cameraView, model, body, camPos, zCoef, now);
+    };
+
+    if (_sun) {
+        const MagneticFieldParams sunParams = MagneticFieldCatalog::ParamsForBody(OrbitLayout::Body::Sun, g_qualityPreset);
+        // Mesh is scaled 0.5 × sphere radius (~2) ≈ 1 unit; inflate so the torus is readable.
+        const float sunRadius = 28.0f;
+        drawBody(OrbitLayout::Body::Sun, _sun->GetPosition(), glm::mat4(1.0f), sunRadius, sunParams.dipoleTiltDeg);
+    }
+
+    for (const auto& component : _renderableSceneComponents) {
+        if (!component.planet) {
+            continue;
+        }
+        const std::wstring& wideName = component.planet->GetEngName();
+        const std::string name(wideName.begin(), wideName.end());
+        const OrbitLayout::Body body = OrbitLayout::BodyFromName(name);
+        if (body == OrbitLayout::Body::Sun) {
+            continue;
+        }
+        const MagneticFieldParams params = MagneticFieldCatalog::ParamsForBody(body, g_qualityPreset);
+        if (!params.enabled) {
+            continue;
+        }
+        const float radius = std::max(component.planet->GetRadius(), 0.5f);
+        drawBody(body, component.planet->GetPosition(), component.planet->GetRotationMatrix(), radius,
+                 params.dipoleTiltDeg);
+    }
+
+    glDepthMask(GL_TRUE);
+    glEnable(GL_CULL_FACE);
+    glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+    glDisable(GL_BLEND);
 }
 
 void Application::RenderOrbitPaths() const {
@@ -1278,6 +1407,10 @@ void Application::ApplyQualityPreset(int preset) {
     ApplyRenderResources(settings.shadowResolution, settings.enableHdr);
     if (_asteroidField) {
         _asteroidField->SetInstanceCount(settings.asteroidInstanceCount);
+    }
+    if (_magneticFieldsEnabled) {
+        _magneticFieldsBuilt = false;
+        EnsureMagneticFieldsBuilt();
     }
     LogQualityTier(settings, _hdrEnabled, gShadowQuality);
 }

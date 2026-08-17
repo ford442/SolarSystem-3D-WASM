@@ -5,6 +5,7 @@ Europa::Europa(const SatelliteInfo& satelliteInfo, std::shared_ptr<SpaceObject> 
     _diffuses(satelliteInfo.diffuseTextures), _normalMap(satelliteInfo.normalMap)
 {
     ConfigureDiffuseLOD(_diffuses.at(0), TexturePaths::Europa::Diffuse.low,
+                        TexturePaths::Europa::Diffuse.mid,
                         TexturePaths::Europa::Diffuse.high, "Europa");
 }
 

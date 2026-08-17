@@ -5,8 +5,9 @@ Clouds::Clouds(const CloudsInfo& cloudsInfo, std::shared_ptr<SpaceObject> parent
 {
 }
 
-void Clouds::ConfigureDiffuseLOD(const std::string& lowPath, const std::string& highPath, const std::string& label) {
-    _diffuseLOD.Configure(_diffuse, lowPath, highPath, label, TextureLoadCategory::Clouds);
+void Clouds::ConfigureDiffuseLOD(const std::string& lowPath, const std::string& midPath,
+                                 const std::string& highPath, const std::string& label) {
+    _diffuseLOD.Configure(_diffuse, lowPath, midPath, highPath, label, TextureLoadCategory::Clouds);
 }
 
 void Clouds::LoadHighResIfClose(const glm::vec3& cameraPosition) {

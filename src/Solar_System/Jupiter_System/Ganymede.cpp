@@ -5,6 +5,7 @@ Ganymede::Ganymede(const SatelliteInfo& satelliteInfo, std::shared_ptr<SpaceObje
     _diffuses(satelliteInfo.diffuseTextures), _normalMap(satelliteInfo.normalMap)
 {
     ConfigureDiffuseLOD(_diffuses.at(0), TexturePaths::Ganymede::Diffuse.low,
+                        TexturePaths::Ganymede::Diffuse.mid,
                         TexturePaths::Ganymede::Diffuse.high, "Ganymede");
 }
 

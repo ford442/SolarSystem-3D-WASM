@@ -12,6 +12,7 @@ void Application::InitStarSystem() {
     StarInfo sunInfo(*_sphereModel, *_mainStarShader, *_starGlowShader, TextureImage2D("resource/textures_low/Star_Spectrum_Low.dds"),
                      _starTemperatureInKelvin, 696342.0, glm::vec3(0.99607843, 0.890196078, 0.725490196), L"Sun", L"Солнце");
     _sun = make_shared<Sun>(sunInfo);
+    _sun->SetMagneticField(MagneticFieldCatalog::IntrinsicParamsForBody(OrbitLayout::Body::Sun));
 
 #ifdef __EMSCRIPTEN__
     LoadPlanetSystemManifests();
@@ -35,6 +36,7 @@ void Application::InitMercury(const MeshHolder& sphereModel) {
                 TextureImage2D(GetTexturePath(TexturePaths::Mercury::Diffuse.low, TexturePaths::Mercury::Diffuse.high)),
             }, TextureImage2D(GetTexturePath(TexturePaths::Mercury::Normal.low, TexturePaths::Mercury::Normal.high)), L"Mercury", L"Меркурий", TextureImage2D(GetTexturePath(TexturePaths::Mercury::Specular.low, TexturePaths::Mercury::Specular.high)));
     shared_ptr<Planet> mercury = make_shared<Mercury>(mercuryInfo, _sun);
+    mercury->SetMagneticField(MagneticFieldCatalog::IntrinsicParamsForBody(OrbitLayout::Body::Mercury));
 
     const glm::mat4 lightProjection = glm::ortho(-mercury->GetRadius() * 3.0f, mercury->GetRadius() * 3.0f, -mercury->GetRadius() * 3.0f, mercury->GetRadius() * 3.0f, _camera.GetNear(), _camera.GetFar());
     const glm::mat4 lightView = glm::lookAt(_sun->GetPosition(), mercury->GetPosition() - _sun->GetPosition(), glm::vec3(0.0, 1.0, 0.0));
@@ -52,6 +54,7 @@ void Application::InitVenus(const MeshHolder& sphereModel) {
                 TextureImage2D(GetTexturePath(TexturePaths::Venus::Diffuse.low, TexturePaths::Venus::Diffuse.high)),
             }, TextureImage2D(GetTexturePath(TexturePaths::Venus::Normal.low, TexturePaths::Venus::Normal.high)), L"Venus", L"Венера");
     shared_ptr<Planet> venus = make_shared<Venus>(venusInfo, _sun);
+    venus->SetMagneticField(MagneticFieldCatalog::IntrinsicParamsForBody(OrbitLayout::Body::Venus));
 
     AtmosphereInfo venusAtmosphereInfo(sphereModel, *_mainAtmosphereShader, 1.1, glm::vec3(203/255.f, 158/255.f, 69/255.), venus->GetRadius() - 0.00007, 1.995);
     unique_ptr<Atmosphere> venusAtmosphere = make_unique<Atmosphere>(venusAtmosphereInfo, venus);
@@ -81,6 +84,7 @@ void Application::InitEarthSystem(const MeshHolder& sphereModel) {
                 TextureImage2D("resource/textures_low/Earth_Night_Diffuse_Low.dds"),
             }, TextureImage2D(GetTexturePath(TexturePaths::Earth::Normal.low, TexturePaths::Earth::Normal.high)), L"Earth", L"Земля", TextureImage2D(GetTexturePath(TexturePaths::Earth::Specular.low, TexturePaths::Earth::Specular.high)));
     shared_ptr<Planet> earth = make_shared<Earth>(earthInfo, _sun);
+    earth->SetMagneticField(MagneticFieldCatalog::IntrinsicParamsForBody(OrbitLayout::Body::Earth));
 
     SatelliteInfo moonInfo(sphereModel, 0.2724, *_mainPlanetShader, {TextureImage2D(GetTexturePath(TexturePaths::Moon::Diffuse.low, TexturePaths::Moon::Diffuse.high))}, TextureImage2D(GetTexturePath(TexturePaths::Moon::Normal.low, TexturePaths::Moon::Normal.high)),
                            L"Moon", L"Луна");
@@ -119,6 +123,7 @@ void Application::InitMarsSystem(const MeshHolder& sphereModel) {
                 TextureImage2D(GetTexturePath(TexturePaths::Mars::Diffuse.low, TexturePaths::Mars::Diffuse.high)),
             }, TextureImage2D(GetTexturePath(TexturePaths::Mars::Normal.low, TexturePaths::Mars::Normal.high)), L"Mars", L"Марс");
     shared_ptr<Planet> mars = make_shared<Mars>(marsInfo, _sun);
+    mars->SetMagneticField(MagneticFieldCatalog::IntrinsicParamsForBody(OrbitLayout::Body::Mars));
 
     SatelliteInfo phobosInfo(phobosModel, 0.001768, *_mainPlanetShader, {TextureImage2D(GetTexturePath(TexturePaths::Phobos::Diffuse.low, TexturePaths::Phobos::Diffuse.high))}, TextureImage2D(GetTexturePath(TexturePaths::Phobos::Normal.low, TexturePaths::Phobos::Normal.high)),
                              L"Phobos", L"Фобос");
@@ -154,6 +159,7 @@ void Application::InitJupiterSystem(const MeshHolder& sphereModel) {
                 TextureImage2D(GetTexturePath(TexturePaths::Jupiter::Diffuse.low, TexturePaths::Jupiter::Diffuse.high)),
             }, TextureImage2D(GetTexturePath(TexturePaths::Jupiter::Normal.low, TexturePaths::Jupiter::Normal.high)), L"Jupiter", L"Юпитер");
     shared_ptr<Planet> jupiter = make_shared<Jupiter>(jupiterInfo, _sun);
+    jupiter->SetMagneticField(MagneticFieldCatalog::IntrinsicParamsForBody(OrbitLayout::Body::Jupiter));
 
     SatelliteInfo ioInfo(sphereModel, 0.28592, *_mainPlanetShader, {TextureImage2D(GetTexturePath(TexturePaths::Io::Diffuse.low, TexturePaths::Io::Diffuse.high))}, TextureImage2D(GetTexturePath(TexturePaths::Io::Normal.low, TexturePaths::Io::Normal.high)),
                          L"Io", L"Ио");
@@ -197,6 +203,7 @@ void Application::InitSaturnSystem(const MeshHolder& sphereModel) {
                 TextureImage2D(GetTexturePath(TexturePaths::Saturn::Diffuse.low, TexturePaths::Saturn::Diffuse.high)),
             }, TextureImage2D(GetTexturePath(TexturePaths::Saturn::Normal.low, TexturePaths::Saturn::Normal.high)), L"Saturn", L"Сатурн");
     shared_ptr<Planet> saturn = make_shared<Saturn>(saturnInfo, _sun);
+    saturn->SetMagneticField(MagneticFieldCatalog::IntrinsicParamsForBody(OrbitLayout::Body::Saturn));
 
     PlanetaryRingInfo saturnRingInfo(saturnRingModel, 22.0, 43.7, *_mainPlanetShader, TextureImage2D("resource/textures_low/Saturn_Rings_Low.dds")); 
     unique_ptr<PlanetaryRing> saturnRing = make_unique<SaturnRing>(saturnRingInfo, saturn);
@@ -264,6 +271,7 @@ void Application::InitUranusSystem(const MeshHolder& sphereModel) {
                 TextureImage2D("resource/textures_low/Uranus_Clouds_Diffuse_Low.dds")
             }, TextureImage2D(GetTexturePath(TexturePaths::Uranus::Normal.low, TexturePaths::Uranus::Normal.high)), L"Uranus", L"Уран");
     shared_ptr<Planet> uranus = make_shared<Uranus>(uranusInfo, _sun);
+    uranus->SetMagneticField(MagneticFieldCatalog::IntrinsicParamsForBody(OrbitLayout::Body::Uranus));
     PlanetaryRingInfo uranusRingInfo(uranusRingModel, 12.6, 16.0, *_mainPlanetShader, TextureImage2D("resource/textures_low/Uranus_Rings_Low.dds")); // Radiuses from 3D model
     unique_ptr<PlanetaryRing> uranusRing = make_unique<UranusRing>(uranusRingInfo, uranus);
 
@@ -317,6 +325,7 @@ void Application::InitNeptuneSystem(const MeshHolder& sphereModel) {
                 TextureImage2D("resource/textures_low/Neptune_Clouds_Diffuse_Low.dds")
             }, TextureImage2D(GetTexturePath(TexturePaths::Neptune::Normal.low, TexturePaths::Neptune::Normal.high)), L"Neptune", L"Нептун");
     shared_ptr<Planet> neptune = make_shared<Neptune>(neptuneInfo, _sun);
+    neptune->SetMagneticField(MagneticFieldCatalog::IntrinsicParamsForBody(OrbitLayout::Body::Neptune));
 
     SatelliteInfo tritonInfo(sphereModel, 0.2724, *_mainPlanetShader, {TextureImage2D(GetTexturePath(TexturePaths::Triton::Diffuse.low, TexturePaths::Triton::Diffuse.high))}, TextureImage2D(GetTexturePath(TexturePaths::Triton::Normal.low, TexturePaths::Triton::Normal.high)),
                              L"Triton", L"Тритон");
@@ -354,6 +363,7 @@ void Application::InitPlutoSystem(const MeshHolder& sphereModel) {
                 TextureImage2D(GetTexturePath(TexturePaths::Pluto::Diffuse.low, TexturePaths::Pluto::Diffuse.high)),
             }, TextureImage2D(GetTexturePath(TexturePaths::Pluto::Normal.low, TexturePaths::Pluto::Normal.high)), L"Pluto", L"Плутон", TextureImage2D(GetTexturePath(TexturePaths::Pluto::Specular.low, TexturePaths::Pluto::Specular.high)));
     shared_ptr<Planet> pluto = make_shared<Pluto>(plutoInfo, _sun);
+    pluto->SetMagneticField(MagneticFieldCatalog::IntrinsicParamsForBody(OrbitLayout::Body::Pluto));
 
     SatelliteInfo charonInfo(sphereModel, 0.09512, *_mainPlanetShader, {TextureImage2D(GetTexturePath(TexturePaths::Charon::Diffuse.low, TexturePaths::Charon::Diffuse.high))}, TextureImage2D(GetTexturePath(TexturePaths::Charon::Normal.low, TexturePaths::Charon::Normal.high)),
                              L"Charon", L"Харон", TextureImage2D(GetTexturePath(TexturePaths::Charon::Specular.low, TexturePaths::Charon::Specular.high)));

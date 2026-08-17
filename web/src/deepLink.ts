@@ -8,6 +8,7 @@ export interface DeepLinkViewState {
     orbitScale?: OrbitScaleMode;
     shadows?: boolean;
     orbitLines?: boolean;
+    magneticFields?: boolean;
     planet?: PlanetIndex;
     camera?: {
         x: number;
@@ -26,6 +27,7 @@ export interface DeepLinkRuntimeReaders {
     getOrbitScaleMode?: () => OrbitScaleMode;
     getShadowQuality?: () => number;
     getOrbitLines?: () => number;
+    getMagneticFields?: () => number;
     getFocusedPlanetIndex?: () => number;
     getCameraPosition?: () => { x: number; y: number; z: number };
     getCameraYaw?: () => number;
@@ -125,6 +127,7 @@ export function parseDeepLinkFromUrl(search = window.location.search): DeepLinkV
     const orbitScale = parseOrbitScale(params.get('orbit') ?? params.get('scale'));
     const shadows = parseBooleanParam(params.get('shadows'));
     const orbitLines = parseBooleanParam(params.get('orbits') ?? params.get('orbitLines'));
+    const magneticFields = parseBooleanParam(params.get('fields') ?? params.get('magneticFields'));
     const planet = parsePlanetIndex(params.get('planet') ?? params.get('focus'));
 
     const x = parseFiniteNumber(params.get('x'));
@@ -145,6 +148,7 @@ export function parseDeepLinkFromUrl(search = window.location.search): DeepLinkV
         orbitScale,
         shadows,
         orbitLines,
+        magneticFields,
         planet,
         camera,
     };
@@ -195,6 +199,11 @@ export function buildShareableUrl(
     const orbitLines = readers.getOrbitLines?.();
     if (orbitLines !== undefined) {
         url.searchParams.set('orbits', orbitLines ? '1' : '0');
+    }
+
+    const magneticFields = readers.getMagneticFields?.();
+    if (magneticFields !== undefined) {
+        url.searchParams.set('fields', magneticFields ? '1' : '0');
     }
 
     const focusedPlanet = readers.getFocusedPlanetIndex?.() ?? -1;

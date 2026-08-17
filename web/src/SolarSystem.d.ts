@@ -56,6 +56,9 @@ export type GetPlanetSceneDistance = (index: PlanetIndex) => number;
 /** Toggle faint heliocentric orbit path lines (1=on, 0=off). */
 export type SetOrbitLines = (enabled: number) => void;
 export type GetOrbitLines = () => number;
+/** Toggle magnetic field ribbon overlay (1=on, 0=off). */
+export type SetMagneticFields = (enabled: number) => void;
+export type GetMagneticFields = () => number;
 
 export type SetXrSessionActive = (active: number) => void;
 export type SetXrEyeCount = (count: number) => void;
@@ -211,6 +214,16 @@ export interface SolarSystemCwrap {
     argTypes: [],
   ): (...args: number[]) => number;
   (
+    ident: 'SetMagneticFields',
+    returnType: null,
+    argTypes: ['number'],
+  ): (...args: number[]) => void;
+  (
+    ident: 'GetMagneticFields',
+    returnType: 'number',
+    argTypes: [],
+  ): (...args: number[]) => number;
+  (
     ident: 'SetXrSessionActive',
     returnType: null,
     argTypes: ['number'],
@@ -315,6 +328,8 @@ export interface SolarSystemModule {
   _GetPlanetSceneDistance: GetPlanetSceneDistance;
   _SetOrbitLines: SetOrbitLines;
   _GetOrbitLines: GetOrbitLines;
+  _SetMagneticFields: SetMagneticFields;
+  _GetMagneticFields: GetMagneticFields;
 }
 
 declare const SolarSystem: (
@@ -328,7 +343,8 @@ declare global {
     /** C++ loading progress callback (EM_ASM). */
     updateLoadingProgress?: (loaded: number, total: number) => void;
     /** C++ LOD streaming progress callback (EM_ASM). */
-    updateStreamingProgress?: (completed: number, total: number, active?: number) => void;
+    /** tierCode: 0=generic, 1=mid, 2=high */
+    updateStreamingProgress?: (completed: number, total: number, active?: number, tierCode?: number) => void;
     /** Console helper documented in AGENTS.md. */
     setCameraPose?: SetCameraPose;
     /** C++ planet focus callback (EM_ASM). */
@@ -343,6 +359,7 @@ declare global {
       | 'musicMuted'
       | 'simulationEpoch'
       | 'orbitLines'
+      | 'magneticFields'
       | string) => void;
     /** Runtime asset base URL for WebResourceFetcher. */
     __solarSystemAssetBase?: string;

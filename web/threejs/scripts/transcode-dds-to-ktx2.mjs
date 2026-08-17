@@ -23,16 +23,17 @@ function readOption(name) {
 }
 
 const tier = readOption('--tier') === 'high' ? 'high' : 'low';
-const outputDirectory = resolve(
-  projectRoot,
-  readOption('--output') ?? (tier === 'high' ? 'public/textures/ktx2/high' : 'public/textures/ktx2'),
-);
 
 const lowDefaults = [
   'Mercury_Diffuse_Low.dds',
   'Venus_Diffuse_Low.dds',
   'Earth_Day_Diffuse_Low.dds',
   'Mars_Diffuse_Low.dds',
+  'Jupiter_Diffuse_Low.dds',
+  'Io_Diffuse_Low.dds',
+  'Europa_Diffuse_Low.dds',
+  'Ganymede_Diffuse_Low.dds',
+  'Callisto_Diffuse_Low.dds',
 ].map((name) => resolve(repositoryRoot, 'resource/textures_low', name));
 
 const highDefaults = [
@@ -40,12 +41,43 @@ const highDefaults = [
   'Venus_Diffuse.dds',
   'Earth_Day_Diffuse.dds',
   'Mars_Diffuse.dds',
+  'Jupiter_Diffuse.dds',
+  'Io_Diffuse.dds',
+  'Europa_Diffuse.dds',
+  'Ganymede_Diffuse.dds',
+  'Callisto_Diffuse.dds',
 ].map((name) => resolve(repositoryRoot, 'resource/textures', name));
 
-const defaultInputs = tier === 'high' ? highDefaults : lowDefaults;
+const skyboxFaces = [
+  'PositiveX.dds',
+  'NegativeX.dds',
+  'PositiveY.dds',
+  'NegativeY.dds',
+  'PositiveZ.dds',
+  'NegativeZ.dds',
+].map((name) => resolve(repositoryRoot, 'resource/textures_low/Main_SkyBox', name));
+
+const isSkybox = process.argv.includes('--skybox');
+const defaultInputs = isSkybox
+  ? skyboxFaces
+  : tier === 'high'
+    ? highDefaults
+    : lowDefaults;
+const defaultOutput = isSkybox
+  ? 'public/textures/ktx2/skybox'
+  : tier === 'high'
+    ? 'public/textures/ktx2/high'
+    : 'public/textures/ktx2';
+const outputDirectory = resolve(projectRoot, readOption('--output') ?? defaultOutput);
+
 const cliInputs = process.argv
   .slice(2)
-  .filter((value, index, args) => !value.startsWith('--') && args[index - 1] !== '--output' && args[index - 1] !== '--tier');
+  .filter(
+    (value, index, args) =>
+      !value.startsWith('--') &&
+      args[index - 1] !== '--output' &&
+      args[index - 1] !== '--tier',
+  );
 const inputs = cliInputs.length > 0 ? cliInputs.map((path) => resolve(path)) : defaultInputs;
 
 const devHighPalette = {
@@ -53,6 +85,11 @@ const devHighPalette = {
   Venus_Diffuse: [0xe2, 0xb0, 0x66],
   Earth_Day_Diffuse: [0x4f, 0x9a, 0xd9],
   Mars_Diffuse: [0xc9, 0x63, 0x42],
+  Jupiter_Diffuse: [0xd4, 0xb0, 0x78],
+  Io_Diffuse: [0xc9, 0xa6, 0x6b],
+  Europa_Diffuse: [0xc8, 0xd0, 0xdc],
+  Ganymede_Diffuse: [0x9a, 0x8f, 0x82],
+  Callisto_Diffuse: [0x6e, 0x65, 0x5c],
 };
 
 function fourCC(view, offset) {

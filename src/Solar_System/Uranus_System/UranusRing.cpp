@@ -3,6 +3,7 @@
 UranusRing::UranusRing(const PlanetaryRingInfo& planetaryRingInfo, std::shared_ptr<Planet> parent) : PlanetaryRing(planetaryRingInfo, std::move(parent))
 {
     ConfigureDiffuseLOD("resource/textures_low/Uranus_Rings_Low.dds",
+                        "resource/textures_mid/Uranus_Rings_Mid.dds",
                         "resource/textures/Uranus_Rings.dds", "UranusRing");
 }
 

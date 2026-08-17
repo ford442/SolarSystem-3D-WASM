@@ -1,0 +1,64 @@
+{
+  "phase": 2,
+  "title": "Solar System · Companion (Sun → Jupiter)",
+  "fullBodyIds": ["mercury", "venus", "earth", "mars", "jupiter"],
+  "proxyBodyIds": ["saturn", "uranus", "neptune", "pluto"],
+  "skybox": {
+    "enabled": true,
+    "directory": "textures/ktx2/skybox/",
+    "faces": [
+      "PositiveX.ktx2",
+      "NegativeX.ktx2",
+      "PositiveY.ktx2",
+      "NegativeY.ktx2",
+      "PositiveZ.ktx2",
+      "NegativeZ.ktx2"
+    ]
+  },
+  "moons": [
+    {
+      "id": "io",
+      "name": "Io",
+      "parent": "jupiter",
+      "orbitRadius": 65,
+      "earthRadiusScale": 0.286,
+      "periodDays": 1.769,
+      "texture": "Io_Diffuse.ktx2",
+      "fallbackColor": "#c9a66b",
+      "renderMode": "full"
+    },
+    {
+      "id": "europa",
+      "name": "Europa",
+      "parent": "jupiter",
+      "orbitRadius": 74,
+      "earthRadiusScale": 0.245,
+      "periodDays": 3.551,
+      "texture": "Europa_Diffuse.ktx2",
+      "fallbackColor": "#c8d0dc",
+      "renderMode": "full"
+    },
+    {
+      "id": "ganymede",
+      "name": "Ganymede",
+      "parent": "jupiter",
+      "orbitRadius": 83,
+      "earthRadiusScale": 0.413,
+      "periodDays": 7.155,
+      "texture": "Ganymede_Diffuse.ktx2",
+      "fallbackColor": "#9a8f82",
+      "renderMode": "full"
+    },
+    {
+      "id": "callisto",
+      "name": "Callisto",
+      "parent": "jupiter",
+      "orbitRadius": 92,
+      "earthRadiusScale": 0.378,
+      "periodDays": 16.69,
+      "texture": "Callisto_Diffuse.ktx2",
+      "fallbackColor": "#6e655c",
+      "renderMode": "proxy"
+    }
+  ]
+}

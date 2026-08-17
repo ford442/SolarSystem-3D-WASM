@@ -12,6 +12,14 @@ PROJECT_ROOT="$SCRIPT_DIR"
 BUILD_JOBS="${BUILD_JOBS:-55}"
 echo "Project Root: $PROJECT_ROOT"
 
+# Keep staged-loading / explorer / companion JSON in sync with the planet catalog.
+if command -v node >/dev/null 2>&1; then
+    echo "Generating planet metadata from resource/planets.catalog.json..."
+    node "$PROJECT_ROOT/scripts/generate-planet-metadata.mjs"
+else
+    echo "Warning: node not found; skipping planet metadata generation."
+fi
+
 # 2. Environment Setup (MOVED UP)
 echo "------------------------------------------------"
 # Default to sourcing emsdk unless skipped
@@ -104,6 +112,11 @@ mkdir -p "$PROJECT_ROOT/web/public/resource/textures_low"
 if [ -d "$PROJECT_ROOT/resource/textures_low" ]; then
     cp -r "$PROJECT_ROOT/resource/textures_low/." "$PROJECT_ROOT/web/public/resource/textures_low/"
     echo "Copied resource/textures_low to web/public/resource/textures_low/"
+fi
+mkdir -p "$PROJECT_ROOT/web/public/resource/textures_mid"
+if [ -d "$PROJECT_ROOT/resource/textures_mid" ]; then
+    cp -r "$PROJECT_ROOT/resource/textures_mid/." "$PROJECT_ROOT/web/public/resource/textures_mid/"
+    echo "Copied resource/textures_mid to web/public/resource/textures_mid/"
 fi
 
 # Keep the production-preview skybox fetch path valid when the external asset

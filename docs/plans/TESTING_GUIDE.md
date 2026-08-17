@@ -345,33 +345,38 @@ Expected:
 
 Repeat for outer (larger radius) or inner. Multiple can download in parallel.
 
-### 5. High-Res LOD Streaming (Queue + UI)
-Fly or teleport inside ~50 units of a planet center:
+### 5. Three-tier LOD Streaming (mid + high, Queue + UI)
+
+Activate Earth, then fly or teleport near its center. Paths use `TextureLODController` (planets, moons, rings, clouds).
+
 ```js
-window.setCameraPose(1900, 0, 0, 180, 0);  // very close to Earth
+window.setCameraPose(1900, 0, 0, 180, 0);  // on top of Earth proxy origin
 ```
-Expected (console + overlay):
-- `[LOD] Camera distance to Earth: 12.3 units. Queueing high-res textures...`
-- `updateStreamingProgress` DOM element appears: "High-res upgrade: 1/3 (33%)" etc.
-- Per-planet queue logs + final: `[LOD] Earth high-res textures loaded successfully`
-- `TextureLoadingQueue` ensures: dedup (no duplicates if you jiggle camera), backoff on transient errors, and preset-limited concurrency.
-- Visual (real assets): texture sharpness jumps. Placeholders: no visible change but paths exercised.
-- No further requests while `_isHighResLoaded`.
+
+**Medium preset** (`?quality=medium` or `setQualityPreset(1)`):
+- Effective upgrade radius ~33 units (T = 50 / 1.5).
+- Inside radius: Network tab shows `resource/textures_mid/*_Mid.dds` only — **no** `resource/textures/Earth_*.dds` full maps.
+- Console: `[LOD][Earth_Day_Diffuse] Queueing mid texture` then `Resident tier now mid`.
+- Overlay: `Mid-res upgrade: …` (`updateStreamingProgress(..., tierCode=1)`).
+
+**Full preset** (`?quality=full`):
+- Inside ~50 units: mid loads first.
+- Inside ~25 units (0.5×T): high maps queue (`textures/Earth_*.dds`); overlay may switch to `High-res upgrade`.
+- Console sequences mid then high per map.
 
 Test queue cancel:
-- Start load → immediately `setCameraPose` far away → console deprioritize/cancel for that planet's paths; loading aborts without applying (or partial).
+- Start mid/high load → immediately `setCameraPose` far away → cancel logs; cancelled apply does not leave a stale higher tier.
 
 ### 6. Downgrade + Hysteresis + Quality Presets
-- Fly away > ~100 units (2× threshold):
-  - `[LOD] ... Downgrading high-res to low-res...`
-  - `[LOD] Earth high-res textures downgraded (VRAM freed)`
-  - `_isHighResLoaded=false`; low-res reloaded via ReloadTexture.
+- From high (full): fly beyond ~T → `[LOD][…] Downgraded high → mid`.
+- Beyond ~2×T → `Downgraded mid → low`.
+- `setQualityPreset(0)` while mid/high resident → force low and cancel in-flight.
 
-| Preset | High-res LOD | Effective upgrade radius | Shadow map | High-res concurrency | WebGL MSAA |
-|--------|--------------|--------------------------|------------|----------------------|------------|
-| `low` / `0` | Disabled; loaded/in-flight upgrades are downgraded or cancelled | none | 1024² (~4 MiB depth storage) | 0 | off |
-| `medium` / `1` | Enabled with camera distance ×1.5 | ~33 units for the default 50-unit threshold | 2048² (~16 MiB) | 2 | off |
-| `full` / `2` | Enabled with camera distance ×1.0 | 50 units | 3000² (~34.3 MiB) | 4 | 4× if the browser/context supports it |
+| Preset | Max texture tier | Effective mid upgrade radius | Shadow map | Concurrency | WebGL MSAA |
+|--------|------------------|------------------------------|------------|-------------|------------|
+| `low` / `0` | low only | none | 1024² | 0 | off |
+| `medium` / `1` | mid only | ~33 units (T/1.5) | 2048² | 2 | off |
+| `full` / `2` | high (via mid) | mid at 50u; high at ~25u | 3000² | 4 | 4× if supported |
 
 Use a URL preset when comparing MSAA because WebGL antialiasing is fixed at context creation:
 
@@ -387,21 +392,44 @@ http://localhost:4173/solar-system/?quality=full
 #### Measurable medium-vs-full check
 
 1. Open each URL in a fresh tab and confirm the `[Quality]` console line:
-   - medium: `shadow=2048x2048`, `high-res concurrency=2`, `LOD distance multiplier=1.5`, `MSAA=0x`
-   - full: `shadow=3000x3000`, `high-res concurrency=4`, `LOD distance multiplier=1.0`, `MSAA=4x`
-2. Load Earth, then position the camera about 40 units from its center. With the approximate test position at `(1900, 0, 0)`, use:
+   - medium: `shadow=2048x2048`, `high-res concurrency=2`, `max texture LOD=mid`, `LOD distance multiplier=1.5`, `MSAA=0x`
+   - full: `shadow=3000x3000`, `high-res concurrency=4`, `max texture LOD=high`, `LOD distance multiplier=1.0`, `MSAA=4x`
+2. Load Earth, then position the camera about 40 units from its center:
 
    ```js
    window.setCameraPose(1940, 0, 0, 180, 0)
    ```
 
-3. Full should queue Earth high-res textures because 40 < 50. Medium should retain low-res because `40 × 1.5 = 60`, outside the 50-unit threshold.
-4. With real assets, compare texture sharpness at that pose: full is high-res while medium remains low-res. The shadow allocation alone also saves about 18.3 MiB in medium, before accounting for fewer resident high-res textures.
-5. Move inside ~33 units in medium and confirm it then queues upgrades. When several texture jobs are pending, queue logs must never exceed `active 2/2` for medium or `active 4/4` for full.
+3. Full (T=50): 40 < 50 → should queue **mid** (not yet high; high needs <25). Medium (T≈33): 40 > 33 → stay low.
+4. Move to ~20 units in medium: mid only (Network has no full `textures/Earth_Day_Diffuse.dds`). Same pose in full: mid then high as you close further.
+5. Queue concurrency must never exceed `active 2/2` for medium or `active 4/4` for full.
+6. Memory: visit several systems on full; WASM heap stays under 1 GB; optional backpressure log at ~768 MiB is OK.
+
+Unit tests (native): `SolarSystemTests` includes `test_texture_lod_controller.cpp` (mid-only medium, mid→high full, hysteresis, cancel, quality cap).
+
+### 6b. Magnetic Field Mode
+
+Settings → **Magnetic fields** (default off; persisted like orbit lines). Deep link: `?fields=1`.
+
+Console: `[MagneticField] Built field-line ribbons for quality preset N`.
+
+| Preset | Bodies with ribbons |
+|--------|---------------------|
+| low | Sun only (toroidal + fast flow) |
+| medium | Sun, Earth, Jupiter, Uranus |
+| full | + Mercury, Saturn, Neptune |
+
+Venus/Mars/Pluto/moons stay omitted.
+
+Manual:
+1. `?quality=medium&fields=1` — approach Earth: cyan tilted dipole; approach Sun: orange equatorial torus, faster pulse.
+2. Teleport to Jupiter / Uranus and confirm tilt (Uranus extreme).
+3. Toggle off — ribbons disappear; FPS on Medium should stay similar to orbit-lines-on (static VBO, shader animation only).
+4. Native unit tests: `test_magnetic_field.cpp` (dipole polarity, torus \(B_\phi\), monotonic arc length, catalog gating).
 
 ### 7. Streaming UI + Throttled Progress
-- High-res phase uses separate overlay (`#streaming-progress` in index.html) + bar.
-- C++ calls `updateStreamingProgress(completed, total)` every frame while queued (throttled naturally by queue).
+- Streaming phase uses overlay (`#streaming-progress` / `#streaming-text`) + bar.
+- C++ calls `updateStreamingProgress(completed, total, active, tierCode)` (`tierCode` 1=mid, 2=high).
 - Auto-hides ~2.5s after done. Also updates main loading hook during streaming for compatibility.
 - In 3D: while planet DOWNLOADING, labels show live % from `totalDownloads - pendingDownloads`.
 
@@ -558,7 +586,8 @@ Larger values = triggers from farther away
 Use Chrome's Performance profiler to identify any frame stutter during texture loading.
 
 ### Future Enhancements
-- Implement for other planets (Mars, Jupiter, etc.)
-- Add intermediate LOD levels (low, medium, high)
-- Implement texture streaming for progressive loading
-- Add distance-based unloading (revert to low-res when far)
+- ~~Implement for other planets (Mars, Jupiter, etc.)~~ — covered via shared `TextureLODController`
+- ~~Add intermediate LOD levels (low, medium, high)~~ — `textures_mid` + preset max tier (see §5–6)
+- ~~Add distance-based unloading (revert to low-res when far)~~ — high→mid→low hysteresis
+- Prefetch mid maps during staged activation (`optionalMidRes` in `planet_manifest.json`)
+- Priority queue: prefer mid jobs over high under memory backpressure

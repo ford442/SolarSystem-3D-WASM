@@ -1,6 +1,6 @@
 # WebGPU Companion Renderer — Multi-Session Plan
 
-**Status:** Phase 1 complete; companion remains opt-in
+**Status:** Phase 2 complete; companion remains opt-in
 **Target:** Parallel track alongside the existing C++/WASM WebGL 2 renderer  
 **Live reference:** [test.1ink.us/solar-system](https://test.1ink.us/solar-system/index.html) (premium WebGL 2 build)
 
@@ -52,12 +52,15 @@ A full WebGPU port of the custom C++ renderer (Emdawnwebgpu / webgpu.h / WGSL) w
 
 ### Phase 2 — Solar System Subset (Session 3)
 
-- [ ] Procedural or JSON-driven orbital parameters (reuse approximate distances from C++ scene).
-- [ ] Sun + Mercury through Mars (or through Jupiter) with labels.
-- [ ] Simple starfield skybox (reuse `resource/textures` sky DDS converted to cube map).
-- [ ] Proxy markers for bodies not yet implemented (parity with staged loading UX).
+- [x] Procedural or JSON-driven orbital parameters (reuse approximate distances from C++ scene / `planets.catalog.json` → `orbital-parameters.json`).
+- [x] Sun + Mercury through Jupiter with labels and focus presets.
+- [x] Galilean moons: Io/Europa/Ganymede as textured low-poly spheres; Callisto as proxy.
+- [x] Simple starfield + optional KTX2 skybox cube (`textures/ktx2/skybox/`, from `Main_SkyBox` DDS).
+- [x] Proxy markers for bodies not yet implemented (Saturn–Pluto; dashed labels + wireframe octahedra).
+- [x] Distance-driven LOD reused for new full bodies; HUD shows low/high/proxy counts.
+- [x] `npm run build` in `web/threejs/`; CI job `build-threejs-companion` in `web-build.yml`.
 
-**Exit criteria:** Fly-through from Sun to Mars feels coherent; no WebGPU validation errors.
+**Exit criteria:** Fly-through from Sun to Jupiter feels coherent; proxies labeled; no WebGPU validation errors.
 
 ### Phase 3 — Effects & Polish (Session 4+)
 

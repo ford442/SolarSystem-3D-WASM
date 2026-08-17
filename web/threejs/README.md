@@ -8,7 +8,8 @@ from, and does not replace, the C++/Emscripten WebGL 2 renderer.
 - Phase 0: complete — Vite/TypeScript, `WebGPURenderer`, WebGL fallback, procedural Earth.
 - Phase 1: complete — shared orbital JSON, DDS→KTX2 pipeline, Mercury through Mars,
   focus presets, OrbitControls, damped WASD flight, and distance-driven low→high texture LOD.
-- Next: labels/proxies for outer planets and simplified effects.
+- **Phase 2: complete** — Sun through Jupiter (full meshes + LOD), Galilean moons (Io/Europa/Ganymede full; Callisto proxy), outer-body **proxy markers** (Saturn–Pluto), denser starfield + optional KTX2 skybox cube, focus presets for full + proxy bodies.
+- Next (Phase 3): bloom/tone polish, simplified atmosphere, loading overlay polish.
 - WebXR spike: on the **WebGLRenderer** fallback, Three's `VRButton` is attached (`renderer.xr.enabled`). The primary WASM app owns the full immersive-vr path — see `docs/plans/WEBXR_PLAN.md`.
 
 ## Run
@@ -20,7 +21,7 @@ npm run dev
 ```
 
 Open <http://localhost:5173/solar-system/webgpu/>. The development command copies the Basis
-transcoder required by `KTX2Loader`; four committed 4×4 KTX2 stubs work without a CDN.
+transcoder required by `KTX2Loader`; committed KTX2 stubs work without a CDN.
 
 Production check:
 
@@ -29,18 +30,29 @@ npm run build
 npm run preview
 ```
 
+Root CI (`web-build.yml` job `build-threejs-companion`) runs the same build.
+
 ## Controls
 
 - Drag to orbit and right-drag to pan.
 - Wheel to zoom toward the pointer.
 - Use WASD plus Space/C for damped flight resembling the C++ camera acceleration.
-- Choose Overview, Mercury, Venus, Earth, or Mars for a smooth focus transition.
+- Focus presets: Overview, Sun, Mercury–Jupiter (full), and dashed **proxy** buttons for Saturn–Pluto.
+- Click body labels in the scene to focus; proxy labels use a dashed style.
 
-## Shared orbital data
+## Scene data
 
-`src/data/orbital-parameters.json` contains positions, radius scales, axial tilts, and rotation rates
-extracted from the four C++ planet classes. Companion-only visual scaling is applied in `main.ts`;
-the JSON values remain in C++ world units so a future shared generator can consume them directly.
+| File | Role |
+|------|------|
+| `src/data/orbital-parameters.json` | Positions / scales from `resource/planets.catalog.json` (codegen) |
+| `src/data/companion-config.json` | Phase-2 **which bodies are full vs proxy**, moons, skybox face list |
+
+Regenerate orbital JSON from the repo root catalog:
+
+```bash
+node scripts/generate-planet-metadata.mjs   # from repo root
+# or: cd web && npm run generate:planet-metadata
+```
 
 ## KTX2 assets
 
@@ -57,21 +69,25 @@ By default the companion looks for local high stubs at:
 /solar-system/webgpu/textures/ktx2/high/<name>.ktx2
 ```
 
+Skybox faces (optional):
+
+```text
+/solar-system/webgpu/textures/ktx2/skybox/{PositiveX,NegativeX,...}.ktx2
+```
+
 Point high-tier fetches at a CORS-enabled CDN or object-storage prefix with:
 
 ```bash
 VITE_KTX2_BASE=https://cdn.example.com/solar-system/ktx2/ npm run dev
 ```
 
-When `VITE_KTX2_BASE` is set, low textures still come from the bundled `textures/ktx2/`
-path while upgrades fetch from the CDN prefix above.
-
 Generate or refresh the local stubs:
 
 ```bash
-npm run assets:transcode        # low tier from resource/textures_low
-npm run assets:transcode:high   # high tier from resource/textures (or dev 128×128 stubs)
-npm run assets:transcode:all    # both tiers
+npm run assets:transcode        # low tier (Mercury–Jupiter + Galilean moons)
+npm run assets:transcode:high   # high tier (or 128×128 dev stubs if DDS missing)
+npm run assets:transcode:skybox # Main_SkyBox DDS → ktx2/skybox/
+npm run assets:transcode:all    # all of the above
 ```
 
 Convert arbitrary legacy DDS files (DXT1, DXT3, DXT5, or 32-bit RGBA) with:

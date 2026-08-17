@@ -1,10 +1,16 @@
 {
-  "source": "C++ Init/AdjustToParent values, companion scale 1 unit = 1 C++ world unit",
+  "source": "Generated from resource/planets.catalog.json — companion scale 1 unit = 1 C++ world unit",
+  "generatedFrom": "resource/planets.catalog.json",
+  "indexConvention": "Body order follows catalog focus index (Sun excluded from this list)",
   "bodies": [
     {
       "id": "mercury",
       "name": "Mercury",
-      "position": [1500, 0, 350],
+      "position": [
+        1500,
+        0,
+        350
+      ],
       "earthRadiusScale": 0.38,
       "axialTiltDegrees": 0,
       "rotationRate": 0.003,
@@ -14,7 +20,11 @@
     {
       "id": "venus",
       "name": "Venus",
-      "position": [1125, 0, -1340],
+      "position": [
+        1125,
+        0,
+        -1340
+      ],
       "earthRadiusScale": 0.95,
       "axialTiltDegrees": 177.3,
       "rotationRate": -0.003,
@@ -24,7 +34,11 @@
     {
       "id": "earth",
       "name": "Earth",
-      "position": [1900, 0, 0],
+      "position": [
+        1900,
+        0,
+        0
+      ],
       "earthRadiusScale": 1,
       "axialTiltDegrees": -23.4,
       "rotationRate": 0.0075,
@@ -34,12 +48,86 @@
     {
       "id": "mars",
       "name": "Mars",
-      "position": [-1732, 0, 1000],
+      "position": [
+        -1732,
+        0,
+        1000
+      ],
       "earthRadiusScale": 0.53,
       "axialTiltDegrees": -25.2,
       "rotationRate": 0.0065,
       "texture": "Mars_Diffuse.ktx2",
       "fallbackColor": "#b65332"
+    },
+    {
+      "id": "jupiter",
+      "name": "Jupiter",
+      "position": [
+        1350,
+        0,
+        1737
+      ],
+      "earthRadiusScale": 11.2,
+      "axialTiltDegrees": -3.1,
+      "rotationRate": 0.02,
+      "texture": "Jupiter_Diffuse.ktx2",
+      "fallbackColor": "#c9a36a"
+    },
+    {
+      "id": "saturn",
+      "name": "Saturn",
+      "position": [
+        0,
+        -100,
+        2450
+      ],
+      "earthRadiusScale": 9.45,
+      "axialTiltDegrees": -26.7,
+      "rotationRate": 0.018,
+      "texture": "Saturn_Diffuse.ktx2",
+      "fallbackColor": "#e6d3a3"
+    },
+    {
+      "id": "uranus",
+      "name": "Uranus",
+      "position": [
+        0,
+        0,
+        -2650
+      ],
+      "earthRadiusScale": 4,
+      "axialTiltDegrees": -97.8,
+      "rotationRate": -0.012,
+      "texture": "Uranus_Diffuse.ktx2",
+      "fallbackColor": "#7ec8e3"
+    },
+    {
+      "id": "neptune",
+      "name": "Neptune",
+      "position": [
+        -2900,
+        0,
+        0
+      ],
+      "earthRadiusScale": 3.88,
+      "axialTiltDegrees": -28.3,
+      "rotationRate": 0.014,
+      "texture": "Neptune_Diffuse.ktx2",
+      "fallbackColor": "#3f6fdb"
+    },
+    {
+      "id": "pluto",
+      "name": "Pluto",
+      "position": [
+        2800,
+        0,
+        1757.73
+      ],
+      "earthRadiusScale": 0.18,
+      "axialTiltDegrees": -122.5,
+      "rotationRate": 0.002,
+      "texture": "Pluto_Diffuse.ktx2",
+      "fallbackColor": "#b59a7a"
     }
   ]
 }

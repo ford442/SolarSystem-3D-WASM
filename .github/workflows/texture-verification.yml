@@ -40,6 +40,10 @@ jobs:
         working-directory: web
         run: npm ci
 
+      - name: Verify planet metadata is generated
+        working-directory: web
+        run: npm run generate:planet-metadata:check
+
       - name: Build WebAssembly
         run: ./build-web.sh --no-emsdk
 

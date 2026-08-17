@@ -6,137 +6,864 @@
   "directories": [
     "textures/",
     "textures_low/",
+    "textures_mid/",
     "sounds/"
   ],
   "files": [
-    { "path": "textures_low/Ariel_Diffuse_Low.dds", "sha256": null },
-    { "path": "textures_low/Ariel_Normal_Low.dds", "sha256": null },
-    { "path": "textures_low/Callisto_Diffuse_Low.dds", "sha256": null },
-    { "path": "textures_low/Callisto_Normal_Low.dds", "sha256": null },
-    { "path": "textures_low/Charon_Diffuse_Low.dds", "sha256": null },
-    { "path": "textures_low/Charon_Normal_Low.dds", "sha256": null },
-    { "path": "textures_low/Charon_Specular_Low.dds", "sha256": null },
-    { "path": "textures_low/Deimos_Diffuse_Low.dds", "sha256": null },
-    { "path": "textures_low/Deimos_Normal_Low.dds", "sha256": null },
-    { "path": "textures_low/Dione_Diffuse_Low.dds", "sha256": null },
-    { "path": "textures_low/Dione_Normal_Low.dds", "sha256": null },
-    { "path": "textures_low/Earth_Clouds_Diffuse_Low.dds", "sha256": null },
-    { "path": "textures_low/Earth_Clouds_Normal_Low.dds", "sha256": null },
-    { "path": "textures_low/Earth_Day_Diffuse_Low.dds", "sha256": null },
-    { "path": "textures_low/Earth_Day_Normal_Low.dds", "sha256": null },
-    { "path": "textures_low/Earth_Day_Specular_Low.dds", "sha256": null },
-    { "path": "textures_low/Earth_Night_Diffuse_Low.dds", "sha256": null },
-    { "path": "textures_low/Earth_Normal_Low.dds", "sha256": null },
-    { "path": "textures_low/Earth_Specular_Low.dds", "sha256": null },
-    { "path": "textures_low/Enceladus_Diffuse_Low.dds", "sha256": null },
-    { "path": "textures_low/Enceladus_Normal_Low.dds", "sha256": null },
-    { "path": "textures_low/Europa_Diffuse_Low.dds", "sha256": null },
-    { "path": "textures_low/Europa_Normal_Low.dds", "sha256": null },
-    { "path": "textures_low/Ganymede_Diffuse_Low.dds", "sha256": null },
-    { "path": "textures_low/Ganymede_Normal_Low.dds", "sha256": null },
-    { "path": "textures_low/Iapetus_Diffuse_Low.dds", "sha256": null },
-    { "path": "textures_low/Iapetus_Normal_Low.dds", "sha256": null },
-    { "path": "textures_low/Io_Diffuse_Low.dds", "sha256": null },
-    { "path": "textures_low/Io_Normal_Low.dds", "sha256": null },
-    { "path": "textures_low/Jupiter_Diffuse_Low.dds", "sha256": null },
-    { "path": "textures_low/Jupiter_Normal_Low.dds", "sha256": null },
-    { "path": "textures_low/Jupiter_Specular_Low.dds", "sha256": null },
-    { "path": "textures_low/Main_SkyBox/NegativeX.dds", "sha256": null },
-    { "path": "textures_low/Main_SkyBox/NegativeY.dds", "sha256": null },
-    { "path": "textures_low/Main_SkyBox/NegativeZ.dds", "sha256": null },
-    { "path": "textures_low/Main_SkyBox/PositiveX.dds", "sha256": null },
-    { "path": "textures_low/Main_SkyBox/PositiveY.dds", "sha256": null },
-    { "path": "textures_low/Main_SkyBox/PositiveZ.dds", "sha256": null },
-    { "path": "textures_low/Mars_Diffuse_Low.dds", "sha256": null },
-    { "path": "textures_low/Mars_Normal_Low.dds", "sha256": null },
-    { "path": "textures_low/Mars_Specular_Low.dds", "sha256": null },
-    { "path": "textures_low/Mercury_Diffuse_Low.dds", "sha256": null },
-    { "path": "textures_low/Mercury_Normal_Low.dds", "sha256": null },
-    { "path": "textures_low/Mercury_Specular_Low.dds", "sha256": null },
-    { "path": "textures_low/Mimas_Diffuse_Low.dds", "sha256": null },
-    { "path": "textures_low/Mimas_Normal_Low.dds", "sha256": null },
-    { "path": "textures_low/Miranda_Diffuse_Low.dds", "sha256": null },
-    { "path": "textures_low/Miranda_Normal_Low.dds", "sha256": null },
-    { "path": "textures_low/Moon_Diffuse_Low.dds", "sha256": null },
-    { "path": "textures_low/Moon_Normal_Low.dds", "sha256": null },
-    { "path": "textures_low/Neptune_Clouds_Diffuse_Low.dds", "sha256": null },
-    { "path": "textures_low/Neptune_Clouds_Normal_Low.dds", "sha256": null },
-    { "path": "textures_low/Neptune_Diffuse_Low.dds", "sha256": null },
-    { "path": "textures_low/Neptune_Normal_Low.dds", "sha256": null },
-    { "path": "textures_low/Neptune_Specular_Low.dds", "sha256": null },
-    { "path": "textures_low/Oberon_Diffuse_Low.dds", "sha256": null },
-    { "path": "textures_low/Oberon_Normal_Low.dds", "sha256": null },
-    { "path": "textures_low/Phobos_Diffuse_Low.dds", "sha256": null },
-    { "path": "textures_low/Phobos_Normal_Low.dds", "sha256": null },
-    { "path": "textures_low/Pluto_Diffuse_Low.dds", "sha256": null },
-    { "path": "textures_low/Pluto_Normal_Low.dds", "sha256": null },
-    { "path": "textures_low/Pluto_Specular_Low.dds", "sha256": null },
-    { "path": "textures_low/Rhea_Diffuse_Low.dds", "sha256": null },
-    { "path": "textures_low/Rhea_Normal_Low.dds", "sha256": null },
-    { "path": "textures_low/Saturn_Diffuse_Low.dds", "sha256": null },
-    { "path": "textures_low/Saturn_Normal_Low.dds", "sha256": null },
-    { "path": "textures_low/Saturn_Rings_Low.dds", "sha256": null },
-    { "path": "textures_low/Saturn_Specular_Low.dds", "sha256": null },
-    { "path": "textures_low/Tethys_Diffuse_Low.dds", "sha256": null },
-    { "path": "textures_low/Tethys_Normal_Low.dds", "sha256": null },
-    { "path": "textures_low/Titan_Diffuse_Low.dds", "sha256": null },
-    { "path": "textures_low/Titan_Normal_Low.dds", "sha256": null },
-    { "path": "textures_low/Titania_Diffuse_Low.dds", "sha256": null },
-    { "path": "textures_low/Titania_Normal_Low.dds", "sha256": null },
-    { "path": "textures_low/Triton_Diffuse_Low.dds", "sha256": null },
-    { "path": "textures_low/Triton_Normal_Low.dds", "sha256": null },
-    { "path": "textures_low/Umbriel_Diffuse_Low.dds", "sha256": null },
-    { "path": "textures_low/Umbriel_Normal_Low.dds", "sha256": null },
-    { "path": "textures_low/Uranus_Clouds_Diffuse_Low.dds", "sha256": null },
-    { "path": "textures_low/Uranus_Clouds_Normal_Low.dds", "sha256": null },
-    { "path": "textures_low/Uranus_Diffuse_Low.dds", "sha256": null },
-    { "path": "textures_low/Uranus_Normal_Low.dds", "sha256": null },
-    { "path": "textures_low/Uranus_Rings_Low.dds", "sha256": null },
-    { "path": "textures_low/Uranus_Specular_Low.dds", "sha256": null },
-    { "path": "textures_low/Venus_Diffuse_Low.dds", "sha256": null },
-    { "path": "textures_low/Venus_Normal_Low.dds", "sha256": null },
-    { "path": "textures_low/Venus_Specular_Low.dds", "sha256": null },
-    { "path": "textures/Main_SkyBox/PositiveX.dds", "sha256": null },
-    { "path": "textures/Main_SkyBox/NegativeX.dds", "sha256": null },
-    { "path": "textures/Main_SkyBox/PositiveY.dds", "sha256": null },
-    { "path": "textures/Main_SkyBox/NegativeY.dds", "sha256": null },
-    { "path": "textures/Main_SkyBox/PositiveZ.dds", "sha256": null },
-    { "path": "textures/Main_SkyBox/NegativeZ.dds", "sha256": null },
-    { "path": "textures/Mercury_Diffuse.dds", "sha256": null },
-    { "path": "textures/Mercury_Normal.dds", "sha256": null },
-    { "path": "textures/Mercury_Specular.dds", "sha256": null },
-    { "path": "textures/Venus_Diffuse.dds", "sha256": null },
-    { "path": "textures/Venus_Normal.dds", "sha256": null },
-    { "path": "textures/Earth_Day_Diffuse.dds", "sha256": null },
-    { "path": "textures/Earth_Normal.dds", "sha256": null },
-    { "path": "textures/Earth_Specular.dds", "sha256": null },
-    { "path": "textures/Mars_Diffuse.dds", "sha256": null },
-    { "path": "textures/Mars_Normal.dds", "sha256": null },
-    { "path": "textures/Jupiter_Diffuse.dds", "sha256": null },
-    { "path": "textures/Jupiter_Normal.dds", "sha256": null },
-    { "path": "textures/Saturn_Diffuse.dds", "sha256": null },
-    { "path": "textures/Saturn_Normal.dds", "sha256": null },
-    { "path": "textures/Uranus_Diffuse.dds", "sha256": null },
-    { "path": "textures/Uranus_Normal.dds", "sha256": null },
-    { "path": "textures/Neptune_Diffuse.dds", "sha256": null },
-    { "path": "textures/Neptune_Normal.dds", "sha256": null },
-    { "path": "textures/Pluto_Diffuse.dds", "sha256": null },
-    { "path": "textures/Pluto_Normal.dds", "sha256": null },
-    { "path": "textures/Pluto_Specular.dds", "sha256": null },
-    { "path": "textures/Moon_Diffuse.dds", "sha256": null, "optional": true },
-    { "path": "textures/Io_Diffuse.dds", "sha256": null, "optional": true },
-    { "path": "textures/Europa_Diffuse.dds", "sha256": null, "optional": true },
-    { "path": "textures/Ganymede_Diffuse.dds", "sha256": null, "optional": true },
-    { "path": "textures/Titan_Diffuse.dds", "sha256": null, "optional": true },
-    { "path": "textures/Saturn_Rings.dds", "sha256": null, "optional": true },
-    { "path": "textures/Uranus_Rings.dds", "sha256": null, "optional": true },
-    { "path": "textures/Earth_Clouds_Diffuse.dds", "sha256": null, "optional": true },
-    { "path": "textures/Neptune_Clouds_Diffuse.dds", "sha256": null, "optional": true },
-    { "path": "textures/Uranus_Clouds_Diffuse.dds", "sha256": null, "optional": true },
-    { "path": "sounds/Stellardrone - Galaxies.mp3", "sha256": null, "optional": true },
-    { "path": "sounds/Stellardrone - Mars.mp3", "sha256": null, "optional": true },
-    { "path": "sounds/Stellardrone - Billions And Billions.mp3", "sha256": null, "optional": true },
-    { "path": "sounds/Stellardrone - Gravitation (Remix).mp3", "sha256": null, "optional": true },
-    { "path": "sounds/Stellardrone - The Edge of Forever.mp3", "sha256": null, "optional": true }
+    {
+      "path": "textures_low/Ariel_Diffuse_Low.dds",
+      "sha256": "7c524486cdc4111467ed765d7753d85849dcd796a265767a8d7a796b97a1593b"
+    },
+    {
+      "path": "textures_low/Ariel_Normal_Low.dds",
+      "sha256": "7c524486cdc4111467ed765d7753d85849dcd796a265767a8d7a796b97a1593b"
+    },
+    {
+      "path": "textures_low/Callisto_Diffuse_Low.dds",
+      "sha256": "7c524486cdc4111467ed765d7753d85849dcd796a265767a8d7a796b97a1593b"
+    },
+    {
+      "path": "textures_low/Callisto_Normal_Low.dds",
+      "sha256": "7c524486cdc4111467ed765d7753d85849dcd796a265767a8d7a796b97a1593b"
+    },
+    {
+      "path": "textures_low/Charon_Diffuse_Low.dds",
+      "sha256": "7c524486cdc4111467ed765d7753d85849dcd796a265767a8d7a796b97a1593b"
+    },
+    {
+      "path": "textures_low/Charon_Normal_Low.dds",
+      "sha256": "7c524486cdc4111467ed765d7753d85849dcd796a265767a8d7a796b97a1593b"
+    },
+    {
+      "path": "textures_low/Charon_Specular_Low.dds",
+      "sha256": "7c524486cdc4111467ed765d7753d85849dcd796a265767a8d7a796b97a1593b"
+    },
+    {
+      "path": "textures_low/Deimos_Diffuse_Low.dds",
+      "sha256": "7c524486cdc4111467ed765d7753d85849dcd796a265767a8d7a796b97a1593b"
+    },
+    {
+      "path": "textures_low/Deimos_Normal_Low.dds",
+      "sha256": "7c524486cdc4111467ed765d7753d85849dcd796a265767a8d7a796b97a1593b"
+    },
+    {
+      "path": "textures_low/Dione_Diffuse_Low.dds",
+      "sha256": "7c524486cdc4111467ed765d7753d85849dcd796a265767a8d7a796b97a1593b"
+    },
+    {
+      "path": "textures_low/Dione_Normal_Low.dds",
+      "sha256": "7c524486cdc4111467ed765d7753d85849dcd796a265767a8d7a796b97a1593b"
+    },
+    {
+      "path": "textures_low/Earth_Clouds_Diffuse_Low.dds",
+      "sha256": "7c524486cdc4111467ed765d7753d85849dcd796a265767a8d7a796b97a1593b"
+    },
+    {
+      "path": "textures_low/Earth_Clouds_Normal_Low.dds",
+      "sha256": "7c524486cdc4111467ed765d7753d85849dcd796a265767a8d7a796b97a1593b"
+    },
+    {
+      "path": "textures_low/Earth_Day_Diffuse_Low.dds",
+      "sha256": "bbe3421d188399db48ea0b7b5bcd8114fa8d5f1ae4e3eac5e3a4212961286d38"
+    },
+    {
+      "path": "textures_low/Earth_Day_Normal_Low.dds",
+      "sha256": "200200afa325fbcd0d19579905c11c68ab9bf11b94cbd8e851d68d479bcc4e9b"
+    },
+    {
+      "path": "textures_low/Earth_Day_Specular_Low.dds",
+      "sha256": "107c21112b8e7ea2eb547d77ddcec3590343e3687a8004abfffc8c03cc09c2c2"
+    },
+    {
+      "path": "textures_low/Earth_Night_Diffuse_Low.dds",
+      "sha256": "7c524486cdc4111467ed765d7753d85849dcd796a265767a8d7a796b97a1593b"
+    },
+    {
+      "path": "textures_low/Earth_Normal_Low.dds",
+      "sha256": "200200afa325fbcd0d19579905c11c68ab9bf11b94cbd8e851d68d479bcc4e9b"
+    },
+    {
+      "path": "textures_low/Earth_Specular_Low.dds",
+      "sha256": "107c21112b8e7ea2eb547d77ddcec3590343e3687a8004abfffc8c03cc09c2c2"
+    },
+    {
+      "path": "textures_low/Enceladus_Diffuse_Low.dds",
+      "sha256": "7c524486cdc4111467ed765d7753d85849dcd796a265767a8d7a796b97a1593b"
+    },
+    {
+      "path": "textures_low/Enceladus_Normal_Low.dds",
+      "sha256": "7c524486cdc4111467ed765d7753d85849dcd796a265767a8d7a796b97a1593b"
+    },
+    {
+      "path": "textures_low/Europa_Diffuse_Low.dds",
+      "sha256": "7c524486cdc4111467ed765d7753d85849dcd796a265767a8d7a796b97a1593b"
+    },
+    {
+      "path": "textures_low/Europa_Normal_Low.dds",
+      "sha256": "7c524486cdc4111467ed765d7753d85849dcd796a265767a8d7a796b97a1593b"
+    },
+    {
+      "path": "textures_low/Ganymede_Diffuse_Low.dds",
+      "sha256": "7c524486cdc4111467ed765d7753d85849dcd796a265767a8d7a796b97a1593b"
+    },
+    {
+      "path": "textures_low/Ganymede_Normal_Low.dds",
+      "sha256": "7c524486cdc4111467ed765d7753d85849dcd796a265767a8d7a796b97a1593b"
+    },
+    {
+      "path": "textures_low/Iapetus_Diffuse_Low.dds",
+      "sha256": "7c524486cdc4111467ed765d7753d85849dcd796a265767a8d7a796b97a1593b"
+    },
+    {
+      "path": "textures_low/Iapetus_Normal_Low.dds",
+      "sha256": "7c524486cdc4111467ed765d7753d85849dcd796a265767a8d7a796b97a1593b"
+    },
+    {
+      "path": "textures_low/Io_Diffuse_Low.dds",
+      "sha256": "7c524486cdc4111467ed765d7753d85849dcd796a265767a8d7a796b97a1593b"
+    },
+    {
+      "path": "textures_low/Io_Normal_Low.dds",
+      "sha256": "7c524486cdc4111467ed765d7753d85849dcd796a265767a8d7a796b97a1593b"
+    },
+    {
+      "path": "textures_low/Jupiter_Diffuse_Low.dds",
+      "sha256": "1e7d60565fa867f4d29bfb5079054cc2775a59f39d1f0c4759eb1ccce00034ee"
+    },
+    {
+      "path": "textures_low/Jupiter_Normal_Low.dds",
+      "sha256": "200200afa325fbcd0d19579905c11c68ab9bf11b94cbd8e851d68d479bcc4e9b"
+    },
+    {
+      "path": "textures_low/Jupiter_Specular_Low.dds",
+      "sha256": "177d0d2a5d5924b76a83c93e720451b37afc8f17368d79fdc4023b85f2fc732f"
+    },
+    {
+      "path": "textures_low/Main_SkyBox/NegativeX.dds",
+      "sha256": "885d9f95f72306d3825377545f7606ff94a3e34d9bc6480d7ea6dd7f7a24086d"
+    },
+    {
+      "path": "textures_low/Main_SkyBox/NegativeY.dds",
+      "sha256": "8c8b519e2775d1340716c39f8f9903527be6d7dd0a2d855499a9a56334df7b5e"
+    },
+    {
+      "path": "textures_low/Main_SkyBox/NegativeZ.dds",
+      "sha256": "e6a4cdf1b31c1d59db5ed6d164478cbdc0fa623b8a9b721f81812b5f80c5e08d"
+    },
+    {
+      "path": "textures_low/Main_SkyBox/PositiveX.dds",
+      "sha256": "a19772d0e00dfa45316e26b23cc91acf1b9b599e625b73a2b9a5ff02418ea945"
+    },
+    {
+      "path": "textures_low/Main_SkyBox/PositiveY.dds",
+      "sha256": "1857bced968f86d45803f58fd2ced567c282141fc7496649e8fdafd82eab4d56"
+    },
+    {
+      "path": "textures_low/Main_SkyBox/PositiveZ.dds",
+      "sha256": "e79e320505a9d0aa6b6a9bc902ea5f18e38e564191a38bc0400d884e242998fb"
+    },
+    {
+      "path": "textures_low/Mars_Diffuse_Low.dds",
+      "sha256": "86a2bde830de896bee444516e305686e04a27948288e8ec522102a9ebd953b38"
+    },
+    {
+      "path": "textures_low/Mars_Normal_Low.dds",
+      "sha256": "200200afa325fbcd0d19579905c11c68ab9bf11b94cbd8e851d68d479bcc4e9b"
+    },
+    {
+      "path": "textures_low/Mars_Specular_Low.dds",
+      "sha256": "9ef4ab424cab58103032e067c6232cc799d32a11ea94f5fbf1b860987d8b8470"
+    },
+    {
+      "path": "textures_low/Mercury_Diffuse_Low.dds",
+      "sha256": "7c524486cdc4111467ed765d7753d85849dcd796a265767a8d7a796b97a1593b"
+    },
+    {
+      "path": "textures_low/Mercury_Normal_Low.dds",
+      "sha256": "200200afa325fbcd0d19579905c11c68ab9bf11b94cbd8e851d68d479bcc4e9b"
+    },
+    {
+      "path": "textures_low/Mercury_Specular_Low.dds",
+      "sha256": "dd59f8efc55c4d9c9563ccd4ecbf7e398f728db1a2cac80a726bc72950c2a13a"
+    },
+    {
+      "path": "textures_low/Mimas_Diffuse_Low.dds",
+      "sha256": "7c524486cdc4111467ed765d7753d85849dcd796a265767a8d7a796b97a1593b"
+    },
+    {
+      "path": "textures_low/Mimas_Normal_Low.dds",
+      "sha256": "7c524486cdc4111467ed765d7753d85849dcd796a265767a8d7a796b97a1593b"
+    },
+    {
+      "path": "textures_low/Miranda_Diffuse_Low.dds",
+      "sha256": "7c524486cdc4111467ed765d7753d85849dcd796a265767a8d7a796b97a1593b"
+    },
+    {
+      "path": "textures_low/Miranda_Normal_Low.dds",
+      "sha256": "7c524486cdc4111467ed765d7753d85849dcd796a265767a8d7a796b97a1593b"
+    },
+    {
+      "path": "textures_low/Moon_Diffuse_Low.dds",
+      "sha256": "7c524486cdc4111467ed765d7753d85849dcd796a265767a8d7a796b97a1593b"
+    },
+    {
+      "path": "textures_low/Moon_Normal_Low.dds",
+      "sha256": "7c524486cdc4111467ed765d7753d85849dcd796a265767a8d7a796b97a1593b"
+    },
+    {
+      "path": "textures_low/Neptune_Clouds_Diffuse_Low.dds",
+      "sha256": "7c524486cdc4111467ed765d7753d85849dcd796a265767a8d7a796b97a1593b"
+    },
+    {
+      "path": "textures_low/Neptune_Clouds_Normal_Low.dds",
+      "sha256": "7c524486cdc4111467ed765d7753d85849dcd796a265767a8d7a796b97a1593b"
+    },
+    {
+      "path": "textures_low/Neptune_Diffuse_Low.dds",
+      "sha256": "52381a16dfe6a1e4c941c3b4d9eea672de87b400af6ef4539ee575f603f640f1"
+    },
+    {
+      "path": "textures_low/Neptune_Normal_Low.dds",
+      "sha256": "200200afa325fbcd0d19579905c11c68ab9bf11b94cbd8e851d68d479bcc4e9b"
+    },
+    {
+      "path": "textures_low/Neptune_Specular_Low.dds",
+      "sha256": "cebeefb0545473b7b663817b89cc91bf25a28ec991f87886644846dbac0589b4"
+    },
+    {
+      "path": "textures_low/Oberon_Diffuse_Low.dds",
+      "sha256": "7c524486cdc4111467ed765d7753d85849dcd796a265767a8d7a796b97a1593b"
+    },
+    {
+      "path": "textures_low/Oberon_Normal_Low.dds",
+      "sha256": "7c524486cdc4111467ed765d7753d85849dcd796a265767a8d7a796b97a1593b"
+    },
+    {
+      "path": "textures_low/Phobos_Diffuse_Low.dds",
+      "sha256": "7c524486cdc4111467ed765d7753d85849dcd796a265767a8d7a796b97a1593b"
+    },
+    {
+      "path": "textures_low/Phobos_Normal_Low.dds",
+      "sha256": "7c524486cdc4111467ed765d7753d85849dcd796a265767a8d7a796b97a1593b"
+    },
+    {
+      "path": "textures_low/Pluto_Diffuse_Low.dds",
+      "sha256": "6d71560a827dc1e34206b4cd185c3bfb3e28fc654a9655a21174c710bc27ef0b"
+    },
+    {
+      "path": "textures_low/Pluto_Normal_Low.dds",
+      "sha256": "200200afa325fbcd0d19579905c11c68ab9bf11b94cbd8e851d68d479bcc4e9b"
+    },
+    {
+      "path": "textures_low/Pluto_Specular_Low.dds",
+      "sha256": "9ce3398448ed5add9b675ed9e2f40c01e7e0e7000bef8e6638233b2c3ae7999f"
+    },
+    {
+      "path": "textures_low/Rhea_Diffuse_Low.dds",
+      "sha256": "7c524486cdc4111467ed765d7753d85849dcd796a265767a8d7a796b97a1593b"
+    },
+    {
+      "path": "textures_low/Rhea_Normal_Low.dds",
+      "sha256": "7c524486cdc4111467ed765d7753d85849dcd796a265767a8d7a796b97a1593b"
+    },
+    {
+      "path": "textures_low/Saturn_Diffuse_Low.dds",
+      "sha256": "8a3a58c9c269599c5d24eefe8db987b26cc88488eb8a44aa67a223281e301e93"
+    },
+    {
+      "path": "textures_low/Saturn_Normal_Low.dds",
+      "sha256": "200200afa325fbcd0d19579905c11c68ab9bf11b94cbd8e851d68d479bcc4e9b"
+    },
+    {
+      "path": "textures_low/Saturn_Rings_Low.dds",
+      "sha256": "7c524486cdc4111467ed765d7753d85849dcd796a265767a8d7a796b97a1593b"
+    },
+    {
+      "path": "textures_low/Saturn_Specular_Low.dds",
+      "sha256": "80c267b7edcb24bc2f2b5aace5112a1494725a71182768bbcba93376520f9566"
+    },
+    {
+      "path": "textures_low/Tethys_Diffuse_Low.dds",
+      "sha256": "7c524486cdc4111467ed765d7753d85849dcd796a265767a8d7a796b97a1593b"
+    },
+    {
+      "path": "textures_low/Tethys_Normal_Low.dds",
+      "sha256": "7c524486cdc4111467ed765d7753d85849dcd796a265767a8d7a796b97a1593b"
+    },
+    {
+      "path": "textures_low/Titan_Diffuse_Low.dds",
+      "sha256": "7c524486cdc4111467ed765d7753d85849dcd796a265767a8d7a796b97a1593b"
+    },
+    {
+      "path": "textures_low/Titan_Normal_Low.dds",
+      "sha256": "7c524486cdc4111467ed765d7753d85849dcd796a265767a8d7a796b97a1593b"
+    },
+    {
+      "path": "textures_low/Titania_Diffuse_Low.dds",
+      "sha256": "7c524486cdc4111467ed765d7753d85849dcd796a265767a8d7a796b97a1593b"
+    },
+    {
+      "path": "textures_low/Titania_Normal_Low.dds",
+      "sha256": "7c524486cdc4111467ed765d7753d85849dcd796a265767a8d7a796b97a1593b"
+    },
+    {
+      "path": "textures_low/Triton_Diffuse_Low.dds",
+      "sha256": "7c524486cdc4111467ed765d7753d85849dcd796a265767a8d7a796b97a1593b"
+    },
+    {
+      "path": "textures_low/Triton_Normal_Low.dds",
+      "sha256": "7c524486cdc4111467ed765d7753d85849dcd796a265767a8d7a796b97a1593b"
+    },
+    {
+      "path": "textures_low/Umbriel_Diffuse_Low.dds",
+      "sha256": "7c524486cdc4111467ed765d7753d85849dcd796a265767a8d7a796b97a1593b"
+    },
+    {
+      "path": "textures_low/Umbriel_Normal_Low.dds",
+      "sha256": "7c524486cdc4111467ed765d7753d85849dcd796a265767a8d7a796b97a1593b"
+    },
+    {
+      "path": "textures_low/Uranus_Clouds_Diffuse_Low.dds",
+      "sha256": "7c524486cdc4111467ed765d7753d85849dcd796a265767a8d7a796b97a1593b"
+    },
+    {
+      "path": "textures_low/Uranus_Clouds_Normal_Low.dds",
+      "sha256": "7c524486cdc4111467ed765d7753d85849dcd796a265767a8d7a796b97a1593b"
+    },
+    {
+      "path": "textures_low/Uranus_Diffuse_Low.dds",
+      "sha256": "ed4713899e65c69b8918e61ce59a161fb5044363723bf716f8b567af1be76e89"
+    },
+    {
+      "path": "textures_low/Uranus_Normal_Low.dds",
+      "sha256": "200200afa325fbcd0d19579905c11c68ab9bf11b94cbd8e851d68d479bcc4e9b"
+    },
+    {
+      "path": "textures_low/Uranus_Rings_Low.dds",
+      "sha256": "7c524486cdc4111467ed765d7753d85849dcd796a265767a8d7a796b97a1593b"
+    },
+    {
+      "path": "textures_low/Uranus_Specular_Low.dds",
+      "sha256": "abc3e209520ab4946f3c7facb39e08f9b6a48703233ae126d6baab002a099e9c"
+    },
+    {
+      "path": "textures_low/Venus_Diffuse_Low.dds",
+      "sha256": "9da9268803b752e21975bac0c7b5f6863a69a8ef3b4d77d0c2ac42d845551b9c"
+    },
+    {
+      "path": "textures_low/Venus_Normal_Low.dds",
+      "sha256": "200200afa325fbcd0d19579905c11c68ab9bf11b94cbd8e851d68d479bcc4e9b"
+    },
+    {
+      "path": "textures_low/Venus_Specular_Low.dds",
+      "sha256": "3c60a942fabc4dd38d8d0a4fdc70f51e1d1dfb02c58dc7caef768720d6140c3d"
+    },
+    {
+      "path": "textures/Main_SkyBox/PositiveX.dds",
+      "sha256": null
+    },
+    {
+      "path": "textures/Main_SkyBox/NegativeX.dds",
+      "sha256": null
+    },
+    {
+      "path": "textures/Main_SkyBox/PositiveY.dds",
+      "sha256": null
+    },
+    {
+      "path": "textures/Main_SkyBox/NegativeY.dds",
+      "sha256": null
+    },
+    {
+      "path": "textures/Main_SkyBox/PositiveZ.dds",
+      "sha256": null
+    },
+    {
+      "path": "textures/Main_SkyBox/NegativeZ.dds",
+      "sha256": null
+    },
+    {
+      "path": "textures/Mercury_Diffuse.dds",
+      "sha256": null
+    },
+    {
+      "path": "textures/Mercury_Normal.dds",
+      "sha256": null
+    },
+    {
+      "path": "textures/Mercury_Specular.dds",
+      "sha256": null
+    },
+    {
+      "path": "textures/Venus_Diffuse.dds",
+      "sha256": null
+    },
+    {
+      "path": "textures/Venus_Normal.dds",
+      "sha256": null
+    },
+    {
+      "path": "textures/Earth_Day_Diffuse.dds",
+      "sha256": null
+    },
+    {
+      "path": "textures/Earth_Normal.dds",
+      "sha256": null
+    },
+    {
+      "path": "textures/Earth_Specular.dds",
+      "sha256": null
+    },
+    {
+      "path": "textures/Mars_Diffuse.dds",
+      "sha256": null
+    },
+    {
+      "path": "textures/Mars_Normal.dds",
+      "sha256": null
+    },
+    {
+      "path": "textures/Jupiter_Diffuse.dds",
+      "sha256": null
+    },
+    {
+      "path": "textures/Jupiter_Normal.dds",
+      "sha256": null
+    },
+    {
+      "path": "textures/Saturn_Diffuse.dds",
+      "sha256": null
+    },
+    {
+      "path": "textures/Saturn_Normal.dds",
+      "sha256": null
+    },
+    {
+      "path": "textures/Uranus_Diffuse.dds",
+      "sha256": null
+    },
+    {
+      "path": "textures/Uranus_Normal.dds",
+      "sha256": null
+    },
+    {
+      "path": "textures/Neptune_Diffuse.dds",
+      "sha256": null
+    },
+    {
+      "path": "textures/Neptune_Normal.dds",
+      "sha256": null
+    },
+    {
+      "path": "textures/Pluto_Diffuse.dds",
+      "sha256": null
+    },
+    {
+      "path": "textures/Pluto_Normal.dds",
+      "sha256": null
+    },
+    {
+      "path": "textures/Pluto_Specular.dds",
+      "sha256": null
+    },
+    {
+      "path": "textures/Moon_Diffuse.dds",
+      "sha256": null,
+      "optional": true
+    },
+    {
+      "path": "textures/Io_Diffuse.dds",
+      "sha256": null,
+      "optional": true
+    },
+    {
+      "path": "textures/Europa_Diffuse.dds",
+      "sha256": null,
+      "optional": true
+    },
+    {
+      "path": "textures/Ganymede_Diffuse.dds",
+      "sha256": null,
+      "optional": true
+    },
+    {
+      "path": "textures/Titan_Diffuse.dds",
+      "sha256": null,
+      "optional": true
+    },
+    {
+      "path": "textures/Saturn_Rings.dds",
+      "sha256": null,
+      "optional": true
+    },
+    {
+      "path": "textures/Uranus_Rings.dds",
+      "sha256": null,
+      "optional": true
+    },
+    {
+      "path": "textures/Earth_Clouds_Diffuse.dds",
+      "sha256": null,
+      "optional": true
+    },
+    {
+      "path": "textures/Neptune_Clouds_Diffuse.dds",
+      "sha256": null,
+      "optional": true
+    },
+    {
+      "path": "textures/Uranus_Clouds_Diffuse.dds",
+      "sha256": null,
+      "optional": true
+    },
+    {
+      "path": "sounds/Stellardrone - Galaxies.mp3",
+      "sha256": null,
+      "optional": true
+    },
+    {
+      "path": "sounds/Stellardrone - Mars.mp3",
+      "sha256": null,
+      "optional": true
+    },
+    {
+      "path": "sounds/Stellardrone - Billions And Billions.mp3",
+      "sha256": null,
+      "optional": true
+    },
+    {
+      "path": "sounds/Stellardrone - Gravitation (Remix).mp3",
+      "sha256": null,
+      "optional": true
+    },
+    {
+      "path": "sounds/Stellardrone - The Edge of Forever.mp3",
+      "sha256": null,
+      "optional": true
+    },
+    {
+      "path": "textures_mid/Ariel_Diffuse_Mid.dds",
+      "sha256": "7c524486cdc4111467ed765d7753d85849dcd796a265767a8d7a796b97a1593b"
+    },
+    {
+      "path": "textures_mid/Ariel_Normal_Mid.dds",
+      "sha256": "7c524486cdc4111467ed765d7753d85849dcd796a265767a8d7a796b97a1593b"
+    },
+    {
+      "path": "textures_mid/Callisto_Diffuse_Mid.dds",
+      "sha256": "7c524486cdc4111467ed765d7753d85849dcd796a265767a8d7a796b97a1593b"
+    },
+    {
+      "path": "textures_mid/Callisto_Normal_Mid.dds",
+      "sha256": "7c524486cdc4111467ed765d7753d85849dcd796a265767a8d7a796b97a1593b"
+    },
+    {
+      "path": "textures_mid/Charon_Diffuse_Mid.dds",
+      "sha256": "7c524486cdc4111467ed765d7753d85849dcd796a265767a8d7a796b97a1593b"
+    },
+    {
+      "path": "textures_mid/Charon_Normal_Mid.dds",
+      "sha256": "7c524486cdc4111467ed765d7753d85849dcd796a265767a8d7a796b97a1593b"
+    },
+    {
+      "path": "textures_mid/Charon_Specular_Mid.dds",
+      "sha256": "7c524486cdc4111467ed765d7753d85849dcd796a265767a8d7a796b97a1593b"
+    },
+    {
+      "path": "textures_mid/Deimos_Diffuse_Mid.dds",
+      "sha256": "7c524486cdc4111467ed765d7753d85849dcd796a265767a8d7a796b97a1593b"
+    },
+    {
+      "path": "textures_mid/Deimos_Normal_Mid.dds",
+      "sha256": "7c524486cdc4111467ed765d7753d85849dcd796a265767a8d7a796b97a1593b"
+    },
+    {
+      "path": "textures_mid/Dione_Diffuse_Mid.dds",
+      "sha256": "7c524486cdc4111467ed765d7753d85849dcd796a265767a8d7a796b97a1593b"
+    },
+    {
+      "path": "textures_mid/Dione_Normal_Mid.dds",
+      "sha256": "7c524486cdc4111467ed765d7753d85849dcd796a265767a8d7a796b97a1593b"
+    },
+    {
+      "path": "textures_mid/Earth_Clouds_Diffuse_Mid.dds",
+      "sha256": "7c524486cdc4111467ed765d7753d85849dcd796a265767a8d7a796b97a1593b"
+    },
+    {
+      "path": "textures_mid/Earth_Clouds_Normal_Mid.dds",
+      "sha256": "7c524486cdc4111467ed765d7753d85849dcd796a265767a8d7a796b97a1593b"
+    },
+    {
+      "path": "textures_mid/Earth_Day_Diffuse_Mid.dds",
+      "sha256": "bbe3421d188399db48ea0b7b5bcd8114fa8d5f1ae4e3eac5e3a4212961286d38"
+    },
+    {
+      "path": "textures_mid/Earth_Day_Normal_Mid.dds",
+      "sha256": "200200afa325fbcd0d19579905c11c68ab9bf11b94cbd8e851d68d479bcc4e9b"
+    },
+    {
+      "path": "textures_mid/Earth_Day_Specular_Mid.dds",
+      "sha256": "107c21112b8e7ea2eb547d77ddcec3590343e3687a8004abfffc8c03cc09c2c2"
+    },
+    {
+      "path": "textures_mid/Earth_Night_Diffuse_Mid.dds",
+      "sha256": "7c524486cdc4111467ed765d7753d85849dcd796a265767a8d7a796b97a1593b"
+    },
+    {
+      "path": "textures_mid/Earth_Normal_Mid.dds",
+      "sha256": "200200afa325fbcd0d19579905c11c68ab9bf11b94cbd8e851d68d479bcc4e9b"
+    },
+    {
+      "path": "textures_mid/Earth_Specular_Mid.dds",
+      "sha256": "107c21112b8e7ea2eb547d77ddcec3590343e3687a8004abfffc8c03cc09c2c2"
+    },
+    {
+      "path": "textures_mid/Enceladus_Diffuse_Mid.dds",
+      "sha256": "7c524486cdc4111467ed765d7753d85849dcd796a265767a8d7a796b97a1593b"
+    },
+    {
+      "path": "textures_mid/Enceladus_Normal_Mid.dds",
+      "sha256": "7c524486cdc4111467ed765d7753d85849dcd796a265767a8d7a796b97a1593b"
+    },
+    {
+      "path": "textures_mid/Europa_Diffuse_Mid.dds",
+      "sha256": "7c524486cdc4111467ed765d7753d85849dcd796a265767a8d7a796b97a1593b"
+    },
+    {
+      "path": "textures_mid/Europa_Normal_Mid.dds",
+      "sha256": "7c524486cdc4111467ed765d7753d85849dcd796a265767a8d7a796b97a1593b"
+    },
+    {
+      "path": "textures_mid/Ganymede_Diffuse_Mid.dds",
+      "sha256": "7c524486cdc4111467ed765d7753d85849dcd796a265767a8d7a796b97a1593b"
+    },
+    {
+      "path": "textures_mid/Ganymede_Normal_Mid.dds",
+      "sha256": "7c524486cdc4111467ed765d7753d85849dcd796a265767a8d7a796b97a1593b"
+    },
+    {
+      "path": "textures_mid/Iapetus_Diffuse_Mid.dds",
+      "sha256": "7c524486cdc4111467ed765d7753d85849dcd796a265767a8d7a796b97a1593b"
+    },
+    {
+      "path": "textures_mid/Iapetus_Normal_Mid.dds",
+      "sha256": "7c524486cdc4111467ed765d7753d85849dcd796a265767a8d7a796b97a1593b"
+    },
+    {
+      "path": "textures_mid/Io_Diffuse_Mid.dds",
+      "sha256": "7c524486cdc4111467ed765d7753d85849dcd796a265767a8d7a796b97a1593b"
+    },
+    {
+      "path": "textures_mid/Io_Normal_Mid.dds",
+      "sha256": "7c524486cdc4111467ed765d7753d85849dcd796a265767a8d7a796b97a1593b"
+    },
+    {
+      "path": "textures_mid/Jupiter_Diffuse_Mid.dds",
+      "sha256": "1e7d60565fa867f4d29bfb5079054cc2775a59f39d1f0c4759eb1ccce00034ee"
+    },
+    {
+      "path": "textures_mid/Jupiter_Normal_Mid.dds",
+      "sha256": "200200afa325fbcd0d19579905c11c68ab9bf11b94cbd8e851d68d479bcc4e9b"
+    },
+    {
+      "path": "textures_mid/Jupiter_Specular_Mid.dds",
+      "sha256": "177d0d2a5d5924b76a83c93e720451b37afc8f17368d79fdc4023b85f2fc732f"
+    },
+    {
+      "path": "textures_mid/Mars_Diffuse_Mid.dds",
+      "sha256": "86a2bde830de896bee444516e305686e04a27948288e8ec522102a9ebd953b38"
+    },
+    {
+      "path": "textures_mid/Mars_Normal_Mid.dds",
+      "sha256": "200200afa325fbcd0d19579905c11c68ab9bf11b94cbd8e851d68d479bcc4e9b"
+    },
+    {
+      "path": "textures_mid/Mars_Specular_Mid.dds",
+      "sha256": "9ef4ab424cab58103032e067c6232cc799d32a11ea94f5fbf1b860987d8b8470"
+    },
+    {
+      "path": "textures_mid/Mercury_Diffuse_Mid.dds",
+      "sha256": "7c524486cdc4111467ed765d7753d85849dcd796a265767a8d7a796b97a1593b"
+    },
+    {
+      "path": "textures_mid/Mercury_Normal_Mid.dds",
+      "sha256": "200200afa325fbcd0d19579905c11c68ab9bf11b94cbd8e851d68d479bcc4e9b"
+    },
+    {
+      "path": "textures_mid/Mercury_Specular_Mid.dds",
+      "sha256": "dd59f8efc55c4d9c9563ccd4ecbf7e398f728db1a2cac80a726bc72950c2a13a"
+    },
+    {
+      "path": "textures_mid/Mimas_Diffuse_Mid.dds",
+      "sha256": "7c524486cdc4111467ed765d7753d85849dcd796a265767a8d7a796b97a1593b"
+    },
+    {
+      "path": "textures_mid/Mimas_Normal_Mid.dds",
+      "sha256": "7c524486cdc4111467ed765d7753d85849dcd796a265767a8d7a796b97a1593b"
+    },
+    {
+      "path": "textures_mid/Miranda_Diffuse_Mid.dds",
+      "sha256": "7c524486cdc4111467ed765d7753d85849dcd796a265767a8d7a796b97a1593b"
+    },
+    {
+      "path": "textures_mid/Miranda_Normal_Mid.dds",
+      "sha256": "7c524486cdc4111467ed765d7753d85849dcd796a265767a8d7a796b97a1593b"
+    },
+    {
+      "path": "textures_mid/Moon_Diffuse_Mid.dds",
+      "sha256": "7c524486cdc4111467ed765d7753d85849dcd796a265767a8d7a796b97a1593b"
+    },
+    {
+      "path": "textures_mid/Moon_Normal_Mid.dds",
+      "sha256": "7c524486cdc4111467ed765d7753d85849dcd796a265767a8d7a796b97a1593b"
+    },
+    {
+      "path": "textures_mid/Neptune_Clouds_Diffuse_Mid.dds",
+      "sha256": "7c524486cdc4111467ed765d7753d85849dcd796a265767a8d7a796b97a1593b"
+    },
+    {
+      "path": "textures_mid/Neptune_Clouds_Normal_Mid.dds",
+      "sha256": "7c524486cdc4111467ed765d7753d85849dcd796a265767a8d7a796b97a1593b"
+    },
+    {
+      "path": "textures_mid/Neptune_Diffuse_Mid.dds",
+      "sha256": "52381a16dfe6a1e4c941c3b4d9eea672de87b400af6ef4539ee575f603f640f1"
+    },
+    {
+      "path": "textures_mid/Neptune_Normal_Mid.dds",
+      "sha256": "200200afa325fbcd0d19579905c11c68ab9bf11b94cbd8e851d68d479bcc4e9b"
+    },
+    {
+      "path": "textures_mid/Neptune_Specular_Mid.dds",
+      "sha256": "cebeefb0545473b7b663817b89cc91bf25a28ec991f87886644846dbac0589b4"
+    },
+    {
+      "path": "textures_mid/Oberon_Diffuse_Mid.dds",
+      "sha256": "7c524486cdc4111467ed765d7753d85849dcd796a265767a8d7a796b97a1593b"
+    },
+    {
+      "path": "textures_mid/Oberon_Normal_Mid.dds",
+      "sha256": "7c524486cdc4111467ed765d7753d85849dcd796a265767a8d7a796b97a1593b"
+    },
+    {
+      "path": "textures_mid/Phobos_Diffuse_Mid.dds",
+      "sha256": "7c524486cdc4111467ed765d7753d85849dcd796a265767a8d7a796b97a1593b"
+    },
+    {
+      "path": "textures_mid/Phobos_Normal_Mid.dds",
+      "sha256": "7c524486cdc4111467ed765d7753d85849dcd796a265767a8d7a796b97a1593b"
+    },
+    {
+      "path": "textures_mid/Pluto_Diffuse_Mid.dds",
+      "sha256": "6d71560a827dc1e34206b4cd185c3bfb3e28fc654a9655a21174c710bc27ef0b"
+    },
+    {
+      "path": "textures_mid/Pluto_Normal_Mid.dds",
+      "sha256": "200200afa325fbcd0d19579905c11c68ab9bf11b94cbd8e851d68d479bcc4e9b"
+    },
+    {
+      "path": "textures_mid/Pluto_Specular_Mid.dds",
+      "sha256": "9ce3398448ed5add9b675ed9e2f40c01e7e0e7000bef8e6638233b2c3ae7999f"
+    },
+    {
+      "path": "textures_mid/Rhea_Diffuse_Mid.dds",
+      "sha256": "7c524486cdc4111467ed765d7753d85849dcd796a265767a8d7a796b97a1593b"
+    },
+    {
+      "path": "textures_mid/Rhea_Normal_Mid.dds",
+      "sha256": "7c524486cdc4111467ed765d7753d85849dcd796a265767a8d7a796b97a1593b"
+    },
+    {
+      "path": "textures_mid/Saturn_Diffuse_Mid.dds",
+      "sha256": "8a3a58c9c269599c5d24eefe8db987b26cc88488eb8a44aa67a223281e301e93"
+    },
+    {
+      "path": "textures_mid/Saturn_Normal_Mid.dds",
+      "sha256": "200200afa325fbcd0d19579905c11c68ab9bf11b94cbd8e851d68d479bcc4e9b"
+    },
+    {
+      "path": "textures_mid/Saturn_Rings_Mid.dds",
+      "sha256": "7c524486cdc4111467ed765d7753d85849dcd796a265767a8d7a796b97a1593b"
+    },
+    {
+      "path": "textures_mid/Saturn_Specular_Mid.dds",
+      "sha256": "80c267b7edcb24bc2f2b5aace5112a1494725a71182768bbcba93376520f9566"
+    },
+    {
+      "path": "textures_mid/Tethys_Diffuse_Mid.dds",
+      "sha256": "7c524486cdc4111467ed765d7753d85849dcd796a265767a8d7a796b97a1593b"
+    },
+    {
+      "path": "textures_mid/Tethys_Normal_Mid.dds",
+      "sha256": "7c524486cdc4111467ed765d7753d85849dcd796a265767a8d7a796b97a1593b"
+    },
+    {
+      "path": "textures_mid/Titan_Diffuse_Mid.dds",
+      "sha256": "7c524486cdc4111467ed765d7753d85849dcd796a265767a8d7a796b97a1593b"
+    },
+    {
+      "path": "textures_mid/Titan_Normal_Mid.dds",
+      "sha256": "7c524486cdc4111467ed765d7753d85849dcd796a265767a8d7a796b97a1593b"
+    },
+    {
+      "path": "textures_mid/Titania_Diffuse_Mid.dds",
+      "sha256": "7c524486cdc4111467ed765d7753d85849dcd796a265767a8d7a796b97a1593b"
+    },
+    {
+      "path": "textures_mid/Titania_Normal_Mid.dds",
+      "sha256": "7c524486cdc4111467ed765d7753d85849dcd796a265767a8d7a796b97a1593b"
+    },
+    {
+      "path": "textures_mid/Triton_Diffuse_Mid.dds",
+      "sha256": "7c524486cdc4111467ed765d7753d85849dcd796a265767a8d7a796b97a1593b"
+    },
+    {
+      "path": "textures_mid/Triton_Normal_Mid.dds",
+      "sha256": "7c524486cdc4111467ed765d7753d85849dcd796a265767a8d7a796b97a1593b"
+    },
+    {
+      "path": "textures_mid/Umbriel_Diffuse_Mid.dds",
+      "sha256": "7c524486cdc4111467ed765d7753d85849dcd796a265767a8d7a796b97a1593b"
+    },
+    {
+      "path": "textures_mid/Umbriel_Normal_Mid.dds",
+      "sha256": "7c524486cdc4111467ed765d7753d85849dcd796a265767a8d7a796b97a1593b"
+    },
+    {
+      "path": "textures_mid/Uranus_Clouds_Diffuse_Mid.dds",
+      "sha256": "7c524486cdc4111467ed765d7753d85849dcd796a265767a8d7a796b97a1593b"
+    },
+    {
+      "path": "textures_mid/Uranus_Clouds_Normal_Mid.dds",
+      "sha256": "7c524486cdc4111467ed765d7753d85849dcd796a265767a8d7a796b97a1593b"
+    },
+    {
+      "path": "textures_mid/Uranus_Diffuse_Mid.dds",
+      "sha256": "ed4713899e65c69b8918e61ce59a161fb5044363723bf716f8b567af1be76e89"
+    },
+    {
+      "path": "textures_mid/Uranus_Normal_Mid.dds",
+      "sha256": "200200afa325fbcd0d19579905c11c68ab9bf11b94cbd8e851d68d479bcc4e9b"
+    },
+    {
+      "path": "textures_mid/Uranus_Rings_Mid.dds",
+      "sha256": "7c524486cdc4111467ed765d7753d85849dcd796a265767a8d7a796b97a1593b"
+    },
+    {
+      "path": "textures_mid/Uranus_Specular_Mid.dds",
+      "sha256": "abc3e209520ab4946f3c7facb39e08f9b6a48703233ae126d6baab002a099e9c"
+    },
+    {
+      "path": "textures_mid/Venus_Diffuse_Mid.dds",
+      "sha256": "9da9268803b752e21975bac0c7b5f6863a69a8ef3b4d77d0c2ac42d845551b9c"
+    },
+    {
+      "path": "textures_mid/Venus_Normal_Mid.dds",
+      "sha256": "200200afa325fbcd0d19579905c11c68ab9bf11b94cbd8e851d68d479bcc4e9b"
+    },
+    {
+      "path": "textures_mid/Venus_Specular_Mid.dds",
+      "sha256": "3c60a942fabc4dd38d8d0a4fdc70f51e1d1dfb02c58dc7caef768720d6140c3d"
+    }
   ]
 }

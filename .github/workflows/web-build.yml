@@ -74,6 +74,10 @@ jobs:
         working-directory: web
         run: npm ci
 
+      - name: Verify planet metadata is generated
+        working-directory: web
+        run: npm run generate:planet-metadata:check
+
       - name: Typecheck and bundle
         working-directory: web
         run: npx tsc && npx vite build

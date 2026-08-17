@@ -3,11 +3,15 @@
 namespace TexturePaths {
 struct Pair {
     const char* low;
+    const char* mid;
     const char* high;
 };
 
 #define SOLAR_TEXTURE_PAIR(Name, Base) \
-    inline constexpr Pair Name{"resource/textures_low/" Base "_Low.dds", "resource/textures/" Base ".dds"}
+    inline constexpr Pair Name{ \
+        "resource/textures_low/" Base "_Low.dds", \
+        "resource/textures_mid/" Base "_Mid.dds", \
+        "resource/textures/" Base ".dds"}
 
 namespace Mercury { SOLAR_TEXTURE_PAIR(Diffuse, "Mercury_Diffuse"); SOLAR_TEXTURE_PAIR(Normal, "Mercury_Normal"); SOLAR_TEXTURE_PAIR(Specular, "Mercury_Specular"); }
 namespace Venus { SOLAR_TEXTURE_PAIR(Diffuse, "Venus_Diffuse"); SOLAR_TEXTURE_PAIR(Normal, "Venus_Normal"); }

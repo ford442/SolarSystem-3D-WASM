@@ -46,6 +46,7 @@ const simulationDateNow = document.getElementById('simulation-date-now') as HTML
 const pausedInput = document.getElementById('simulation-paused') as HTMLInputElement;
 const shadowsInput = document.getElementById('shadows-enabled') as HTMLInputElement;
 const orbitLinesInput = document.getElementById('orbit-lines-enabled') as HTMLInputElement;
+const magneticFieldsInput = document.getElementById('magnetic-fields-enabled') as HTMLInputElement;
 const musicVolumeInput = document.getElementById('music-volume') as HTMLInputElement;
 const musicVolumeValue = document.getElementById('music-volume-value') as HTMLOutputElement;
 const musicMutedInput = document.getElementById('music-muted') as HTMLInputElement;
@@ -183,6 +184,7 @@ void Module(moduleConfig).then((instance) => {
             pausedInput,
             shadowsInput,
             orbitLinesInput,
+            magneticFieldsInput,
             musicVolumeInput,
             musicVolumeValue,
             musicMutedInput,

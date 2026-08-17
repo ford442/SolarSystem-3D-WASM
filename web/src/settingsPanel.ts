@@ -19,6 +19,7 @@ export interface PersistedSettings {
     paused: boolean;
     shadows: boolean;
     orbitLines: boolean;
+    magneticFields: boolean;
     musicVolume: number;
     musicMuted: boolean;
     simulationDate?: string;
@@ -38,6 +39,7 @@ export interface SettingsPanelElements {
     pausedInput: HTMLInputElement;
     shadowsInput: HTMLInputElement;
     orbitLinesInput: HTMLInputElement;
+    magneticFieldsInput: HTMLInputElement;
     musicVolumeInput: HTMLInputElement;
     musicVolumeValue: HTMLOutputElement;
     musicMutedInput: HTMLInputElement;
@@ -71,6 +73,7 @@ function readPersistedSettings(): Partial<PersistedSettings> {
             paused: typeof parsed.paused === 'boolean' ? parsed.paused : undefined,
             shadows: typeof parsed.shadows === 'boolean' ? parsed.shadows : undefined,
             orbitLines: typeof parsed.orbitLines === 'boolean' ? parsed.orbitLines : undefined,
+            magneticFields: typeof parsed.magneticFields === 'boolean' ? parsed.magneticFields : undefined,
             musicVolume: typeof parsed.musicVolume === 'number' && Number.isFinite(parsed.musicVolume)
                 ? Math.min(100, Math.max(0, Math.round(parsed.musicVolume)))
                 : undefined,
@@ -107,6 +110,7 @@ export function initSettingsPanel(options: SettingsPanelInitOptions): void {
         pausedInput,
         shadowsInput,
         orbitLinesInput,
+        magneticFieldsInput,
         musicVolumeInput,
         musicVolumeValue,
         musicMutedInput,
@@ -122,6 +126,7 @@ export function initSettingsPanel(options: SettingsPanelInitOptions): void {
             paused: pausedInput.checked,
             shadows: shadowsInput.checked,
             orbitLines: orbitLinesInput.checked,
+            magneticFields: magneticFieldsInput.checked,
             musicVolume: Number(musicVolumeInput.value),
             musicMuted: musicMutedInput.checked,
             simulationDate: simulationDateInput.value || undefined,
@@ -213,6 +218,9 @@ export function initSettingsPanel(options: SettingsPanelInitOptions): void {
             case 'orbitLines':
                 orbitLinesInput.checked = runtime.getOrbitLines();
                 break;
+            case 'magneticFields':
+                magneticFieldsInput.checked = runtime.getMagneticFields();
+                break;
         }
     }
 
@@ -237,6 +245,7 @@ export function initSettingsPanel(options: SettingsPanelInitOptions): void {
     const paused = deepLink.paused ?? saved.paused ?? runtime.getPaused();
     const shadows = deepLink.shadows ?? saved.shadows ?? true;
     const orbitLines = deepLink.orbitLines ?? saved.orbitLines ?? true;
+    const magneticFields = deepLink.magneticFields ?? saved.magneticFields ?? false;
     const musicVolumePercent = saved.musicVolume ?? Math.round(runtime.getMusicVolume() * 100);
     const musicMuted = saved.musicMuted ?? runtime.getMusicMuted();
     const simulationDate = deepLink.simulationDate
@@ -251,6 +260,7 @@ export function initSettingsPanel(options: SettingsPanelInitOptions): void {
     pausedInput.checked = paused;
     shadowsInput.checked = shadows;
     orbitLinesInput.checked = orbitLines;
+    magneticFieldsInput.checked = magneticFields;
     applyMusicVolumePercent(musicVolumePercent);
     musicMutedInput.checked = musicMuted;
 
@@ -268,6 +278,7 @@ export function initSettingsPanel(options: SettingsPanelInitOptions): void {
     }
     runtime.setShadowQuality(shadowQualityForPreset(quality, shadows));
     runtime.setOrbitLines(orbitLines);
+    runtime.setMagneticFields(magneticFields);
     runtime.setMusicMuted(musicMuted);
     if (!musicMuted) {
         runtime.setMusicVolume(musicVolumePercent / 100);
@@ -342,6 +353,14 @@ export function initSettingsPanel(options: SettingsPanelInitOptions): void {
         persistPanelSettings();
     });
 
+    magneticFieldsInput.addEventListener('change', () => {
+        runtime.setMagneticFields(magneticFieldsInput.checked);
+        settingsStatus.textContent = magneticFieldsInput.checked
+            ? 'Magnetic field lines enabled'
+            : 'Magnetic field lines disabled';
+        persistPanelSettings();
+    });
+
     musicVolumeInput.addEventListener('input', () => {
         const percent = Number(musicVolumeInput.value);
         updateMusicVolumeDisplay(percent);
@@ -370,6 +389,7 @@ export function initSettingsPanel(options: SettingsPanelInitOptions): void {
             getOrbitScaleMode: () => runtime.getOrbitScaleMode(),
             getShadowQuality: () => runtime.getShadowQuality(),
             getOrbitLines: () => (runtime.getOrbitLines() ? 1 : 0),
+            getMagneticFields: () => (runtime.getMagneticFields() ? 1 : 0),
             getFocusedPlanetIndex: () => runtime.getFocusedPlanetIndex(),
             getCameraPosition: () => runtime.getCameraPosition(),
             getCameraYaw: () => runtime.getCameraYaw(),
@@ -393,6 +413,7 @@ export function initSettingsPanel(options: SettingsPanelInitOptions): void {
         pausedInput.checked = false;
         shadowsInput.checked = true;
         orbitLinesInput.checked = true;
+        magneticFieldsInput.checked = false;
         musicMutedInput.checked = false;
         updateTimeScaleDisplay(1);
         applyMusicVolumePercent(30);
@@ -401,6 +422,7 @@ export function initSettingsPanel(options: SettingsPanelInitOptions): void {
         runtime.setPaused(false);
         runtime.setShadowQuality(resetShadowQuality);
         runtime.setOrbitLines(true);
+        runtime.setMagneticFields(false);
         runtime.setMusicMuted(false);
         runtime.setMusicVolume(0.3);
         const nowIso = isoDateUtcNow();

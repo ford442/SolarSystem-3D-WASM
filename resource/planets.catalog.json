@@ -1,0 +1,698 @@
+{
+  "schemaVersion": 1,
+  "generatedOutputs": [
+    "web/public/planet_facts.json",
+    "web/threejs/src/data/orbital-parameters.json",
+    "resource/planet_manifest.json"
+  ],
+  "sceneNote": {
+    "en": "Distances in the 3D scene are artistic. Toggle scale mode to compare compressed orbits vs AU-proportional spacing.",
+    "ru": "Расстояния в 3D-сцене художественные. Переключайте режим масштаба, чтобы сравнить сжатые орбиты и пропорциональные а.е."
+  },
+  "scaleModes": {
+    "compressed": {
+      "label": {
+        "en": "Compressed orbits",
+        "ru": "Сжатые орбиты"
+      },
+      "description": {
+        "en": "Artistic spacing for navigation — all worlds stay within a few thousand scene units.",
+        "ru": "Художественные расстояния для навигации — все миры в пределах нескольких тысяч единиц сцены."
+      }
+    },
+    "realistic": {
+      "label": {
+        "en": "Realistic distances",
+        "ru": "Реалистичные расстояния"
+      },
+      "description": {
+        "en": "Orbit radii scaled to NASA semi-major axes (1 AU ≈ Earth's compressed distance). Vast empty space between worlds.",
+        "ru": "Радиусы орбит по полуосям NASA (1 а.е. ≈ сжатое расстояние Земли). Огромные пустоты между мирами."
+      }
+    }
+  },
+  "initTagAllowlist": [
+    "Mercury",
+    "Venus",
+    "EarthSystem",
+    "MarsSystem",
+    "JupiterSystem",
+    "SaturnSystem",
+    "UranusSystem",
+    "NeptuneSystem",
+    "PlutoSystem"
+  ],
+  "bodies": [
+    {
+      "id": "sun",
+      "index": 0,
+      "kind": "star",
+      "parent": null,
+      "displayName": {
+        "en": "Sun",
+        "ru": "Солнце"
+      },
+      "type": "star",
+      "facts": {
+        "diameterKm": 1392700,
+        "massEarths": 333000,
+        "siderealRotationDays": 25.38,
+        "orbitalPeriodDays": null,
+        "distanceAu": 0,
+        "moons": 0,
+        "summary": {
+          "en": "G-type main-sequence star; contains 99.86% of the Solar System's mass.",
+          "ru": "Звезда спектрального класса G; содержит 99,86% массы Солнечной системы."
+        }
+      },
+      "orbit": {
+        "compressedOffset": [
+          0,
+          0,
+          0
+        ],
+        "inclinationDeg": 0.0,
+        "siderealRotationDays": 25.38,
+        "orbitalPeriodDays": null,
+        "distanceAu": 0.0,
+        "axialTiltDegrees": 0,
+        "earthRadiusScale": 1,
+        "rotationRate": 0.005
+      },
+      "includeInCompanion": false
+    },
+    {
+      "id": "mercury",
+      "index": 1,
+      "kind": "planet",
+      "parent": "sun",
+      "displayName": {
+        "en": "Mercury",
+        "ru": "Меркурий"
+      },
+      "type": "terrestrial",
+      "facts": {
+        "diameterKm": 4879,
+        "massEarths": 0.055,
+        "siderealRotationDays": 58.646,
+        "orbitalPeriodDays": 88,
+        "distanceAu": 0.387,
+        "moons": 0,
+        "summary": {
+          "en": "Smallest planet; extreme temperature swings between sunlit and shadowed hemispheres.",
+          "ru": "Самая маленькая планета; резкие перепады температуры между освещённой и теневой сторонами."
+        }
+      },
+      "orbit": {
+        "compressedOffset": [
+          1500,
+          0,
+          350
+        ],
+        "inclinationDeg": 7.0,
+        "siderealRotationDays": 58.646,
+        "orbitalPeriodDays": 88.0,
+        "distanceAu": 0.387,
+        "axialTiltDegrees": 0,
+        "earthRadiusScale": 0.38,
+        "rotationRate": 0.003
+      },
+      "system": {
+        "name": "Mercury",
+        "initTag": "Mercury",
+        "activationRadius": 800,
+        "lodThreshold": 50,
+        "proxyPosition": [
+          1500,
+          0,
+          350
+        ]
+      },
+      "assets": {
+        "requiredLow": [
+          "resource/textures_low/Mercury_Diffuse_Low.dds",
+          "resource/textures_low/Mercury_Normal_Low.dds",
+          "resource/textures_low/Mercury_Specular_Low.dds"
+        ],
+        "optionalLow": [],
+        "optionalHigh": [],
+        "companionTexture": "Mercury_Diffuse.ktx2",
+        "fallbackColor": "#9b8b75"
+      },
+      "includeInCompanion": true
+    },
+    {
+      "id": "venus",
+      "index": 2,
+      "kind": "planet",
+      "parent": "sun",
+      "displayName": {
+        "en": "Venus",
+        "ru": "Венера"
+      },
+      "type": "terrestrial",
+      "facts": {
+        "diameterKm": 12104,
+        "massEarths": 0.815,
+        "siderealRotationDays": -243.025,
+        "orbitalPeriodDays": 225,
+        "distanceAu": 0.723,
+        "moons": 0,
+        "summary": {
+          "en": "Dense CO₂ atmosphere drives a runaway greenhouse; surface hotter than Mercury.",
+          "ru": "Плотная атмосфера CO₂ вызывает парниковый эффект; поверхность горячее, чем у Меркурия."
+        }
+      },
+      "orbit": {
+        "compressedOffset": [
+          1125,
+          0,
+          -1340
+        ],
+        "inclinationDeg": 3.4,
+        "siderealRotationDays": -243.025,
+        "orbitalPeriodDays": 224.7,
+        "distanceAu": 0.723,
+        "axialTiltDegrees": 177.3,
+        "earthRadiusScale": 0.95,
+        "rotationRate": -0.003
+      },
+      "system": {
+        "name": "Venus",
+        "initTag": "Venus",
+        "activationRadius": 800,
+        "lodThreshold": 50,
+        "proxyPosition": [
+          1125,
+          0,
+          -1340
+        ]
+      },
+      "assets": {
+        "requiredLow": [
+          "resource/textures_low/Venus_Diffuse_Low.dds",
+          "resource/textures_low/Venus_Normal_Low.dds"
+        ],
+        "optionalLow": [],
+        "optionalHigh": [],
+        "companionTexture": "Venus_Diffuse.ktx2",
+        "fallbackColor": "#d5a55f"
+      },
+      "includeInCompanion": true
+    },
+    {
+      "id": "earth",
+      "index": 3,
+      "kind": "planet",
+      "parent": "sun",
+      "displayName": {
+        "en": "Earth",
+        "ru": "Земля"
+      },
+      "type": "terrestrial",
+      "facts": {
+        "diameterKm": 12742,
+        "massEarths": 1,
+        "siderealRotationDays": 0.997,
+        "orbitalPeriodDays": 365.25,
+        "distanceAu": 1,
+        "moons": 1,
+        "summary": {
+          "en": "Only known world with stable liquid water on the surface and abundant life.",
+          "ru": "Единственный известный мир с устойчивой жидкой водой на поверхности и обилием жизни."
+        }
+      },
+      "orbit": {
+        "compressedOffset": [
+          1900,
+          0,
+          0
+        ],
+        "inclinationDeg": 0.0,
+        "siderealRotationDays": 0.99726968,
+        "orbitalPeriodDays": 365.25,
+        "distanceAu": 1.0,
+        "axialTiltDegrees": -23.4,
+        "earthRadiusScale": 1,
+        "rotationRate": 0.0075
+      },
+      "system": {
+        "name": "Earth",
+        "initTag": "EarthSystem",
+        "activationRadius": 800,
+        "lodThreshold": 50,
+        "proxyPosition": [
+          1900,
+          0,
+          0
+        ]
+      },
+      "assets": {
+        "requiredLow": [
+          "resource/textures_low/Earth_Day_Diffuse_Low.dds",
+          "resource/textures_low/Earth_Normal_Low.dds",
+          "resource/textures_low/Earth_Specular_Low.dds"
+        ],
+        "optionalLow": [
+          "resource/textures_low/Earth_Clouds_Diffuse_Low.dds",
+          "resource/textures_low/Earth_Night_Diffuse_Low.dds",
+          "resource/textures_low/Earth_Clouds_Normal_Low.dds",
+          "resource/textures_low/Moon_Diffuse_Low.dds",
+          "resource/textures_low/Moon_Normal_Low.dds"
+        ],
+        "optionalHigh": [
+          "resource/textures/Moon_Diffuse.dds",
+          "resource/textures/Earth_Clouds_Diffuse.dds"
+        ],
+        "companionTexture": "Earth_Day_Diffuse.ktx2",
+        "fallbackColor": "#2f6fc0"
+      },
+      "includeInCompanion": true
+    },
+    {
+      "id": "mars",
+      "index": 4,
+      "kind": "planet",
+      "parent": "sun",
+      "displayName": {
+        "en": "Mars",
+        "ru": "Марс"
+      },
+      "type": "terrestrial",
+      "facts": {
+        "diameterKm": 6779,
+        "massEarths": 0.107,
+        "siderealRotationDays": 1.026,
+        "orbitalPeriodDays": 687,
+        "distanceAu": 1.524,
+        "moons": 2,
+        "summary": {
+          "en": "Iron-rich desert world with the largest volcano and canyon in the Solar System.",
+          "ru": "Пустынный мир, богатый железом, с крупнейшим вулканом и каньоном Солнечной системы."
+        }
+      },
+      "orbit": {
+        "compressedOffset": [
+          -1732,
+          0,
+          1000
+        ],
+        "inclinationDeg": 1.9,
+        "siderealRotationDays": 1.025957,
+        "orbitalPeriodDays": 687.0,
+        "distanceAu": 1.524,
+        "axialTiltDegrees": -25.2,
+        "earthRadiusScale": 0.53,
+        "rotationRate": 0.0065
+      },
+      "system": {
+        "name": "Mars",
+        "initTag": "MarsSystem",
+        "activationRadius": 800,
+        "lodThreshold": 50,
+        "proxyPosition": [
+          -1732,
+          0,
+          1000
+        ]
+      },
+      "assets": {
+        "requiredLow": [
+          "resource/textures_low/Mars_Diffuse_Low.dds",
+          "resource/textures_low/Mars_Normal_Low.dds"
+        ],
+        "optionalLow": [
+          "resource/textures_low/Phobos_Diffuse_Low.dds",
+          "resource/textures_low/Phobos_Normal_Low.dds",
+          "resource/textures_low/Deimos_Diffuse_Low.dds",
+          "resource/textures_low/Deimos_Normal_Low.dds"
+        ],
+        "optionalHigh": [],
+        "companionTexture": "Mars_Diffuse.ktx2",
+        "fallbackColor": "#b65332"
+      },
+      "includeInCompanion": true
+    },
+    {
+      "id": "jupiter",
+      "index": 5,
+      "kind": "planet",
+      "parent": "sun",
+      "displayName": {
+        "en": "Jupiter",
+        "ru": "Юпитер"
+      },
+      "type": "gas_giant",
+      "facts": {
+        "diameterKm": 139820,
+        "massEarths": 318,
+        "siderealRotationDays": 0.414,
+        "orbitalPeriodDays": 4333,
+        "distanceAu": 5.203,
+        "moons": 95,
+        "summary": {
+          "en": "Most massive planet; Great Red Spot is a centuries-old anticyclonic storm.",
+          "ru": "Самая массивная планета; Большое красное пятно — многовековой антициклонный шторм."
+        }
+      },
+      "orbit": {
+        "compressedOffset": [
+          1350,
+          0,
+          1737
+        ],
+        "inclinationDeg": 1.3,
+        "siderealRotationDays": 0.41354,
+        "orbitalPeriodDays": 4333.0,
+        "distanceAu": 5.203,
+        "axialTiltDegrees": -3.1,
+        "earthRadiusScale": 11.2,
+        "rotationRate": 0.02
+      },
+      "system": {
+        "name": "Jupiter",
+        "initTag": "JupiterSystem",
+        "activationRadius": 1500,
+        "lodThreshold": 50,
+        "proxyPosition": [
+          1350,
+          0,
+          1737
+        ]
+      },
+      "assets": {
+        "requiredLow": [
+          "resource/textures_low/Jupiter_Diffuse_Low.dds",
+          "resource/textures_low/Jupiter_Normal_Low.dds"
+        ],
+        "optionalLow": [
+          "resource/textures_low/Io_Diffuse_Low.dds",
+          "resource/textures_low/Io_Normal_Low.dds",
+          "resource/textures_low/Europa_Diffuse_Low.dds",
+          "resource/textures_low/Europa_Normal_Low.dds",
+          "resource/textures_low/Ganymede_Diffuse_Low.dds",
+          "resource/textures_low/Ganymede_Normal_Low.dds",
+          "resource/textures_low/Callisto_Diffuse_Low.dds",
+          "resource/textures_low/Callisto_Normal_Low.dds"
+        ],
+        "optionalHigh": [
+          "resource/textures/Io_Diffuse.dds",
+          "resource/textures/Europa_Diffuse.dds",
+          "resource/textures/Ganymede_Diffuse.dds"
+        ],
+        "companionTexture": "Jupiter_Diffuse.ktx2",
+        "fallbackColor": "#c9a36a"
+      },
+      "includeInCompanion": true
+    },
+    {
+      "id": "saturn",
+      "index": 6,
+      "kind": "planet",
+      "parent": "sun",
+      "displayName": {
+        "en": "Saturn",
+        "ru": "Сатурн"
+      },
+      "type": "gas_giant",
+      "facts": {
+        "diameterKm": 116460,
+        "massEarths": 95,
+        "siderealRotationDays": 0.444,
+        "orbitalPeriodDays": 10759,
+        "distanceAu": 9.537,
+        "moons": 146,
+        "summary": {
+          "en": "Spectacular ring system of ice and rock; average density less than water.",
+          "ru": "Великолепная кольцевая система из льда и камня; средняя плотность меньше воды."
+        }
+      },
+      "orbit": {
+        "compressedOffset": [
+          0,
+          -100,
+          2450
+        ],
+        "inclinationDeg": 2.5,
+        "siderealRotationDays": 0.44401,
+        "orbitalPeriodDays": 10759.0,
+        "distanceAu": 9.537,
+        "axialTiltDegrees": -26.7,
+        "earthRadiusScale": 9.45,
+        "rotationRate": 0.018
+      },
+      "system": {
+        "name": "Saturn",
+        "initTag": "SaturnSystem",
+        "activationRadius": 1500,
+        "lodThreshold": 50,
+        "proxyPosition": [
+          0,
+          -100,
+          2450
+        ]
+      },
+      "assets": {
+        "requiredLow": [
+          "resource/textures_low/Saturn_Diffuse_Low.dds",
+          "resource/textures_low/Saturn_Normal_Low.dds"
+        ],
+        "optionalLow": [
+          "resource/textures_low/Saturn_Rings_Low.dds",
+          "resource/textures_low/Mimas_Diffuse_Low.dds",
+          "resource/textures_low/Mimas_Normal_Low.dds",
+          "resource/textures_low/Enceladus_Diffuse_Low.dds",
+          "resource/textures_low/Enceladus_Normal_Low.dds",
+          "resource/textures_low/Tethys_Diffuse_Low.dds",
+          "resource/textures_low/Tethys_Normal_Low.dds",
+          "resource/textures_low/Dione_Diffuse_Low.dds",
+          "resource/textures_low/Dione_Normal_Low.dds",
+          "resource/textures_low/Rhea_Diffuse_Low.dds",
+          "resource/textures_low/Rhea_Normal_Low.dds",
+          "resource/textures_low/Titan_Diffuse_Low.dds",
+          "resource/textures_low/Titan_Normal_Low.dds",
+          "resource/textures_low/Iapetus_Diffuse_Low.dds",
+          "resource/textures_low/Iapetus_Normal_Low.dds"
+        ],
+        "optionalHigh": [
+          "resource/textures/Titan_Diffuse.dds",
+          "resource/textures/Saturn_Rings.dds"
+        ],
+        "companionTexture": "Saturn_Diffuse.ktx2",
+        "fallbackColor": "#e6d3a3"
+      },
+      "includeInCompanion": true
+    },
+    {
+      "id": "uranus",
+      "index": 7,
+      "kind": "planet",
+      "parent": "sun",
+      "displayName": {
+        "en": "Uranus",
+        "ru": "Уран"
+      },
+      "type": "ice_giant",
+      "facts": {
+        "diameterKm": 50724,
+        "massEarths": 14.5,
+        "siderealRotationDays": -0.718,
+        "orbitalPeriodDays": 30687,
+        "distanceAu": 19.191,
+        "moons": 28,
+        "summary": {
+          "en": "Rotates on its side; faint rings and a methane haze give a blue-green hue.",
+          "ru": "Вращается «на боку»; слабые кольца и метановая дымка придают сине-зелёный оттенок."
+        }
+      },
+      "orbit": {
+        "compressedOffset": [
+          0,
+          0,
+          -2650
+        ],
+        "inclinationDeg": 0.8,
+        "siderealRotationDays": -0.71833,
+        "orbitalPeriodDays": 30687.0,
+        "distanceAu": 19.191,
+        "axialTiltDegrees": -97.8,
+        "earthRadiusScale": 4.0,
+        "rotationRate": -0.012
+      },
+      "system": {
+        "name": "Uranus",
+        "initTag": "UranusSystem",
+        "activationRadius": 1500,
+        "lodThreshold": 50,
+        "proxyPosition": [
+          0,
+          0,
+          -2650
+        ]
+      },
+      "assets": {
+        "requiredLow": [
+          "resource/textures_low/Uranus_Diffuse_Low.dds",
+          "resource/textures_low/Uranus_Normal_Low.dds"
+        ],
+        "optionalLow": [
+          "resource/textures_low/Uranus_Clouds_Diffuse_Low.dds",
+          "resource/textures_low/Uranus_Rings_Low.dds",
+          "resource/textures_low/Uranus_Clouds_Normal_Low.dds",
+          "resource/textures_low/Miranda_Diffuse_Low.dds",
+          "resource/textures_low/Miranda_Normal_Low.dds",
+          "resource/textures_low/Ariel_Diffuse_Low.dds",
+          "resource/textures_low/Ariel_Normal_Low.dds",
+          "resource/textures_low/Umbriel_Diffuse_Low.dds",
+          "resource/textures_low/Umbriel_Normal_Low.dds",
+          "resource/textures_low/Titania_Diffuse_Low.dds",
+          "resource/textures_low/Titania_Normal_Low.dds",
+          "resource/textures_low/Oberon_Diffuse_Low.dds",
+          "resource/textures_low/Oberon_Normal_Low.dds"
+        ],
+        "optionalHigh": [
+          "resource/textures/Uranus_Rings.dds",
+          "resource/textures/Uranus_Clouds_Diffuse.dds"
+        ],
+        "companionTexture": "Uranus_Diffuse.ktx2",
+        "fallbackColor": "#7ec8e3"
+      },
+      "includeInCompanion": true
+    },
+    {
+      "id": "neptune",
+      "index": 8,
+      "kind": "planet",
+      "parent": "sun",
+      "displayName": {
+        "en": "Neptune",
+        "ru": "Нептун"
+      },
+      "type": "ice_giant",
+      "facts": {
+        "diameterKm": 49244,
+        "massEarths": 17.1,
+        "siderealRotationDays": 0.671,
+        "orbitalPeriodDays": 60190,
+        "distanceAu": 30.069,
+        "moons": 16,
+        "summary": {
+          "en": "Windiest planet; supersonic jet streams despite receiving little solar heat.",
+          "ru": "Самая ветреная планета; сверхзвуковые струи ветра при слабом солнечном нагреве."
+        }
+      },
+      "orbit": {
+        "compressedOffset": [
+          -2900,
+          0,
+          0
+        ],
+        "inclinationDeg": 1.8,
+        "siderealRotationDays": 0.67125,
+        "orbitalPeriodDays": 60190.0,
+        "distanceAu": 30.069,
+        "axialTiltDegrees": -28.3,
+        "earthRadiusScale": 3.88,
+        "rotationRate": 0.014
+      },
+      "system": {
+        "name": "Neptune",
+        "initTag": "NeptuneSystem",
+        "activationRadius": 1500,
+        "lodThreshold": 50,
+        "proxyPosition": [
+          -2900,
+          0,
+          0
+        ]
+      },
+      "assets": {
+        "requiredLow": [
+          "resource/textures_low/Neptune_Diffuse_Low.dds",
+          "resource/textures_low/Neptune_Normal_Low.dds"
+        ],
+        "optionalLow": [
+          "resource/textures_low/Neptune_Clouds_Diffuse_Low.dds",
+          "resource/textures_low/Neptune_Clouds_Normal_Low.dds",
+          "resource/textures_low/Triton_Diffuse_Low.dds",
+          "resource/textures_low/Triton_Normal_Low.dds"
+        ],
+        "optionalHigh": [
+          "resource/textures/Neptune_Clouds_Diffuse.dds"
+        ],
+        "companionTexture": "Neptune_Diffuse.ktx2",
+        "fallbackColor": "#3f6fdb"
+      },
+      "includeInCompanion": true
+    },
+    {
+      "id": "pluto",
+      "index": 9,
+      "kind": "dwarf_planet",
+      "parent": "sun",
+      "displayName": {
+        "en": "Pluto",
+        "ru": "Плутон"
+      },
+      "type": "dwarf_planet",
+      "facts": {
+        "diameterKm": 2377,
+        "massEarths": 0.0022,
+        "siderealRotationDays": 6.387,
+        "orbitalPeriodDays": 90560,
+        "distanceAu": 39.482,
+        "moons": 5,
+        "summary": {
+          "en": "Icy dwarf planet in the Kuiper Belt with a heart-shaped nitrogen glacier.",
+          "ru": "Ледяная карликовая планета пояса Койпера с ледником азота в форме сердца."
+        }
+      },
+      "orbit": {
+        "compressedOffset": [
+          2800,
+          0,
+          1757.73
+        ],
+        "inclinationDeg": 17.2,
+        "siderealRotationDays": 6.3872,
+        "orbitalPeriodDays": 90560.0,
+        "distanceAu": 39.482,
+        "axialTiltDegrees": -122.5,
+        "earthRadiusScale": 0.18,
+        "rotationRate": 0.002
+      },
+      "system": {
+        "name": "Pluto",
+        "initTag": "PlutoSystem",
+        "activationRadius": 1500,
+        "lodThreshold": 50,
+        "proxyPosition": [
+          2800,
+          0,
+          1757.73
+        ]
+      },
+      "assets": {
+        "requiredLow": [
+          "resource/textures_low/Pluto_Diffuse_Low.dds",
+          "resource/textures_low/Pluto_Normal_Low.dds",
+          "resource/textures_low/Pluto_Specular_Low.dds"
+        ],
+        "optionalLow": [
+          "resource/textures_low/Charon_Diffuse_Low.dds",
+          "resource/textures_low/Charon_Normal_Low.dds",
+          "resource/textures_low/Charon_Specular_Low.dds"
+        ],
+        "optionalHigh": [],
+        "companionTexture": "Pluto_Diffuse.ktx2",
+        "fallbackColor": "#b59a7a"
+      },
+      "includeInCompanion": true
+    }
+  ],
+  "indexConvention": {
+    "description": "Focus indices match OrbitLayout::Body and planet_facts (Sun=0 … Pluto=9). WASM/TS focus APIs use this index; nearest-planet helpers may document +1 offsets relative to other lists.",
+    "sun": 0,
+    "pluto": 9
+  }
+}

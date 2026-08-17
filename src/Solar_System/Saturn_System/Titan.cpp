@@ -5,6 +5,7 @@ Titan::Titan(const SatelliteInfo& satelliteInfo, std::shared_ptr<SpaceObject> pa
     _diffuses(satelliteInfo.diffuseTextures), _normalMap(satelliteInfo.normalMap)
 {
     ConfigureDiffuseLOD(_diffuses.at(0), TexturePaths::Titan::Diffuse.low,
+                        TexturePaths::Titan::Diffuse.mid,
                         TexturePaths::Titan::Diffuse.high, "Titan");
 }
 

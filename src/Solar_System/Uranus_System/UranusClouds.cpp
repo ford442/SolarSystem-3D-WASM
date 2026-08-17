@@ -4,6 +4,7 @@
 UranusClouds::UranusClouds(const CloudsInfo& cloudsInfo, std::shared_ptr<SpaceObject> parent) : Clouds(cloudsInfo, std::move(parent))
 {
     ConfigureDiffuseLOD("resource/textures_low/Uranus_Clouds_Diffuse_Low.dds",
+                        "resource/textures_mid/Uranus_Clouds_Diffuse_Mid.dds",
                         "resource/textures/Uranus_Clouds_Diffuse.dds", "UranusClouds");
 }
 

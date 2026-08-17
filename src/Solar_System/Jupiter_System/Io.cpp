@@ -5,6 +5,7 @@ Io::Io(const SatelliteInfo& satelliteInfo, std::shared_ptr<SpaceObject> parent) 
     _diffuses(satelliteInfo.diffuseTextures), _normalMap(satelliteInfo.normalMap)
 {
     ConfigureDiffuseLOD(_diffuses.at(0), TexturePaths::Io::Diffuse.low,
+                        TexturePaths::Io::Diffuse.mid,
                         TexturePaths::Io::Diffuse.high, "Io");
 }
 

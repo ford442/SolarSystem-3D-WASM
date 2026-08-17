@@ -20,3 +20,15 @@ const std::wstring& SpaceObject::GetEngName() const {
 const std::wstring& SpaceObject::GetOtherLangName() const {
     return _otherLangName;
 }
+
+void SpaceObject::SetMagneticField(const MagneticFieldParams& params) {
+    _magneticField = params;
+}
+
+const MagneticFieldParams& SpaceObject::GetMagneticField() const {
+    return _magneticField;
+}
+
+bool SpaceObject::HasMagneticField() const {
+    return _magneticField.enabled;
+}

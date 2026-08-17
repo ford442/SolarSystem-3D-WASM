@@ -79,6 +79,12 @@ set(SOLARSYSTEM_SOURCES
     src/Auxiliary_Modules/LensFlare.h
     src/Auxiliary_Modules/OrbitPathRenderer.cpp
     src/Auxiliary_Modules/OrbitPathRenderer.h
+    src/Auxiliary_Modules/MagneticFieldParams.cpp
+    src/Auxiliary_Modules/MagneticFieldParams.h
+    src/Auxiliary_Modules/MagneticFieldTracer.cpp
+    src/Auxiliary_Modules/MagneticFieldTracer.h
+    src/Auxiliary_Modules/MagneticFieldLineRenderer.cpp
+    src/Auxiliary_Modules/MagneticFieldLineRenderer.h
     src/Auxiliary_Modules/Ephemeris.cpp
     src/Auxiliary_Modules/Ephemeris.h
     src/Solar_System/Mercury/Mercury.cpp
