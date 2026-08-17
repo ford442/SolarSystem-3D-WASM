@@ -22,6 +22,7 @@ struct MagneticFieldParams {
     int samplesPerLine = 96;
     float ribbonWidth = 0.06f; // fraction of body radius
     float flowSpeed = 1.0f;
+    float opacity = 0.85f;
     glm::vec3 color = {0.35f, 0.75f, 1.0f};
 };
 
