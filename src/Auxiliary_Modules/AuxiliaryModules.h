@@ -10,6 +10,7 @@
 #include "TextRenderer.h"
 #include "LensFlare.h"
 #include "OrbitPathRenderer.h"
+#include "MagneticFieldLineMesh.h"
 #include "MagneticFieldLineRenderer.h"
 
 #endif //SOLARSYSTEM_AUXILIARYMODULES_H

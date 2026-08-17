@@ -83,6 +83,8 @@ set(SOLARSYSTEM_SOURCES
     src/Auxiliary_Modules/MagneticFieldParams.h
     src/Auxiliary_Modules/MagneticFieldTracer.cpp
     src/Auxiliary_Modules/MagneticFieldTracer.h
+    src/Auxiliary_Modules/MagneticFieldLineMesh.cpp
+    src/Auxiliary_Modules/MagneticFieldLineMesh.h
     src/Auxiliary_Modules/MagneticFieldLineRenderer.cpp
     src/Auxiliary_Modules/MagneticFieldLineRenderer.h
     src/Auxiliary_Modules/Ephemeris.cpp

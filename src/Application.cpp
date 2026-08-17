@@ -939,7 +939,9 @@ void Application::EnsureMagneticFieldsBuilt() {
     };
     for (const auto body : kFieldBodies) {
         const MagneticFieldParams params = MagneticFieldCatalog::ParamsForBody(body, g_qualityPreset);
-        _magneticFieldRenderer->AddBody(body, params);
+        MagneticFieldLineMesh mesh;
+        mesh.Upload(MagneticFieldTracer::Trace(params));
+        _magneticFieldRenderer->AddBody(body, std::move(mesh), params);
     }
     _magneticFieldsBuilt = true;
     _magneticFieldsQuality = g_qualityPreset;
@@ -952,33 +954,35 @@ void Application::RenderMagneticFields() const {
     }
 
     glEnable(GL_BLEND);
-    glBlendFunc(GL_ONE, GL_ONE);
+    glBlendFunc(GL_SRC_ALPHA, GL_ONE);
     glEnable(GL_DEPTH_TEST);
     glDepthMask(GL_FALSE);
     glDisable(GL_CULL_FACE);
+    glEnable(GL_POLYGON_OFFSET_FILL);
+    glPolygonOffset(-1.0f, -1.0f);
 
     const float zCoef = static_cast<float>(2.0 / glm::log2(_camera.GetFar() + 1.0));
     const float now = static_cast<float>(glfwGetTime());
     const glm::vec3 camPos = _camera.GetPosition();
 
-    auto drawBody = [&](OrbitLayout::Body body, const glm::vec3& position, const glm::mat4& rotation,
-                        float radius, float dipoleTiltDeg) {
-        if (radius < 1.0e-4f) {
+    auto drawBody = [&](OrbitLayout::Body body, const MagneticFieldParams& params, const glm::vec3& position,
+                        const glm::mat4& rotation, float radius) {
+        if (!params.enabled || radius < 1.0e-4f) {
             return;
         }
         glm::mat4 model(1.0f);
         model = glm::translate(model, position);
         model *= rotation;
-        model = glm::rotate(model, glm::radians(dipoleTiltDeg), glm::vec3(1.0f, 0.0f, 0.0f));
+        model = glm::rotate(model, glm::radians(params.dipoleTiltDeg), glm::vec3(1.0f, 0.0f, 0.0f));
         model = glm::scale(model, glm::vec3(radius));
-        _magneticFieldRenderer->Draw(_cameraProjection, _cameraView, model, body, camPos, zCoef, now);
+        _magneticFieldRenderer->Draw(_cameraProjection, _cameraView, model, params, body, camPos, zCoef, now);
     };
 
     if (_sun) {
         const MagneticFieldParams sunParams = MagneticFieldCatalog::ParamsForBody(OrbitLayout::Body::Sun, g_qualityPreset);
         // Mesh is scaled 0.5 × sphere radius (~2) ≈ 1 unit; inflate so the torus is readable.
         const float sunRadius = 28.0f;
-        drawBody(OrbitLayout::Body::Sun, _sun->GetPosition(), glm::mat4(1.0f), sunRadius, sunParams.dipoleTiltDeg);
+        drawBody(OrbitLayout::Body::Sun, sunParams, _sun->GetPosition(), glm::mat4(1.0f), sunRadius);
     }
 
     for (const auto& component : _renderableSceneComponents) {
@@ -996,10 +1000,10 @@ void Application::RenderMagneticFields() const {
             continue;
         }
         const float radius = std::max(component.planet->GetRadius(), 0.5f);
-        drawBody(body, component.planet->GetPosition(), component.planet->GetRotationMatrix(), radius,
-                 params.dipoleTiltDeg);
+        drawBody(body, params, component.planet->GetPosition(), component.planet->GetRotationMatrix(), radius);
     }
 
+    glDisable(GL_POLYGON_OFFSET_FILL);
     glDepthMask(GL_TRUE);
     glEnable(GL_CULL_FACE);
     glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);

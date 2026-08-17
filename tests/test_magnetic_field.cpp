@@ -1,5 +1,6 @@
 #include <gtest/gtest.h>
 
+#include "Auxiliary_Modules/MagneticFieldLineMesh.h"
 #include "Auxiliary_Modules/MagneticFieldTracer.h"
 
 #include <cmath>
@@ -105,4 +106,52 @@ TEST(MagneticFieldCatalogTest, IntrinsicValuesAreEducationalDefaults) {
     EXPECT_FALSE(MagneticFieldCatalog::IntrinsicParamsForBody(OrbitLayout::Body::Venus).enabled);
     EXPECT_FALSE(MagneticFieldCatalog::IntrinsicParamsForBody(OrbitLayout::Body::Mars).enabled);
     EXPECT_FALSE(MagneticFieldCatalog::IntrinsicParamsForBody(OrbitLayout::Body::Pluto).enabled);
+}
+
+TEST(MagneticFieldRibbonTest, ExpandCreatesTwoTrianglesPerSegment) {
+    MagneticFieldLine line;
+    line.samples = {
+        {{0.0f, 0.0f, 0.0f}, 0.0f},
+        {{1.0f, 0.0f, 0.0f}, 0.5f},
+        {{2.0f, 0.0f, 0.0f}, 1.0f},
+    };
+
+    const auto verts = MagneticFieldLineMesh::Expand({line});
+    ASSERT_EQ(verts.size(), 12u);
+
+    EXPECT_FLOAT_EQ(verts[0].lineUV, -1.0f);
+    EXPECT_FLOAT_EQ(verts[1].lineUV, 1.0f);
+    EXPECT_FLOAT_EQ(verts[0].arcLength, 0.0f);
+    EXPECT_FLOAT_EQ(verts[2].arcLength, 0.5f);
+    EXPECT_NEAR(verts[0].tangent.x, 1.0f, 1.0e-5f);
+    EXPECT_NEAR(glm::length(verts[0].tangent), 1.0f, 1.0e-5f);
+}
+
+TEST(MagneticFieldRibbonTest, ExpandSkipsDegenerateSegments) {
+    MagneticFieldLine line;
+    line.samples = {
+        {{0.0f, 0.0f, 0.0f}, 0.0f},
+        {{0.0f, 0.0f, 0.0f}, 0.0f},
+        {{0.0f, 1.0f, 0.0f}, 1.0f},
+    };
+    const auto verts = MagneticFieldLineMesh::Expand({line});
+    ASSERT_EQ(verts.size(), 6u);
+    EXPECT_NEAR(verts[0].tangent.y, 1.0f, 1.0e-5f);
+}
+
+TEST(MagneticFieldRibbonTest, TracedEarthLinesExpandToQuads) {
+    MagneticFieldParams params = MagneticFieldCatalog::ParamsForBody(OrbitLayout::Body::Earth, 1);
+    ASSERT_TRUE(params.enabled);
+    const auto lines = MagneticFieldTracer::Trace(params);
+    const auto verts = MagneticFieldLineMesh::Expand(lines);
+    EXPECT_GT(verts.size(), 24u);
+    EXPECT_EQ(verts.size() % 6u, 0u);
+}
+
+TEST(MagneticFieldCatalogTest, SunAnimatesFasterThanEarth) {
+    const auto sun = MagneticFieldCatalog::IntrinsicParamsForBody(OrbitLayout::Body::Sun);
+    const auto earth = MagneticFieldCatalog::IntrinsicParamsForBody(OrbitLayout::Body::Earth);
+    EXPECT_GT(sun.flowSpeed, earth.flowSpeed);
+    EXPECT_GT(sun.opacity, 0.0f);
+    EXPECT_GT(earth.opacity, 0.0f);
 }
