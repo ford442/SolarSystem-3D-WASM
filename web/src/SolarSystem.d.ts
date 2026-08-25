@@ -20,8 +20,8 @@ export type GetTimeScale = () => number;
 
 /** Pause or resume orbital animation. */
 export type SetPaused = (paused: boolean) => void;
-/** Returns 1 while paused and 0 while running. */
-export type GetPaused = () => number;
+/** Raw C export returns 0/1; wasmBridge façade returns boolean. */
+export type GetPaused = () => boolean;
 
 /** Set the simulation epoch as a Julian Date (fractional day allowed). */
 export type SetSimulationEpoch = (julianDate: number) => void;
@@ -33,6 +33,10 @@ export type ShadowQuality = 0 | 1 | 2 | 3;
 export type SetShadowQuality = (quality: ShadowQuality) => void;
 export type GetShadowQuality = () => ShadowQuality;
 
+export type SetTouchMovement = (forward: number, right: number, vertical: number) => void;
+export type AddTouchLook = (deltaX: number, deltaY: number) => void;
+export type AddTouchZoom = (delta: number) => void;
+
 export type PlanetIndex = 0 | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9;
 
 export type OrbitScaleMode = 0 | 1;
@@ -40,7 +44,7 @@ export type OrbitScaleMode = 0 | 1;
 export type SetMusicVolume = (volume: number) => void;
 export type GetMusicVolume = () => number;
 export type SetMusicMuted = (muted: boolean) => void;
-export type GetMusicMuted = () => number;
+export type GetMusicMuted = () => boolean;
 
 /** Planet index accepted by FocusPlanet: 0=sun, 1=Mercury, ..., 9=Pluto. */
 export type FocusPlanet = (index: PlanetIndex) => void;
@@ -53,17 +57,17 @@ export type GetNearestPlanetIndex = () => number;
 export type GetFocusedPlanetIndex = () => number;
 export type GetPlanetSceneDistance = (index: PlanetIndex) => number;
 
-/** Toggle faint heliocentric orbit path lines (1=on, 0=off). */
-export type SetOrbitLines = (enabled: number) => void;
-export type GetOrbitLines = () => number;
-/** Toggle magnetic field ribbon overlay (1=on, 0=off). */
-export type SetMagneticFields = (enabled: number) => void;
-export type GetMagneticFields = () => number;
+/** Toggle faint heliocentric orbit path lines. */
+export type SetOrbitLines = (enabled: boolean) => void;
+export type GetOrbitLines = () => boolean;
+/** Toggle magnetic field ribbon overlay. */
+export type SetMagneticFields = (enabled: boolean) => void;
+export type GetMagneticFields = () => boolean;
 /** Issue #107 aliases for Set/GetMagneticFields. */
 export type SetMagneticFieldMode = SetMagneticFields;
 export type GetMagneticFieldMode = GetMagneticFields;
 
-export type SetXrSessionActive = (active: number) => void;
+export type SetXrSessionActive = (active: boolean) => void;
 export type SetXrEyeCount = (count: number) => void;
 export type SetXrEyeViewport = (
   eye: number,
@@ -294,18 +298,42 @@ export interface SolarSystemCwrap {
     // END GENERATED CWARP OVERLOADS
 }
 
+export type SettingsChangeField =
+  | 'quality'
+  | 'timeScale'
+  | 'paused'
+  | 'shadowQuality'
+  | 'musicVolume'
+  | 'musicMuted'
+  | 'simulationEpoch'
+  | 'orbitLines'
+  | 'magneticFields'
+  | 'magneticFieldMode';
+
 export interface SolarSystemModuleConfig {
   canvas: HTMLCanvasElement;
   locateFile?: (path: string, prefix: string) => string;
   print?: (text: string) => void;
   printErr?: (text: string) => void;
   onRuntimeInitialized?: () => void;
+  /** C++ → JS callbacks registered on Module before runtime init. */
+  updateLoadingProgress?: (loaded: number, total: number) => void;
+  updateStreamingProgress?: (completed: number, total: number, active?: number, tierCode?: number) => void;
+  onPlanetFocused?: (index: number) => void;
+  onSettingsChanged?: (field: SettingsChangeField | string) => void;
   /** Passed through to Emscripten's WebGL context creation (GLFW). */
   contextAttributes?: {
     xrCompatible?: boolean;
     majorVersion?: number;
     minorVersion?: number;
     antialias?: boolean;
+    depth?: boolean;
+    stencil?: boolean;
+    alpha?: boolean;
+    premultipliedAlpha?: boolean;
+    preserveDrawingBuffer?: boolean;
+    powerPreference?: 'default' | 'high-performance' | 'low-power';
+    failIfMajorPerformanceCaveat?: boolean;
   };
 }
 
@@ -313,6 +341,7 @@ export interface SolarSystemModule {
   canvas: HTMLCanvasElement;
   cwrap: SolarSystemCwrap;
   HEAPF32: Float32Array;
+  HEAP8: Int8Array;
   _main: (argc: number, argv: number) => number;
   _SetCameraPose: SetCameraPose;
   _SetQualityPreset: SetQualityPreset;
@@ -320,7 +349,7 @@ export interface SolarSystemModule {
   _SetTimeScale: SetTimeScale;
   _GetTimeScale: GetTimeScale;
   _SetPaused: SetPaused;
-  _GetPaused: GetPaused;
+  _GetPaused: () => number;
   _SetSimulationEpoch: SetSimulationEpoch;
   _GetSimulationEpoch: GetSimulationEpoch;
   _SetShadowQuality: SetShadowQuality;
@@ -332,7 +361,7 @@ export interface SolarSystemModule {
   _SetMusicVolume: SetMusicVolume;
   _GetMusicVolume: GetMusicVolume;
   _SetMusicMuted: SetMusicMuted;
-  _GetMusicMuted: GetMusicMuted;
+  _GetMusicMuted: () => number;
   _FocusPlanet: FocusPlanet;
   _SetOrbitScaleMode: SetOrbitScaleMode;
   _GetOrbitScaleMode: GetOrbitScaleMode;
@@ -340,11 +369,22 @@ export interface SolarSystemModule {
   _GetFocusedPlanetIndex: GetFocusedPlanetIndex;
   _GetPlanetSceneDistance: GetPlanetSceneDistance;
   _SetOrbitLines: SetOrbitLines;
-  _GetOrbitLines: GetOrbitLines;
+  _GetOrbitLines: () => number;
   _SetMagneticFields: SetMagneticFields;
-  _GetMagneticFields: GetMagneticFields;
+  _GetMagneticFields: () => number;
   _SetMagneticFieldMode: SetMagneticFieldMode;
-  _GetMagneticFieldMode: GetMagneticFieldMode;
+  _GetMagneticFieldMode: () => number;
+  _SetXrSessionActive: SetXrSessionActive;
+  _SetXrEyeCount: SetXrEyeCount;
+  _SetXrEyeViewport: SetXrEyeViewport;
+  _GetXrMatrixScratch: GetXrMatrixScratch;
+  _CommitXrEyeMatrices: CommitXrEyeMatrices;
+  _RunXrFrame: RunXrFrame;
+  _GetCameraPositionX: GetCameraPositionComponent;
+  _GetCameraPositionY: GetCameraPositionComponent;
+  _GetCameraPositionZ: GetCameraPositionComponent;
+  _GetCameraYaw: GetCameraYaw;
+  _GetCameraPitch: GetCameraPitch;
 }
 
 declare const SolarSystem: (
@@ -355,28 +395,8 @@ export default SolarSystem;
 
 declare global {
   interface Window {
-    /** C++ loading progress callback (EM_ASM). */
-    updateLoadingProgress?: (loaded: number, total: number) => void;
-    /** C++ LOD streaming progress callback (EM_ASM). */
-    /** tierCode: 0=generic, 1=mid, 2=high */
-    updateStreamingProgress?: (completed: number, total: number, active?: number, tierCode?: number) => void;
     /** Console helper documented in AGENTS.md. */
     setCameraPose?: SetCameraPose;
-    /** C++ planet focus callback (EM_ASM). */
-    onPlanetFocused?: (index: number) => void;
-    /** C++ settings change callback (keyboard shortcuts / runtime toggles). */
-    onSettingsChanged?: (field:
-      | 'quality'
-      | 'timeScale'
-      | 'paused'
-      | 'shadowQuality'
-      | 'musicVolume'
-      | 'musicMuted'
-      | 'simulationEpoch'
-      | 'orbitLines'
-      | 'magneticFields'
-      | 'magneticFieldMode'
-      | string) => void;
     /** Runtime asset base URL for WebResourceFetcher. */
     __solarSystemAssetBase?: string;
     /** Init config published before Module() — read by QualitySettings.cpp. */
@@ -385,4 +405,7 @@ declare global {
       isMobileWeb: boolean;
     };
   }
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const Module: SolarSystemModuleConfig & Record<string, any>;
 }

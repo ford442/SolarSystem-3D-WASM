@@ -5,6 +5,8 @@ import type {
     ShadowQuality,
     SolarSystemModule,
 } from './SolarSystem.js';
+import { createCachedCwrapExports } from './wasmBridge.exports.js';
+import { clearWasmCallback, registerWasmCallbacks } from './wasmCallbacks.js';
 
 /**
  * Planet index conventions (FocusPlanet / GetFocusedPlanetIndex):
@@ -93,55 +95,55 @@ export function getSolarSystemRuntime(): SolarSystemRuntime | null {
 }
 
 export function createSolarSystemRuntime(instance: SolarSystemModule): SolarSystemRuntime {
-    const cwrap = instance.cwrap.bind(instance);
+    const exports = createCachedCwrapExports(instance.cwrap);
 
     const runtime: SolarSystemRuntime = {
         heapF32: instance.HEAPF32,
 
-        setCameraPose: cwrap('SetCameraPose', null, ['number', 'number', 'number', 'number', 'number']),
-        setQualityPreset: (preset) => cwrap('SetQualityPreset', null, ['number'])(preset),
-        getQualityPreset: () => cwrap('GetQualityPreset', 'number', [])() as QualityPreset,
-        setTimeScale: cwrap('SetTimeScale', null, ['number']),
-        getTimeScale: cwrap('GetTimeScale', 'number', []),
-        setPaused: (paused) => cwrap('SetPaused', null, ['number'])(paused ? 1 : 0),
-        getPaused: () => cwrap('GetPaused', 'number', [])() !== 0,
-        setSimulationEpoch: cwrap('SetSimulationEpoch', null, ['number']),
-        getSimulationEpoch: cwrap('GetSimulationEpoch', 'number', []),
-        setShadowQuality: (quality) => cwrap('SetShadowQuality', null, ['number'])(quality),
-        getShadowQuality: () => cwrap('GetShadowQuality', 'number', [])() as ShadowQuality,
-        setTouchMovement: cwrap('SetTouchMovement', null, ['number', 'number', 'number']),
-        addTouchLook: cwrap('AddTouchLook', null, ['number', 'number']),
-        addTouchZoom: cwrap('AddTouchZoom', null, ['number']),
-        isMobileWeb: () => cwrap('IsMobileWeb', 'number', [])() !== 0,
-        setMusicVolume: cwrap('SetMusicVolume', null, ['number']),
-        getMusicVolume: cwrap('GetMusicVolume', 'number', []),
-        setMusicMuted: (muted) => cwrap('SetMusicMuted', null, ['number'])(muted ? 1 : 0),
-        getMusicMuted: () => cwrap('GetMusicMuted', 'number', [])() !== 0,
-        focusPlanet: (index) => cwrap('FocusPlanet', null, ['number'])(index),
-        setOrbitScaleMode: (mode) => cwrap('SetOrbitScaleMode', null, ['number'])(mode),
-        getOrbitScaleMode: () => cwrap('GetOrbitScaleMode', 'number', [])() as OrbitScaleMode,
-        getNearestPlanetIndex: cwrap('GetNearestPlanetIndex', 'number', []),
-        getFocusedPlanetIndex: cwrap('GetFocusedPlanetIndex', 'number', []),
-        getPlanetSceneDistance: cwrap('GetPlanetSceneDistance', 'number', ['number']),
-        setOrbitLines: (enabled) => cwrap('SetOrbitLines', null, ['number'])(enabled ? 1 : 0),
-        getOrbitLines: () => cwrap('GetOrbitLines', 'number', [])() !== 0,
-        setMagneticFields: (enabled) => cwrap('SetMagneticFields', null, ['number'])(enabled ? 1 : 0),
-        getMagneticFields: () => cwrap('GetMagneticFields', 'number', [])() !== 0,
-        setMagneticFieldMode: (enabled) => cwrap('SetMagneticFieldMode', null, ['number'])(enabled ? 1 : 0),
-        getMagneticFieldMode: () => cwrap('GetMagneticFieldMode', 'number', [])() !== 0,
-        setXrSessionActive: (active) => cwrap('SetXrSessionActive', null, ['number'])(active ? 1 : 0),
-        setXrEyeCount: cwrap('SetXrEyeCount', null, ['number']),
-        setXrEyeViewport: cwrap('SetXrEyeViewport', null, ['number', 'number', 'number', 'number', 'number']),
-        getXrMatrixScratchPtr: cwrap('GetXrMatrixScratch', 'number', []),
-        commitXrEyeMatrices: cwrap('CommitXrEyeMatrices', null, ['number']),
-        runXrFrame: cwrap('RunXrFrame', null, []),
+        setCameraPose: exports.setCameraPose,
+        setQualityPreset: (preset) => exports.setQualityPreset(preset),
+        getQualityPreset: () => exports.getQualityPreset() as QualityPreset,
+        setTimeScale: exports.setTimeScale,
+        getTimeScale: exports.getTimeScale,
+        setPaused: (paused) => exports.setPaused(paused ? 1 : 0),
+        getPaused: () => exports.getPaused() !== 0,
+        setSimulationEpoch: exports.setSimulationEpoch,
+        getSimulationEpoch: exports.getSimulationEpoch,
+        setShadowQuality: (quality) => exports.setShadowQuality(quality),
+        getShadowQuality: () => exports.getShadowQuality() as ShadowQuality,
+        setTouchMovement: exports.setTouchMovement,
+        addTouchLook: exports.addTouchLook,
+        addTouchZoom: exports.addTouchZoom,
+        isMobileWeb: () => exports.isMobileWeb() !== 0,
+        setMusicVolume: exports.setMusicVolume,
+        getMusicVolume: exports.getMusicVolume,
+        setMusicMuted: (muted) => exports.setMusicMuted(muted ? 1 : 0),
+        getMusicMuted: () => exports.getMusicMuted() !== 0,
+        focusPlanet: (index) => exports.focusPlanet(index),
+        setOrbitScaleMode: (mode) => exports.setOrbitScaleMode(mode),
+        getOrbitScaleMode: () => exports.getOrbitScaleMode() as OrbitScaleMode,
+        getNearestPlanetIndex: exports.getNearestPlanetIndex,
+        getFocusedPlanetIndex: exports.getFocusedPlanetIndex,
+        getPlanetSceneDistance: (index) => exports.getPlanetSceneDistance(index),
+        setOrbitLines: (enabled) => exports.setOrbitLines(enabled ? 1 : 0),
+        getOrbitLines: () => exports.getOrbitLines() !== 0,
+        setMagneticFields: (enabled) => exports.setMagneticFields(enabled ? 1 : 0),
+        getMagneticFields: () => exports.getMagneticFields() !== 0,
+        setMagneticFieldMode: (enabled) => exports.setMagneticFieldMode(enabled ? 1 : 0),
+        getMagneticFieldMode: () => exports.getMagneticFieldMode() !== 0,
+        setXrSessionActive: (active) => exports.setXrSessionActive(active ? 1 : 0),
+        setXrEyeCount: exports.setXrEyeCount,
+        setXrEyeViewport: exports.setXrEyeViewport,
+        getXrMatrixScratchPtr: exports.getXrMatrixScratch,
+        commitXrEyeMatrices: exports.commitXrEyeMatrices,
+        runXrFrame: exports.runXrFrame,
         getCameraPosition: () => ({
-            x: cwrap('GetCameraPositionX', 'number', [])(),
-            y: cwrap('GetCameraPositionY', 'number', [])(),
-            z: cwrap('GetCameraPositionZ', 'number', [])(),
+            x: exports.getCameraPositionX(),
+            y: exports.getCameraPositionY(),
+            z: exports.getCameraPositionZ(),
         }),
-        getCameraYaw: cwrap('GetCameraYaw', 'number', []),
-        getCameraPitch: cwrap('GetCameraPitch', 'number', []),
+        getCameraYaw: exports.getCameraYaw,
+        getCameraPitch: exports.getCameraPitch,
     };
 
     activeRuntime = runtime;
@@ -157,10 +159,8 @@ export function subscribeSettingsChanges(
     handler: (field: SettingsChangeField) => void,
 ): () => void {
     const wrapped = (field: string) => handler(field as SettingsChangeField);
-    window.onSettingsChanged = wrapped;
+    registerWasmCallbacks({ onSettingsChanged: wrapped });
     return () => {
-        if (window.onSettingsChanged === wrapped) {
-            window.onSettingsChanged = undefined;
-        }
+        clearWasmCallback('onSettingsChanged', wrapped);
     };
 }

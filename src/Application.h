@@ -1,6 +1,7 @@
 #ifndef SOLARSYSTEM_APPLICATION_H
 #define SOLARSYSTEM_APPLICATION_H
 #include "ApplicationTypes.h"
+#include "SimState.h"
 #include "Auxiliary_Modules/AuxiliaryModules.h"
 #include "PlanetSystemManifest.h"
 #include "Solar_System/AsteroidField.h"
@@ -54,8 +55,11 @@ public:
         const std::function<void(const SpaceObject& object, const MagneticFieldParams& params)>& fn) const;
     Camera& GetCamera() { return _camera; }
     const Camera& GetCamera() const { return _camera; }
+    SimState& GetSimState() { return _simState; }
+    const SimState& GetSimState() const { return _simState; }
 
 private:
+    SimState _simState;
     Camera _camera{0.001f, 20000.f, 5.0f, 0.05f, glm::vec3(-134.0f, 0.0f, 0.0f)};
 
     float _lastX = 0.f;

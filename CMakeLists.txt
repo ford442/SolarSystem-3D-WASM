@@ -49,6 +49,10 @@ set(SOLARSYSTEM_SOURCES
     src/Application.cpp
     src/Application.h
     src/ApplicationTypes.h
+    src/JsBridge.cpp
+    src/JsBridge.h
+    src/WasmExports.cpp
+    src/WasmExports.h
     src/QualitySettings.cpp
     src/QualitySettings.h
     src/ResourceManifest.cpp
@@ -57,6 +61,7 @@ set(SOLARSYSTEM_SOURCES
     src/SceneRenderer.cpp
     src/StarSystemFactory.cpp
     src/SimState.h
+    src/SimState.cpp
     src/Auxiliary_Modules/TextureImage2D.cpp
     src/Auxiliary_Modules/TextureImage2D.h
     src/Auxiliary_Modules/TextureLoadingQueue.cpp
@@ -228,7 +233,7 @@ if(EMSCRIPTEN)
     )
 
     # Link-only: memory, preloads, module shape, JS interop.
-    # EMSCRIPTEN_KEEPALIVE on Application.cpp exports; only _main listed here.
+    # EMSCRIPTEN_KEEPALIVE on WasmExports.cpp; only _main listed here.
     # textures_low (~124 KB) preloaded so planets stay visible without a live asset server.
     # Sounds are LFS-excluded — do not preload (CI/sandbox).
     set(SOLAR_EM_LINK_FLAGS

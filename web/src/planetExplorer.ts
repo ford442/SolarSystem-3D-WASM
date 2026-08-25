@@ -1,4 +1,5 @@
 import type { OrbitScaleMode, PlanetIndex } from './SolarSystem.js';
+import { registerWasmCallbacks } from './wasmCallbacks.js';
 
 export interface PlanetFactBody {
     index: PlanetIndex;
@@ -219,9 +220,11 @@ export class PlanetExplorer {
         this.syncScaleFromRuntime();
         this.elements.status.textContent = 'Explorer ready';
         this.startPolling();
-        window.onPlanetFocused = (index: number) => {
-            this.onExternalFocus(index as PlanetIndex);
-        };
+        registerWasmCallbacks({
+            onPlanetFocused: (index: number) => {
+                this.onExternalFocus(index as PlanetIndex);
+            },
+        });
     }
 
     applyDeepLinkPlanet(index: PlanetIndex, options: { focusCamera: boolean }): void {

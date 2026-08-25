@@ -1,4 +1,5 @@
 #include "QualitySettings.h"
+#include "SimState.h"
 #include <cstring>
 #include <iomanip>
 #include <iostream>
@@ -6,9 +7,6 @@
 #ifdef __EMSCRIPTEN__
 #include <emscripten.h>
 #endif
-
-int g_qualityPreset = 2;
-bool g_isMobileWeb = false;
 
 std::string GetTexturePath(const std::string& lowRes, const std::string& highRes) {
 #ifdef __EMSCRIPTEN__
@@ -43,7 +41,7 @@ QualityTierSettings GetQualitySettings(int preset, bool mobile) {
 }
 
 TextureLodTier GetMaxTextureLodTier() {
-    return GetQualitySettings(g_qualityPreset, g_isMobileWeb).maxTextureLodTier;
+    return GetQualitySettings(gSimState->qualityPreset, gSimState->isMobileWeb).maxTextureLodTier;
 }
 
 void LogQualityTier(const QualityTierSettings& settings, bool hdrEnabled, int shadowQuality) {

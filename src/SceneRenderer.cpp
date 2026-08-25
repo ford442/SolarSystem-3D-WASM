@@ -1,4 +1,5 @@
 #include "Application.h"
+#include "JsBridge.h"
 #include "SimState.h"
 #include "Solar_System/OrbitLayout.h"
 #include "Auxiliary_Modules/Ephemeris.h"
@@ -12,7 +13,7 @@
 using namespace std;
 
 void Application::ProcessSceneComponentsRendering() {
-    const float timeScale = gTimePaused ? 0.0f : gTimeScale;
+    const float timeScale = gSimState->timePaused ? 0.0f : gSimState->timeScale;
 
     for (auto& component : _renderableSceneComponents) {
         // Place bodies once per frame (shadow + color passes only render).
@@ -57,7 +58,7 @@ void Application::ShadowMapPass(const RenderableSceneComponent& component) {
     // A cleared depth texture contains 1.0 everywhere, which the existing
     // lighting shaders interpret as fully lit. Keep the texture bound but skip
     // all shadow geometry when shadows are disabled.
-    if (gShadowQuality == 0) {
+    if (gSimState->shadowQuality == 0) {
         glBindFramebuffer(GL_FRAMEBUFFER, 0);
         return;
     }
@@ -387,7 +388,7 @@ void Application::RenderHints() const {
     deque<wstring> timeRunHint;
     timeRunHint.emplace_back(L"Time (P:pause, +/-:scale, .:step): ");
     std::wstringstream wss;
-    wss << (gTimePaused ? L"paused" : L"run") << L" x" << static_cast<int>(gTimeScale);
+    wss << (gSimState->timePaused ? L"paused" : L"run") << L" x" << static_cast<int>(gSimState->timeScale);
     int year = 0;
     int month = 0;
     int day = 0;
@@ -494,14 +495,7 @@ void Application::RenderTextureLoadingProgress() const {
     }
 
 #ifdef __EMSCRIPTEN__
-    EM_ASM({
-        if (typeof window.updateStreamingProgress === 'function') {
-            window.updateStreamingProgress($0, $1, $2, $3);
-        }
-        if (typeof window.updateLoadingProgress === 'function' && $1 > 0) {
-            window.updateLoadingProgress($0, $1);
-        }
-    }, completed, total, active, tierCode);
+    NotifyStreamingProgress(completed, total, active, tierCode);
 #endif
 
     if (queued == 0) {

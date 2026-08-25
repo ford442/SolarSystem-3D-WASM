@@ -11,8 +11,8 @@ NeptuneClouds::NeptuneClouds(const CloudsInfo& cloudsInfo, std::shared_ptr<Space
 void NeptuneClouds::AdjustToParent(float /*timeScale*/) {
     static float rotationAngle = 0;
     constexpr float kSpinDegPerSimSecond = 4.8f; // ~8*0.01 per frame @ 60fps
-    if (gSimDeltaSeconds > 0.0f) {
-        rotationAngle += kSpinDegPerSimSecond * gSimDeltaSeconds;
+    if (gSimState->simDeltaSeconds > 0.0f) {
+        rotationAngle += kSpinDegPerSimSecond * gSimState->simDeltaSeconds;
     }
 
     LoadIdentityModelMatrix();

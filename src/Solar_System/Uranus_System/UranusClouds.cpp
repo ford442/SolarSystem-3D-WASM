@@ -11,8 +11,8 @@ UranusClouds::UranusClouds(const CloudsInfo& cloudsInfo, std::shared_ptr<SpaceOb
 void UranusClouds::AdjustToParent(float /*timeScale*/) {
     static float rotationAngle = 0;
     constexpr float kSpinDegPerSimSecond = 3.447f; // ~6*0.009575 per frame @ 60fps
-    if (gSimDeltaSeconds > 0.0f) {
-        rotationAngle += kSpinDegPerSimSecond * gSimDeltaSeconds;
+    if (gSimState->simDeltaSeconds > 0.0f) {
+        rotationAngle += kSpinDegPerSimSecond * gSimState->simDeltaSeconds;
     }
 
     LoadIdentityModelMatrix();
