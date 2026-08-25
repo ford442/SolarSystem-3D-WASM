@@ -55,7 +55,8 @@ test('WASM module boots and staged loading reacts to camera pose', async ({ page
     .poll(
       () =>
         consoleLogs.some(
-          (line) => line.includes('[StagedLoading]') && line.includes('Mercury'),
+          (line) =>
+            line.includes('[StagedLoading]') && line.includes('starting download'),
         ),
       { timeout: 15_000 },
     )
