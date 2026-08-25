@@ -1,3 +1,5 @@
+import type { WasmModuleCallbacks } from './wasmCallbacks.js';
+
 export interface ProgressOverlayElements {
     loadingContainer: HTMLElement;
     progressBar: HTMLElement;
@@ -7,7 +9,7 @@ export interface ProgressOverlayElements {
     streamingBar: HTMLElement | null;
 }
 
-export function initProgressOverlay(elements: ProgressOverlayElements): void {
+export function createProgressCallbacks(elements: ProgressOverlayElements): WasmModuleCallbacks {
     const {
         loadingContainer,
         progressBar,
@@ -61,6 +63,8 @@ export function initProgressOverlay(elements: ProgressOverlayElements): void {
         }
     }
 
-    window.updateLoadingProgress = updateProgress;
-    window.updateStreamingProgress = updateStreamingProgress;
+    return {
+        updateLoadingProgress: updateProgress,
+        updateStreamingProgress,
+    };
 }

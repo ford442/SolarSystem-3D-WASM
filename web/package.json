@@ -14,6 +14,7 @@
     "test:textures": "node verify-textures.js",
     "test:smoke": "playwright test",
     "generate:wasm-exports": "node ../scripts/generate-wasm-exports.mjs",
+    "generate:wasm-exports:check": "node ../scripts/generate-wasm-exports.mjs --check",
     "generate:planet-metadata": "node ../scripts/generate-planet-metadata.mjs",
     "generate:planet-metadata:check": "node ../scripts/generate-planet-metadata.mjs --check",
     "prebuild": "npm run generate:planet-metadata"

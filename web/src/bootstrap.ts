@@ -3,7 +3,7 @@ import Module, { type SolarSystemModuleConfig } from './SolarSystem.js';
 import { parseDeepLinkFromUrl } from './deepLink';
 import { publishInitConfig, resolveInitConfig } from './initialSettings';
 import { PlanetExplorer } from './planetExplorer';
-import { initProgressOverlay } from './progressOverlay';
+import { createProgressCallbacks } from './progressOverlay';
 import { initSettingsPanel } from './settingsPanel';
 import { initTouchControls, isMobileLikeDevice } from './touchControls';
 import { initWebXr } from './webxr';
@@ -11,6 +11,7 @@ import {
     createSolarSystemRuntime,
     exposeConsoleHelpers,
 } from './wasmBridge';
+import { installWasmCallbacksOnConfig } from './wasmCallbacks';
 
 // Emscripten 6 prefers resizable WebAssembly buffers when the browser exposes
 // toResizableBuffer(). Current Chrome DOM/WebGL APIs reject views backed by
@@ -61,7 +62,7 @@ const deployedBaseUrl = new URL(import.meta.env.BASE_URL, window.location.href);
 const isMobileDevice = isMobileLikeDevice();
 const runtimeAssetBase = import.meta.env.VITE_ASSET_BASE?.trim() || deployedBaseUrl.toString();
 
-initProgressOverlay({
+const progressCallbacks = createProgressCallbacks({
     loadingContainer,
     progressBar,
     progressText,
@@ -81,12 +82,20 @@ for (const eventName of ['pointerdown', 'pointerup', 'click', 'keydown', 'keyup'
     explorerPanel.addEventListener(eventName, (event) => event.stopPropagation());
 }
 
-const moduleConfig: SolarSystemModuleConfig = {
+const moduleConfig: SolarSystemModuleConfig = installWasmCallbacksOnConfig({
     canvas,
     contextAttributes: {
         xrCompatible: true,
         majorVersion: 2,
         minorVersion: 0,
+        antialias: true,
+        depth: true,
+        stencil: false,
+        alpha: false,
+        premultipliedAlpha: true,
+        preserveDrawingBuffer: false,
+        powerPreference: 'default' as const,
+        failIfMajorPerformanceCaveat: false,
     },
     locateFile: (path: string, prefix: string) => {
         if (path.endsWith('.wasm') || path.endsWith('.data')) {
@@ -99,7 +108,7 @@ const moduleConfig: SolarSystemModuleConfig = {
     onRuntimeInitialized: () => {
         console.log('SolarSystem WASM initialized');
     },
-};
+}, progressCallbacks);
 
 void Module(moduleConfig).then((instance) => {
     console.log('Module loaded successfully', instance);
