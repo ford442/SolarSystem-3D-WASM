@@ -13,12 +13,12 @@ constexpr float kTwoPi = 6.28318530717958647692f;
 
 /** Advance a mean anomaly using this frame's scaled sim delta. */
 inline void AdvanceAnomaly(float& anomalyRad, float orbitalPeriodDays) {
-    if (gSimDeltaSeconds <= 0.0f || orbitalPeriodDays <= 0.0f) {
+    if (gSimState->simDeltaSeconds <= 0.0f || orbitalPeriodDays <= 0.0f) {
         return;
     }
     const float periodSeconds =
         OrbitLayout::kEarthOrbitSecondsAt1x * (orbitalPeriodDays / kEarthYearDays);
-    anomalyRad += gSimDeltaSeconds * (kTwoPi / periodSeconds);
+    anomalyRad += gSimState->simDeltaSeconds * (kTwoPi / periodSeconds);
     anomalyRad = std::fmod(anomalyRad, kTwoPi);
     if (anomalyRad < 0.0f) {
         anomalyRad += kTwoPi;
@@ -37,10 +37,10 @@ inline glm::vec3 OffsetXY(float radius, float anomalyRad) {
 
 /** Advance axial spin in degrees (linear in sim time). */
 inline void AdvanceSpin(float& spinDegrees, float degreesPerSimSecond) {
-    if (gSimDeltaSeconds <= 0.0f) {
+    if (gSimState->simDeltaSeconds <= 0.0f) {
         return;
     }
-    spinDegrees += degreesPerSimSecond * gSimDeltaSeconds;
+    spinDegrees += degreesPerSimSecond * gSimState->simDeltaSeconds;
 }
 
 } // namespace SatelliteOrbit

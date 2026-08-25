@@ -1,4 +1,5 @@
 #include "Planet.h"
+#include "../SimState.h"
 
 Planet::Planet(const PlanetInfo& planetInfo, std::shared_ptr<Star> parentStar) :
     SpaceObject(planetInfo.planetModel, *planetInfo.planetShader, planetInfo.engName, planetInfo.otherLangName), _parentStar(std::move(parentStar)),
@@ -19,7 +20,7 @@ float Planet::GetEffectiveLODThreshold() const {
 #ifdef __EMSCRIPTEN__
     // Medium uses a 1.5x distance multiplier. Expressed as a threshold, this
     // means the camera must be 1.5x closer than full quality before upgrading.
-    if (g_qualityPreset == 1) {
+    if (gSimState->qualityPreset == 1) {
         return _lodThreshold / 1.5f;
     }
 #endif

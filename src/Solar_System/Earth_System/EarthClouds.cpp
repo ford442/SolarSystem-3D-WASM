@@ -12,8 +12,8 @@ void EarthClouds::AdjustToParent(float /*timeScale*/) {
     static float rotationAngle = 0;
     // ~1.125 deg/s at 1x preserves prior ~0.01875 deg/frame @ 60fps look.
     constexpr float kSpinDegPerSimSecond = 1.125f;
-    if (gSimDeltaSeconds > 0.0f) {
-        rotationAngle += kSpinDegPerSimSecond * gSimDeltaSeconds;
+    if (gSimState->simDeltaSeconds > 0.0f) {
+        rotationAngle += kSpinDegPerSimSecond * gSimState->simDeltaSeconds;
     }
 
     LoadIdentityModelMatrix();

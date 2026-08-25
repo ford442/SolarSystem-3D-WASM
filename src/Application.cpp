@@ -1,7 +1,9 @@
 #include "Application.h"
+#include "JsBridge.h"
 #include "QualitySettings.h"
 #include "ResourceManifest.h"
 #include "SimState.h"
+#include "WasmExports.h"
 #include "Auxiliary_Modules/WebResourceFetcher.h"
 #include "Auxiliary_Modules/TextureLoadingQueue.h"
 #include "Solar_System/OrbitLayout.h"
@@ -18,239 +20,16 @@
 
 using namespace std;
 
-namespace {
-    Application* activeApplication = nullptr;
-
-#ifdef __EMSCRIPTEN__
-    float g_touchForward = 0.0f;
-    float g_touchRight = 0.0f;
-    float g_touchVertical = 0.0f;
-
-    void NotifySettingsChanged(const char* field) {
-        EM_ASM({
-            if (typeof window.onSettingsChanged === 'function') {
-                window.onSettingsChanged(UTF8ToString($0));
-            }
-        }, field);
-    }
-#else
-    void NotifySettingsChanged(const char*) {}
-#endif
-}
-
-float gTimeScale = 1.0f;
-bool gTimePaused = false;
-bool gAdvanceStep = false;
-int gShadowQuality = 3; // 0=off, 1=low, 2=medium, 3=full
-float gSimDeltaSeconds = 0.0f;
-
-#ifdef __EMSCRIPTEN__
-extern "C" {
-    // Keep this small control surface as an explicit C ABI consumed through
-    // cwrap. If the web API grows to return planet lists or settings structs,
-    // migrate those structured values to embind instead of adding pointer-based
-    // C exports; these scalar settings remain simpler as cwrap calls.
-    EMSCRIPTEN_KEEPALIVE void SetCameraPose(float x, float y, float z, float yaw, float pitch) {
-        if (!activeApplication) return;
-        Camera& cam = activeApplication->GetCamera();
-        cam.SetPosition(glm::vec3(x, y, z));
-        cam.SetYawPitch(yaw, pitch);
-    }
-    EMSCRIPTEN_KEEPALIVE void SetQualityPreset(int preset) {
-        g_qualityPreset = (preset < 0 ? 0 : preset > 2 ? 2 : preset);
-        if (activeApplication) {
-            activeApplication->ApplyQualityPreset(g_qualityPreset);
-        }
-        NotifySettingsChanged("quality");
-    }
-    EMSCRIPTEN_KEEPALIVE int GetQualityPreset() {
-        return g_qualityPreset;
-    }
-    EMSCRIPTEN_KEEPALIVE void SetTimeScale(float scale) {
-        gTimeScale = glm::clamp(scale, 0.01f, 10000.0f);
-        NotifySettingsChanged("timeScale");
-    }
-    EMSCRIPTEN_KEEPALIVE float GetTimeScale() {
-        return gTimeScale;
-    }
-    EMSCRIPTEN_KEEPALIVE void SetPaused(bool paused) {
-        gTimePaused = paused;
-        NotifySettingsChanged("paused");
-    }
-    EMSCRIPTEN_KEEPALIVE int GetPaused() {
-        return gTimePaused ? 1 : 0;
-    }
-    EMSCRIPTEN_KEEPALIVE void SetSimulationEpoch(double julianDate) {
-        OrbitLayout::SetJulianDate(julianDate);
-        NotifySettingsChanged("simulationEpoch");
-    }
-    EMSCRIPTEN_KEEPALIVE double GetSimulationEpoch() {
-        return OrbitLayout::GetJulianDate();
-    }
-    EMSCRIPTEN_KEEPALIVE void SetShadowQuality(int quality) {
-        if (activeApplication) {
-            activeApplication->ApplyShadowQuality(quality);
-        } else {
-            gShadowQuality = std::clamp(quality, 0, 3);
-        }
-        NotifySettingsChanged("shadowQuality");
-    }
-    EMSCRIPTEN_KEEPALIVE int GetShadowQuality() {
-        return gShadowQuality;
-    }
-    EMSCRIPTEN_KEEPALIVE void SetTouchMovement(float forward, float right, float vertical) {
-        g_touchForward = glm::clamp(forward, -1.0f, 1.0f);
-        g_touchRight = glm::clamp(right, -1.0f, 1.0f);
-        g_touchVertical = glm::clamp(vertical, -1.0f, 1.0f);
-    }
-    EMSCRIPTEN_KEEPALIVE void AddTouchLook(float deltaX, float deltaY) {
-        if (activeApplication) {
-            activeApplication->GetCamera().ProcessMouseMovement(deltaX, deltaY);
-        }
-    }
-    EMSCRIPTEN_KEEPALIVE void AddTouchZoom(float delta) {
-        if (activeApplication && std::abs(delta) > 0.0001f) {
-            activeApplication->GetCamera().ProcessMouseScroll(delta);
-        }
-    }
-    EMSCRIPTEN_KEEPALIVE int IsMobileWeb() {
-        return g_isMobileWeb ? 1 : 0;
-    }
-    EMSCRIPTEN_KEEPALIVE void SetMusicVolume(float volume) {
-        if (activeApplication) {
-            activeApplication->SetMusicVolume(volume);
-        }
-        NotifySettingsChanged("musicVolume");
-    }
-    EMSCRIPTEN_KEEPALIVE float GetMusicVolume() {
-        return activeApplication ? activeApplication->GetMusicVolume() : 0.3f;
-    }
-    EMSCRIPTEN_KEEPALIVE void SetMusicMuted(int muted) {
-        if (activeApplication) {
-            activeApplication->SetMusicMuted(muted != 0);
-        }
-        NotifySettingsChanged("musicMuted");
-    }
-    EMSCRIPTEN_KEEPALIVE int GetMusicMuted() {
-        return activeApplication && activeApplication->GetMusicMuted() ? 1 : 0;
-    }
-    EMSCRIPTEN_KEEPALIVE void FocusPlanet(int idx) {
-        if (activeApplication) {
-            activeApplication->FocusPlanetByIndex(idx);
-        }
-    }
-    EMSCRIPTEN_KEEPALIVE void SetOrbitScaleMode(int mode) {
-        if (activeApplication) {
-            activeApplication->ApplyOrbitScaleMode(mode);
-        } else {
-            OrbitLayout::SetScaleMode(mode == 1 ? OrbitLayout::ScaleMode::Realistic : OrbitLayout::ScaleMode::Compressed);
-        }
-    }
-    EMSCRIPTEN_KEEPALIVE int GetOrbitScaleMode() {
-        return static_cast<int>(OrbitLayout::GetScaleMode());
-    }
-    EMSCRIPTEN_KEEPALIVE int GetNearestPlanetIndex() {
-        return activeApplication ? activeApplication->GetNearestPlanetIndexForJs() : -1;
-    }
-    EMSCRIPTEN_KEEPALIVE int GetFocusedPlanetIndex() {
-        return activeApplication ? activeApplication->GetFocusedPlanetIndex() : -1;
-    }
-    EMSCRIPTEN_KEEPALIVE float GetPlanetSceneDistance(int idx) {
-        idx = std::clamp(idx, 0, 9);
-        return OrbitLayout::GetSceneDistance(static_cast<OrbitLayout::Body>(idx));
-    }
-    EMSCRIPTEN_KEEPALIVE void SetOrbitLines(int enabled) {
-        if (activeApplication) {
-            activeApplication->SetOrbitLinesEnabled(enabled != 0);
-        }
-        NotifySettingsChanged("orbitLines");
-    }
-    EMSCRIPTEN_KEEPALIVE int GetOrbitLines() {
-        return activeApplication && activeApplication->GetOrbitLinesEnabled() ? 1 : 0;
-    }
-    void ApplyMagneticFieldMode(int enabled) {
-        if (activeApplication) {
-            activeApplication->SetMagneticFieldsEnabled(enabled != 0);
-        }
-        NotifySettingsChanged("magneticFields");
-        NotifySettingsChanged("magneticFieldMode");
-    }
-    EMSCRIPTEN_KEEPALIVE void SetMagneticFields(int enabled) {
-        ApplyMagneticFieldMode(enabled);
-    }
-    EMSCRIPTEN_KEEPALIVE int GetMagneticFields() {
-        return activeApplication && activeApplication->GetMagneticFieldsEnabled() ? 1 : 0;
-    }
-    EMSCRIPTEN_KEEPALIVE void SetMagneticFieldMode(int enabled) {
-        ApplyMagneticFieldMode(enabled);
-    }
-    EMSCRIPTEN_KEEPALIVE int GetMagneticFieldMode() {
-        return activeApplication && activeApplication->GetMagneticFieldsEnabled() ? 1 : 0;
-    }
-
-    // --- WebXR stereo control surface ---
-    EMSCRIPTEN_KEEPALIVE void SetXrSessionActive(int active) {
-        if (!activeApplication) {
-            return;
-        }
-        activeApplication->SetXrActive(active != 0);
-        if (active) {
-            emscripten_pause_main_loop();
-        } else {
-            emscripten_resume_main_loop();
-        }
-    }
-    EMSCRIPTEN_KEEPALIVE void SetXrEyeCount(int count) {
-        if (activeApplication) {
-            activeApplication->SetXrEyeCount(count);
-        }
-    }
-    EMSCRIPTEN_KEEPALIVE void SetXrEyeViewport(int eye, int x, int y, int width, int height) {
-        if (activeApplication) {
-            activeApplication->SetXrEyeViewport(eye, x, y, width, height);
-        }
-    }
-    EMSCRIPTEN_KEEPALIVE float* GetXrMatrixScratch() {
-        return activeApplication ? activeApplication->GetXrMatrixScratch() : nullptr;
-    }
-    EMSCRIPTEN_KEEPALIVE void CommitXrEyeMatrices(int eye) {
-        if (activeApplication) {
-            activeApplication->CommitXrEyeMatrices(eye);
-        }
-    }
-    EMSCRIPTEN_KEEPALIVE void RunXrFrame() {
-        if (activeApplication) {
-            activeApplication->RunOneFrame();
-        }
-    }
-    EMSCRIPTEN_KEEPALIVE float GetCameraPositionX() {
-        return activeApplication ? activeApplication->GetCamera().GetPosition().x : 0.0f;
-    }
-    EMSCRIPTEN_KEEPALIVE float GetCameraPositionY() {
-        return activeApplication ? activeApplication->GetCamera().GetPosition().y : 0.0f;
-    }
-    EMSCRIPTEN_KEEPALIVE float GetCameraPositionZ() {
-        return activeApplication ? activeApplication->GetCamera().GetPosition().z : 0.0f;
-    }
-    EMSCRIPTEN_KEEPALIVE float GetCameraYaw() {
-        return activeApplication ? activeApplication->GetCamera().GetYaw() : -90.0f;
-    }
-    EMSCRIPTEN_KEEPALIVE float GetCameraPitch() {
-        return activeApplication ? activeApplication->GetCamera().GetPitch() : 0.0f;
-    }
-}
-#endif
-
-
 // Error Callback
 void glfwErrorCallback(int error, const char* description) {
     std::cerr << "GLFW Error (" << error << "): " << description << std::endl;
 }
 
 Application::Application() : _fpsHandler(240) {
-    activeApplication = this;
+    gSimState = &_simState;
+    SetActiveApplication(this);
     InitSystems();
-    ApplyQualityPreset(g_qualityPreset);
+    ApplyQualityPreset(gSimState->qualityPreset);
     InitScene();
 }
 
@@ -267,9 +46,9 @@ void Application::InitSystems() {
     }
 
 #ifdef __EMSCRIPTEN__
-    g_isMobileWeb = ReadIsMobileWeb();
-    g_qualityPreset = ReadInitialQualityPreset();
-    const auto qualitySettings = GetQualitySettings(g_qualityPreset, g_isMobileWeb);
+    gSimState->isMobileWeb = ReadIsMobileWeb();
+    gSimState->qualityPreset = ReadInitialQualityPreset();
+    const auto qualitySettings = GetQualitySettings(gSimState->qualityPreset, gSimState->isMobileWeb);
     glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 3);
     glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 0);
     glfwWindowHint(GLFW_CLIENT_API, GLFW_OPENGL_ES_API);
@@ -432,8 +211,8 @@ void Application::RunOneFrame() {
     _deltaTime = currentFrame - _lastFrame;
     _lastFrame = currentFrame;
 
-    gSimDeltaSeconds = gTimePaused ? 0.0f : static_cast<float>(_deltaTime) * gTimeScale;
-    OrbitLayout::Advance(gSimDeltaSeconds);
+    gSimState->simDeltaSeconds = gSimState->timePaused ? 0.0f : static_cast<float>(_deltaTime) * gSimState->timeScale;
+    OrbitLayout::Advance(gSimState->simDeltaSeconds);
 #ifdef __EMSCRIPTEN__
     RefreshPlanetProxyPositions();
 #endif
@@ -515,13 +294,8 @@ void Application::InitScene() {
 
 void Application::UpdateLoadingProgress() {
 #ifdef __EMSCRIPTEN__
-    int loaded = _totalResources - _resourcesPending;
-    // Call JavaScript function to update progress bar
-    EM_ASM({
-        if (typeof window.updateLoadingProgress === 'function') {
-            window.updateLoadingProgress($0, $1);
-        }
-    }, loaded, _totalResources);
+    const int loaded = _totalResources - _resourcesPending;
+    NotifyLoadingProgress(loaded, _totalResources);
 #endif
 }
 
@@ -529,12 +303,12 @@ void Application::UpdateLoadingProgress() {
 void Application::InitSceneObjects() {
     _camera.SetAspect(static_cast<float>(_displayWidth) / static_cast<float>(_displayHeight));
     const auto qualitySettings = GetQualitySettings(
-        gShadowQuality == 0 ? g_qualityPreset : gShadowQuality - 1, g_isMobileWeb);
+        gSimState->shadowQuality == 0 ? gSimState->qualityPreset : gSimState->shadowQuality - 1, gSimState->isMobileWeb);
     _shadowMapFBO = make_unique<ShadowMapFBO>(qualitySettings.shadowResolution, qualitySettings.shadowResolution);
     _hdrEnabled = qualitySettings.enableHdr;
     _hdrShader = make_unique<Shader>("resource/shaders/passThrough.vs", "resource/shaders/hdr.fs");
     _hdr = make_unique<HDR>(*_hdrShader, _displayWidth, _displayHeight, _hdrEnabled);
-    LogQualityTier(qualitySettings, _hdrEnabled, gShadowQuality);
+    LogQualityTier(qualitySettings, _hdrEnabled, gSimState->shadowQuality);
 
     const vector<string> skyBoxFaces = GetSkyBoxFaces();
 
@@ -566,12 +340,12 @@ void Application::InitSceneObjects() {
     _orbitPathRenderer = make_unique<OrbitPathRenderer>();
     _magneticFieldRenderer = make_unique<MagneticFieldLineRenderer>();
     {
-        const auto fieldQuality = GetQualitySettings(g_qualityPreset, g_isMobileWeb);
+        const auto fieldQuality = GetQualitySettings(gSimState->qualityPreset, gSimState->isMobileWeb);
         _magneticFieldBloom = make_unique<MagneticFieldBloom>(_displayWidth, _displayHeight,
                                                               fieldQuality.enableMagneticBloom);
     }
     {
-        const auto asteroidQuality = GetQualitySettings(g_qualityPreset, g_isMobileWeb);
+        const auto asteroidQuality = GetQualitySettings(gSimState->qualityPreset, gSimState->isMobileWeb);
         _asteroidField = make_unique<AsteroidField>(AsteroidField::kDefaultSeed,
                                                     asteroidQuality.asteroidInstanceCount);
     }
@@ -748,20 +522,23 @@ void Application::ProcessInput(GLFWwindow* window) {
     }
 
 #ifdef __EMSCRIPTEN__
-    if (g_touchForward > 0.01f) {
-        _camera.ProcessKeyboard(CameraVector::FORWARD, static_cast<float>(_deltaTime) * g_touchForward);
-    } else if (g_touchForward < -0.01f) {
-        _camera.ProcessKeyboard(CameraVector::BACKWARD, static_cast<float>(_deltaTime) * -g_touchForward);
+    const float touchForward = GetTouchForward();
+    const float touchRight = GetTouchRight();
+    const float touchVertical = GetTouchVertical();
+    if (touchForward > 0.01f) {
+        _camera.ProcessKeyboard(CameraVector::FORWARD, static_cast<float>(_deltaTime) * touchForward);
+    } else if (touchForward < -0.01f) {
+        _camera.ProcessKeyboard(CameraVector::BACKWARD, static_cast<float>(_deltaTime) * -touchForward);
     }
-    if (g_touchRight > 0.01f) {
-        _camera.ProcessKeyboard(CameraVector::RIGHT, static_cast<float>(_deltaTime) * g_touchRight);
-    } else if (g_touchRight < -0.01f) {
-        _camera.ProcessKeyboard(CameraVector::LEFT, static_cast<float>(_deltaTime) * -g_touchRight);
+    if (touchRight > 0.01f) {
+        _camera.ProcessKeyboard(CameraVector::RIGHT, static_cast<float>(_deltaTime) * touchRight);
+    } else if (touchRight < -0.01f) {
+        _camera.ProcessKeyboard(CameraVector::LEFT, static_cast<float>(_deltaTime) * -touchRight);
     }
-    if (g_touchVertical > 0.01f) {
-        _camera.ProcessKeyboard(CameraVector::WORLD_UP, static_cast<float>(_deltaTime) * g_touchVertical);
-    } else if (g_touchVertical < -0.01f) {
-        _camera.ProcessKeyboard(CameraVector::WORLD_DOWN, static_cast<float>(_deltaTime) * -g_touchVertical);
+    if (touchVertical > 0.01f) {
+        _camera.ProcessKeyboard(CameraVector::WORLD_UP, static_cast<float>(_deltaTime) * touchVertical);
+    } else if (touchVertical < -0.01f) {
+        _camera.ProcessKeyboard(CameraVector::WORLD_DOWN, static_cast<float>(_deltaTime) * -touchVertical);
     }
 #endif
 
@@ -830,15 +607,15 @@ void Application::KeyCallback(GLFWwindow* window, int key, int, int action, int)
 
         // Time scale / pause / step
         if (key == GLFW_KEY_EQUAL || key == GLFW_KEY_KP_ADD) {
-            gTimeScale = glm::clamp(gTimeScale * 2.0f, 0.01f, 10000.0f);
+            gSimState->timeScale = glm::clamp(gSimState->timeScale * 2.0f, 0.01f, 10000.0f);
             NotifySettingsChanged("timeScale");
         }
         if (key == GLFW_KEY_MINUS || key == GLFW_KEY_KP_SUBTRACT) {
-            gTimeScale = glm::clamp(gTimeScale / 2.0f, 0.01f, 10000.0f);
+            gSimState->timeScale = glm::clamp(gSimState->timeScale / 2.0f, 0.01f, 10000.0f);
             NotifySettingsChanged("timeScale");
         }
         if (key == GLFW_KEY_P) {
-            gTimePaused = !gTimePaused;
+            gSimState->timePaused = !gSimState->timePaused;
             NotifySettingsChanged("paused");
         }
         if (key == GLFW_KEY_M) {
@@ -847,7 +624,7 @@ void Application::KeyCallback(GLFWwindow* window, int key, int, int action, int)
             NotifySettingsChanged("magneticFieldMode");
         }
         if (key == GLFW_KEY_PERIOD) {
-            gAdvanceStep = true;
+            gSimState->advanceStep = true;
         }
     }
 }
@@ -943,7 +720,7 @@ void Application::EnsureMagneticFieldsBuilt() {
     if (!_magneticFieldRenderer) {
         return;
     }
-    if (_magneticFieldsBuilt && _magneticFieldsQuality == g_qualityPreset) {
+    if (_magneticFieldsBuilt && _magneticFieldsQuality == gSimState->qualityPreset) {
         return;
     }
 
@@ -958,14 +735,14 @@ void Application::EnsureMagneticFieldsBuilt() {
         OrbitLayout::Body::Neptune,
     };
     for (const auto body : kFieldBodies) {
-        const MagneticFieldParams params = MagneticFieldCatalog::ParamsForBody(body, g_qualityPreset);
+        const MagneticFieldParams params = MagneticFieldCatalog::ParamsForBody(body, gSimState->qualityPreset);
         MagneticFieldLineMesh mesh;
         mesh.Upload(MagneticFieldTracer::Trace(params));
         _magneticFieldRenderer->AddBody(body, std::move(mesh), params);
     }
     _magneticFieldsBuilt = true;
-    _magneticFieldsQuality = g_qualityPreset;
-    std::cout << "[MagneticField] Built field-line ribbons for quality preset " << g_qualityPreset << std::endl;
+    _magneticFieldsQuality = gSimState->qualityPreset;
+    std::cout << "[MagneticField] Built field-line ribbons for quality preset " << gSimState->qualityPreset << std::endl;
 }
 
 void Application::RenderMagneticFields() {
@@ -994,7 +771,7 @@ void Application::RenderMagneticFields() {
 
         if (_sun) {
             const MagneticFieldParams sunParams =
-                MagneticFieldCatalog::ParamsForBody(OrbitLayout::Body::Sun, g_qualityPreset);
+                MagneticFieldCatalog::ParamsForBody(OrbitLayout::Body::Sun, gSimState->qualityPreset);
             // Mesh is scaled 0.5 × sphere radius (~2) ≈ 1 unit; inflate so the torus is readable.
             const float sunRadius = 28.0f;
             drawBody(OrbitLayout::Body::Sun, sunParams, _sun->GetPosition(), glm::mat4(1.0f), sunRadius);
@@ -1010,7 +787,7 @@ void Application::RenderMagneticFields() {
             if (body == OrbitLayout::Body::Sun) {
                 continue;
             }
-            const MagneticFieldParams params = MagneticFieldCatalog::ParamsForBody(body, g_qualityPreset);
+            const MagneticFieldParams params = MagneticFieldCatalog::ParamsForBody(body, gSimState->qualityPreset);
             if (!params.enabled) {
                 continue;
             }
@@ -1032,14 +809,14 @@ void Application::RenderMagneticFields() {
     bindRibbonState();
     drawBodies(1.0f, 1.0f);
 
-    const auto quality = GetQualitySettings(g_qualityPreset, g_isMobileWeb);
+    const auto quality = GetQualitySettings(gSimState->qualityPreset, gSimState->isMobileWeb);
     if (_magneticFieldBloom && quality.enableMagneticBloom) {
         _magneticFieldBloom->Resize(_displayWidth, _displayHeight);
         if (_magneticFieldBloom->IsEnabled()) {
             _magneticFieldBloom->BeginCapture();
             bindRibbonState();
             drawBodies(2.0f, 1.35f);
-            const float intensity = g_isMobileWeb ? 0.48f : (quality.magneticBloomPasses >= 2 ? 0.82f : 0.62f);
+            const float intensity = gSimState->isMobileWeb ? 0.48f : (quality.magneticBloomPasses >= 2 ? 0.82f : 0.62f);
             _magneticFieldBloom->BlurAndComposite(quality.magneticBloomPasses, intensity);
         }
     }
@@ -1089,7 +866,7 @@ void Application::RenderAsteroidField() {
         return;
     }
 
-    _asteroidField->Update(gSimDeltaSeconds);
+    _asteroidField->Update(gSimState->simDeltaSeconds);
 
     static const float zCoef = static_cast<float>(2.0 / glm::log2(_camera.GetFar() + 1.0));
     _asteroidField->Render(_cameraProjection, _cameraView,
@@ -1130,11 +907,7 @@ void Application::FocusPlanetByIndex(int idx) {
     _camera.StartTransitionTo(cameraPos, yaw, pitch, 2.0f);
 
 #ifdef __EMSCRIPTEN__
-    EM_ASM({
-        if (typeof window.onPlanetFocused === 'function') {
-            window.onPlanetFocused($0);
-        }
-    }, idx);
+    NotifyPlanetFocused(idx);
 #endif
 }
 
@@ -1410,7 +1183,7 @@ void Application::UpdateLOD() {
 
     const glm::vec3 camPos = _camera.GetPosition();
 
-    if (g_qualityPreset == 0) {
+    if (gSimState->qualityPreset == 0) {
         // Low preset: force downgrade/cancel every high-res scene texture and skip upgrades.
         const glm::vec3 fakeFar = camPos + glm::vec3(100000.0f, 0.0f, 0.0f);
         for (auto& rc : _renderableSceneComponents) {
@@ -1442,13 +1215,13 @@ void Application::UpdateLOD() {
 }
 
 void Application::ApplyQualityPreset(int preset) {
-    g_qualityPreset = std::clamp(preset, 0, 2);
-    const auto settings = GetQualitySettings(g_qualityPreset, g_isMobileWeb);
+    gSimState->qualityPreset = std::clamp(preset, 0, 2);
+    const auto settings = GetQualitySettings(gSimState->qualityPreset, gSimState->isMobileWeb);
 
     TextureLoadingQueue::GetInstance().SetMaxConcurrentLoads(settings.maxConcurrentTextureLoads);
 
-    if (gShadowQuality > 0) {
-        gShadowQuality = g_qualityPreset + 1;
+    if (gSimState->shadowQuality > 0) {
+        gSimState->shadowQuality = gSimState->qualityPreset + 1;
     }
 
     ApplyRenderResources(settings.shadowResolution, settings.enableHdr);
@@ -1459,13 +1232,13 @@ void Application::ApplyQualityPreset(int preset) {
         _magneticFieldsBuilt = false;
         EnsureMagneticFieldsBuilt();
     }
-    LogQualityTier(settings, _hdrEnabled, gShadowQuality);
+    LogQualityTier(settings, _hdrEnabled, gSimState->shadowQuality);
 }
 
 void Application::ApplyRenderResources(uint16_t shadowResolution, bool enableHdr) {
     _hdrEnabled = enableHdr;
 
-    if (_shadowMapFBO && gShadowQuality > 0) {
+    if (_shadowMapFBO && gSimState->shadowQuality > 0) {
         _shadowMapFBO->Resize(shadowResolution, shadowResolution);
     }
 
@@ -1473,24 +1246,24 @@ void Application::ApplyRenderResources(uint16_t shadowResolution, bool enableHdr
         _hdr->SetEnabled(enableHdr, _displayWidth, _displayHeight);
     }
     if (_magneticFieldBloom) {
-        const auto bloomSettings = GetQualitySettings(g_qualityPreset, g_isMobileWeb);
+        const auto bloomSettings = GetQualitySettings(gSimState->qualityPreset, gSimState->isMobileWeb);
         _magneticFieldBloom->SetEnabled(bloomSettings.enableMagneticBloom, _displayWidth, _displayHeight);
     }
 }
 
 void Application::ApplyShadowQuality(int quality) {
-    gShadowQuality = std::clamp(quality, 0, 3);
-    if (gShadowQuality == 0) {
+    gSimState->shadowQuality = std::clamp(quality, 0, 3);
+    if (gSimState->shadowQuality == 0) {
         std::cout << "[Shadows] disabled" << std::endl;
         return;
     }
 
-    const auto settings = GetQualitySettings(gShadowQuality - 1, g_isMobileWeb);
+    const auto settings = GetQualitySettings(gSimState->shadowQuality - 1, gSimState->isMobileWeb);
     if (_shadowMapFBO) {
         _shadowMapFBO->Resize(settings.shadowResolution, settings.shadowResolution);
     }
     ApplyRenderResources(settings.shadowResolution, settings.enableHdr);
-    LogQualityTier(settings, _hdrEnabled, gShadowQuality);
+    LogQualityTier(settings, _hdrEnabled, gSimState->shadowQuality);
 }
 
 #ifdef __EMSCRIPTEN__
@@ -1552,8 +1325,9 @@ void Application::RenderXrStereoFrame() {
 #endif
 
 Application::~Application() {
-    if (activeApplication == this) {
-        activeApplication = nullptr;
+    if (GetActiveApplication() == this) {
+        SetActiveApplication(nullptr);
+        ResetSimStateToFallback();
     }
     Dispose();
 }

@@ -4,9 +4,6 @@
 #include <cstdint>
 #include <string>
 
-extern int g_qualityPreset;
-extern bool g_isMobileWeb;
-
 enum class TextureLodTier : uint8_t {
     Low = 0,
     Mid = 1,

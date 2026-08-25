@@ -1,6 +1,7 @@
 #include <gtest/gtest.h>
 
 #include "QualitySettings.h"
+#include "SimState.h"
 
 namespace {
 
@@ -47,12 +48,12 @@ TEST(QualitySettingsTest, OutOfRangePresetUsesFullTier) {
 }
 
 TEST(QualitySettingsTest, GetMaxTextureLodTierFollowsPreset) {
-    g_qualityPreset = 0;
-    g_isMobileWeb = false;
+    gSimState->qualityPreset = 0;
+    gSimState->isMobileWeb = false;
     EXPECT_EQ(GetMaxTextureLodTier(), TextureLodTier::Low);
-    g_qualityPreset = 1;
+    gSimState->qualityPreset = 1;
     EXPECT_EQ(GetMaxTextureLodTier(), TextureLodTier::Mid);
-    g_qualityPreset = 2;
+    gSimState->qualityPreset = 2;
     EXPECT_EQ(GetMaxTextureLodTier(), TextureLodTier::High);
 }
 
