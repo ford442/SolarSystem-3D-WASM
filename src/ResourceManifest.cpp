@@ -69,7 +69,12 @@ void Application::LoadCoreResources() {
 
     const auto skyBoxFaces = GetSkyBoxFaces();
     for (size_t i = 0; i < skyBoxFaces.size(); ++i) {
-        coreResources.push_back({kHighSkyBoxFaces[i], skyBoxFaces[i]});
+        // Use the quality-resolved path as both the fetch URL and the virtual
+        // path.  On WASM GetTexturePath() returns the low-res path, so we must
+        // fetch from resource/textures_low/Main_SkyBox/ (not the high-res
+        // resource/textures/Main_SkyBox/ which 404s when only placeholder files
+        // are deployed).  On native both paths are the high-res path anyway.
+        coreResources.push_back({skyBoxFaces[i], skyBoxFaces[i]});
     }
 
     _totalResources = static_cast<int>(coreResources.size());

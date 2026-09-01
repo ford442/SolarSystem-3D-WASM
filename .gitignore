@@ -19,6 +19,11 @@ build-check/
 *.data
 web/src/SolarSystem.js
 web/public/resource/
+# Ship placeholder skybox faces so the dev server serves them without a full build
+!web/public/resource/
+!web/public/resource/textures_low/
+!web/public/resource/textures_low/Main_SkyBox/
+!web/public/resource/textures_low/Main_SkyBox/*.dds
 
 # CodeQL artifacts
 _codeql_build_dir/
