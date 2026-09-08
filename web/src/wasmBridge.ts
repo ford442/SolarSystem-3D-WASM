@@ -10,8 +10,8 @@ import { clearWasmCallback, registerWasmCallbacks } from './wasmCallbacks.js';
 
 /**
  * Planet index conventions (FocusPlanet / GetFocusedPlanetIndex):
- * - 0 = Sun, 1 = Mercury … 9 = Pluto (matches deepLink PLANET_IDS).
- * GetNearestPlanetIndex returns 1–9 for the nearest loaded planet, or -1 when unknown
+ * - 0 = Sun, 1 = Mercury … 9 = Pluto, 10 = Ceres, 11 = Vesta (matches deepLink PLANET_IDS).
+ * GetNearestPlanetIndex returns 1–11 for the nearest loaded planet, or -1 when unknown
  * (C++ adds +1 offset via GetNearestPlanetIndexForJs).
  */
 export type { PlanetIndex, QualityPreset, ShadowQuality, OrbitScaleMode };
@@ -67,7 +67,7 @@ export interface SolarSystemRuntime {
     focusPlanet(index: PlanetIndex): void;
     setOrbitScaleMode(mode: OrbitScaleMode): void;
     getOrbitScaleMode(): OrbitScaleMode;
-    /** 1–9 nearest loaded planet, or -1. See planet index note above. */
+    /** 1–11 nearest loaded planet, or -1. See planet index note above. */
     getNearestPlanetIndex(): number;
     getFocusedPlanetIndex(): number;
     getPlanetSceneDistance(index: PlanetIndex): number;

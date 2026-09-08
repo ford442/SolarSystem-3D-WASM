@@ -9,6 +9,8 @@ struct SimState {
     float simDeltaSeconds = 0.0f;
     int qualityPreset = 2;
     bool isMobileWeb = false;
+    /** Canvas backing-store pixels per CSS pixel (capped per quality tier); see webglContext.ts. */
+    float backingStoreScale = 1.0f;
 };
 
 /** Active simulation state; points at Application::_simState while the app runs. */

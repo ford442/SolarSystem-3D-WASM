@@ -218,6 +218,36 @@
         "resource/textures_low/Charon_Normal_Low.dds",
         "resource/textures_low/Charon_Specular_Low.dds"
       ]
+    },
+    {
+      "name": "Ceres",
+      "init": "Ceres",
+      "proxyPosition": [
+        400.51,
+        0,
+        2028.28
+      ],
+      "activationRadius": 900,
+      "required": [
+        "resource/textures_low/Ceres_Diffuse_Low.dds",
+        "resource/textures_low/Ceres_Normal_Low.dds"
+      ],
+      "optional": []
+    },
+    {
+      "name": "Vesta",
+      "init": "Vesta",
+      "proxyPosition": [
+        2010.24,
+        0,
+        378.02
+      ],
+      "activationRadius": 900,
+      "required": [
+        "resource/textures_low/Vesta_Diffuse_Low.dds",
+        "resource/textures_low/Vesta_Normal_Low.dds"
+      ],
+      "optional": []
     }
   ]
 }

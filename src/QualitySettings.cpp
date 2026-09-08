@@ -96,4 +96,18 @@ int ReadInitialQualityPreset() {
         return 2;
     });
 }
+
+float ReadBackingStoreScale() {
+    return static_cast<float>(EM_ASM_DOUBLE({
+        try {
+            const init = window.__solarSystemInit;
+            if (init && typeof init.backingStoreScale === 'number' && init.backingStoreScale > 0) {
+                return init.backingStoreScale;
+            }
+        } catch (error) {
+            console.warn('[Quality] Could not read init config:', error);
+        }
+        return 1.0;
+    }));
+}
 #endif

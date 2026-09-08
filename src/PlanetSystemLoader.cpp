@@ -45,6 +45,8 @@ std::function<void()> Application::MakePlanetInitFunc(const std::string& initTag
     if (initTag == "UranusSystem") return [this] { InitUranusSystem(*_sphereModel); };
     if (initTag == "NeptuneSystem") return [this] { InitNeptuneSystem(*_sphereModel); };
     if (initTag == "PlutoSystem") return [this] { InitPlutoSystem(*_sphereModel); };
+    if (initTag == "Ceres") return [this] { InitCatalogBody(*_sphereModel, OrbitLayout::Body::Ceres); };
+    if (initTag == "Vesta") return [this] { InitCatalogBody(*_sphereModel, OrbitLayout::Body::Vesta); };
     return {};
 }
 void Application::UpdatePlanetSystemLoading() {

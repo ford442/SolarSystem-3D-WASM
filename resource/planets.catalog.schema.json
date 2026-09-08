@@ -45,7 +45,30 @@
           "orbit": { "type": "object" },
           "system": { "type": "object" },
           "assets": { "type": "object" },
-          "includeInCompanion": { "type": "boolean" }
+          "includeInCompanion": { "type": "boolean" },
+          "render": {
+            "type": "object",
+            "description": "Optional. Drives BodyCatalog.generated.h (see generate-planet-metadata.mjs). Present today only for planets/dwarf planets with no unique shader needs; the Sun, ring systems, and moons remain hand-maintained C++ classes.",
+            "properties": {
+              "shaderFlags": {
+                "type": "object",
+                "properties": {
+                  "hasNightTexture": { "type": "boolean" },
+                  "hasSpecularMap": { "type": "boolean" },
+                  "hasClouds": { "type": "boolean" }
+                }
+              },
+              "ambientFactor": { "type": "number" },
+              "lod": {
+                "type": "object",
+                "properties": {
+                  "diffuse": { "type": "string" },
+                  "normal": { "type": "string" },
+                  "specular": { "type": ["string", "null"] }
+                }
+              }
+            }
+          }
         }
       }
     }

@@ -48,4 +48,7 @@
 #include "Pluto_System/Pluto.h"
 #include "Pluto_System/Charon.h"
 
+// Catalog-driven bodies (Ceres, Vesta) — no per-body class, see CatalogBody.h.
+#include "CatalogBody.h"
+
 #endif //SOLARSYSTEM_SOLARSYSTEM_H

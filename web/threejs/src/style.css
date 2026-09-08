@@ -20,6 +20,64 @@ html, body {
   display: block;
 }
 
+#loading-overlay {
+  position: fixed;
+  z-index: 20;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  background: radial-gradient(circle at 50% 45%, #0a1730 0%, #01030a 68%);
+  transition: opacity 380ms ease;
+}
+
+#loading-overlay.hidden {
+  opacity: 0;
+  pointer-events: none;
+}
+
+.loading-panel {
+  width: min(420px, calc(100vw - 48px));
+  text-align: center;
+}
+
+.loading-panel h2 {
+  margin: 0 0 14px;
+  font-size: 15px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: #cfe0ff;
+}
+
+#loading-bar-track {
+  height: 6px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: rgba(139, 178, 255, 0.16);
+}
+
+#loading-bar {
+  width: 0;
+  height: 100%;
+  border-radius: 999px;
+  background: linear-gradient(90deg, #4d84ff, #9fd0ff);
+  transition: width 220ms ease;
+}
+
+#loading-percent {
+  margin: 10px 0 4px;
+  font-size: 13px;
+  font-variant-numeric: tabular-nums;
+  color: #eaf1ff;
+}
+
+#loading-detail {
+  margin: 0;
+  min-height: 16px;
+  font-size: 12px;
+  color: #8fa2c2;
+}
+
 .hud {
   position: fixed;
   z-index: 10;
@@ -55,6 +113,29 @@ html, body {
   flex-wrap: wrap;
   gap: 6px;
   margin-top: 11px;
+}
+
+#music-toggle {
+  margin-top: 9px;
+  padding: 5px 9px;
+  border: 1px solid rgba(139, 178, 255, 0.28);
+  border-radius: 7px;
+  font: inherit;
+  font-size: 12px;
+  color: #eaf1ff;
+  background: rgba(35, 60, 105, 0.62);
+  cursor: pointer;
+}
+
+#music-toggle[aria-pressed='true'] {
+  border-color: rgba(159, 202, 255, 0.8);
+  background: rgba(52, 86, 145, 0.88);
+}
+
+#music-toggle:disabled {
+  color: #8fa2c2;
+  background: rgba(24, 34, 54, 0.6);
+  cursor: not-allowed;
 }
 
 #focus-presets button, .planet-label {

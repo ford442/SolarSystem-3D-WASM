@@ -144,8 +144,30 @@ extern "C" {
         return activeApplication ? activeApplication->GetFocusedPlanetIndex() : -1;
     }
     EMSCRIPTEN_KEEPALIVE float GetPlanetSceneDistance(int idx) {
-        idx = std::clamp(idx, 0, 9);
+        idx = std::clamp(idx, 0, OrbitLayout::kBodyCount - 1);
         return OrbitLayout::GetSceneDistance(static_cast<OrbitLayout::Body>(idx));
+    }
+    // Next inner-planet conjunction at the current epoch, as four scalars so the UI can
+    // format it however it likes. Body indices match FocusPlanet; -1 when none was found.
+    EMSCRIPTEN_KEEPALIVE double GetNextConjunctionJulianDate() {
+        if (!activeApplication) return 0.0;
+        const auto& next = activeApplication->GetNextConjunction();
+        return next.valid ? next.julianDate : 0.0;
+    }
+    EMSCRIPTEN_KEEPALIVE int GetNextConjunctionBodyA() {
+        if (!activeApplication) return -1;
+        const auto& next = activeApplication->GetNextConjunction();
+        return next.valid ? next.bodyA : -1;
+    }
+    EMSCRIPTEN_KEEPALIVE int GetNextConjunctionBodyB() {
+        if (!activeApplication) return -1;
+        const auto& next = activeApplication->GetNextConjunction();
+        return next.valid ? next.bodyB : -1;
+    }
+    EMSCRIPTEN_KEEPALIVE double GetNextConjunctionSeparationDeg() {
+        if (!activeApplication) return -1.0;
+        const auto& next = activeApplication->GetNextConjunction();
+        return next.valid ? next.separationDeg : -1.0;
     }
     EMSCRIPTEN_KEEPALIVE void SetOrbitLines(int enabled) {
         if (activeApplication) {

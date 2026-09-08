@@ -7,13 +7,29 @@
     <title>Solar System (Three.js / WebGPU companion)</title>
   </head>
   <body>
-    <canvas id="scene" aria-label="Interactive solar system companion (Sun to Jupiter)"></canvas>
+    <canvas id="scene" aria-label="Interactive solar system companion (Sun to Pluto)"></canvas>
+    <div
+      id="loading-overlay"
+      role="progressbar"
+      aria-label="Loading solar system companion"
+      aria-valuemin="0"
+      aria-valuemax="100"
+      aria-valuenow="0"
+    >
+      <div class="loading-panel">
+        <h2>Loading Solar System</h2>
+        <div id="loading-bar-track"><div id="loading-bar"></div></div>
+        <p id="loading-percent">0%</p>
+        <p id="loading-detail">Starting renderer…</p>
+      </div>
+    </div>
     <section class="hud" aria-label="Companion renderer controls">
       <h1 id="companion-title">Solar System · Companion</h1>
       <p id="info">Initializing renderer…</p>
       <p id="texture-status">Preparing KTX2 textures…</p>
-      <p class="hint">Drag to orbit · wheel to zoom · WASD + Space/C to glide · proxies = not fully implemented</p>
+      <p class="hint">Drag to orbit · wheel to zoom · WASD + Space/C to glide</p>
       <nav id="focus-presets" aria-label="Camera focus presets"></nav>
+      <button id="music-toggle" type="button" aria-pressed="false">♪ Music off</button>
     </section>
     <script type="module" src="/src/main.ts"></script>
   </body>

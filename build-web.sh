@@ -9,7 +9,7 @@ echo "================================================"
 # 1. Resolve Project Root
 SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )"
 PROJECT_ROOT="$SCRIPT_DIR"
-BUILD_JOBS="${BUILD_JOBS:-55}"
+BUILD_JOBS="${BUILD_JOBS:-$(nproc 2>/dev/null || echo 4)}"
 echo "Project Root: $PROJECT_ROOT"
 
 # Keep staged-loading / explorer / companion JSON in sync with the planet catalog.

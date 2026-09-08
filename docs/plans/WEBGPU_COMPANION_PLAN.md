@@ -1,6 +1,6 @@
 # WebGPU Companion Renderer — Multi-Session Plan
 
-**Status:** Phase 2 complete; companion remains opt-in
+**Status:** Phase 3 complete; companion remains opt-in
 **Target:** Parallel track alongside the existing C++/WASM WebGL 2 renderer  
 **Live reference:** [test.1ink.us/solar-system](https://test.1ink.us/solar-system/index.html) (premium WebGL 2 build)
 
@@ -64,12 +64,35 @@ A full WebGPU port of the custom C++ renderer (Emdawnwebgpu / webgpu.h / WGSL) w
 
 ### Phase 3 — Effects & Polish (Session 4+)
 
-- [ ] Post-processing: bloom, tone mapping (match HDR feel loosely).
-- [ ] Basic atmosphere shader (simplified; not full Mie/scattering port).
-- [ ] Loading overlay + per-body fetch progress (reuse `updateLoadingProgress` pattern from `web/src/main.ts`).
-- [ ] Optional: background music via same MP3 paths as WASM build.
+- [x] Post-processing: bloom, tone mapping (match HDR feel loosely).
+- [x] Basic atmosphere shader (simplified; not full Mie/scattering port).
+- [x] Loading overlay + per-body fetch progress (reuse `updateLoadingProgress` pattern from `web/src/main.ts`).
+- [x] Optional: background music via same MP3 paths as WASM build.
+- [x] Outer system promoted from proxy → full: Saturn (+ rings), Uranus (+ rings), Neptune, Pluto.
 
 **Exit criteria:** Demo is presentable as a “lite” sibling to the main app.
+
+**Phase 3 notes**
+
+- Bloom runs through two code paths (`src/postFx.ts`): a TSL `RenderPipeline` for
+  `WebGPURenderer` (WebGPU *and* its internal WebGL backend), and
+  `EffectComposer` + `UnrealBloomPass` + `OutputPass` for the plain
+  `THREE.WebGLRenderer` rescue path. Both threshold-bloom the whole frame — the
+  Sun is the only bright emitter — and tone map with ACES.
+- Atmospheres (`src/atmosphere.ts`) are inverted-hull Fresnel shells, likewise
+  duplicated as a TSL node material and a GLSL `ShaderMaterial`, because neither
+  material type spans both renderers. Configured per body in
+  `companion-config.json` (Earth, Venus, Titan).
+- Planets now hang off a tilted pivot so the body spins around its *tilted* axis
+  and rings/atmospheres inherit the tilt without wobbling with the spin.
+- Ring strips (`src/rings.ts`) use radius-mapped UVs and a procedural banded
+  texture; a real KTX2 strip replaces it automatically once one is published
+  (the committed `*_Rings_Low.dds` files are 4×4 placeholders).
+- **Known gap:** high-tier LOD still uses the absolute C++-parity thresholds
+  (50 u upgrade / 100 u downgrade) while planets are drawn at 30 u × Earth-radius
+  scale, so focus presets frame a body further out than the upgrade distance and
+  only manual WASD flight triggers a high-res swap. Retuning those constants is
+  deferred so C++ parity stays an explicit decision.
 
 ### Phase 4 — Hybrid Evaluation (Future)
 
@@ -165,5 +188,6 @@ Alternative: long-lived branch `feature/webgpu-companion` if folder pollution is
 | 2026-06-22 | 0 | Scaffold `web/threejs/`: Vite+TS, WebGPURenderer+WebGL fallback, single textured Earth sphere (procedural canvas), OrbitControls, sun light. Local dev verified. No C++ changes. README + plan log updated. |
 | 2026-07-14 | 1 | Shared inner-planet orbital JSON, DDS→KTX2 conversion and local stubs, CDN-aware KTX2Loader, Mercury–Mars scene, focus presets, and damped flight controls. No C++ changes. |
 | 2026-07-21 | 1b | Distance-driven low→high KTX2 LOD in `web/threejs/src/textureLod.ts` (50u upgrade / 100u downgrade, single in-flight load, texture dispose). Dual-tier transcode (`--tier high`), `VITE_KTX2_BASE` for production high-res CDN, dev 128×128 high stubs. No C++ changes. |
+| 2026-09-08 | 4 | Phase 3: bloom + ACES tone mapping on both renderer paths (`postFx.ts`), Fresnel atmosphere shells (`atmosphere.ts`), procedural/KTX2 ring strips (`rings.ts`), loading overlay with declared asset denominator (`loadingOverlay.ts`), optional background music reusing the WASM MP3 paths (`audio.ts`). Saturn/Uranus/Neptune/Pluto promoted from proxies to full bodies (no proxies remain); Moon, Titan and Triton added; Galilean orbit radii moved outside Jupiter's own radius. Planets gained a tilt pivot. No C++ changes. |
 
 _Update this table at the end of each work session._

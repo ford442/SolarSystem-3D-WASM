@@ -27,6 +27,14 @@
       "sha256": "7c524486cdc4111467ed765d7753d85849dcd796a265767a8d7a796b97a1593b"
     },
     {
+      "path": "textures_low/Ceres_Diffuse_Low.dds",
+      "sha256": "36bf1465f0b85ed1fdc93c9a40fe7536929d28d685bc4ca2f62d95729b1344a0"
+    },
+    {
+      "path": "textures_low/Ceres_Normal_Low.dds",
+      "sha256": "200200afa325fbcd0d19579905c11c68ab9bf11b94cbd8e851d68d479bcc4e9b"
+    },
+    {
       "path": "textures_low/Charon_Diffuse_Low.dds",
       "sha256": "7c524486cdc4111467ed765d7753d85849dcd796a265767a8d7a796b97a1593b"
     },
@@ -359,6 +367,22 @@
       "sha256": "3c60a942fabc4dd38d8d0a4fdc70f51e1d1dfb02c58dc7caef768720d6140c3d"
     },
     {
+      "path": "textures_low/Vesta_Diffuse_Low.dds",
+      "sha256": "209808c241e7bcbd4072887965acf3bcc288ca971ad7c0f70ab9eb3b0016e076"
+    },
+    {
+      "path": "textures_low/Vesta_Normal_Low.dds",
+      "sha256": "200200afa325fbcd0d19579905c11c68ab9bf11b94cbd8e851d68d479bcc4e9b"
+    },
+    {
+      "path": "textures/Ceres_Diffuse.dds",
+      "sha256": null
+    },
+    {
+      "path": "textures/Ceres_Normal.dds",
+      "sha256": null
+    },
+    {
       "path": "textures/Main_SkyBox/PositiveX.dds",
       "sha256": null
     },
@@ -517,6 +541,14 @@
       "optional": true
     },
     {
+      "path": "textures/Vesta_Diffuse.dds",
+      "sha256": null
+    },
+    {
+      "path": "textures/Vesta_Normal.dds",
+      "sha256": null
+    },
+    {
       "path": "sounds/Stellardrone - Galaxies.mp3",
       "sha256": null,
       "optional": true
@@ -556,6 +588,14 @@
     {
       "path": "textures_mid/Callisto_Normal_Mid.dds",
       "sha256": "7c524486cdc4111467ed765d7753d85849dcd796a265767a8d7a796b97a1593b"
+    },
+    {
+      "path": "textures_mid/Ceres_Diffuse_Mid.dds",
+      "sha256": null
+    },
+    {
+      "path": "textures_mid/Ceres_Normal_Mid.dds",
+      "sha256": null
     },
     {
       "path": "textures_mid/Charon_Diffuse_Mid.dds",
@@ -864,6 +904,14 @@
     {
       "path": "textures_mid/Venus_Specular_Mid.dds",
       "sha256": "3c60a942fabc4dd38d8d0a4fdc70f51e1d1dfb02c58dc7caef768720d6140c3d"
+    },
+    {
+      "path": "textures_mid/Vesta_Diffuse_Mid.dds",
+      "sha256": null
+    },
+    {
+      "path": "textures_mid/Vesta_Normal_Mid.dds",
+      "sha256": null
     }
   ]
 }

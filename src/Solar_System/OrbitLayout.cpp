@@ -4,6 +4,7 @@
 
 #include <algorithm>
 #include <cmath>
+#include <cstddef>
 #include <glm/glm.hpp>
 #include <glm/gtc/constants.hpp>
 
@@ -22,30 +23,15 @@ constexpr float kEarthYearDays = 365.25f;
 
 // NASA fact-sheet averages for periods/inclination/sidereal day.
 // Sidereal rotation days: Venus and Uranus are retrograde (negative).
+// Generated from resource/planets.catalog.json — see OrbitLayoutBodies.generated.inc header
+// comment. Run `node scripts/generate-planet-metadata.mjs` after editing the catalog.
 constexpr BodyData kBodies[] = {
-    // Sun
-    {glm::vec3(0.0f), 0.0f, 0.0f, 0.0f, 25.38f},
-    // Mercury
-    {glm::vec3(1500.0f, 0.0f, 350.0f), 0.387f, 88.0f, 7.0f, 58.646f},
-    // Venus
-    {glm::vec3(1125.0f, 0.0f, -1340.0f), 0.723f, 224.7f, 3.4f, -243.025f},
-    // Earth
-    {glm::vec3(1900.0f, 0.0f, 0.0f), 1.0f, 365.25f, 0.0f, 0.99726968f},
-    // Mars
-    {glm::vec3(-1732.0f, 0.0f, 1000.0f), 1.524f, 687.0f, 1.9f, 1.025957f},
-    // Jupiter
-    {glm::vec3(1350.0f, 0.0f, 1737.0f), 5.203f, 4333.0f, 1.3f, 0.41354f},
-    // Saturn
-    {glm::vec3(0.0f, -100.0f, 2450.0f), 9.537f, 10759.0f, 2.5f, 0.44401f},
-    // Uranus
-    {glm::vec3(0.0f, 0.0f, -2650.0f), 19.191f, 30687.0f, 0.8f, -0.71833f},
-    // Neptune
-    {glm::vec3(-2900.0f, 0.0f, 0.0f), 30.069f, 60190.0f, 1.8f, 0.67125f},
-    // Pluto
-    {glm::vec3(2800.0f, 0.0f, 1757.73f), 39.482f, 90560.0f, 17.2f, 6.3872f},
+#include "OrbitLayoutBodies.generated.inc"
 };
 
-constexpr int kBodyCount = static_cast<int>(sizeof(kBodies) / sizeof(kBodies[0]));
+static_assert(sizeof(kBodies) / sizeof(kBodies[0]) == static_cast<std::size_t>(kBodyCount),
+              "Generated body rows must cover every OrbitLayout::Body value — "
+              "rerun scripts/generate-planet-metadata.mjs after editing the catalog.");
 
 ScaleMode g_scaleMode = ScaleMode::Compressed;
 double g_julianDate = Ephemeris::kJ2000;
@@ -230,6 +216,8 @@ Body BodyFromName(const std::string& name) {
     if (name == "Uranus") return Body::Uranus;
     if (name == "Neptune") return Body::Neptune;
     if (name == "Pluto") return Body::Pluto;
+    if (name == "Ceres") return Body::Ceres;
+    if (name == "Vesta") return Body::Vesta;
     return Body::Sun;
 }
 

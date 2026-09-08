@@ -73,11 +73,44 @@ resource/asset-manifest.json  ◄──  web/deploy.py --update-manifest  (fill 
 | `node scripts/generate-planet-metadata.mjs --write-checksums` | Fill asset-manifest sha256 for files present on disk |
 | `python3 web/deploy.py assets --update-manifest …` | Hash + upload assets |
 
-**Index convention:** focus body indices are **Sun = 0 … Pluto = 9**, matching `OrbitLayout::Body` and explorer `planet_facts.json`. Do not renumber without updating C++ enum / ephemeris tables.
+**Index convention:** focus body indices are **Sun = 0 … Pluto = 9, Ceres = 10, Vesta = 11**, matching `OrbitLayout::Body` and explorer `planet_facts.json`. Do not renumber without updating C++ enum / ephemeris tables. `OrbitLayout::kBodyCount` is the loop bound; a `static_assert` in `OrbitLayout.cpp` fails the build if the generated row count and the enum disagree.
 
-**Do not hand-edit** generated JSON (`planet_facts.json`, `planet_manifest.json`, `orbital-parameters.json`). Edit the catalog and re-run codegen. C++ per-body render classes and `OrbitLayout` physics tables are still hand-maintained (optional future: generated `OrbitLayoutBodies.generated.inc`).
+**Do not hand-edit** generated JSON (`planet_facts.json`, `planet_manifest.json`, `orbital-parameters.json`) or the generated C++ headers below. Edit the catalog and re-run codegen.
 
-**Adding metadata for a new focus body:** edit `planets.catalog.json` (facts, orbit offset, system assets, initTag on allowlist), run codegen, then implement the C++ `Init*System` if the body should render.
+`OrbitLayout::kBodies[]` (heliocentric compressed-art offset, AU distance, orbital period,
+inclination, sidereal rotation) is generated into
+`src/Solar_System/OrbitLayoutBodies.generated.inc` and `#include`d by `OrbitLayout.cpp` — every
+field there is a verified passthrough of the catalog's `orbit` block (2026-09-08: confirmed
+byte-identical to the previous hand-written table for all 10 bodies).
+
+`src/Solar_System/BodyCatalog.generated.h` is generated from each body's `render` block
+(shader flags, ambient factor, texture LOD ids, display names, `earthRadiusScale`) for
+planets/dwarf planets with no unique shader needs. `Solar_System/CatalogBody` consumes a row
+directly, so a body whose only distinguishing features fit in that row needs **no C++ class at
+all** — Ceres and Vesta are built this way, from a catalog entry plus one
+`InitCatalogBody(sphereModel, body)` line. The rows for the eight planets and Pluto are not
+consumed yet: those still have hand-written classes (see the per-body
+`Render()`/`AdjustToParent()` in `src/Solar_System/<Body>/<Body>.cpp`) that hardcode the same
+values and can migrate one at a time. Moons are not in the catalog at all yet — their orbits (radius/period/tilt/spin) are
+hardcoded per-file (e.g. `Moon::AdjustToParent()`), a bigger migration than the primary bodies
+since there's no existing shared data source to generate from.
+
+**Known catalog/render inconsistency:** `orbit.axialTiltDegrees` feeds only the Three.js
+companion today and does **not** match the hand-tuned art tilts C++ applies via `Rotate()` for
+Uranus, Neptune, and Pluto (different sign, axis, or presence — e.g. Uranus is `-97.8°` in the
+catalog vs. `Rotate(81.2°, X axis)` in `Uranus.cpp`; Pluto has a catalog tilt but no `Rotate()`
+call at all in C++). `BodyCatalog.generated.h` deliberately excludes tilt rather than paper
+over this — reconciling which value is "correct" (and whether the Three.js companion or the
+main scene's art direction should change) needs a sighted decision, not a codegen pass.
+
+**Adding metadata for a new focus body:** edit `planets.catalog.json` (facts, orbit offset,
+system assets, initTag on allowlist, and a `render` block if it has no unique shader needs) and
+run codegen. A body with a `render` block then needs only two more lines — an
+`InitCatalogBody(…)` call in `StarSystemFactory.cpp` (desktop) and an initTag branch in
+`MakePlanetInitFunc` (staged web loading) — plus a `Body` enum value and a `BodyFromName`
+mapping. A body that needs its own atmosphere, rings, clouds, or fixed art tilt still wants a
+hand-written class; `CatalogBody` deliberately does not apply axial tilt (same reason the
+generated table excludes it).
 
 ---
 
@@ -411,9 +444,14 @@ std::string GetTexturePath(const std::string& lowRes, const std::string& highRes
 
 ## 10. Adding a new planet
 
+**Catalog-only bodies first:** if the world needs nothing but a diffuse/normal (optional
+specular) texture set and an orbit, skip this list — add a catalog entry with a `render` block,
+an `OrbitLayout::Body` value, a `BodyFromName` mapping, and one `InitCatalogBody()` call. See
+§2.1. The steps below are for bodies with their own atmosphere, rings, clouds, or art tilt.
+
 1. Create `src/Solar_System/<Planet>_System/<Planet>.h/.cpp` inheriting `Planet` (and `Satellite` subclasses for moons).
 2. Add includes to `SolarSystem.h`.
-3. Declare `Init<Planet>System()` in `Application.h`; implement in `Application.cpp` using `GetTexturePath("resource/textures_low/...", "resource/textures/...")`.
+3. Declare `Init<Planet>System()` in `Application.h`; implement in `StarSystemFactory.cpp` using `GetTexturePath("resource/textures_low/...", "resource/textures/...")`.
 4. **Desktop:** call from `InitStarSystem()` directly.
 5. **WASM:** add a `PlanetSystemManifest` entry with `assetPaths`, `optionalAssetPaths`, `proxyPosition`, `activationRadius`, and `initFunc`.
 6. **LOD (optional):** override `LoadHighResIfClose()` / `UnloadHighResIfFar()` on the planet class.

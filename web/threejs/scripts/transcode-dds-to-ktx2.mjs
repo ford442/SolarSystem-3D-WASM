@@ -24,29 +24,35 @@ function readOption(name) {
 
 const tier = readOption('--tier') === 'high' ? 'high' : 'low';
 
-const lowDefaults = [
-  'Mercury_Diffuse_Low.dds',
-  'Venus_Diffuse_Low.dds',
-  'Earth_Day_Diffuse_Low.dds',
-  'Mars_Diffuse_Low.dds',
-  'Jupiter_Diffuse_Low.dds',
-  'Io_Diffuse_Low.dds',
-  'Europa_Diffuse_Low.dds',
-  'Ganymede_Diffuse_Low.dds',
-  'Callisto_Diffuse_Low.dds',
-].map((name) => resolve(repositoryRoot, 'resource/textures_low', name));
+/** Phase 3 scene: Sun→Pluto, Galilean moons, Moon/Titan/Triton, plus both ring strips. */
+const companionTextures = [
+  'Mercury_Diffuse',
+  'Venus_Diffuse',
+  'Earth_Day_Diffuse',
+  'Mars_Diffuse',
+  'Jupiter_Diffuse',
+  'Saturn_Diffuse',
+  'Saturn_Rings',
+  'Uranus_Diffuse',
+  'Uranus_Rings',
+  'Neptune_Diffuse',
+  'Pluto_Diffuse',
+  'Moon_Diffuse',
+  'Io_Diffuse',
+  'Europa_Diffuse',
+  'Ganymede_Diffuse',
+  'Callisto_Diffuse',
+  'Titan_Diffuse',
+  'Triton_Diffuse',
+];
 
-const highDefaults = [
-  'Mercury_Diffuse.dds',
-  'Venus_Diffuse.dds',
-  'Earth_Day_Diffuse.dds',
-  'Mars_Diffuse.dds',
-  'Jupiter_Diffuse.dds',
-  'Io_Diffuse.dds',
-  'Europa_Diffuse.dds',
-  'Ganymede_Diffuse.dds',
-  'Callisto_Diffuse.dds',
-].map((name) => resolve(repositoryRoot, 'resource/textures', name));
+const lowDefaults = companionTextures.map((name) =>
+  resolve(repositoryRoot, 'resource/textures_low', `${name}_Low.dds`),
+);
+
+const highDefaults = companionTextures.map((name) =>
+  resolve(repositoryRoot, 'resource/textures', `${name}.dds`),
+);
 
 const skyboxFaces = [
   'PositiveX.dds',
@@ -90,6 +96,15 @@ const devHighPalette = {
   Europa_Diffuse: [0xc8, 0xd0, 0xdc],
   Ganymede_Diffuse: [0x9a, 0x8f, 0x82],
   Callisto_Diffuse: [0x6e, 0x65, 0x5c],
+  Saturn_Diffuse: [0xe6, 0xd3, 0xa3],
+  Saturn_Rings: [0xd9, 0xc9, 0xa2],
+  Uranus_Diffuse: [0x7e, 0xc8, 0xe3],
+  Uranus_Rings: [0x9f, 0xb6, 0xc6],
+  Neptune_Diffuse: [0x3f, 0x6f, 0xdb],
+  Pluto_Diffuse: [0xb5, 0x9a, 0x7a],
+  Moon_Diffuse: [0xb9, 0xb4, 0xab],
+  Titan_Diffuse: [0xd9, 0xa1, 0x5c],
+  Triton_Diffuse: [0xcf, 0xc7, 0xbd],
 };
 
 function fourCC(view, offset) {

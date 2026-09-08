@@ -7,7 +7,7 @@
 #include <cmath>
 
 #ifdef __EMSCRIPTEN__
-#include <emscripten.h>
+#include <emscripten/heap.h>
 #endif
 
 TextureLoadingQueue& TextureLoadingQueue::GetInstance() {
@@ -29,7 +29,7 @@ const char* CategoryName(TextureLoadCategory category) {
 
 #ifdef __EMSCRIPTEN__
 size_t GetWasmHeapBytes() {
-    return static_cast<size_t>(EM_ASM_INT({ return HEAP8.length; }));
+    return emscripten_get_heap_size();
 }
 
 constexpr size_t kMemoryPressureBytes = static_cast<size_t>(768) * 1024 * 1024;

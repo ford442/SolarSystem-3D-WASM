@@ -1,5 +1,6 @@
 import type { KTX2Loader } from 'three/addons/loaders/KTX2Loader.js';
 import * as THREE from 'three';
+import type { AssetProgressSink } from './loadingOverlay';
 
 /** Match C++ `Planet::_lodThreshold` upgrade distance. */
 export const LOD_UPGRADE_DISTANCE = 50;
@@ -43,13 +44,21 @@ export class PlanetTextureLodManager {
   private inFlightPlanetId: string | null = null;
   private readonly loader: KTX2Loader;
   private readonly onTierChange?: (planetId: string, tier: TextureTier) => void;
+  private readonly progress?: AssetProgressSink;
 
   constructor(
     loader: KTX2Loader,
     onTierChange?: (planetId: string, tier: TextureTier) => void,
+    progress?: AssetProgressSink,
   ) {
     this.loader = loader;
     this.onTierChange = onTierChange;
+    this.progress = progress;
+  }
+
+  /** Progress key for a planet/tier pair; also used to seed the loading overlay. */
+  static progressKey(planetId: string, tier: TextureTier): string {
+    return `${planetId}:${tier}`;
   }
 
   register(target: PlanetTextureLodTarget): void {
@@ -123,6 +132,8 @@ export class PlanetTextureLodManager {
 
   private async loadLowTexture(target: PlanetTextureLodTarget): Promise<void> {
     const state = this.mustGetState(target.id);
+    const progressKey = PlanetTextureLodManager.progressKey(target.id, 'low');
+    this.progress?.start(progressKey, `${target.name} (low)`);
 
     try {
       const texture = await this.loader.loadAsync(target.lowUrl);
@@ -132,8 +143,10 @@ export class PlanetTextureLodManager {
         this.setActiveTexture(target, state, texture, 'low');
       }
       console.info(`[texture-lod] ${target.name} low KTX2 ready`, target.lowUrl);
+      this.progress?.settle(progressKey, true);
     } catch (error) {
       console.warn(`[texture-lod] ${target.name} low KTX2 unavailable; keeping color stub.`, target.lowUrl, error);
+      this.progress?.settle(progressKey, false);
     }
   }
 
@@ -141,9 +154,12 @@ export class PlanetTextureLodManager {
     const state = this.mustGetState(target.id);
     const generation = ++state.loadGeneration;
     this.inFlightPlanetId = target.id;
+    const progressKey = PlanetTextureLodManager.progressKey(target.id, 'high');
+    this.progress?.start(progressKey, `${target.name} (high)`);
 
     void this.loader.loadAsync(target.highUrl)
       .then((texture) => {
+        this.progress?.settle(progressKey, true);
         if (state.loadGeneration !== generation) {
           texture.dispose();
           return;
@@ -169,6 +185,7 @@ export class PlanetTextureLodManager {
         console.info(`[texture-lod] ${target.name} upgraded to high KTX2`, target.highUrl);
       })
       .catch((error: unknown) => {
+        this.progress?.settle(progressKey, false);
         if (state.loadGeneration === generation) {
           state.loadGeneration = 0;
           if (this.inFlightPlanetId === target.id) {

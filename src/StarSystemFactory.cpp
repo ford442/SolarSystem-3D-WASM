@@ -27,7 +27,40 @@ void Application::InitStarSystem() {
     InitUranusSystem(*_sphereModel);
     InitNeptuneSystem(*_sphereModel);
     InitPlutoSystem(*_sphereModel);
+    InitCatalogBody(*_sphereModel, OrbitLayout::Body::Ceres);
+    InitCatalogBody(*_sphereModel, OrbitLayout::Body::Vesta);
 #endif
+}
+
+void Application::InitCatalogBody(const MeshHolder& sphereModel, OrbitLayout::Body body) {
+    const BodyCatalog::Entry* entry = BodyCatalog::FindByIndex(static_cast<int>(body));
+    if (!entry) {
+        std::cerr << "[CatalogBody] No render descriptor for focus index "
+                  << static_cast<int>(body) << " — check planets.catalog.json" << std::endl;
+        return;
+    }
+
+    const TexturePaths::Paths diffuse = TexturePaths::ForTextureId(entry->lod.diffuse);
+    const TexturePaths::Paths normal = TexturePaths::ForTextureId(entry->lod.normal);
+    const TexturePaths::Paths specular =
+        TexturePaths::ForTextureId(entry->lod.specular ? entry->lod.specular : "");
+
+    PlanetInfo info(sphereModel, entry->earthRadiusScale, *_mainPlanetShader,
+                    {TextureImage2D(GetTexturePath(diffuse.low, diffuse.high))},
+                    TextureImage2D(GetTexturePath(normal.low, normal.high)),
+                    entry->displayNameEn, entry->displayNameRu,
+                    entry->lod.specular ? TextureImage2D(GetTexturePath(specular.low, specular.high))
+                                        : TextureImage2D());
+    shared_ptr<Planet> planet = make_shared<CatalogBody>(info, _sun, *entry);
+    planet->SetMagneticField(MagneticFieldCatalog::IntrinsicParamsForBody(body));
+
+    const glm::mat4 lightProjection = glm::ortho(-planet->GetRadius() * 3.0f, planet->GetRadius() * 3.0f, -planet->GetRadius() * 3.0f, planet->GetRadius() * 3.0f, _camera.GetNear(), _camera.GetFar());
+    const glm::mat4 lightView = glm::lookAt(_sun->GetPosition(), planet->GetPosition() - _sun->GetPosition(), glm::vec3(0.0, 1.0, 0.0));
+
+    RenderableSceneComponent component;
+    component.lightSpaceMatrix = lightProjection * lightView;
+    component.planet = move(planet);
+    _renderableSceneComponents.push_back(move(component));
 }
 
 void Application::InitMercury(const MeshHolder& sphereModel) {

@@ -27,6 +27,10 @@ export interface CachedCwrapExports {
     getNearestPlanetIndex: () => number;
     getFocusedPlanetIndex: () => number;
     getPlanetSceneDistance: (...args: number[]) => number;
+    getNextConjunctionJulianDate: () => number;
+    getNextConjunctionBodyA: () => number;
+    getNextConjunctionBodyB: () => number;
+    getNextConjunctionSeparationDeg: () => number;
     setOrbitLines: (...args: number[]) => void;
     getOrbitLines: () => number;
     setMagneticFields: (...args: number[]) => void;
@@ -73,6 +77,10 @@ export function createCachedCwrapExports(cwrap: SolarSystemCwrap): CachedCwrapEx
     getNearestPlanetIndex: cwrap('GetNearestPlanetIndex', 'number', []) as () => number,
     getFocusedPlanetIndex: cwrap('GetFocusedPlanetIndex', 'number', []) as () => number,
     getPlanetSceneDistance: cwrap('GetPlanetSceneDistance', 'number', ['number']) as (...args: number[]) => number,
+    getNextConjunctionJulianDate: cwrap('GetNextConjunctionJulianDate', 'number', []) as () => number,
+    getNextConjunctionBodyA: cwrap('GetNextConjunctionBodyA', 'number', []) as () => number,
+    getNextConjunctionBodyB: cwrap('GetNextConjunctionBodyB', 'number', []) as () => number,
+    getNextConjunctionSeparationDeg: cwrap('GetNextConjunctionSeparationDeg', 'number', []) as () => number,
     setOrbitLines: cwrap('SetOrbitLines', null, ['number']) as (...args: number[]) => void,
     getOrbitLines: cwrap('GetOrbitLines', 'number', []) as () => number,
     setMagneticFields: cwrap('SetMagneticFields', null, ['number']) as (...args: number[]) => void,
@@ -93,4 +101,4 @@ export function createCachedCwrapExports(cwrap: SolarSystemCwrap): CachedCwrapEx
     };
 }
 
-export const EXPORT_COUNT = 42;
+export const EXPORT_COUNT = 46;

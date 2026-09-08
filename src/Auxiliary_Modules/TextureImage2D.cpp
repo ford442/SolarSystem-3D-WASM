@@ -1,5 +1,7 @@
 #include "TextureImage2D.h"
 #include "WebResourceFetcher.h"
+#include "GlCapabilities.h"
+#include "../SimState.h"
 #include <cstdint>
 #include <algorithm>
 #include <stdexcept>
@@ -65,6 +67,11 @@ void TextureImage2D::LoadTextureFromFile(const std::string& path, GLint wrapPara
         _height = image.get_height();
 #ifdef __EMSCRIPTEN__
         ValidateTextureDimensions(path, _width, _height);
+        if (isCompressed && !GetGlCapabilities().s3tcCompressedTextures) {
+            throw std::runtime_error(
+                "DXT/S3TC compressed textures are not supported by this GPU/browser "
+                "(WEBGL_compressed_texture_s3tc missing) for " + path);
+        }
 #endif
         image.upload_texture2D();
         // hasEmbedded reflects what was *actually* uploaded (MAX_LEVEL>0).
@@ -151,7 +158,13 @@ void TextureImage2D::LoadTextureFromFile(const std::string& path, GLint wrapPara
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, wrapParam);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, minFilter);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, magFilter);
-#ifndef __EMSCRIPTEN__
+#ifdef __EMSCRIPTEN__
+    const auto& glCaps = GetGlCapabilities();
+    if (glCaps.anisotropicFiltering) {
+        const float cap = gSimState->isMobileWeb ? 4.0f : 8.0f;
+        glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_MAX_ANISOTROPY_EXT, std::min(glCaps.maxAnisotropy, cap));
+    }
+#else
     glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_MAX_ANISOTROPY_EXT, 16);
 #endif
 

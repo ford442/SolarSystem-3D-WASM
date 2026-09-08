@@ -3,6 +3,7 @@
 #include "ApplicationTypes.h"
 #include "SimState.h"
 #include "Auxiliary_Modules/AuxiliaryModules.h"
+#include "Auxiliary_Modules/SkyEvents.h"
 #include "PlanetSystemManifest.h"
 #include "Solar_System/AsteroidField.h"
 #include "Solar_System/SolarSystem.h"
@@ -14,6 +15,7 @@
 
 #ifdef __EMSCRIPTEN__
 #include <emscripten.h>
+#include <emscripten/html5.h>
 #endif
 
 #ifdef SOLARSYSTEM_USE_SDL_MIXER
@@ -42,6 +44,12 @@ public:
     void ApplyOrbitScaleMode(int mode);
     void FocusPlanetByIndex(int idx);
     int GetFocusedPlanetIndex() const;
+    /**
+     * Next inner-planet conjunction at the current simulation epoch. Cached: the search costs
+     * a couple of milliseconds, so it only re-runs when the event passes or time is scrubbed
+     * backwards, not every frame.
+     */
+    const SkyEvents::Conjunction& GetNextConjunction() const;
     int GetNearestPlanetIndexForJs() const;
     void SetMusicVolume(float volume);
     float GetMusicVolume() const;
@@ -139,6 +147,11 @@ private:
     std::vector<RenderableSceneComponent> _renderableSceneComponents;
     std::vector<std::string> _backgroundSongPaths;
     
+    // Next-conjunction hint cache — see GetNextConjunction().
+    mutable SkyEvents::Conjunction _nextConjunction;
+    mutable double _nextConjunctionComputedJd = 0.0;
+    mutable bool _nextConjunctionCached = false;
+
     // Pre-allocated containers for RenderHints to eliminate per-frame allocations
     mutable std::deque<wchar_t> _distanceInfoCache;
     mutable std::deque<std::wstring> _fpsHintCache;
@@ -167,6 +180,8 @@ private:
     void InitUranusSystem(const MeshHolder& sphereModel);
     void InitNeptuneSystem(const MeshHolder& sphereModel);
     void InitPlutoSystem(const MeshHolder& sphereModel);
+    /** Build a body straight from its BodyCatalog row (Ceres, Vesta) — no per-body class. */
+    void InitCatalogBody(const MeshHolder& sphereModel, OrbitLayout::Body body);
     void InitSongList();
     void Dispose();
     void UpdateLoadingProgress(); // Update JavaScript loading progress bar
@@ -211,7 +226,11 @@ private:
     void ProcessInput(GLFWwindow* window);
     float CalculateSpaceObjectDistance(const SpaceObject* spaceObject) const;
     glm::vec3 CurrentFpsColor() const;
+    void HandleResize(int width, int height);
     static void FramebufferSizeCallback(GLFWwindow* window, int width, int height);
+#ifdef __EMSCRIPTEN__
+    static EM_BOOL WebWindowResizeCallback(int eventType, const EmscriptenUiEvent* uiEvent, void* userData);
+#endif
     static void MouseCallback(GLFWwindow* window, double xPos, double yPos);
     static void ScrollCallback(GLFWwindow* window, double xoffset, double yOffset);
     static void KeyCallback(GLFWwindow* window, int key, int scancode, int action, int mods);

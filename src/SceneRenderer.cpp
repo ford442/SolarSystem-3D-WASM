@@ -397,6 +397,13 @@ void Application::RenderHints() const {
         << L'-' << std::setw(2) << day;
     timeRunHint.emplace_back(wss.str());
 
+    // Sky event driven by the ephemeris, not a baked animation — see SkyEvents.h.
+    deque<wstring> conjunctionHint;
+    if (const SkyEvents::Conjunction& next = GetNextConjunction(); next.valid) {
+        const std::string line = SkyEvents::Format(next);
+        conjunctionHint.emplace_back(line.begin(), line.end()); // ASCII only, see SkyEvents
+    }
+
     deque<wstring> planetStarHint;
     planetStarHint.emplace_back(L"Planet/Star distances(Z): ");
     planetStarHint.emplace_back((_isRenderPlanetStarDistances) ? L"On" : L"Off");
@@ -453,6 +460,9 @@ void Application::RenderHints() const {
     magneticHint.emplace_back(_magneticFieldsEnabled ? L"On" : L"Off");
 
     _textRenderer->ReverseRender(*_mainTextShader, _tmpStringCache, 0.99 * _displayWidth, 0.95 * _displayHeight, 0.35, textColor);
+    if (!conjunctionHint.empty()) {
+        _textRenderer->ReverseRender(*_mainTextShader, conjunctionHint, 0.99 * _displayWidth, 0.925 * _displayHeight, 0.35, textColor);
+    }
     _textRenderer->Render(*_mainTextShader, _fpsHintCache, 0.01 * _displayWidth, 0.95 * _displayHeight, 0.35, CurrentFpsColor());
     _textRenderer->Render(*_mainTextShader, _gpuHintCache, 0.01 * _displayWidth, 0.925 * _displayHeight, 0.35, textColor);
     _textRenderer->Render(*_mainTextShader, _soundVolumeHintCache, 0.01 * _displayWidth, 0.9 * _displayHeight, 0.35, textColor);

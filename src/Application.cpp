@@ -1,29 +1,23 @@
+// Application lifecycle and the per-frame loop. The rest of Application's members live
+// alongside their subject: PlatformWindow.cpp (window/GL bring-up, resize, teardown),
+// InputHandler.cpp, AudioPlayer.cpp, RenderSettings.cpp (quality presets + LOD),
+// SceneRenderer.cpp / SceneOverlayRenderer.cpp (drawing), StarSystemFactory.cpp and
+// PlanetSystemLoader.cpp (scene construction), XrSession.cpp (WebXR).
 #include "Application.h"
 #include "JsBridge.h"
 #include "QualitySettings.h"
 #include "ResourceManifest.h"
 #include "SimState.h"
 #include "WasmExports.h"
-#include "Auxiliary_Modules/WebResourceFetcher.h"
 #include "Auxiliary_Modules/TextureLoadingQueue.h"
 #include "Solar_System/OrbitLayout.h"
-#include "Auxiliary_Modules/Ephemeris.h"
-#include <SDL_image.h>
 #include <algorithm>
-#include <array>
-#include <cstring>
-#include <fstream>
-#include <iomanip>
+#include <chrono>
+#include <cmath>
 #include <iostream>
-#include <random>
-#include <glm/gtc/type_ptr.hpp>
+#include <thread>
 
 using namespace std;
-
-// Error Callback
-void glfwErrorCallback(int error, const char* description) {
-    std::cerr << "GLFW Error (" << error << "): " << description << std::endl;
-}
 
 Application::Application() : _fpsHandler(240) {
     gSimState = &_simState;
@@ -33,131 +27,12 @@ Application::Application() : _fpsHandler(240) {
     InitScene();
 }
 
-void Application::InitSystems() {
-    ios_base::sync_with_stdio(false);
-    cin.tie(nullptr);
-
-    OrbitLayout::SetJulianDate(Ephemeris::JulianDateNowUtc());
-
-    glfwSetErrorCallback(glfwErrorCallback);
-
-    if (!glfwInit()) {
-        throw runtime_error("Failed to initialize GLFW");
+Application::~Application() {
+    if (GetActiveApplication() == this) {
+        SetActiveApplication(nullptr);
+        ResetSimStateToFallback();
     }
-
-#ifdef __EMSCRIPTEN__
-    gSimState->isMobileWeb = ReadIsMobileWeb();
-    gSimState->qualityPreset = ReadInitialQualityPreset();
-    const auto qualitySettings = GetQualitySettings(gSimState->qualityPreset, gSimState->isMobileWeb);
-    glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 3);
-    glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 0);
-    glfwWindowHint(GLFW_CLIENT_API, GLFW_OPENGL_ES_API);
-    glfwWindowHint(GLFW_RESIZABLE, GLFW_FALSE);
-    glfwWindowHint(GLFW_SAMPLES, qualitySettings.requestedMsaaSamples);
-#else
-    glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 4);
-    glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 6);
-    glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
-    glfwWindowHint(GLFW_SAMPLES, 4);
-#endif
-
-    glfwWindowHint(GLFW_VISIBLE, GLFW_FALSE);
-
-    const GLFWvidmode* mode = glfwGetVideoMode(glfwGetPrimaryMonitor());
-    if (mode) {
-        _displayWidth = mode->width;
-        _displayHeight = mode->height;
-    } else {
-        _displayWidth = 1280;
-        _displayHeight = 720;
-    }
-    if (_displayWidth == 0) _displayWidth = 800;
-    if (_displayHeight == 0) _displayHeight = 600;
-
-    _mainWindow = glfwCreateWindow(_displayWidth, _displayHeight, "SolarSystem", nullptr, nullptr);
-
-    if (_mainWindow == nullptr) {
-        glfwTerminate();
-        throw runtime_error("Failed to create GLFW window");
-    }
-
-#ifdef __EMSCRIPTEN__
-    glfwSetInputMode(_mainWindow, GLFW_CURSOR, GLFW_CURSOR_NORMAL);
-    glfwSetMouseButtonCallback(_mainWindow, [](GLFWwindow* window, int button, int action, int mods) {
-        if (button == GLFW_MOUSE_BUTTON_LEFT && action == GLFW_PRESS) {
-            glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
-        }
-    });
-#else
-    glfwSetInputMode(_mainWindow, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
-#endif
-
-    glfwMakeContextCurrent(_mainWindow);
-
-#ifdef __EMSCRIPTEN__
-    GLint actualSamples = 0;
-    glGetIntegerv(GL_SAMPLES, &actualSamples);
-    std::cout << "[Quality] Requested " << qualitySettings.requestedMsaaSamples
-              << "x MSAA, context provides " << actualSamples << " samples" << std::endl;
-#endif
-
-    glfwSetWindowUserPointer(_mainWindow, this);
-    glfwSetFramebufferSizeCallback(_mainWindow, FramebufferSizeCallback);
-    glfwSetCursorPosCallback(_mainWindow, MouseCallback);
-    glfwSetScrollCallback(_mainWindow, ScrollCallback);
-    glfwSetKeyCallback(_mainWindow, KeyCallback);
-
-#ifndef __EMSCRIPTEN__
-    glewExperimental = true;
-    glewInit();
-#endif
-
-    FT_Init_FreeType(&_ft);
-
-#ifndef __EMSCRIPTEN__
-    if (SDL_Init(SDL_INIT_EVERYTHING)) {
-        Dispose();
-        throw runtime_error("Failed to init SDL");
-    }
-#endif
-
-#ifdef SOLARSYSTEM_USE_SDL_MIXER
-    if (Mix_OpenAudio(44100, MIX_DEFAULT_FORMAT, 2, 2048) < 0) {
-        std::cerr << "[Audio] Failed to init SDL_mixer: " << Mix_GetError() << std::endl;
-        _mixerInitialized = false;
-    } else {
-        Mix_AllocateChannels(16);
-        _mixerInitialized = true;
-        std::cout << "[Audio] SDL_mixer initialized" << std::endl;
-    }
-#else
-    _soundEngine = createIrrKlangDevice(ESOD_AUTO_DETECT, ESEO_MULTI_THREADED | ESEO_LOAD_PLUGINS);
-    if (!_soundEngine) {
-        throw runtime_error("Failed to init sound engine");
-    }
-    _soundEngine->setSoundVolume(0.3);
-#endif
-
-    if (!IMG_Init(IMG_INIT_JPG | IMG_INIT_PNG)) {
-        Dispose();
-        std::string msg = "Failed to init SDL_Image: ";
-        msg += IMG_GetError();
-        throw runtime_error(msg);
-    }
-
-    glEnable(GL_DEPTH_TEST);
-#ifndef __EMSCRIPTEN__
-    glEnable(GL_MULTISAMPLE);
-#endif
-    glEnable(GL_CULL_FACE);
-
-#ifndef __EMSCRIPTEN__
-    glEnable(GL_POLYGON_SMOOTH);
-    LoadWindowIcon();
-#endif
-
-    glCullFace(GL_BACK);
-    DisplaySystemInformation();
+    Dispose();
 }
 
 void Application::Exec() {
@@ -184,7 +59,7 @@ void Application::RunOneFrame() {
         }
         glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
         glClear(GL_COLOR_BUFFER_BIT);
-        
+
         // Update progress bar
         UpdateLoadingProgress();
 
@@ -362,521 +237,8 @@ void Application::InitSceneObjects() {
     StartPlayBackgroundMusic();
 }
 
-
-void Application::DisplaySystemInformation() const {
-    cout << "GPU Supplier: " << glGetString(GL_VENDOR) << endl;
-    cout << "GPU: " << glGetString(GL_RENDERER) << endl;
-
-    GLint majorVersion, minorVersion;
-    glGetIntegerv(GL_MAJOR_VERSION, &majorVersion);
-    glGetIntegerv(GL_MINOR_VERSION, &minorVersion);
-    cout << "OpenGL version: " << majorVersion << '.' << minorVersion << endl;
-
-#ifndef __EMSCRIPTEN__
-    GLint totalMemoryKb;
-    glGetIntegerv(GL_GPU_MEMORY_INFO_TOTAL_AVAILABLE_MEMORY_NVX, &totalMemoryKb);
-
-    GLint currentMemoryKb;
-    glGetIntegerv(GL_GPU_MEMORY_INFO_CURRENT_AVAILABLE_VIDMEM_NVX, &currentMemoryKb);
-    cout << "Total GPU Memory: " << totalMemoryKb << " kb\nFree GPU Memory: " << currentMemoryKb << " kb" << endl;
-#endif
-
-    GLint maxTextureSize;
-    glGetIntegerv(GL_MAX_TEXTURE_SIZE, &maxTextureSize);
-    cout << "Max texture size in the system: "<< maxTextureSize << "x" << maxTextureSize << endl;
-    cout << "Driver: " << glGetString(GL_VERSION) << endl;
-}
-
-void Application::LoadWindowIcon() const {
-    constexpr auto execIconPath = "resource/icons/solarsystem-logo.png";
-    SDL_Surface* windowIcon = IMG_Load(execIconPath);
-    if (windowIcon == nullptr) {
-        std::cerr << "WARNING: Cannot load window icon " << execIconPath
-                  << " (" << IMG_GetError() << ")" << std::endl;
-        return;
-    }
-    if (windowIcon->w > 256 || windowIcon->h > 256) {
-        std::cerr << "WARNING: Skipping oversized window icon ("
-                  << windowIcon->w << "x" << windowIcon->h << ")" << std::endl;
-        SDL_FreeSurface(windowIcon);
-        return;
-    }
-    GLFWimage image;
-    image.pixels = static_cast<unsigned char*>(windowIcon->pixels);
-    image.width = windowIcon->w;
-    image.height = windowIcon->h;
-    glfwSetWindowIcon(_mainWindow, 1, &image);
-    SDL_FreeSurface(windowIcon);
-}
-
-void Application::ProcessInput(GLFWwindow* window) {
-    static float movementSpeed = _camera.GetMovementSpeed();
-
-    if (_isFirstMouse) {
-        _lastX = 0;
-        _lastY = 0;
-        _isFirstMouse = false;
-    }
-
-    float xPos = _lastX, yPos = _lastY;
-    float shiftIncrease = 1.0f, yScroll = 0;
-
-    if (glfwGetKey(window, GLFW_KEY_LEFT_SHIFT) == GLFW_PRESS) {
-        shiftIncrease = 4 * _camera.GetMovementSpeed();
-    }
-    if (glfwGetKey(window, GLFW_KEY_ESCAPE) == GLFW_PRESS) {
-        glfwSetWindowShouldClose(window, true);
-    }
-    if (glfwGetKey(window, GLFW_KEY_W) == GLFW_PRESS) {
-        _camera.ProcessKeyboard(CameraVector::FORWARD, _deltaTime * shiftIncrease);
-    }
-    if (glfwGetKey(window, GLFW_KEY_S) == GLFW_PRESS) {
-        _camera.ProcessKeyboard(CameraVector::BACKWARD, _deltaTime * shiftIncrease);
-    }
-    if (glfwGetKey(window, GLFW_KEY_A) == GLFW_PRESS) {
-        _camera.ProcessKeyboard(CameraVector::LEFT, _deltaTime * shiftIncrease);
-    }
-    if (glfwGetKey(window, GLFW_KEY_D) == GLFW_PRESS) {
-        _camera.ProcessKeyboard(CameraVector::RIGHT, _deltaTime * shiftIncrease);
-    }
-    if (glfwGetKey(window, GLFW_KEY_SPACE) == GLFW_PRESS) {
-        _camera.ProcessKeyboard(CameraVector::WORLD_UP, _deltaTime * shiftIncrease);
-    }
-    if (glfwGetKey(window, GLFW_KEY_C) == GLFW_PRESS) {
-        _camera.ProcessKeyboard(CameraVector::WORLD_DOWN, _deltaTime * shiftIncrease);
-    }
-    
-    if (glfwGetKey(window, GLFW_KEY_PAGE_UP) == GLFW_PRESS) {
-#ifdef SOLARSYSTEM_USE_SDL_MIXER
-        SetMusicVolume(GetMusicVolume() + 0.05f);
-#else
-        _soundEngine->setSoundVolume(clamp(_soundEngine->getSoundVolume() + 0.01, 0.0, 1.0));
-#endif
-        NotifySettingsChanged("musicVolume");
-    }
-    if (glfwGetKey(window, GLFW_KEY_PAGE_DOWN) == GLFW_PRESS) {
-#ifdef SOLARSYSTEM_USE_SDL_MIXER
-        SetMusicVolume(GetMusicVolume() - 0.05f);
-#else
-        _soundEngine->setSoundVolume(clamp(_soundEngine->getSoundVolume() - 0.01, 0.0, 1.0));
-#endif
-        NotifySettingsChanged("musicVolume");
-    }
-    if (glfwGetKey(window, GLFW_KEY_1) == GLFW_PRESS) {
-        movementSpeed = glm::clamp(movementSpeed + 0.01f, 0.0f, 150.f);
-        _camera.SetMovementSpeed(movementSpeed);
-    }
-    if (glfwGetKey(window, GLFW_KEY_2) == GLFW_PRESS) {
-        movementSpeed = glm::clamp(movementSpeed - 0.01f, 0.0f, 150.f);
-        _camera.SetMovementSpeed(movementSpeed);
-    }
-    if (glfwGetKey(window, GLFW_KEY_3) == GLFW_PRESS) {
-        _starExposure = glm::clamp(_starExposure + 0.1f, 0.0f, 20.f);
-    }
-    if (glfwGetKey(window, GLFW_KEY_4) == GLFW_PRESS) {
-        _starExposure = glm::clamp(_starExposure - 0.1f, 0.0f, 20.f);
-    }
-    if (glfwGetKey(window, GLFW_KEY_5) == GLFW_PRESS) {
-        _starGamma = glm::clamp(_starGamma + 0.01f, 0.0f, 2.f);
-    }
-    if (glfwGetKey(window, GLFW_KEY_6) == GLFW_PRESS) {
-        _starGamma = glm::clamp(_starGamma - 0.01f, 0.0f, 2.f);
-    }
-    if (glfwGetKey(window, GLFW_KEY_7) == GLFW_PRESS) {
-        _starTemperatureInKelvin = glm::clamp(_starTemperatureInKelvin + 15.0f, 800.f, 30000.f);
-    }
-    if (glfwGetKey(window, GLFW_KEY_8) == GLFW_PRESS) {
-        _starTemperatureInKelvin = glm::clamp(_starTemperatureInKelvin - 15.0f, 800.f, 30000.f);
-    }
-    if (glfwGetKey(window, GLFW_KEY_LEFT) == GLFW_PRESS) {
-        xPos -= 1;
-        float xOffset = xPos - _lastX;
-        _lastX = xPos;
-        _camera.ProcessMouseMovement(xOffset, 0);
-    }
-    if (glfwGetKey(window, GLFW_KEY_RIGHT) == GLFW_PRESS) {
-        xPos += 1;
-        float xOffset = xPos - _lastX;
-        _lastX = xPos;
-        _camera.ProcessMouseMovement(xOffset, 0);
-    }
-    if (glfwGetKey(window, GLFW_KEY_UP) == GLFW_PRESS) {
-        yPos -= 1;
-        float yOffset = _lastY - yPos; 
-        _lastY = yPos;
-        _camera.ProcessMouseMovement(0, yOffset);
-    }
-    if (glfwGetKey(window, GLFW_KEY_DOWN) == GLFW_PRESS) {
-        yPos += 1;
-        float yOffset = _lastY - yPos; 
-        _lastY = yPos;
-        _camera.ProcessMouseMovement(0, yOffset);
-    }
-    if (glfwGetKey(window, GLFW_KEY_V) == GLFW_PRESS) {
-        yScroll += 0.16f;
-        _camera.ProcessMouseScroll(yScroll);
-    }
-    if (glfwGetKey(window, GLFW_KEY_B) == GLFW_PRESS) {
-        yScroll -= 0.16f;
-        _camera.ProcessMouseScroll(yScroll);
-    }
-
-#ifdef __EMSCRIPTEN__
-    const float touchForward = GetTouchForward();
-    const float touchRight = GetTouchRight();
-    const float touchVertical = GetTouchVertical();
-    if (touchForward > 0.01f) {
-        _camera.ProcessKeyboard(CameraVector::FORWARD, static_cast<float>(_deltaTime) * touchForward);
-    } else if (touchForward < -0.01f) {
-        _camera.ProcessKeyboard(CameraVector::BACKWARD, static_cast<float>(_deltaTime) * -touchForward);
-    }
-    if (touchRight > 0.01f) {
-        _camera.ProcessKeyboard(CameraVector::RIGHT, static_cast<float>(_deltaTime) * touchRight);
-    } else if (touchRight < -0.01f) {
-        _camera.ProcessKeyboard(CameraVector::LEFT, static_cast<float>(_deltaTime) * -touchRight);
-    }
-    if (touchVertical > 0.01f) {
-        _camera.ProcessKeyboard(CameraVector::WORLD_UP, static_cast<float>(_deltaTime) * touchVertical);
-    } else if (touchVertical < -0.01f) {
-        _camera.ProcessKeyboard(CameraVector::WORLD_DOWN, static_cast<float>(_deltaTime) * -touchVertical);
-    }
-#endif
-
-    glfwSetCursorPos(window, _lastX, _lastY);
-}
-
-void Application::FramebufferSizeCallback(GLFWwindow*, int width, int height) {
-    glViewport(0, 0, width, height);
-}
-
-void Application::MouseCallback(GLFWwindow* window, double xPos, double yPos) {
-    auto* app = static_cast<Application*>(glfwGetWindowUserPointer(window));
-    if (!app) return;
-
-    if (app->_isFirstMouse) {
-        app->_lastX = static_cast<float>(xPos);
-        app->_lastY = static_cast<float>(yPos);
-        app->_isFirstMouse = false;
-    }
-
-    float xOffset = static_cast<float>(xPos) - app->_lastX;
-    float yOffset = app->_lastY - static_cast<float>(yPos);
-
-    app->_lastX = static_cast<float>(xPos);
-    app->_lastY = static_cast<float>(yPos);
-
-    app->_camera.ProcessMouseMovement(xOffset, yOffset);
-}
-
-void Application::ScrollCallback(GLFWwindow* window, double, double yOffset) {
-    auto* app = static_cast<Application*>(glfwGetWindowUserPointer(window));
-    if (!app) return;
-    app->_camera.ProcessMouseScroll(static_cast<float>(yOffset));
-}
-
-void Application::KeyCallback(GLFWwindow* window, int key, int, int action, int) {
-    auto* app = static_cast<Application*>(glfwGetWindowUserPointer(window));
-    if (!app) return;
-
-    if (key == GLFW_KEY_Z && action == GLFW_PRESS) {
-        app->_isRenderPlanetStarDistances = !app->_isRenderPlanetStarDistances;
-    }
-    if (key == GLFW_KEY_X && action == GLFW_PRESS) {
-        app->_isRenderSatelliteDistances = !app->_isRenderSatelliteDistances;
-    }
-    if (key == GLFW_KEY_TAB && action == GLFW_PRESS) {
-        app->_isRenderHints = !app->_isRenderHints;
-    }
-    if (key == GLFW_KEY_F1 && action == GLFW_PRESS) {
-        app->_isVertSyncEnabled = !app->_isVertSyncEnabled;
-        VertSync(app->_isVertSyncEnabled);
-    }
-
-    if (action == GLFW_PRESS) {
-        // Planet focus presets (smooth transition to live orbital positions)
-        if (key == GLFW_KEY_F2) app->FocusPlanetByIndex(1);  // Mercury
-        if (key == GLFW_KEY_F3) app->FocusPlanetByIndex(2);  // Venus
-        if (key == GLFW_KEY_F4) app->FocusPlanetByIndex(3);  // Earth
-        if (key == GLFW_KEY_F5) app->FocusPlanetByIndex(4);  // Mars
-        if (key == GLFW_KEY_F6) app->FocusPlanetByIndex(5);  // Jupiter
-        if (key == GLFW_KEY_F7) app->FocusPlanetByIndex(6);  // Saturn
-        if (key == GLFW_KEY_F8) app->FocusPlanetByIndex(7);  // Uranus
-        if (key == GLFW_KEY_F9) app->FocusPlanetByIndex(8);  // Neptune
-        if (key == GLFW_KEY_F10) app->FocusPlanetByIndex(9); // Pluto
-        if (key == GLFW_KEY_F11) app->FocusPlanetByIndex(0); // Sun
-
-        // Time scale / pause / step
-        if (key == GLFW_KEY_EQUAL || key == GLFW_KEY_KP_ADD) {
-            gSimState->timeScale = glm::clamp(gSimState->timeScale * 2.0f, 0.01f, 10000.0f);
-            NotifySettingsChanged("timeScale");
-        }
-        if (key == GLFW_KEY_MINUS || key == GLFW_KEY_KP_SUBTRACT) {
-            gSimState->timeScale = glm::clamp(gSimState->timeScale / 2.0f, 0.01f, 10000.0f);
-            NotifySettingsChanged("timeScale");
-        }
-        if (key == GLFW_KEY_P) {
-            gSimState->timePaused = !gSimState->timePaused;
-            NotifySettingsChanged("paused");
-        }
-        if (key == GLFW_KEY_M) {
-            app->SetMagneticFieldsEnabled(!app->GetMagneticFieldsEnabled());
-            NotifySettingsChanged("magneticFields");
-            NotifySettingsChanged("magneticFieldMode");
-        }
-        if (key == GLFW_KEY_PERIOD) {
-            gSimState->advanceStep = true;
-        }
-    }
-}
-
-bool Application::WGLExtensionSupported(const char* extensionName) {
-#if defined(__EMSCRIPTEN__) || !defined(_WIN32)
-    (void)extensionName;
-    return false;
-#else
-    PFNWGLGETEXTENSIONSSTRINGEXTPROC wglGetExtensionsStringEXT = nullptr;
-    wglGetExtensionsStringEXT = (PFNWGLGETEXTENSIONSSTRINGEXTPROC)wglGetProcAddress("wglGetExtensionsStringEXT");
-    return strstr(wglGetExtensionsStringEXT(), extensionName) != nullptr;
-#endif
-}
-
-void Application::VertSync(bool enable) {
-#if defined(__EMSCRIPTEN__) || !defined(_WIN32)
-    glfwSwapInterval(enable ? 1 : 0);
-#else
-    PFNWGLSWAPINTERVALEXTPROC wglSwapIntervalEXT = nullptr;
-    PFNWGLGETSWAPINTERVALEXTPROC wglGetSwapIntervalEXT = nullptr;
-
-    if (WGLExtensionSupported("WGL_EXT_swap_control")) {
-        wglSwapIntervalEXT = (PFNWGLSWAPINTERVALEXTPROC)wglGetProcAddress("wglSwapIntervalEXT");
-        wglGetSwapIntervalEXT = (PFNWGLGETSWAPINTERVALEXTPROC)wglGetProcAddress("wglGetSwapIntervalEXT");
-    }
-
-    if (wglSwapIntervalEXT)
-        wglSwapIntervalEXT(enable);
-#endif
-}
-
-void Application::StopSearchNearestPlanet() {
-    _isSearchNearestPlanet = false;
-#ifndef __EMSCRIPTEN__
-    if (_searchNearestPlanetThread)
-        _searchNearestPlanetThread->join();
-#endif
-}
-
-
-void Application::ApplyOrbitScaleMode(int mode) {
-    const auto scaleMode = mode == 1 ? OrbitLayout::ScaleMode::Realistic : OrbitLayout::ScaleMode::Compressed;
-    OrbitLayout::SetScaleMode(scaleMode);
-    RefreshPlanetProxyPositions();
-    if (_asteroidField) {
-        _asteroidField->Update(0.0f); // rebuild instance matrices for new AU→scene mapping
-    }
-    std::cout << "[OrbitScale] " << (scaleMode == OrbitLayout::ScaleMode::Realistic ? "realistic" : "compressed")
-              << " distances active" << std::endl;
-}
-
-void Application::SetOrbitLinesEnabled(bool enabled) {
-    _orbitLinesEnabled = enabled;
-}
-
-bool Application::GetOrbitLinesEnabled() const {
-    return _orbitLinesEnabled;
-}
-
-void Application::SetMagneticFieldsEnabled(bool enabled) {
-    _magneticFieldsEnabled = enabled;
-    if (enabled) {
-        EnsureMagneticFieldsBuilt();
-    }
-}
-
-bool Application::GetMagneticFieldsEnabled() const {
-    return _magneticFieldsEnabled;
-}
-
-void Application::ForEachEnabledMagneticField(
-    const std::function<void(const SpaceObject& object, const MagneticFieldParams& params)>& fn) const {
-    if (!fn) {
-        return;
-    }
-    if (_sun && _sun->HasMagneticField()) {
-        fn(*_sun, _sun->GetMagneticField());
-    }
-    for (const auto& component : _renderableSceneComponents) {
-        if (component.planet && component.planet->HasMagneticField()) {
-            fn(*component.planet, component.planet->GetMagneticField());
-        }
-        for (const auto& satellite : component.satellites) {
-            if (satellite && satellite->HasMagneticField()) {
-                fn(*satellite, satellite->GetMagneticField());
-            }
-        }
-    }
-}
-
-void Application::EnsureMagneticFieldsBuilt() {
-    if (!_magneticFieldRenderer) {
-        return;
-    }
-    if (_magneticFieldsBuilt && _magneticFieldsQuality == gSimState->qualityPreset) {
-        return;
-    }
-
-    _magneticFieldRenderer->Clear();
-    static constexpr OrbitLayout::Body kFieldBodies[] = {
-        OrbitLayout::Body::Sun,
-        OrbitLayout::Body::Mercury,
-        OrbitLayout::Body::Earth,
-        OrbitLayout::Body::Jupiter,
-        OrbitLayout::Body::Saturn,
-        OrbitLayout::Body::Uranus,
-        OrbitLayout::Body::Neptune,
-    };
-    for (const auto body : kFieldBodies) {
-        const MagneticFieldParams params = MagneticFieldCatalog::ParamsForBody(body, gSimState->qualityPreset);
-        MagneticFieldLineMesh mesh;
-        mesh.Upload(MagneticFieldTracer::Trace(params));
-        _magneticFieldRenderer->AddBody(body, std::move(mesh), params);
-    }
-    _magneticFieldsBuilt = true;
-    _magneticFieldsQuality = gSimState->qualityPreset;
-    std::cout << "[MagneticField] Built field-line ribbons for quality preset " << gSimState->qualityPreset << std::endl;
-}
-
-void Application::RenderMagneticFields() {
-    if (!_magneticFieldsEnabled || !_magneticFieldRenderer || _magneticFieldRenderer->Empty()) {
-        return;
-    }
-
-    const float zCoef = static_cast<float>(2.0 / glm::log2(_camera.GetFar() + 1.0));
-    const float now = static_cast<float>(glfwGetTime());
-    const glm::vec3 camPos = _camera.GetPosition();
-
-    auto drawBodies = [&](float ribbonWidthScale, float opacityScale) {
-        auto drawBody = [&](OrbitLayout::Body body, const MagneticFieldParams& params, const glm::vec3& position,
-                            const glm::mat4& rotation, float radius) {
-            if (!params.enabled || radius < 1.0e-4f) {
-                return;
-            }
-            glm::mat4 model(1.0f);
-            model = glm::translate(model, position);
-            model *= rotation;
-            model = glm::rotate(model, glm::radians(params.dipoleTiltDeg), glm::vec3(1.0f, 0.0f, 0.0f));
-            model = glm::scale(model, glm::vec3(radius));
-            _magneticFieldRenderer->Draw(_cameraProjection, _cameraView, model, params, body, camPos, zCoef, now,
-                                         ribbonWidthScale, opacityScale);
-        };
-
-        if (_sun) {
-            const MagneticFieldParams sunParams =
-                MagneticFieldCatalog::ParamsForBody(OrbitLayout::Body::Sun, gSimState->qualityPreset);
-            // Mesh is scaled 0.5 × sphere radius (~2) ≈ 1 unit; inflate so the torus is readable.
-            const float sunRadius = 28.0f;
-            drawBody(OrbitLayout::Body::Sun, sunParams, _sun->GetPosition(), glm::mat4(1.0f), sunRadius);
-        }
-
-        for (const auto& component : _renderableSceneComponents) {
-            if (!component.planet) {
-                continue;
-            }
-            const std::wstring& wideName = component.planet->GetEngName();
-            const std::string name(wideName.begin(), wideName.end());
-            const OrbitLayout::Body body = OrbitLayout::BodyFromName(name);
-            if (body == OrbitLayout::Body::Sun) {
-                continue;
-            }
-            const MagneticFieldParams params = MagneticFieldCatalog::ParamsForBody(body, gSimState->qualityPreset);
-            if (!params.enabled) {
-                continue;
-            }
-            const float radius = std::max(component.planet->GetRadius(), 0.5f);
-            drawBody(body, params, component.planet->GetPosition(), component.planet->GetRotationMatrix(), radius);
-        }
-    };
-
-    auto bindRibbonState = []() {
-        glEnable(GL_BLEND);
-        glBlendFunc(GL_SRC_ALPHA, GL_ONE);
-        glEnable(GL_DEPTH_TEST);
-        glDepthMask(GL_FALSE);
-        glDisable(GL_CULL_FACE);
-        glEnable(GL_POLYGON_OFFSET_FILL);
-        glPolygonOffset(-1.0f, -1.0f);
-    };
-
-    bindRibbonState();
-    drawBodies(1.0f, 1.0f);
-
-    const auto quality = GetQualitySettings(gSimState->qualityPreset, gSimState->isMobileWeb);
-    if (_magneticFieldBloom && quality.enableMagneticBloom) {
-        _magneticFieldBloom->Resize(_displayWidth, _displayHeight);
-        if (_magneticFieldBloom->IsEnabled()) {
-            _magneticFieldBloom->BeginCapture();
-            bindRibbonState();
-            drawBodies(2.0f, 1.35f);
-            const float intensity = gSimState->isMobileWeb ? 0.48f : (quality.magneticBloomPasses >= 2 ? 0.82f : 0.62f);
-            _magneticFieldBloom->BlurAndComposite(quality.magneticBloomPasses, intensity);
-        }
-    }
-
-    glDisable(GL_POLYGON_OFFSET_FILL);
-    glDepthMask(GL_TRUE);
-    glEnable(GL_CULL_FACE);
-    glEnable(GL_DEPTH_TEST);
-    glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
-    glDisable(GL_BLEND);
-}
-
-void Application::RenderOrbitPaths() const {
-    if (!_orbitLinesEnabled || !_orbitPathRenderer || !_sun) {
-        return;
-    }
-
-    glEnable(GL_BLEND);
-    glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
-    glEnable(GL_DEPTH_TEST);
-    glDepthMask(GL_FALSE);
-
-    const glm::vec3 sunPos = _sun->GetPosition();
-    const float orbitAlpha = _magneticFieldsEnabled ? 0.08f : 0.35f;
-    const glm::vec4 color(0.45f, 0.55f, 0.75f, orbitAlpha);
-
-    for (int i = 1; i <= 9; ++i) {
-        const auto body = static_cast<OrbitLayout::Body>(i);
-        const float radius = OrbitLayout::GetOrbitRadius(body);
-        if (radius < 0.001f) {
-            continue;
-        }
-
-        glm::mat4 model(1.0f);
-        model = glm::translate(model, sunPos);
-        model = glm::rotate(model, glm::radians(OrbitLayout::GetInclinationDegrees(body)), glm::vec3(1.0f, 0.0f, 0.0f));
-        model = glm::scale(model, glm::vec3(radius));
-        _orbitPathRenderer->Draw(_cameraProjection, _cameraView, model, color);
-    }
-
-    glDepthMask(GL_TRUE);
-    glDisable(GL_BLEND);
-}
-
-void Application::RenderAsteroidField() {
-    if (!_asteroidField || !_sun) {
-        return;
-    }
-
-    _asteroidField->Update(gSimState->simDeltaSeconds);
-
-    static const float zCoef = static_cast<float>(2.0 / glm::log2(_camera.GetFar() + 1.0));
-    _asteroidField->Render(_cameraProjection, _cameraView,
-                           _sun->GetPosition(), _camera.GetPosition(),
-                           _camera.GetRightVector(), _camera.GetUpVector(),
-                           zCoef);
-}
-
 void Application::FocusPlanetByIndex(int idx) {
-    idx = std::clamp(idx, 0, 9);
+    idx = std::clamp(idx, 0, OrbitLayout::kBodyCount - 1);
     _focusedPlanetIndex = idx;
 
     glm::vec3 target(0.0f);
@@ -888,13 +250,28 @@ void Application::FocusPlanetByIndex(int idx) {
         }
         focusRadius = 40.0f;
     } else {
-        const size_t componentIndex = static_cast<size_t>(idx - 1);
-        if (componentIndex < _renderableSceneComponents.size()) {
-            const auto& planet = _renderableSceneComponents[componentIndex].planet;
-            target = planet->GetPosition();
-            focusRadius = std::max(planet->GetRadius() * 4.0f, 2.0f);
+        // Match on the planet's own name rather than position in the vector: staged loading
+        // pushes components in camera-approach order, so the Nth component is not body N.
+        const auto body = static_cast<OrbitLayout::Body>(idx);
+        const Planet* found = nullptr;
+        for (const auto& component : _renderableSceneComponents) {
+            if (!component.planet) {
+                continue;
+            }
+            const std::wstring& wideName = component.planet->GetEngName();
+            const std::string name(wideName.begin(), wideName.end());
+            if (OrbitLayout::BodyFromName(name) == body) {
+                found = component.planet.get();
+                break;
+            }
+        }
+
+        if (found) {
+            target = found->GetPosition();
+            focusRadius = std::max(found->GetRadius() * 4.0f, 2.0f);
         } else {
-            target = OrbitLayout::GetOffset(static_cast<OrbitLayout::Body>(idx));
+            // Not loaded yet (web staged loading): fly to where the ephemeris says it is.
+            target = OrbitLayout::GetOffset(body);
             focusRadius = 20.0f;
         }
     }
@@ -915,59 +292,30 @@ int Application::GetFocusedPlanetIndex() const {
     return _focusedPlanetIndex;
 }
 
+const SkyEvents::Conjunction& Application::GetNextConjunction() const {
+    // How long to wait before retrying a search that found nothing, in simulated days.
+    // Only reachable if the search window is ever shortened; the default window always hits.
+    constexpr double kEmptyRetryDays = 30.0;
+
+    const double jd = OrbitLayout::GetJulianDate();
+    const bool passed = _nextConjunction.valid && jd > _nextConjunction.julianDate;
+    const bool rewound = jd < _nextConjunctionComputedJd - 0.5;
+    const bool retryEmpty = !_nextConjunction.valid && jd > _nextConjunctionComputedJd + kEmptyRetryDays;
+
+    if (!_nextConjunctionCached || passed || rewound || retryEmpty) {
+        _nextConjunction = SkyEvents::NextInnerPlanetConjunction(jd);
+        _nextConjunctionComputedJd = jd;
+        _nextConjunctionCached = true;
+    }
+    return _nextConjunction;
+}
+
 int Application::GetNearestPlanetIndexForJs() const {
     if (_nearestPlanetIndex < 0) {
         return -1;
     }
     return static_cast<int>(_nearestPlanetIndex) + 1;
 }
-
-
-void Application::SetMusicVolume(float volume) {
-#ifdef SOLARSYSTEM_USE_SDL_MIXER
-    _musicVolume = glm::clamp(volume, 0.0f, 1.0f);
-    if (!_musicMuted && _mixerInitialized && Mix_PlayingMusic()) {
-        Mix_VolumeMusic(static_cast<int>(MIX_MAX_VOLUME * _musicVolume));
-    }
-#else
-    _soundEngine->setSoundVolume(glm::clamp(volume, 0.0f, 1.0f));
-#endif
-}
-
-float Application::GetMusicVolume() const {
-#ifdef SOLARSYSTEM_USE_SDL_MIXER
-    return _musicVolume;
-#else
-    return _soundEngine->getSoundVolume();
-#endif
-}
-
-void Application::SetMusicMuted(bool muted) {
-#ifdef SOLARSYSTEM_USE_SDL_MIXER
-    _musicMuted = muted;
-    if (!_mixerInitialized) {
-        return;
-    }
-    if (_musicMuted) {
-        Mix_VolumeMusic(0);
-        return;
-    }
-    if (Mix_PlayingMusic()) {
-        Mix_VolumeMusic(static_cast<int>(MIX_MAX_VOLUME * _musicVolume));
-    }
-#else
-    (void)muted;
-#endif
-}
-
-bool Application::GetMusicMuted() const {
-#ifdef SOLARSYSTEM_USE_SDL_MIXER
-    return _musicMuted;
-#else
-    return false;
-#endif
-}
-
 
 void Application::StartSearchNearestPlanet() {
     _isSearchNearestPlanet = true;
@@ -992,7 +340,7 @@ void Application::StartSearchNearestPlanet() {
                 _nearestPlanetIndex = -1;
             }
 
-            this_thread::sleep_for(25ms); 
+            this_thread::sleep_for(25ms);
         }
     });
 #endif
@@ -1002,13 +350,13 @@ void Application::UpdateSearchNearestPlanet() {
 #ifdef __EMSCRIPTEN__
     if (_isSearchNearestPlanet && ++_nearestPlanetSearchFrameCounter >= 60) {
         _nearestPlanetSearchFrameCounter = 0;
-        
+
         auto nearestPlanetIt = min_element(_renderableSceneComponents.begin(), _renderableSceneComponents.end(),
                            [this](const RenderableSceneComponent& left, const RenderableSceneComponent& right)
         {
             return CalculateSpaceObjectDistance(left.planet.get()) < CalculateSpaceObjectDistance(right.planet.get());
         });
-        
+
         if (nearestPlanetIt != _renderableSceneComponents.end()) {
             _nearestPlanetIndex = distance(_renderableSceneComponents.begin(), nearestPlanetIt);
         } else {
@@ -1018,147 +366,11 @@ void Application::UpdateSearchNearestPlanet() {
 #endif
 }
 
-void Application::StartPlayBackgroundMusic() {
-    _isBackgroundMusicPlay = true;
-
-#ifdef SOLARSYSTEM_USE_SDL_MIXER
-    _currentSongIndex = 0;
-    _musicStartTime = 0;
-    _musicDuration = 0;
-    _currentMusic = nullptr;
-#else
-    auto mapRange = [](float value, float inMin, float inMax, float outMin, float outMax) {
-        return outMin + (outMax - outMin) * (value - inMin) / (inMax - inMin);
-    };
-
-    _backgroundMusicThread = make_unique<thread>([=]() {
-        for (ssize_t i = 0; i < _backgroundSongPaths.size() && _isBackgroundMusicPlay; i++) {
-            this_thread::sleep_for(1s); 
-
-            auto song = _soundEngine->play2D(_backgroundSongPaths[i].c_str(), false, true, true);
-            song->setVolume(0);
-            song->setIsPaused(false);
-            _currentMusicTrack = _backgroundSongPaths[i].substr(16); 
-
-            while (!song->isFinished()) {
-                if (song->getPlayPosition() < 5000) { 
-                    auto x = mapRange(song->getPlayPosition(), 0.0f, 5000.0f, 0.0f, 0.7f); 
-                    auto volume = exp(x) - 1; 
-                    song->setVolume(clamp(volume, 0.0f, 1.0f));
-                }
-                else if (song->getPlayPosition() > song->getPlayLength() - 5000) { 
-                    auto x = mapRange(song->getPlayPosition(), song->getPlayLength() - 5000, song->getPlayLength(), 0.0f, 6.0f);
-                    auto volume = exp(-x); 
-                    song->setVolume(clamp(volume, 0.0f, 1.0f));
-                }
-
-                this_thread::sleep_for(25ms); 
-            }
-
-            if (i == _backgroundSongPaths.size() - 1) 
-                i = -1; 
-
-            song->drop();
-        }
-    });
-#endif
-}
-
-void Application::UpdateBackgroundMusic() {
-#ifdef SOLARSYSTEM_USE_SDL_MIXER
-    if (!_isBackgroundMusicPlay || !_mixerInitialized || _musicMuted || _backgroundSongPaths.empty())
-        return;
-
-    if (_availableSongPaths.empty())
-        return;
-
-    const auto applyMusicVolume = [this](float fadeMultiplier) {
-        Mix_VolumeMusic(static_cast<int>(MIX_MAX_VOLUME * _musicVolume * fadeMultiplier));
-    };
-
-    if (!Mix_PlayingMusic()) {
-        if (_currentMusic) {
-            Mix_FreeMusic(_currentMusic);
-            _currentMusic = nullptr;
-        }
-
-        const size_t songCount = _backgroundSongPaths.size();
-        for (size_t attempt = 0; attempt < songCount; ++attempt) {
-            if (_currentSongIndex >= static_cast<int>(songCount)) {
-                _currentSongIndex = 0;
-            }
-
-            const std::string& path = _backgroundSongPaths[_currentSongIndex];
-            ++_currentSongIndex;
-
-            if (_availableSongPaths.count(path) == 0) {
-                continue;
-            }
-
-            _currentMusic = Mix_LoadMUS(path.c_str());
-            if (!_currentMusic) {
-                std::cerr << "[Audio] Failed to decode track (skipped): " << path
-                          << " (" << Mix_GetError() << ")" << std::endl;
-                _availableSongPaths.erase(path);
-                continue;
-            }
-
-            _currentMusicTrack = path.substr(std::string("resource/sounds/").size());
-            Mix_PlayMusic(_currentMusic, 1);
-            applyMusicVolume(0.0f);
-            _musicStartTime = SDL_GetTicks();
-            _musicDuration = 180000;
-            std::cout << "[Audio] Now playing: " << _currentMusicTrack << std::endl;
-            return;
-        }
-
-        std::cerr << "[Audio] No playable tracks available yet; waiting for downloads" << std::endl;
-        return;
-    }
-
-    const uint32_t currentTime = SDL_GetTicks();
-    const uint32_t elapsed = currentTime - _musicStartTime;
-
-    if (elapsed < 5000) {
-        applyMusicVolume(static_cast<float>(elapsed) / 5000.0f);
-    } else if (_musicDuration > 0 && elapsed > _musicDuration - 5000) {
-        applyMusicVolume(static_cast<float>(_musicDuration - elapsed) / 5000.0f);
-    } else {
-        applyMusicVolume(1.0f);
-    }
-#endif
-}
-
-void Application::StopPlayBackgroundMusic() {
-    _isBackgroundMusicPlay = false;
-#ifdef SOLARSYSTEM_USE_SDL_MIXER
-    if (_currentMusic) {
-        Mix_HaltMusic();
-        Mix_FreeMusic(_currentMusic);
-        _currentMusic = nullptr;
-    }
-#else
-    _soundEngine->stopAllSounds();
-    if (_backgroundMusicThread)
-        _backgroundMusicThread->join();
-#endif
-}
-
-void Application::Dispose() {
-    glfwTerminate();
-    
+void Application::StopSearchNearestPlanet() {
+    _isSearchNearestPlanet = false;
 #ifndef __EMSCRIPTEN__
-    SDL_Quit();
-#endif
-    
-    IMG_Quit();
-    StopSearchNearestPlanet();
-    StopPlayBackgroundMusic();
-    
-#ifdef SOLARSYSTEM_USE_SDL_MIXER
-    Mix_CloseAudio();
-#elif !defined(__EMSCRIPTEN__)
-    _soundEngine->drop();
+    if (_searchNearestPlanetThread)
+        _searchNearestPlanetThread->join();
 #endif
 }
 
@@ -1175,159 +387,4 @@ glm::vec3 Application::CurrentFpsColor() const {
         return {0.949, 0.85, 0.325};
     else
         return {0.239, 0.949, 0.45};
-}
-
-void Application::UpdateLOD() {
-#ifdef __EMSCRIPTEN__
-    if (_renderableSceneComponents.empty()) return;
-
-    const glm::vec3 camPos = _camera.GetPosition();
-
-    if (gSimState->qualityPreset == 0) {
-        // Low preset: force downgrade/cancel every high-res scene texture and skip upgrades.
-        const glm::vec3 fakeFar = camPos + glm::vec3(100000.0f, 0.0f, 0.0f);
-        for (auto& rc : _renderableSceneComponents) {
-            if (rc.planet) rc.planet->LoadHighResIfClose(fakeFar);
-            for (auto& satellite : rc.satellites) satellite->LoadHighResIfClose(fakeFar);
-            if (rc.planetaryRing) rc.planetaryRing->LoadHighResIfClose(fakeFar);
-            if (rc.clouds) rc.clouds->LoadHighResIfClose(fakeFar);
-        }
-        return;
-    }
-
-    // Call on *all* ready planets: far ones will downgrade if loaded + past hysteresis;
-    // near ones will upgrade if appropriate.
-    for (auto& rc : _renderableSceneComponents) {
-        if (rc.planet) {
-            rc.planet->LoadHighResIfClose(camPos);
-        }
-        for (auto& satellite : rc.satellites) {
-            satellite->LoadHighResIfClose(camPos);
-        }
-        if (rc.planetaryRing) {
-            rc.planetaryRing->LoadHighResIfClose(camPos);
-        }
-        if (rc.clouds) {
-            rc.clouds->LoadHighResIfClose(camPos);
-        }
-    }
-#endif
-}
-
-void Application::ApplyQualityPreset(int preset) {
-    gSimState->qualityPreset = std::clamp(preset, 0, 2);
-    const auto settings = GetQualitySettings(gSimState->qualityPreset, gSimState->isMobileWeb);
-
-    TextureLoadingQueue::GetInstance().SetMaxConcurrentLoads(settings.maxConcurrentTextureLoads);
-
-    if (gSimState->shadowQuality > 0) {
-        gSimState->shadowQuality = gSimState->qualityPreset + 1;
-    }
-
-    ApplyRenderResources(settings.shadowResolution, settings.enableHdr);
-    if (_asteroidField) {
-        _asteroidField->SetInstanceCount(settings.asteroidInstanceCount);
-    }
-    if (_magneticFieldsEnabled) {
-        _magneticFieldsBuilt = false;
-        EnsureMagneticFieldsBuilt();
-    }
-    LogQualityTier(settings, _hdrEnabled, gSimState->shadowQuality);
-}
-
-void Application::ApplyRenderResources(uint16_t shadowResolution, bool enableHdr) {
-    _hdrEnabled = enableHdr;
-
-    if (_shadowMapFBO && gSimState->shadowQuality > 0) {
-        _shadowMapFBO->Resize(shadowResolution, shadowResolution);
-    }
-
-    if (_hdr) {
-        _hdr->SetEnabled(enableHdr, _displayWidth, _displayHeight);
-    }
-    if (_magneticFieldBloom) {
-        const auto bloomSettings = GetQualitySettings(gSimState->qualityPreset, gSimState->isMobileWeb);
-        _magneticFieldBloom->SetEnabled(bloomSettings.enableMagneticBloom, _displayWidth, _displayHeight);
-    }
-}
-
-void Application::ApplyShadowQuality(int quality) {
-    gSimState->shadowQuality = std::clamp(quality, 0, 3);
-    if (gSimState->shadowQuality == 0) {
-        std::cout << "[Shadows] disabled" << std::endl;
-        return;
-    }
-
-    const auto settings = GetQualitySettings(gSimState->shadowQuality - 1, gSimState->isMobileWeb);
-    if (_shadowMapFBO) {
-        _shadowMapFBO->Resize(settings.shadowResolution, settings.shadowResolution);
-    }
-    ApplyRenderResources(settings.shadowResolution, settings.enableHdr);
-    LogQualityTier(settings, _hdrEnabled, gSimState->shadowQuality);
-}
-
-#ifdef __EMSCRIPTEN__
-void Application::SetXrActive(bool active) {
-    _xr.active = active;
-    _xr.currentEye = 0;
-    if (!active) {
-        _xr.eyeCount = 0;
-        glBindFramebuffer(GL_FRAMEBUFFER, 0);
-        glViewport(0, 0, _displayWidth, _displayHeight);
-        glDisable(GL_SCISSOR_TEST);
-    }
-    std::cout << "[WebXR] session " << (active ? "active" : "inactive") << std::endl;
-}
-
-void Application::SetXrEyeCount(int count) {
-    _xr.eyeCount = std::clamp(count, 0, 2);
-}
-
-void Application::SetXrEyeViewport(int eye, int x, int y, int width, int height) {
-    if (eye < 0 || eye > 1) {
-        return;
-    }
-    auto& e = _xr.eyes[eye];
-    e.viewportX = x;
-    e.viewportY = y;
-    e.viewportWidth = std::max(width, 1);
-    e.viewportHeight = std::max(height, 1);
-}
-
-float* Application::GetXrMatrixScratch() {
-    return _xr.matrixScratch;
-}
-
-void Application::CommitXrEyeMatrices(int eye) {
-    if (eye < 0 || eye > 1) {
-        return;
-    }
-    auto& e = _xr.eyes[eye];
-    std::memcpy(glm::value_ptr(e.view), _xr.matrixScratch, 16 * sizeof(float));
-    std::memcpy(glm::value_ptr(e.projection), _xr.matrixScratch + 16, 16 * sizeof(float));
-}
-
-void Application::RenderXrStereoFrame() {
-    // JS has already bound the XRWebGLLayer framebuffer and cleared it.
-    const int eyes = std::clamp(_xr.eyeCount, 0, 2);
-    for (int eye = 0; eye < eyes; ++eye) {
-        _xr.currentEye = eye;
-        const auto& e = _xr.eyes[eye];
-        glViewport(e.viewportX, e.viewportY, e.viewportWidth, e.viewportHeight);
-        glEnable(GL_SCISSOR_TEST);
-        glScissor(e.viewportX, e.viewportY, e.viewportWidth, e.viewportHeight);
-        glClear(GL_DEPTH_BUFFER_BIT);
-        glDisable(GL_SCISSOR_TEST);
-        RenderFrameContent();
-    }
-    _xr.currentEye = 0;
-}
-#endif
-
-Application::~Application() {
-    if (GetActiveApplication() == this) {
-        SetActiveApplication(nullptr);
-        ResetSimStateToFallback();
-    }
-    Dispose();
 }

@@ -153,6 +153,36 @@
       "moons": 5,
       "summary": "Icy dwarf planet in the Kuiper Belt with a heart-shaped nitrogen glacier.",
       "summaryRu": "Ледяная карликовая планета пояса Койпера с ледником азота в форме сердца."
+    },
+    {
+      "index": 10,
+      "id": "ceres",
+      "name": "Ceres",
+      "nameRu": "Церера",
+      "type": "dwarf_planet",
+      "diameterKm": 939,
+      "massEarths": 0.000157,
+      "siderealRotationDays": 0.3781,
+      "orbitalPeriodDays": 1679.85,
+      "distanceAu": 2.7656,
+      "moons": 0,
+      "summary": "Largest main-belt object and the only dwarf planet inside Neptune's orbit; ~25% water ice by mass.",
+      "summaryRu": "Крупнейший объект главного пояса и единственная карликовая планета внутри орбиты Нептуна; около 25% массы — водяной лёд."
+    },
+    {
+      "index": 11,
+      "id": "vesta",
+      "name": "Vesta",
+      "nameRu": "Веста",
+      "type": "asteroid",
+      "diameterKm": 525,
+      "massEarths": 0.0000434,
+      "siderealRotationDays": 0.2226,
+      "orbitalPeriodDays": 1325.39,
+      "distanceAu": 2.3614,
+      "moons": 0,
+      "summary": "Second-most massive main-belt body; a differentiated protoplanet with a giant south-polar impact basin.",
+      "summaryRu": "Второе по массе тело главного пояса; дифференцированная протопланета с гигантским ударным бассейном у южного полюса."
     }
   ],
   "scaleModes": {

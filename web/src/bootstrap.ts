@@ -12,20 +12,7 @@ import {
     exposeConsoleHelpers,
 } from './wasmBridge';
 import { installWasmCallbacksOnConfig } from './wasmCallbacks';
-
-// Emscripten 6 prefers resizable WebAssembly buffers when the browser exposes
-// toResizableBuffer(). Current Chrome DOM/WebGL APIs reject views backed by
-// those buffers. Hiding the optional method selects Emscripten's built-in
-// fixed-buffer fallback; memory growth still works by refreshing heap views.
-const wasmMemoryPrototype = WebAssembly.Memory.prototype as WebAssembly.Memory & {
-    toResizableBuffer?: () => ArrayBuffer;
-};
-if (typeof wasmMemoryPrototype.toResizableBuffer === 'function') {
-    Object.defineProperty(wasmMemoryPrototype, 'toResizableBuffer', {
-        configurable: true,
-        value: undefined,
-    });
-}
+import { computeWebGlSizing } from './webglContext';
 
 const canvas = document.getElementById('canvas') as HTMLCanvasElement;
 const loadingContainer = document.getElementById('loading-container') as HTMLElement;
@@ -77,6 +64,23 @@ window.__solarSystemAssetBase = runtimeAssetBase;
 const initConfig = resolveInitConfig();
 publishInitConfig(initConfig);
 
+// Emscripten's GLFW port builds its own WebGL context-attributes object from GLFW
+// window hints only (antialias/depth/stencil/alpha) and ignores Module.contextAttributes
+// entirely — passing powerPreference/xrCompatible/etc. there is a silent no-op. Creating
+// the context ourselves and handing it to Module.preinitializedWebGLContext is the
+// supported hook Emscripten actually honors: GLFW reuses this context as-is instead of
+// creating its own. See docs/plans/PORTING_GUIDE.md and web/src/webglContext.ts.
+const { contextOptions, tier } = computeWebGlSizing(initConfig);
+const preinitializedWebGLContext = canvas.getContext('webgl2', contextOptions) as WebGL2RenderingContext | null;
+if (preinitializedWebGLContext) {
+    console.log(
+        `[WebGL] tier=${tier} requested`, contextOptions,
+        'actual', preinitializedWebGLContext.getContextAttributes(),
+    );
+} else {
+    console.error('[WebGL] Failed to create a WebGL2 context with', contextOptions);
+}
+
 for (const eventName of ['pointerdown', 'pointerup', 'click', 'keydown', 'keyup']) {
     settingsPanel.addEventListener(eventName, (event) => event.stopPropagation());
     explorerPanel.addEventListener(eventName, (event) => event.stopPropagation());
@@ -84,19 +88,7 @@ for (const eventName of ['pointerdown', 'pointerup', 'click', 'keydown', 'keyup'
 
 const moduleConfig: SolarSystemModuleConfig = installWasmCallbacksOnConfig({
     canvas,
-    contextAttributes: {
-        xrCompatible: true,
-        majorVersion: 2,
-        minorVersion: 0,
-        antialias: true,
-        depth: true,
-        stencil: false,
-        alpha: false,
-        premultipliedAlpha: true,
-        preserveDrawingBuffer: false,
-        powerPreference: 'default' as const,
-        failIfMajorPerformanceCaveat: false,
-    },
+    ...(preinitializedWebGLContext ? { preinitializedWebGLContext } : {}),
     locateFile: (path: string, prefix: string) => {
         if (path.endsWith('.wasm') || path.endsWith('.data')) {
             return new URL(path, deployedBaseUrl).toString();

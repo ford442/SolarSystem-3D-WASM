@@ -31,6 +31,7 @@ void LogQualityTier(const QualityTierSettings& settings, bool hdrEnabled, int sh
 #ifdef __EMSCRIPTEN__
 bool ReadIsMobileWeb();
 int ReadInitialQualityPreset();
+float ReadBackingStoreScale();
 #endif
 
 #endif // SOLARSYSTEM_QUALITY_SETTINGS_H

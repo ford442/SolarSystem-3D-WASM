@@ -46,8 +46,37 @@ TEST_F(OrbitLayoutTest, BodyFromNameMapsKnownPlanets) {
 }
 
 TEST_F(OrbitLayoutTest, BodyFromNameFallsBackToSun) {
-    EXPECT_EQ(OrbitLayout::BodyFromName("Ceres"), OrbitLayout::Body::Sun);
+    EXPECT_EQ(OrbitLayout::BodyFromName("Eris"), OrbitLayout::Body::Sun);
+    EXPECT_EQ(OrbitLayout::BodyFromName("ceres"), OrbitLayout::Body::Sun); // manifest names are capitalised
     EXPECT_EQ(OrbitLayout::BodyFromName(""), OrbitLayout::Body::Sun);
+}
+
+TEST_F(OrbitLayoutTest, BodyFromNameResolvesCatalogDwarfs) {
+    // PlanetSystemLoader::RefreshPlanetProxyPositions maps manifest system names this way,
+    // so a miss here silently parks the proxy marker on the Sun.
+    EXPECT_EQ(OrbitLayout::BodyFromName("Ceres"), OrbitLayout::Body::Ceres);
+    EXPECT_EQ(OrbitLayout::BodyFromName("Vesta"), OrbitLayout::Body::Vesta);
+}
+
+TEST_F(OrbitLayoutTest, BeltDwarfsOrbitBetweenMarsAndJupiter) {
+    const float mars = OrbitLayout::GetOrbitRadius(OrbitLayout::Body::Mars);
+    const float jupiter = OrbitLayout::GetOrbitRadius(OrbitLayout::Body::Jupiter);
+    for (const auto body : {OrbitLayout::Body::Ceres, OrbitLayout::Body::Vesta}) {
+        const float radius = OrbitLayout::GetOrbitRadius(body);
+        EXPECT_GT(radius, mars);
+        EXPECT_LT(radius, jupiter);
+        // Compressed art radius must agree with the AU→scene map the asteroid belt uses,
+        // or the dwarfs would float off the belt they belong to.
+        EXPECT_NEAR(radius, OrbitLayout::AuToSceneDistance(OrbitLayout::GetAuDistance(body)), 0.5f);
+    }
+}
+
+TEST_F(OrbitLayoutTest, BeltDwarfsSpinFasterThanEarth) {
+    // Ceres ~9.1 h, Vesta ~5.3 h; a zero here means the catalog row lost its rotation period.
+    EXPECT_LT(OrbitLayout::GetSiderealRotationDays(OrbitLayout::Body::Ceres), 0.5f);
+    EXPECT_GT(OrbitLayout::GetSiderealRotationDays(OrbitLayout::Body::Ceres), 0.0f);
+    EXPECT_LT(OrbitLayout::GetSiderealRotationDays(OrbitLayout::Body::Vesta),
+              OrbitLayout::GetSiderealRotationDays(OrbitLayout::Body::Ceres));
 }
 
 TEST_F(OrbitLayoutTest, ResetForTestsUsesJ2000) {

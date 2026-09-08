@@ -52,14 +52,33 @@ constexpr Elements kStandish[] = {
      -55.12002969, 218.45945325, 44.96476227, -0.32241464, 131.78422574, -0.00508664},
 };
 
-// Pluto Keplerian elements at J2000.0 (approx.); mean motion from sidereal period.
-constexpr double kPlutoA = 39.482;
-constexpr double kPlutoE = 0.2488;
-constexpr double kPlutoIDeg = 17.16;
-constexpr double kPlutoOmDeg = 110.299;
-constexpr double kPlutoWDeg = 113.834;
-constexpr double kPlutoM0Deg = 14.53;
-constexpr double kPlutoPeriodDays = 90465.0; // ~248.0 yr
+// Fixed-element Keplerian bodies: no Standish secular rates, just osculating elements
+// propagated in mean anomaly from their own epoch. Accuracy degrades away from that epoch
+// (~2° at 26 yr for the belt bodies) — fine for a visualiser, not for flight dynamics.
+struct KeplerBody {
+    double epochJd;
+    double a;        // AU
+    double e;
+    double IDeg;
+    double OmDeg;    // longitude of ascending node
+    double wDeg;     // argument of perihelion
+    double M0Deg;    // mean anomaly at epochJd
+    double nDegPerDay;
+};
+
+// Pluto: rough J2000 elements, mean motion from the ~248 yr sidereal period.
+constexpr KeplerBody kPluto{
+    kJ2000, 39.482, 0.2488, 17.16, 110.299, 113.834, 14.53, 360.0 / 90465.0};
+
+// Ceres and Vesta: JPL SBDB osculating elements, epoch 2461200.5 (2026-Aug-08 TDB),
+// solutions 48 / 39 respectively. Refresh from
+// https://ssd-api.jpl.nasa.gov/sbdb.api?sstr=ceres&full-prec=true if the drift ever matters.
+constexpr KeplerBody kCeres{
+    2461200.5, 2.765552595034094, 0.07969229514816586, 10.58802780183462,
+    80.24862682043221, 73.29421453021587, 274.4193463761342, 0.21430445064843};
+constexpr KeplerBody kVesta{
+    2461200.5, 2.361365965127599, 0.09020374382834395, 7.143925545058711,
+    103.701293265032, 151.4686478221564, 81.19015607686903, 0.2716183613599909};
 
 double wrapDeg180(double deg) {
     deg = std::fmod(deg + 180.0, 360.0);
@@ -146,11 +165,9 @@ HelioLB standishPosition(const Elements& el, double jd) {
     return fromOrbitalPlane(a, e, I, Om, w, M);
 }
 
-HelioLB plutoPosition(double jd) {
-    const double days = jd - kJ2000;
-    const double nDegPerDay = 360.0 / kPlutoPeriodDays;
-    const double M = wrapDeg180(kPlutoM0Deg + nDegPerDay * days);
-    return fromOrbitalPlane(kPlutoA, kPlutoE, kPlutoIDeg, kPlutoOmDeg, kPlutoWDeg, M);
+HelioLB keplerPosition(const KeplerBody& body, double jd) {
+    const double M = wrapDeg180(body.M0Deg + body.nDegPerDay * (jd - body.epochJd));
+    return fromOrbitalPlane(body.a, body.e, body.IDeg, body.OmDeg, body.wDeg, M);
 }
 
 } // namespace
@@ -191,15 +208,50 @@ double JulianDateNowUtc() {
     return JulianDateFromYmd(tmUtc.tm_year + 1900, tmUtc.tm_mon + 1, tmUtc.tm_mday) + dayFraction;
 }
 
+namespace {
+
+class StandishEphemeris final : public IEphemeris {
+public:
+    const char* Name() const override { return "standish"; }
+
+    HelioLB PlanetHeliocentric(int bodyIndex, double julianDate) const override {
+        // 0=Sun, 1=Mercury … 8=Neptune, 9=Pluto, 10=Ceres, 11=Vesta
+        switch (bodyIndex) {
+            case 9:
+                return keplerPosition(kPluto, julianDate);
+            case 10:
+                return keplerPosition(kCeres, julianDate);
+            case 11:
+                return keplerPosition(kVesta, julianDate);
+            default:
+                break;
+        }
+        if (bodyIndex <= 0 || bodyIndex > 8) {
+            return {};
+        }
+        return standishPosition(kStandish[bodyIndex - 1], julianDate);
+    }
+};
+
+const IEphemeris* g_backend = nullptr;
+
+} // namespace
+
+const IEphemeris& StandishBackend() {
+    static const StandishEphemeris instance;
+    return instance;
+}
+
+const IEphemeris& GetBackend() {
+    return g_backend ? *g_backend : StandishBackend();
+}
+
+void SetBackend(const IEphemeris* backend) {
+    g_backend = backend;
+}
+
 HelioLB Position(int bodyIndex, double julianDate) {
-    // 0=Sun, 1=Mercury … 8=Neptune, 9=Pluto
-    if (bodyIndex <= 0 || bodyIndex > 9) {
-        return {};
-    }
-    if (bodyIndex == 9) {
-        return plutoPosition(julianDate);
-    }
-    return standishPosition(kStandish[bodyIndex - 1], julianDate);
+    return GetBackend().PlanetHeliocentric(bodyIndex, julianDate);
 }
 
 } // namespace Ephemeris

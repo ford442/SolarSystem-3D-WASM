@@ -4,7 +4,8 @@
 #include <glm/vec3.hpp>
 #include <string>
 
-// Canonical planet indices match FocusPlanet / planet_facts.json (0=Sun … 9=Pluto).
+// Canonical body indices match FocusPlanet / planet_facts.json (0=Sun … 9=Pluto,
+// then catalog-only dwarf/belt bodies).
 namespace OrbitLayout {
 
 enum class Body : int {
@@ -17,8 +18,13 @@ enum class Body : int {
     Saturn = 6,
     Uranus = 7,
     Neptune = 8,
-    Pluto = 9
+    Pluto = 9,
+    Ceres = 10,
+    Vesta = 11
 };
+
+/** Number of bodies in the layout table; valid Body values are 0 … kBodyCount-1. */
+constexpr int kBodyCount = static_cast<int>(Body::Vesta) + 1;
 
 enum class ScaleMode : int {
     Compressed = 0,

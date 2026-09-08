@@ -194,6 +194,25 @@ and orbit paths fade (they stay available via the Orbit lines checkbox). Medium 
 a half-resolution plasma bloom; Low keeps the Sun’s field only and skips bloom. Values are
 visual, not SI magnetosphere physics. The toggle persists in `localStorage` like orbit lines.
 
+### Educational mode
+
+Everything below is driven by the ephemeris at the current epoch, not by baked animation, so a
+shared link reproduces exactly what you were looking at.
+
+| Feature | How to reach it | What it shows |
+|---------|-----------------|---------------|
+| **Date scrubber** | Simulation panel, or `P` / `+` / `-` / `.` keys; `?date=` in a deep link | Moves the simulation epoch. Planet positions come from JPL's Standish series; Pluto, Ceres, and Vesta from fixed Keplerian elements. |
+| **Scale toggle** | Simulation panel, or `?scale=realistic` | Switches between artistic compressed orbits and AU-proportional spacing. |
+| **Magnetic fields** | `M` key or `?fields=1` | Dipole / toroidal ribbons (visual, not SI values) — see the note above. |
+| **Next conjunction** | Text hints overlay (`TAB`) | The next date two of Mercury, Venus, and Mars share a geocentric ecliptic longitude, with their apparent separation. Recomputed from the ephemeris whenever you scrub the date. |
+| **Ceres and Vesta** | Focus index 10 and 11, or `?planet=ceres` / `?planet=vesta` | The two largest main-belt bodies, orbiting inside the existing asteroid field with the same staged LOD texture path as the planets. |
+
+Accuracy is deliberately "visualiser grade": positions are good to roughly an arcminute for the
+planets near the present day, and the belt bodies drift about half a degree per decade away from
+their element epoch because nothing models Jupiter's perturbations. Conjunction dates are
+therefore reliable to within a day, not a minute. `tests/test_sky_events.cpp` and
+`tests/test_ephemeris.cpp` pin these against JPL Horizons.
+
 <h2 id="runtime-asset-hosting">Runtime asset hosting</h2>
 
 The multi-gigabyte high-resolution DDS files and music are release artifacts, not source-code

@@ -46,6 +46,8 @@ const PLANET_IDS: Record<string, PlanetIndex> = {
     uranus: 7,
     neptune: 8,
     pluto: 9,
+    ceres: 10,
+    vesta: 11,
 };
 
 const PLANET_ID_BY_INDEX = Object.fromEntries(
@@ -88,7 +90,7 @@ function parsePlanetIndex(value: string | null): PlanetIndex | undefined {
         return PLANET_IDS[normalized];
     }
     const asNumber = Number(value);
-    if (Number.isInteger(asNumber) && asNumber >= 0 && asNumber <= 9) {
+    if (Number.isInteger(asNumber) && asNumber >= 0 && asNumber <= 11) {
         return asNumber as PlanetIndex;
     }
     return undefined;
@@ -207,7 +209,7 @@ export function buildShareableUrl(
     }
 
     const focusedPlanet = readers.getFocusedPlanetIndex?.() ?? -1;
-    if (focusedPlanet >= 0 && focusedPlanet <= 9) {
+    if (focusedPlanet >= 0 && focusedPlanet <= 11) {
         url.searchParams.set('planet', PLANET_ID_BY_INDEX[focusedPlanet as PlanetIndex]);
     }
 

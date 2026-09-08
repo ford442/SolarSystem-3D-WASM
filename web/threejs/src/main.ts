@@ -11,6 +11,11 @@ import {
   type PlanetTextureLodTarget,
   type TextureTier,
 } from './textureLod';
+import { createLoadingOverlay, type AssetProgressSink } from './loadingOverlay';
+import { createPostPipeline, type PostPipeline, type PostProcessingConfig } from './postFx';
+import { createAtmosphereShell, type AtmosphereConfig } from './atmosphere';
+import { applyRingTexture, createRingMesh, type RingConfig } from './rings';
+import { CompanionMusic, type MusicConfig } from './audio';
 
 interface OrbitalBody {
   id: string;
@@ -50,6 +55,10 @@ interface CompanionConfig {
     directory: string;
     faces: string[];
   };
+  postProcessing: PostProcessingConfig;
+  music: MusicConfig;
+  atmospheres: AtmosphereConfig[];
+  rings: RingConfig[];
   moons: MoonConfig[];
 }
 
@@ -60,7 +69,10 @@ interface BodyView {
   name: string;
   mode: BodyRenderMode;
   kind: 'sun' | 'planet' | 'moon' | 'proxy';
+  /** Spinning body mesh. */
   mesh: THREE.Object3D;
+  /** Tilted parent that owns position, rings and atmosphere (planets only). */
+  pivot?: THREE.Object3D;
   label: HTMLElement;
   visualRadius: number;
   worldPosition: THREE.Vector3;
@@ -91,7 +103,9 @@ const infoElement = requiredElement('info');
 const focusElement = requiredElement('focus-presets');
 const textureStatusElement = requiredElement('texture-status');
 const titleElement = requiredElement('companion-title');
+const musicButton = requiredElement('music-toggle') as HTMLButtonElement;
 const canvas = requiredCanvas('scene');
+const overlay = createLoadingOverlay();
 
 const lowTextureBase = withTrailingSlash(`${import.meta.env.BASE_URL}textures/ktx2/`);
 const highTextureBase = withTrailingSlash(
@@ -101,18 +115,25 @@ const transcoderBase = withTrailingSlash(`${import.meta.env.BASE_URL}basis/`);
 const skyboxBase = withTrailingSlash(
   `${import.meta.env.BASE_URL}${companionConfig.skybox.directory}`,
 );
+// Music lives with the WASM deploy one level up (`/solar-system/resource/sounds/`),
+// or wherever VITE_ASSET_BASE points, exactly like the main app's fetches.
+const musicAssetBase = withTrailingSlash(
+  import.meta.env.VITE_ASSET_BASE?.trim() ||
+    new URL('../', new URL(import.meta.env.BASE_URL, window.location.href)).toString(),
+);
 
 const scene = new THREE.Scene();
 scene.background = new THREE.Color(0x01030a);
 scene.fog = new THREE.FogExp2(0x01030a, 0.00004);
 
 const camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.1, 20_000);
-camera.position.set(0, 1250, 3600);
+camera.position.set(0, 1800, 5200);
 
 let renderer: CompanionRenderer;
 let controls: OrbitControls;
 let ktx2Loader: KTX2Loader;
 let textureLodManager: PlanetTextureLodManager;
+let postPipeline: PostPipeline;
 let cameraTransition: CameraTransition | null = null;
 const bodies: BodyView[] = [];
 const bodyById = new Map<string, BodyView>();
@@ -128,8 +149,24 @@ let pendingTextureLoads = 0;
 const EARTH_ORBIT_SECONDS_AT_1X = 120;
 const EARTH_YEAR_DAYS = 365.25;
 
+/** Every fetch is mirrored into the overlay and the persistent HUD counter. */
+const assetProgress: AssetProgressSink = {
+  start(key, label) {
+    pendingTextureLoads++;
+    overlay.start(key, label);
+    updateTextureStatus();
+  },
+  settle(key, loaded) {
+    pendingTextureLoads = Math.max(0, pendingTextureLoads - 1);
+    overlay.settle(key, loaded);
+    updateTextureStatus();
+  },
+};
+
 async function init(): Promise<void> {
   titleElement.textContent = companionConfig.title;
+  overlay.expect(expectedAssetKeys());
+  overlay.setStatus('Starting renderer…');
 
   const rendererResult = await createRenderer(canvas);
   renderer = rendererResult.renderer;
@@ -137,7 +174,7 @@ async function init(): Promise<void> {
   renderer.setSize(window.innerWidth, window.innerHeight);
   renderer.outputColorSpace = THREE.SRGBColorSpace;
   renderer.toneMapping = THREE.ACESFilmicToneMapping;
-  renderer.toneMappingExposure = 1.15;
+  renderer.toneMappingExposure = companionConfig.postProcessing.toneMappingExposure;
 
   controls = new OrbitControls(camera, renderer.domElement);
   controls.enableDamping = true;
@@ -147,7 +184,8 @@ async function init(): Promise<void> {
   controls.panSpeed = 0.65;
   controls.zoomToCursor = true;
   controls.minDistance = 8;
-  controls.maxDistance = 9000;
+  // Stay inside the 14k skybox cube so the backdrop never clips.
+  controls.maxDistance = 6500;
   controls.target.set(0, 0, 0);
 
   ktx2Loader = new KTX2Loader()
@@ -155,30 +193,39 @@ async function init(): Promise<void> {
     .setWorkerLimit(2)
     .detectSupport(renderer);
 
-  textureLodManager = new PlanetTextureLodManager(ktx2Loader, () => {
-    tierCounts.low = 0;
-    tierCounts.high = 0;
-    for (const body of bodies) {
-      if (!body.textureTarget) continue;
-      const tier = textureLodManager.getActiveTier(body.id);
-      tierCounts[tier]++;
-    }
-    updateTextureStatus();
-  });
+  textureLodManager = new PlanetTextureLodManager(
+    ktx2Loader,
+    () => {
+      tierCounts.low = 0;
+      tierCounts.high = 0;
+      for (const body of bodies) {
+        if (!body.textureTarget) continue;
+        const tier = textureLodManager.getActiveTier(body.id);
+        tierCounts[tier]++;
+      }
+      updateTextureStatus();
+    },
+    assetProgress,
+  );
 
   addLightingAndSun();
   addProceduralStarfield();
-  await tryLoadSkybox();
   createSolarSystem();
   createFocusPresets();
   bindInput();
+  postPipeline = createPostPipeline(renderer, scene, camera, companionConfig.postProcessing);
   onResize();
+  await tryLoadSkybox();
+
+  new CompanionMusic(companionConfig.music, musicAssetBase, musicButton);
 
   const fullCount = companionConfig.fullBodyIds.length;
   const proxyCount = companionConfig.proxyBodyIds.length;
+  const proxySummary = proxyCount > 0 ? ` · ${proxyCount} proxies` : '';
   infoElement.textContent =
-    `Phase ${companionConfig.phase} · ${rendererResult.backend} · ` +
-    `${fullCount} full bodies · ${proxyCount} proxies · ${companionConfig.moons.length} moons · ${skyboxStatus}`;
+    `Phase ${companionConfig.phase} · ${rendererResult.backend} · ${postPipeline.label} · ` +
+    `${fullCount} planets${proxySummary} · ${companionConfig.moons.length} moons · ` +
+    `${companionConfig.rings.length} ring systems · ${skyboxStatus}`;
   updateTextureStatus();
 
   if (renderer instanceof THREE.WebGLRenderer) {
@@ -189,20 +236,63 @@ async function init(): Promise<void> {
   }
 
   renderer.setAnimationLoop(animate);
-  console.info('[threejs-companion] Phase 2 ready', {
+  console.info(`[threejs-companion] Phase ${companionConfig.phase} ready`, {
     backend: rendererResult.backend,
+    post: postPipeline.label,
     orbitalSource: orbitalParameters.source,
     fullBodyIds: companionConfig.fullBodyIds,
     proxyBodyIds: companionConfig.proxyBodyIds,
+    ringSystems: companionConfig.rings.map((ring) => ring.bodyId),
+    atmospheres: companionConfig.atmospheres.map((atmosphere) => atmosphere.bodyId),
     lowTextureBase,
     highTextureBase,
+    musicAssetBase,
     skyboxStatus,
   });
+}
+
+/**
+ * Assets that gate the loading overlay: one low-tier texture per textured body,
+ * every ring strip, and each skybox face. High-tier upgrades stream later and
+ * are reported in the HUD instead.
+ */
+function expectedAssetKeys(): string[] {
+  const keys = companionConfig.fullBodyIds.map((id) =>
+    PlanetTextureLodManager.progressKey(id, 'low'),
+  );
+
+  for (const moon of companionConfig.moons) {
+    if (moon.renderMode === 'full') {
+      keys.push(PlanetTextureLodManager.progressKey(moon.id, 'low'));
+    }
+  }
+
+  for (const ring of companionConfig.rings) {
+    keys.push(`${ring.bodyId}:ring`);
+  }
+
+  if (companionConfig.skybox.enabled) {
+    for (const face of companionConfig.skybox.faces) {
+      keys.push(`skybox:${face}`);
+    }
+  }
+
+  return keys;
 }
 
 async function createRenderer(
   targetCanvas: HTMLCanvasElement,
 ): Promise<{ renderer: CompanionRenderer; backend: string }> {
+  // `?renderer=webgl` forces the plain WebGLRenderer rescue path, which is the
+  // only way to exercise the EffectComposer post stack and the VRButton spike
+  // (WebGPURenderer otherwise falls back to its own WebGL backend).
+  if (new URLSearchParams(window.location.search).get('renderer') === 'webgl') {
+    return {
+      renderer: new THREE.WebGLRenderer({ canvas: targetCanvas, antialias: true }),
+      backend: 'WebGL fallback (forced)',
+    };
+  }
+
   try {
     const webgpuRenderer = new WebGPURenderer({ canvas: targetCanvas, antialias: true });
     await webgpuRenderer.init();
@@ -221,7 +311,7 @@ async function createRenderer(
 }
 
 function addLightingAndSun(): void {
-  const sunRadius = 45;
+  const sunRadius = 110;
   const sunMesh = new THREE.Mesh(
     new THREE.SphereGeometry(sunRadius, 48, 32),
     new THREE.MeshBasicMaterial({ color: 0xffd46a }),
@@ -286,42 +376,39 @@ async function tryLoadSkybox(): Promise<void> {
     return;
   }
 
-  try {
-    const materials: THREE.MeshBasicMaterial[] = [];
-    for (const face of companionConfig.skybox.faces) {
-      const url = textureUrl(face, skyboxBase);
-      pendingTextureLoads++;
-      updateTextureStatus();
+  // Each face settles independently so one 404 cannot wedge the loading overlay.
+  const materials = await Promise.all(
+    companionConfig.skybox.faces.map(async (face) => {
+      const progressKey = `skybox:${face}`;
+      assetProgress.start(progressKey, `Skybox ${face.replace('.ktx2', '')}`);
       try {
-        const texture = await ktx2Loader.loadAsync(url);
+        const texture = await ktx2Loader.loadAsync(textureUrl(face, skyboxBase));
         texture.colorSpace = THREE.SRGBColorSpace;
-        materials.push(
-          new THREE.MeshBasicMaterial({
-            map: texture,
-            side: THREE.BackSide,
-            depthWrite: false,
-          }),
-        );
-      } finally {
-        pendingTextureLoads = Math.max(0, pendingTextureLoads - 1);
-        updateTextureStatus();
+        assetProgress.settle(progressKey, true);
+        return new THREE.MeshBasicMaterial({
+          map: texture,
+          side: THREE.BackSide,
+          depthWrite: false,
+        });
+      } catch (error) {
+        assetProgress.settle(progressKey, false);
+        console.warn(`[threejs-companion] Skybox face ${face} unavailable.`, error);
+        return null;
       }
-    }
+    }),
+  );
 
-    if (materials.length === 6) {
-      // BoxGeometry material order: +x, -x, +y, -y, +z, -z
-      const sky = new THREE.Mesh(new THREE.BoxGeometry(14_000, 14_000, 14_000), materials);
-      sky.name = 'Skybox';
-      sky.frustumCulled = false;
-      scene.add(sky);
-      skyboxStatus = 'KTX2 cube + starfield';
-      console.info('[threejs-companion] Skybox cube loaded from', skyboxBase);
-    } else {
-      skyboxStatus = 'procedural starfield (skybox incomplete)';
-    }
-  } catch (error) {
-    skyboxStatus = 'procedural starfield (skybox unavailable)';
-    console.warn('[threejs-companion] Skybox KTX2 unavailable; using starfield only.', error);
+  if (materials.every((material) => material !== null)) {
+    // BoxGeometry material order: +x, -x, +y, -y, +z, -z
+    const sky = new THREE.Mesh(new THREE.BoxGeometry(14_000, 14_000, 14_000), materials);
+    sky.name = 'Skybox';
+    sky.frustumCulled = false;
+    scene.add(sky);
+    skyboxStatus = 'KTX2 cube + starfield';
+    console.info('[threejs-companion] Skybox cube loaded from', skyboxBase);
+  } else {
+    for (const material of materials) material?.dispose();
+    skyboxStatus = 'procedural starfield (skybox incomplete)';
   }
 }
 
@@ -352,10 +439,18 @@ function createFullPlanet(parameters: OrbitalBody): void {
   });
   const mesh = new THREE.Mesh(new THREE.SphereGeometry(visualRadius, 64, 48), material);
   mesh.name = parameters.name;
-  mesh.position.fromArray(parameters.position);
-  mesh.rotation.z = THREE.MathUtils.degToRad(parameters.axialTiltDegrees);
-  scene.add(mesh);
-  addOrbitGuide(mesh.position.length());
+
+  // The tilt lives on a pivot so the body spins around its *tilted* axis and
+  // rings/atmosphere inherit the tilt without wobbling with the spin.
+  const pivot = new THREE.Group();
+  pivot.name = `${parameters.name}Pivot`;
+  pivot.position.fromArray(parameters.position);
+  pivot.rotation.z = THREE.MathUtils.degToRad(parameters.axialTiltDegrees);
+  pivot.add(mesh);
+  scene.add(pivot);
+  addOrbitGuide(pivot.position.length());
+  attachRingSystem(parameters.id, visualRadius, pivot);
+  attachAtmosphere(parameters.id, visualRadius, pivot);
 
   const label = createBodyLabel(parameters.name, false);
   label.addEventListener('click', () => focusBody(parameters.id));
@@ -365,7 +460,7 @@ function createFullPlanet(parameters: OrbitalBody): void {
     id: parameters.id,
     name: parameters.name,
     mesh,
-    worldPosition: mesh.position,
+    worldPosition: pivot.position,
     lowUrl: textureUrl(parameters.texture, lowTextureBase),
     highUrl: textureUrl(parameters.texture, highTextureBase),
   };
@@ -376,15 +471,52 @@ function createFullPlanet(parameters: OrbitalBody): void {
     mode: 'full',
     kind: 'planet',
     mesh,
+    pivot,
     label,
     visualRadius,
-    worldPosition: mesh.position,
+    worldPosition: pivot.position,
     rotationRate: parameters.rotationRate,
     textureTarget,
   };
   bodies.push(view);
   bodyById.set(parameters.id, view);
   textureLodManager.register(textureTarget);
+}
+
+function attachRingSystem(bodyId: string, bodyRadius: number, parent: THREE.Object3D): void {
+  const config = companionConfig.rings.find((ring) => ring.bodyId === bodyId);
+  if (!config) return;
+
+  const ring = createRingMesh(bodyRadius, config);
+  parent.add(ring);
+  void loadRingStrip(config, ring);
+}
+
+/** The committed ring DDS files are 4×4 placeholders; procedural stays until a real strip lands. */
+async function loadRingStrip(config: RingConfig, ring: THREE.Mesh): Promise<void> {
+  const progressKey = `${config.bodyId}:ring`;
+  const label = `${capitalize(config.bodyId)} rings`;
+  assetProgress.start(progressKey, label);
+
+  try {
+    const texture = await ktx2Loader.loadAsync(textureUrl(config.texture, lowTextureBase));
+    const applied = applyRingTexture(ring, texture);
+    assetProgress.settle(progressKey, true);
+    console.info(
+      applied
+        ? `[threejs-companion] ${label}: KTX2 strip applied`
+        : `[threejs-companion] ${label}: KTX2 strip too small; keeping procedural strip`,
+    );
+  } catch (error) {
+    assetProgress.settle(progressKey, false);
+    console.warn(`[threejs-companion] ${label}: KTX2 unavailable; keeping procedural strip.`, error);
+  }
+}
+
+function attachAtmosphere(bodyId: string, bodyRadius: number, parent: THREE.Object3D): void {
+  const config = companionConfig.atmospheres.find((atmosphere) => atmosphere.bodyId === bodyId);
+  if (!config) return;
+  parent.add(createAtmosphereShell(renderer, bodyRadius, config));
 }
 
 function createProxyMarker(parameters: OrbitalBody): void {
@@ -477,6 +609,7 @@ function createMoon(moon: MoonConfig): void {
   mesh.name = moon.name;
   // Parent-relative: moons live in world space but track parent each frame.
   scene.add(mesh);
+  attachAtmosphere(moon.id, visualRadius, mesh);
 
   const label = createBodyLabel(isProxy ? `${moon.name} · proxy` : moon.name, isProxy);
   label.addEventListener('click', () => focusBody(moon.id));
@@ -570,10 +703,12 @@ function addLocalOrbitGuide(center: THREE.Vector3, radius: number): void {
 function updateTextureStatus(): void {
   const highBaseLabel = import.meta.env.VITE_KTX2_BASE?.trim() ? 'CDN high' : 'local high';
   const pending = pendingTextureLoads > 0 ? ` · loading ${pendingTextureLoads}` : '';
-  const proxyCount = bodies.filter((b) => b.mode === 'proxy').length;
+  const proxyCount = bodies.filter((body) => body.mode === 'proxy').length;
+  const proxies = proxyCount > 0 ? ` · proxies ${proxyCount}` : '';
+  const failures = overlay.failureCount > 0 ? ` · ${overlay.failureCount} unavailable` : '';
   textureStatusElement.textContent =
-    `LOD low ${tierCounts.low} · high ${tierCounts.high} · proxies ${proxyCount} · ` +
-    `${highBaseLabel}: ${highTextureBase}${pending}`;
+    `LOD low ${tierCounts.low} · high ${tierCounts.high}${proxies} · ` +
+    `${highBaseLabel}: ${highTextureBase}${pending}${failures}`;
 }
 
 function createFocusPresets(): void {
@@ -618,14 +753,35 @@ function focusBody(id: string): void {
   const body = bodyById.get(id);
   if (!body) return;
   const target = body.worldPosition.clone();
-  const direction = camera.position.clone().sub(controls.target).normalize();
-  if (direction.lengthSq() < 0.5) direction.set(0.7, 0.35, 0.7).normalize();
-  const distance = Math.max(body.visualRadius * 7, body.mode === 'proxy' ? 180 : 100);
+  const direction = sunlitApproach(target);
+  const distance = Math.max(body.visualRadius * 4.2, body.mode === 'proxy' ? 180 : 100);
   startCameraTransition(target.clone().add(direction.multiplyScalar(distance)), target);
 }
 
+/**
+ * Approach vector that keeps the lit hemisphere facing the camera: mostly
+ * sunward (the Sun sits at the origin) with a tangential and vertical offset so
+ * the body reads as a gibbous disc rather than a flat full phase.
+ */
+function sunlitApproach(target: THREE.Vector3): THREE.Vector3 {
+  const sunward = target.clone().negate();
+  if (sunward.lengthSq() < 1) {
+    // The Sun itself: keep whatever direction the camera already looks from.
+    const current = camera.position.clone().sub(controls.target);
+    return current.lengthSq() < 0.5 ? new THREE.Vector3(0.7, 0.35, 0.7).normalize() : current.normalize();
+  }
+
+  sunward.normalize();
+  const tangent = new THREE.Vector3().crossVectors(sunward, camera.up).normalize();
+  return sunward
+    .multiplyScalar(0.78)
+    .addScaledVector(tangent, 0.42)
+    .addScaledVector(camera.up, 0.3)
+    .normalize();
+}
+
 function focusOverview(): void {
-  startCameraTransition(new THREE.Vector3(0, 1250, 3600), new THREE.Vector3(0, 0, 0));
+  startCameraTransition(new THREE.Vector3(0, 1800, 5200), new THREE.Vector3(0, 0, 0));
 }
 
 function startCameraTransition(position: THREE.Vector3, target: THREE.Vector3): void {
@@ -742,13 +898,22 @@ function animate(now: number): void {
     .filter((target): target is PlanetTextureLodTarget => target !== undefined);
   textureLodManager.update(camera, lodTargets);
   updateLabels();
-  renderer.render(scene, camera);
+  postPipeline.render();
 }
 
 function onResize(): void {
   camera.aspect = window.innerWidth / window.innerHeight;
   camera.updateProjectionMatrix();
   renderer?.setSize(window.innerWidth, window.innerHeight);
+  postPipeline?.setSize(
+    window.innerWidth,
+    window.innerHeight,
+    Math.min(window.devicePixelRatio, 2),
+  );
+}
+
+function capitalize(value: string): string {
+  return value.charAt(0).toUpperCase() + value.slice(1);
 }
 
 function withTrailingSlash(value: string): string {
@@ -771,4 +936,6 @@ void init().catch((error: unknown) => {
   console.error('[threejs-companion] Initialization failed', error);
   infoElement.textContent = `Initialization failed: ${error instanceof Error ? error.message : String(error)}`;
   infoElement.classList.add('error');
+  // Drop the overlay so the HUD error is readable.
+  overlay.hide();
 });

@@ -57,7 +57,17 @@ The CMakeLists.txt has separate configurations for EMSCRIPTEN vs native builds, 
 
 **Core Modules**
 - `main.cpp` — Application entry point
-- `Application.h/cpp` — Main application class managing render loop and scenes
+- `Application.h` — The single `Application` class. Its members are split across several
+  translation units by responsibility; `Application.h` is the one place that declares them all:
+  - `Application.cpp` — lifecycle (ctor/dtor, `InitScene`/`InitSceneObjects`) and the frame loop
+  - `PlatformWindow.cpp` — GLFW/SDL/GL bring-up, window icon, resize, vsync, `Dispose`
+  - `InputHandler.cpp` — polled input plus the mouse/scroll/key callbacks
+  - `AudioPlayer.cpp` — background music (SDL_mixer on web, irrKlang on native)
+  - `SceneRenderer.cpp` — shadow/color passes for planets, atmospheres, rings, clouds, text overlays
+  - `SceneOverlayRenderer.cpp` — magnetic field ribbons, orbit paths, asteroid belt
+  - `RenderSettings.cpp` — quality/shadow presets, orbit scale mode, texture LOD manager
+  - `StarSystemFactory.cpp` / `PlanetSystemLoader.cpp` — scene construction and staged web loading
+  - `XrSession.cpp` — WebXR eye state and the stereo render pass (web only)
 - `SystemModules.h` — Convenience headers bundling system includes
 
 **Auxiliary Modules** (`Auxiliary_Modules/`)
@@ -132,6 +142,18 @@ The CMakeLists.txt has separate configurations for EMSCRIPTEN vs native builds, 
 ## Common Tasks
 
 ### Adding a New Celestial Body
+
+**Catalog-driven path (preferred for a body with no unique shader needs).** No new class:
+1. Add a body to `resource/planets.catalog.json` with a `render` block, `system.initTag` (also on `initTagAllowlist`), and `assets.requiredLow`
+2. Run `node scripts/generate-planet-metadata.mjs`
+3. Add the `OrbitLayout::Body` enum value and its `BodyFromName` mapping
+4. Add Keplerian elements to `Ephemeris.cpp` if the body is not in the Standish table
+5. Call `InitCatalogBody(*_sphereModel, OrbitLayout::Body::X)` from `InitStarSystem()` (desktop) and add an initTag branch in `MakePlanetInitFunc` (staged web loading)
+
+Ceres and Vesta are the worked example. `scripts/make_placeholder_dds.py` writes the stand-in
+textures that `resource/textures_low/` ships until real ones are uploaded.
+
+**Hand-written path (atmosphere, rings, clouds, or a fixed art tilt).**
 1. Create a new class in the appropriate system folder (e.g., `Saturn_System/NewSatellite.h/cpp`)
 2. Inherit from `Satellite` or `Planet` as appropriate
 3. Override `update()` and `render()` if needed; use parent implementations for default behavior

@@ -37,7 +37,7 @@ export type SetTouchMovement = (forward: number, right: number, vertical: number
 export type AddTouchLook = (deltaX: number, deltaY: number) => void;
 export type AddTouchZoom = (delta: number) => void;
 
-export type PlanetIndex = 0 | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9;
+export type PlanetIndex = 0 | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10 | 11;
 
 export type OrbitScaleMode = 0 | 1;
 
@@ -46,13 +46,13 @@ export type GetMusicVolume = () => number;
 export type SetMusicMuted = (muted: boolean) => void;
 export type GetMusicMuted = () => boolean;
 
-/** Planet index accepted by FocusPlanet: 0=sun, 1=Mercury, ..., 9=Pluto. */
+/** Planet index accepted by FocusPlanet: 0=sun, 1=Mercury, ..., 9=Pluto, 10=Ceres, 11=Vesta. */
 export type FocusPlanet = (index: PlanetIndex) => void;
 
 /** 0=compressed artistic orbits, 1=AU-proportional spacing. */
 export type SetOrbitScaleMode = (mode: OrbitScaleMode) => void;
 export type GetOrbitScaleMode = () => OrbitScaleMode;
-/** Returns 1–9 for nearest loaded planet, or -1 when unknown. */
+/** Returns 1–11 for nearest loaded planet, or -1 when unknown. */
 export type GetNearestPlanetIndex = () => number;
 export type GetFocusedPlanetIndex = () => number;
 export type GetPlanetSceneDistance = (index: PlanetIndex) => number;
@@ -211,6 +211,26 @@ export interface SolarSystemCwrap {
     argTypes: ['number'],
   ): (...args: number[]) => number;
   (
+    ident: 'GetNextConjunctionJulianDate',
+    returnType: 'number',
+    argTypes: [],
+  ): (...args: number[]) => number;
+  (
+    ident: 'GetNextConjunctionBodyA',
+    returnType: 'number',
+    argTypes: [],
+  ): (...args: number[]) => number;
+  (
+    ident: 'GetNextConjunctionBodyB',
+    returnType: 'number',
+    argTypes: [],
+  ): (...args: number[]) => number;
+  (
+    ident: 'GetNextConjunctionSeparationDeg',
+    returnType: 'number',
+    argTypes: [],
+  ): (...args: number[]) => number;
+  (
     ident: 'SetOrbitLines',
     returnType: null,
     argTypes: ['number'],
@@ -321,20 +341,15 @@ export interface SolarSystemModuleConfig {
   updateStreamingProgress?: (completed: number, total: number, active?: number, tierCode?: number) => void;
   onPlanetFocused?: (index: number) => void;
   onSettingsChanged?: (field: SettingsChangeField | string) => void;
-  /** Passed through to Emscripten's WebGL context creation (GLFW). */
-  contextAttributes?: {
-    xrCompatible?: boolean;
-    majorVersion?: number;
-    minorVersion?: number;
-    antialias?: boolean;
-    depth?: boolean;
-    stencil?: boolean;
-    alpha?: boolean;
-    premultipliedAlpha?: boolean;
-    preserveDrawingBuffer?: boolean;
-    powerPreference?: 'default' | 'high-performance' | 'low-power';
-    failIfMajorPerformanceCaveat?: boolean;
-  };
+  /**
+   * A WebGL2 context created by the caller (see web/src/webglContext.ts), reused as-is by
+   * Emscripten's GLFW port. This is the ONLY way to control powerPreference / xrCompatible /
+   * premultipliedAlpha / preserveDrawingBuffer / alpha / antialias here — GLFW builds its own
+   * context-attributes object from GLFW window hints and ignores any other Module config key
+   * for this purpose (there used to be a `contextAttributes` field on this interface; it was
+   * never read by Emscripten's runtime and has been removed).
+   */
+  preinitializedWebGLContext?: WebGL2RenderingContext;
 }
 
 export interface SolarSystemModule {

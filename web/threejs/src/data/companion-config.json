@@ -1,8 +1,18 @@
 {
-  "phase": 2,
-  "title": "Solar System · Companion (Sun → Jupiter)",
-  "fullBodyIds": ["mercury", "venus", "earth", "mars", "jupiter"],
-  "proxyBodyIds": ["saturn", "uranus", "neptune", "pluto"],
+  "phase": 3,
+  "title": "Solar System · Companion (Sun → Pluto)",
+  "fullBodyIds": [
+    "mercury",
+    "venus",
+    "earth",
+    "mars",
+    "jupiter",
+    "saturn",
+    "uranus",
+    "neptune",
+    "pluto"
+  ],
+  "proxyBodyIds": [],
   "skybox": {
     "enabled": true,
     "directory": "textures/ktx2/skybox/",
@@ -15,12 +25,83 @@
       "NegativeZ.ktx2"
     ]
   },
+  "postProcessing": {
+    "enabled": true,
+    "bloomStrength": 0.85,
+    "bloomRadius": 0.45,
+    "bloomThreshold": 0.72,
+    "toneMappingExposure": 1.15
+  },
+  "music": {
+    "enabled": true,
+    "directory": "resource/sounds/",
+    "volume": 0.32,
+    "tracks": [
+      "Stellardrone - Galaxies.mp3",
+      "Stellardrone - Mars.mp3",
+      "Stellardrone - Billions And Billions.mp3",
+      "Stellardrone - Gravitation (Remix).mp3",
+      "Stellardrone - The Edge of Forever.mp3"
+    ]
+  },
+  "atmospheres": [
+    {
+      "bodyId": "earth",
+      "color": "#5fa8ff",
+      "shellScale": 1.045,
+      "intensity": 0.85,
+      "falloff": 2.6
+    },
+    {
+      "bodyId": "venus",
+      "color": "#ffd79a",
+      "shellScale": 1.06,
+      "intensity": 0.7,
+      "falloff": 2.2
+    },
+    {
+      "bodyId": "titan",
+      "color": "#f0a45a",
+      "shellScale": 1.09,
+      "intensity": 0.75,
+      "falloff": 2.0
+    }
+  ],
+  "rings": [
+    {
+      "bodyId": "saturn",
+      "innerScale": 1.24,
+      "outerScale": 2.27,
+      "texture": "Saturn_Rings.ktx2",
+      "opacity": 0.92,
+      "palette": ["#d9c9a2", "#b8a578", "#f0e5c8"]
+    },
+    {
+      "bodyId": "uranus",
+      "innerScale": 1.64,
+      "outerScale": 2.0,
+      "texture": "Uranus_Rings.ktx2",
+      "opacity": 0.45,
+      "palette": ["#9fb6c6", "#6d8496", "#c6d6e2"]
+    }
+  ],
   "moons": [
+    {
+      "id": "moon",
+      "name": "Moon",
+      "parent": "earth",
+      "orbitRadius": 95,
+      "earthRadiusScale": 0.273,
+      "periodDays": 27.32,
+      "texture": "Moon_Diffuse.ktx2",
+      "fallbackColor": "#b9b4ab",
+      "renderMode": "full"
+    },
     {
       "id": "io",
       "name": "Io",
       "parent": "jupiter",
-      "orbitRadius": 65,
+      "orbitRadius": 420,
       "earthRadiusScale": 0.286,
       "periodDays": 1.769,
       "texture": "Io_Diffuse.ktx2",
@@ -31,7 +112,7 @@
       "id": "europa",
       "name": "Europa",
       "parent": "jupiter",
-      "orbitRadius": 74,
+      "orbitRadius": 470,
       "earthRadiusScale": 0.245,
       "periodDays": 3.551,
       "texture": "Europa_Diffuse.ktx2",
@@ -42,7 +123,7 @@
       "id": "ganymede",
       "name": "Ganymede",
       "parent": "jupiter",
-      "orbitRadius": 83,
+      "orbitRadius": 530,
       "earthRadiusScale": 0.413,
       "periodDays": 7.155,
       "texture": "Ganymede_Diffuse.ktx2",
@@ -53,12 +134,34 @@
       "id": "callisto",
       "name": "Callisto",
       "parent": "jupiter",
-      "orbitRadius": 92,
+      "orbitRadius": 600,
       "earthRadiusScale": 0.378,
       "periodDays": 16.69,
       "texture": "Callisto_Diffuse.ktx2",
       "fallbackColor": "#6e655c",
-      "renderMode": "proxy"
+      "renderMode": "full"
+    },
+    {
+      "id": "titan",
+      "name": "Titan",
+      "parent": "saturn",
+      "orbitRadius": 760,
+      "earthRadiusScale": 0.404,
+      "periodDays": 15.945,
+      "texture": "Titan_Diffuse.ktx2",
+      "fallbackColor": "#d9a15c",
+      "renderMode": "full"
+    },
+    {
+      "id": "triton",
+      "name": "Triton",
+      "parent": "neptune",
+      "orbitRadius": 220,
+      "earthRadiusScale": 0.212,
+      "periodDays": 5.877,
+      "texture": "Triton_Diffuse.ktx2",
+      "fallbackColor": "#cfc7bd",
+      "renderMode": "full"
     }
   ]
 }
