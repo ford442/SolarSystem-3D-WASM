@@ -1,7 +1,7 @@
 #include "Mesh.h"
 
 Mesh::Mesh(std::vector<Vertex> vertices, std::vector<size_t> indices, std::vector<Texture> textures)
-    : _vao(0), _vbo(0), _ebo(0), _vertices(std::move(vertices)), _indices(std::move(indices)), _textures(std::move(textures))
+    : _vertices(std::move(vertices)), _indices(std::move(indices)), _textures(std::move(textures)), _vbo(0), _vao(0), _ebo(0)
 {
     SetupMesh();
 }
@@ -22,7 +22,7 @@ Mesh::~Mesh() {
 }
 
 Mesh::Mesh(const Mesh& other)
-    : _vertices(other._vertices), _indices(other._indices), _textures(other._textures), _vao(0), _vbo(0), _ebo(0)
+    : _vertices(other._vertices), _indices(other._indices), _textures(other._textures), _vbo(0), _vao(0), _ebo(0)
 {
     SetupMesh();
 }
@@ -50,8 +50,8 @@ Mesh& Mesh::operator=(const Mesh& other) {
 }
 
 Mesh::Mesh(Mesh&& other) noexcept
-    : _vao(other._vao), _vbo(other._vbo), _ebo(other._ebo),
-      _vertices(std::move(other._vertices)), _indices(std::move(other._indices)), _textures(std::move(other._textures))
+    : _vertices(std::move(other._vertices)), _indices(std::move(other._indices)), _textures(std::move(other._textures)),
+      _vbo(other._vbo), _vao(other._vao), _ebo(other._ebo)
 {
     other._vao = 0;
     other._vbo = 0;

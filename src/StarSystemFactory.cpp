@@ -181,7 +181,7 @@ void Application::InitCatalogSystem(const MeshHolder& sphereModel, const std::st
         glm::lookAt(_sun->GetPosition(), planet->GetPosition() - _sun->GetPosition(), glm::vec3(0.0, 1.0, 0.0));
 
     component.lightSpaceMatrix = lightProjection * lightView;
-    component.planet = move(planet);
-    component.satellites = move(satellites);
-    _renderableSceneComponents.push_back(move(component));
+    component.planet = std::move(planet);
+    component.satellites = std::move(satellites);
+    _renderableSceneComponents.push_back(std::move(component));
 }

@@ -2,8 +2,10 @@
 #include "WebResourceFetcher.h"
 
 MeshHolder::MeshHolder(const std::string& path) {
-    // Fetch model on demand
-    WebResourceFetcher::Fetch(path);
+    // Models are downloaded by Application::LoadCoreResources() before the scene is
+    // constructed; this only reports a download that never landed, since Assimp's
+    // failure below is reported as a generic "unable to open file".
+    WebResourceFetcher::RequireResident(path, "MeshHolder");
 
     Assimp::Importer importer;
     const aiScene* scene = importer.ReadFile(path, aiProcess_Triangulate | aiProcess_GenSmoothNormals | aiProcess_FlipUVs | aiProcess_CalcTangentSpace);
@@ -131,6 +133,6 @@ std::vector<Texture> MeshHolder::LoadMaterialTextures(aiMaterial* mat, const aiT
     return textures;
 }
 
-size_t TextureFromFile(const std::string& path) {
+size_t TextureFromFile(const std::string& /*path*/) {
     return 0;
 }

@@ -9,9 +9,12 @@
 #endif
 
 std::string GetTexturePath(const std::string& lowRes, const std::string& highRes) {
+    // Only one of the two is live per target; name the other away from -Wunused-parameter.
 #ifdef __EMSCRIPTEN__
+    (void)highRes;
     return lowRes;
 #else
+    (void)lowRes;
     return highRes;
 #endif
 }
@@ -71,9 +74,9 @@ void LogQualityTier(const QualityTierSettings& settings, bool hdrEnabled, int sh
 bool ReadIsMobileWeb() {
     return EM_ASM_INT({
         try {
-            const init = window.__solarSystemInit;
-            if (init && typeof init.isMobileWeb === 'boolean') {
-                return init.isMobileWeb ? 1 : 0;
+            const init = window['__solarSystemInit'];
+            if (init && typeof init['isMobileWeb'] === 'boolean') {
+                return init['isMobileWeb'] ? 1 : 0;
             }
         } catch (error) {
             console.warn('[Quality] Could not read init config:', error);
@@ -85,9 +88,9 @@ bool ReadIsMobileWeb() {
 int ReadInitialQualityPreset() {
     return EM_ASM_INT({
         try {
-            const init = window.__solarSystemInit;
-            if (init && typeof init.qualityPreset === 'number') {
-                const preset = Math.max(0, Math.min(2, init.qualityPreset | 0));
+            const init = window['__solarSystemInit'];
+            if (init && typeof init['qualityPreset'] === 'number') {
+                const preset = Math.max(0, Math.min(2, init['qualityPreset'] | 0));
                 return preset;
             }
         } catch (error) {
@@ -100,9 +103,9 @@ int ReadInitialQualityPreset() {
 float ReadBackingStoreScale() {
     return static_cast<float>(EM_ASM_DOUBLE({
         try {
-            const init = window.__solarSystemInit;
-            if (init && typeof init.backingStoreScale === 'number' && init.backingStoreScale > 0) {
-                return init.backingStoreScale;
+            const init = window['__solarSystemInit'];
+            if (init && typeof init['backingStoreScale'] === 'number' && init['backingStoreScale'] > 0) {
+                return init['backingStoreScale'];
             }
         } catch (error) {
             console.warn('[Quality] Could not read init config:', error);

@@ -166,34 +166,44 @@ if(WIN32)
 endif()
 
 if(EMSCRIPTEN)
-    # Port / shared settings — applied once to compile and once to link (no duplicates).
+    # Port settings that genuinely affect compilation (they put the port's headers on
+    # the include path) — applied once to compile and once to link, no duplicates.
+    # Anything emcc reports as "linker setting ignored during compilation" belongs in
+    # SOLAR_EM_LINK_FLAGS instead, or -Wall drowns in -Wunused-command-line-argument.
     set(SOLAR_EM_PORT_FLAGS
-        "SHELL:-sUSE_GLFW=3"
         "SHELL:-sUSE_SDL=2"
         "SHELL:-sUSE_SDL_IMAGE=2"
         "SHELL:-sSDL2_IMAGE_FORMATS=['png','jpg']"
         "SHELL:-sUSE_SDL_MIXER=2"
         "SHELL:-sUSE_FREETYPE=1"
-        "SHELL:-sFULL_ES3=1"
-        "SHELL:-sALLOW_MEMORY_GROWTH=1"
-        # Explicit default: fixed-buffer growth (new ArrayBuffer + view refresh on
-        # grow), not resizable-ArrayBuffer growth. Current Chrome WebGL/DOM APIs
-        # reject views backed by a resizable buffer (see web/src/bootstrap.ts history).
-        "SHELL:-sGROWABLE_ARRAYBUFFERS=0"
-        "SHELL:-sMAX_WEBGL_VERSION=2"
-        "SHELL:-sMIN_WEBGL_VERSION=2"
-        "SHELL:-sGL_ENABLE_GET_PROC_ADDRESS=1"
-        # ASYNCIFY required for WebResourceFetcher (emscripten_wget_data).
-        # Native -fwasm-exceptions is incompatible with ASYNCIFY=1 (emcc warning);
-        # keep the JS exception path so try/catch still works.
-        "SHELL:-sASYNCIFY=1"
-        "SHELL:-sDISABLE_EXCEPTION_CATCHING=0"
+        # No ASYNCIFY / JSPI: every download goes through the callback-based
+        # emscripten_async_wget2 path in WebResourceFetcher::DownloadFile, and the
+        # scene is not constructed until those callbacks have settled, so nothing
+        # suspends the Wasm stack. See docs/plans/PORTING_GUIDE.md §3b.
+        #
+        # With ASYNCIFY gone, native Wasm exceptions are usable (Chrome 95+,
+        # Firefox 100+, Safari 15.2+). external/assimp must be built with the same
+        # flag — setup_web_dependencies.sh passes it.
+        "SHELL:-fwasm-exceptions"
     )
+
+    # Compile-only: warnings would just be dead arguments on the link line.
+    set(SOLAR_EM_WARNING_FLAGS -Wall -Wextra)
 
     # Link-only: memory, preloads, module shape, JS interop.
     # textures_low (~124 KB) preloaded so planets stay visible without a live asset server.
     # Sounds are LFS-excluded — do not preload (CI/sandbox).
     set(SOLAR_EM_LINK_FLAGS
+        "SHELL:-sUSE_GLFW=3"
+        "SHELL:-sFULL_ES3=1"
+        "SHELL:-sMAX_WEBGL_VERSION=2"
+        "SHELL:-sMIN_WEBGL_VERSION=2"
+        "SHELL:-sGL_ENABLE_GET_PROC_ADDRESS=1"
+        "SHELL:-sALLOW_MEMORY_GROWTH=1"
+        # Explicit default: fixed-buffer growth (new ArrayBuffer + view refresh on
+        # grow), not resizable-ArrayBuffer growth. Current Chrome WebGL/DOM APIs
+        # reject views backed by a resizable buffer (see web/src/bootstrap.ts history).
+        "SHELL:-sGROWABLE_ARRAYBUFFERS=0"
         "SHELL:-sINITIAL_MEMORY=256MB"
         "SHELL:-sMAXIMUM_MEMORY=1GB"
         "SHELL:--preload-file ${CMAKE_SOURCE_DIR}/resource/shaders@/resource/shaders"
@@ -217,17 +227,25 @@ if(EMSCRIPTEN)
 
     if(CMAKE_BUILD_TYPE STREQUAL "Debug")
         set(SOLAR_EM_COMPILE_OPT_FLAGS -O0 -g)
-        set(SOLAR_EM_LINK_OPT_FLAGS -O0 -g "SHELL:-sASSERTIONS=1")
+        # GL_ASSERTIONS validates GL enum/handle arguments in the JS GL layer.
+        # Add "SHELL:-sGL_DEBUG=1" temporarily to also trace every GL call.
+        set(SOLAR_EM_LINK_OPT_FLAGS -O0 -g "SHELL:-sASSERTIONS=1" "SHELL:-sGL_ASSERTIONS=1")
     else()
         # Release (default) and RelWithDebInfo / empty CMAKE_BUILD_TYPE.
-        # Do not enable --closure 1: it strips EM_ASM tables this app needs for
-        # window.updateLoadingProgress / mobile detection / similar bridges.
+        # --closure 1 halves the JS glue (183 380 B -> 87 678 B). The old blocker was
+        # Closure renaming the Module.foo / window.__solarSystemFoo properties read from
+        # EM_ASM; those are all bracket-notation now (JsBridge.cpp, QualitySettings.cpp,
+        # WebResourceFetcher.cpp), which Closure never renames, so no externs file is
+        # needed. New JS bridges MUST use Module['name'], not Module.name -- a dotted
+        # read is silently renamed and the callback simply never fires in Release.
+        # See the "--closure 1" section of docs/plans/PORTING_GUIDE.md §3b.
         set(SOLAR_EM_COMPILE_OPT_FLAGS -O3 -flto)
-        set(SOLAR_EM_LINK_OPT_FLAGS -O3 -flto)
+        set(SOLAR_EM_LINK_OPT_FLAGS -O3 -flto "SHELL:--closure 1")
     endif()
 
     target_compile_options(${PROJECT_NAME} PRIVATE
         ${SOLAR_EM_PORT_FLAGS}
+        ${SOLAR_EM_WARNING_FLAGS}
         ${SOLAR_EM_COMPILE_OPT_FLAGS}
     )
     target_link_options(${PROJECT_NAME} PRIVATE
@@ -275,6 +293,10 @@ else()
         Freetype::Freetype
         assimp::assimp
     )
+endif()
+
+if(NOT EMSCRIPTEN AND NOT MSVC)
+    target_compile_options(${PROJECT_NAME} PRIVATE -Wall -Wextra)
 endif()
 
 option(SOLARSYSTEM_BUILD_TESTS "Build native unit tests" OFF)

@@ -210,7 +210,7 @@ While `NOT_LOADED` or `DOWNLOADING`, `RenderPlanetProxyMarkers()` draws 3D label
 
 Desktop: all manifests are empty; `InitStarSystem()` creates every planet immediately.
 
-**Manifest file (`resource/planet_manifest.json`):** Preloaded into the WASM bundle alongside shaders. At startup, `WebResourceFetcher::Fetch` may overwrite it from the CDN (hotfix without WASM rebuild). Bump the `version` field when publishing an updated manifest so operators can track/cache-bust deployments. Each entry uses `proxyPosition` as an offset from the Sun, `required` / `optional` asset paths, and an `init` tag bound to `InitXxxSystem()` in C++ (`Mercury`, `EarthSystem`, …).
+**Manifest file (`resource/planet_manifest.json`):** Preloaded into the WASM bundle alongside shaders, and read from MEMFS — the CDN-overwrite-at-startup path is gone with the blocking `WebResourceFetcher::Fetch` (a hotfix now needs a WASM rebuild, or a `DownloadFile` staged ahead of `LoadPlanetSystemManifests`). Bump the `version` field when publishing an updated manifest so operators can track/cache-bust deployments. Each entry uses `proxyPosition` as an offset from the Sun, `required` / `optional` asset paths, and an `init` tag bound to `InitXxxSystem()` in C++ (`Mercury`, `EarthSystem`, …).
 
 ```json
 {
@@ -373,7 +373,7 @@ See [README.md § Runtime asset hosting](../README.md#runtime-asset-hosting) for
 | `HDR`, `LensFlare` | Post-processing (star glow only) |
 | `MagneticFieldBloom` | Half-res field-line bloom (not the star HDR FBO) |
 | `TextureImage2D` | DDS load, reload, mip level management |
-| `WebResourceFetcher` | `DownloadFile` (async) + `Fetch` (sync) — WASM only |
+| `WebResourceFetcher` | `DownloadFile` (async, callback-based) + `RequireResident` (residency probe) — WASM only |
 | `TextureLoadingQueue` | Serialized high-res LOD downloads |
 | `OrbitPathRenderer` | Faint heliocentric `GL_LINE_LOOP` guides |
 | `MagneticFieldTracer` / `MagneticFieldLineRenderer` / `MagneticFieldBloom` | Optional dipole+toroidal ribbons (static VBO, GPU flow, half-res bloom on Medium+) |

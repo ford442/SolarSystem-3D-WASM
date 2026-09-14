@@ -34,8 +34,8 @@ public:
     virtual void AdjustToParent(float timeScale = 0.0f) = 0;
     float GetRadius() const;
     float GetEarthSizeCoefficient() const;
-    virtual void LoadHighResIfClose(const glm::vec3& cameraPos) { } // Default: no-op
-    virtual void UnloadHighResIfFar(const glm::vec3& cameraPos) { } // Default: no-op
+    virtual void LoadHighResIfClose(const glm::vec3& /*cameraPos*/) { } // Default: no-op
+    virtual void UnloadHighResIfFar(const glm::vec3& /*cameraPos*/) { } // Default: no-op
 
     bool IsHighResLoaded() const { return _isHighResLoaded; }
     float GetLastCameraDistance() const { return _lastCameraDistance; }

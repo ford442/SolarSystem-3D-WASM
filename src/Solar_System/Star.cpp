@@ -1,8 +1,8 @@
 #include "Star.h"
 
 Star::Star(const StarInfo& starInfo) : SpaceObject(starInfo.starModel, *starInfo.starShader, starInfo.engName, starInfo.otherLangName),
-    _starTemperature(starInfo.starTemperature), _starRadius(starInfo.starRadius), _starSpectrumTexture(starInfo.starSpectrum), _glowShader(starInfo.glowStarShader),
-    _glowTintMult(starInfo.glowTintMult)
+    _starTemperature(starInfo.starTemperature), _starRadius(starInfo.starRadius), _glowTintMult(starInfo.glowTintMult),
+    _starSpectrumTexture(starInfo.starSpectrum), _glowShader(starInfo.glowStarShader)
 {
     InitBuffers();
     _starOcclusion.fill(0);

@@ -10,8 +10,8 @@ struct AtmosphereInfo {
 
     explicit AtmosphereInfo(MeshHolder model, const Shader& shader, float earthScaleFactor, const glm::vec3& atmosphereColor,
                             float innerRadius, float outerRadius, const glm::vec3& mieTint = glm::vec3(1.0)) : atmosphereModel(std::move(model)),
-                            atmosphereShader(&shader), scaleFactor(earthScaleFactor), atmosphereColor(atmosphereColor), mieTint(mieTint), innerRadius(innerRadius),
-                            outerRadius(outerRadius) {}
+                            atmosphereShader(&shader), atmosphereColor(atmosphereColor), mieTint(mieTint), scaleFactor(earthScaleFactor),
+                            innerRadius(innerRadius), outerRadius(outerRadius) {}
 };
 
 class Atmosphere : public OuterShell {

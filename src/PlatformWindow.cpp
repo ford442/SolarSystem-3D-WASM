@@ -94,7 +94,7 @@ void Application::InitSystems() {
 
 #ifdef __EMSCRIPTEN__
     glfwSetInputMode(_mainWindow, GLFW_CURSOR, GLFW_CURSOR_NORMAL);
-    glfwSetMouseButtonCallback(_mainWindow, [](GLFWwindow* window, int button, int action, int mods) {
+    glfwSetMouseButtonCallback(_mainWindow, [](GLFWwindow* window, int button, int action, int /*mods*/) {
         if (button == GLFW_MOUSE_BUTTON_LEFT && action == GLFW_PRESS) {
             glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
         }

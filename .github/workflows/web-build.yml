@@ -68,9 +68,13 @@ jobs:
         id: assimp-cache
         with:
           path: external/assimp/build-wasm/
-          key: assimp-wasm-6.0.0-${{ hashFiles('setup_web_dependencies.sh') }}
+          # 'wasmeh' marks the exception ABI the library is built with. Bump it
+          # whenever that changes: a cached -fexceptions/JS-EH libassimp.a cannot be
+          # linked into a -fwasm-exceptions build, and restore-keys would otherwise
+          # happily restore one across a flag change in setup_web_dependencies.sh.
+          key: assimp-wasm-6.0.0-wasmeh-${{ hashFiles('setup_web_dependencies.sh') }}
           restore-keys: |
-            assimp-wasm-6.0.0-
+            assimp-wasm-6.0.0-wasmeh-
 
       - name: Build WebAssembly
         run: ./build-web.sh --no-emsdk
