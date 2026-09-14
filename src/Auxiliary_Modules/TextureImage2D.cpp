@@ -36,7 +36,7 @@ namespace {
             height > static_cast<unsigned int>(maxTextureSize)) {
             throw std::runtime_error(
                 "Texture dimensions " + std::to_string(width) + "x" + std::to_string(height) +
-                " exceed GL_MAX_TEXTURE_SIZE (" + std::to_string(maxTextureSize) + ")");
+                " exceed GL_MAX_TEXTURE_SIZE (" + std::to_string(maxTextureSize) + ") for " + path);
         }
     }
 #endif

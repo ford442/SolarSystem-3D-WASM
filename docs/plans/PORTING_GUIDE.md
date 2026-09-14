@@ -173,8 +173,10 @@ requirement.
 `-sJSPI=1` (Emscripten 6's `ASYNCIFY=2`) was measured on 2026-09-07 at 2 815 331 B wasm
 versus ASYNCIFY's 3 972 203 B, but threw `SuspendError: trying to suspend without
 WebAssembly.promising` at runtime because suspension happened outside `main()`'s
-synchronous body. It is moot now: with no suspension points at all, plain no-ASYNCIFY
-beats both.
+synchronous body. It is moot now: with no suspension points at all, removing ASYNCIFY
+outright beats JSPI on both size and runtime cost — 2 589 471 B wasm, **−34.8%** against
+the ASYNCIFY baseline and ~226 KB smaller than JSPI, with no stack-switching at all. See
+"Artifact size baseline" below.
 
 ### Native Wasm exceptions
 

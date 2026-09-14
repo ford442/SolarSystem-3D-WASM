@@ -166,23 +166,16 @@ if(WIN32)
 endif()
 
 if(EMSCRIPTEN)
-    # Port / shared settings — applied once to compile and once to link (no duplicates).
+    # Port settings that genuinely affect compilation (they put the port's headers on
+    # the include path) — applied once to compile and once to link, no duplicates.
+    # Anything emcc reports as "linker setting ignored during compilation" belongs in
+    # SOLAR_EM_LINK_FLAGS instead, or -Wall drowns in -Wunused-command-line-argument.
     set(SOLAR_EM_PORT_FLAGS
-        "SHELL:-sUSE_GLFW=3"
         "SHELL:-sUSE_SDL=2"
         "SHELL:-sUSE_SDL_IMAGE=2"
         "SHELL:-sSDL2_IMAGE_FORMATS=['png','jpg']"
         "SHELL:-sUSE_SDL_MIXER=2"
         "SHELL:-sUSE_FREETYPE=1"
-        "SHELL:-sFULL_ES3=1"
-        "SHELL:-sALLOW_MEMORY_GROWTH=1"
-        # Explicit default: fixed-buffer growth (new ArrayBuffer + view refresh on
-        # grow), not resizable-ArrayBuffer growth. Current Chrome WebGL/DOM APIs
-        # reject views backed by a resizable buffer (see web/src/bootstrap.ts history).
-        "SHELL:-sGROWABLE_ARRAYBUFFERS=0"
-        "SHELL:-sMAX_WEBGL_VERSION=2"
-        "SHELL:-sMIN_WEBGL_VERSION=2"
-        "SHELL:-sGL_ENABLE_GET_PROC_ADDRESS=1"
         # No ASYNCIFY / JSPI: every download goes through the callback-based
         # emscripten_async_wget2 path in WebResourceFetcher::DownloadFile, and the
         # scene is not constructed until those callbacks have settled, so nothing
@@ -201,6 +194,16 @@ if(EMSCRIPTEN)
     # textures_low (~124 KB) preloaded so planets stay visible without a live asset server.
     # Sounds are LFS-excluded — do not preload (CI/sandbox).
     set(SOLAR_EM_LINK_FLAGS
+        "SHELL:-sUSE_GLFW=3"
+        "SHELL:-sFULL_ES3=1"
+        "SHELL:-sMAX_WEBGL_VERSION=2"
+        "SHELL:-sMIN_WEBGL_VERSION=2"
+        "SHELL:-sGL_ENABLE_GET_PROC_ADDRESS=1"
+        "SHELL:-sALLOW_MEMORY_GROWTH=1"
+        # Explicit default: fixed-buffer growth (new ArrayBuffer + view refresh on
+        # grow), not resizable-ArrayBuffer growth. Current Chrome WebGL/DOM APIs
+        # reject views backed by a resizable buffer (see web/src/bootstrap.ts history).
+        "SHELL:-sGROWABLE_ARRAYBUFFERS=0"
         "SHELL:-sINITIAL_MEMORY=256MB"
         "SHELL:-sMAXIMUM_MEMORY=1GB"
         "SHELL:--preload-file ${CMAKE_SOURCE_DIR}/resource/shaders@/resource/shaders"

@@ -133,6 +133,6 @@ std::vector<Texture> MeshHolder::LoadMaterialTextures(aiMaterial* mat, const aiT
     return textures;
 }
 
-size_t TextureFromFile(const std::string& path) {
+size_t TextureFromFile(const std::string& /*path*/) {
     return 0;
 }

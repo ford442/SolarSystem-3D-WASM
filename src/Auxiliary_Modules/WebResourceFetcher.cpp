@@ -81,7 +81,7 @@ void EnsureDirectoryExists(const std::string& path) {
 }
 
 // Callback wrappers for emscripten_async_wget2
-void OnLoad2(unsigned int handle, void* arg, const char* file) {
+void OnLoad2(unsigned int /*handle*/, void* arg, const char* /*file*/) {
     auto* context = static_cast<DownloadContext*>(arg);
     s_activeDownloads.erase(context->virtualPath);
     std::cout << "Successfully downloaded: " << context->resolvedUrl << " -> " << context->virtualPath << std::endl;
@@ -91,7 +91,7 @@ void OnLoad2(unsigned int handle, void* arg, const char* file) {
     delete context;
 }
 
-void OnError2(unsigned int handle, void* arg, int status) {
+void OnError2(unsigned int /*handle*/, void* arg, int status) {
     auto* context = static_cast<DownloadContext*>(arg);
     s_activeDownloads.erase(context->virtualPath);
     std::cerr << "Failed to download " << context->resolvedUrl << " -> " << context->virtualPath << ". Status: " << status << std::endl;
@@ -101,8 +101,8 @@ void OnError2(unsigned int handle, void* arg, int status) {
     delete context;
 }
 
-// Matching the signature from the error message: void (*)(unsigned int, void *, int)
-void OnProgress2(unsigned int handle, void* arg, int bytesLoaded) {
+// Matching the signature emscripten_async_wget2 expects: void (*)(unsigned int, void *, int)
+void OnProgress2(unsigned int /*handle*/, void* /*arg*/, int /*bytesLoaded*/) {
     // Progress tracking - bytesLoaded is the number of bytes loaded so far
     // Note: We could expose this for more granular progress tracking
     // For now, we rely on the completion callbacks for progress

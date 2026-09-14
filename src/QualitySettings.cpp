@@ -9,9 +9,12 @@
 #endif
 
 std::string GetTexturePath(const std::string& lowRes, const std::string& highRes) {
+    // Only one of the two is live per target; name the other away from -Wunused-parameter.
 #ifdef __EMSCRIPTEN__
+    (void)highRes;
     return lowRes;
 #else
+    (void)lowRes;
     return highRes;
 #endif
 }
