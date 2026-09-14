@@ -4,9 +4,11 @@
 SkyBox::SkyBox(const std::vector<std::string>& faces) {
     InitBuffers();
 
-    // Ensure all 6 faces are available before loading
+    // Faces are downloaded by Application::LoadCoreResources() and the scene is not
+    // constructed until those downloads settle, so they are already in MEMFS here.
+    // LoadCubeMap() rebuilds a solid-colour cubemap if any face is missing anyway.
     for (const auto& face : faces) {
-        WebResourceFetcher::Fetch(face);
+        WebResourceFetcher::RequireResident(face, "SkyBox");
     }
 
     LoadCubeMap(faces);

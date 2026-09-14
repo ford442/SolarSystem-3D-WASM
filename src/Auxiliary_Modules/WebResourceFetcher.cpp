@@ -40,8 +40,8 @@ namespace {
     EM_JS(char*, GetRuntimeAssetBaseUrl, (const char* fallbackBasePtr), {
         const fallbackBase = UTF8ToString(fallbackBasePtr);
         const configuredBase =
-            typeof window !== 'undefined' && typeof window.__solarSystemAssetBase === 'string' && window.__solarSystemAssetBase.length > 0
-                ? window.__solarSystemAssetBase
+            typeof window !== 'undefined' && typeof window['__solarSystemAssetBase'] === 'string' && window['__solarSystemAssetBase'].length > 0
+                ? window['__solarSystemAssetBase']
                 : fallbackBase;
         const length = lengthBytesUTF8(configuredBase) + 1;
         const buffer = _malloc(length);
@@ -127,43 +127,6 @@ void WebResourceFetcher::DownloadFile(const std::string& url, const std::string&
     emscripten_async_wget2(resolvedUrl.c_str(), virtualPath.c_str(), "GET", nullptr, context, OnLoad2, OnError2, OnProgress2);
 }
 
-void WebResourceFetcher::Fetch(const std::string& path) {
-    if (std::filesystem::exists(path)) {
-        return;
-    }
-
-    const std::string resolvedUrl = ResolveResourceUrl(path);
-    std::cout << "[WebResourceFetcher] Fetching: " << resolvedUrl << " ..." << std::endl;
-
-    void* buffer = nullptr;
-    int numBytes = 0;
-    int error = 0;
-
-    emscripten_wget_data(resolvedUrl.c_str(), &buffer, &numBytes, &error);
-
-    if (error || !buffer || numBytes == 0) {
-        std::cerr << "[WebResourceFetcher] Warning: Failed to download " << resolvedUrl
-                  << " (fallback texture will be used if applicable)" << std::endl;
-        if (buffer) {
-            free(buffer);
-        }
-        return;
-    }
-
-    std::filesystem::path fsPath(path);
-    if (fsPath.has_parent_path()) {
-        std::filesystem::create_directories(fsPath.parent_path());
-    }
-
-    std::ofstream outfile(path, std::ios::binary);
-    outfile.write(static_cast<char*>(buffer), numBytes);
-    outfile.close();
-
-    free(buffer);
-
-    std::cout << "[WebResourceFetcher] Downloaded and written to MEMFS: " << resolvedUrl << " -> " << path << std::endl;
-}
-
 bool WebResourceFetcher::ResourceExists(const std::string& virtualPath) {
     return std::filesystem::exists(virtualPath);
 }
@@ -195,11 +158,26 @@ void WebResourceFetcher::DownloadFile(const std::string& url, const std::string&
     if (callback) callback(true);
 }
 
-void WebResourceFetcher::Fetch(const std::string& path) {
-}
-
 bool WebResourceFetcher::ResourceExists(const std::string& virtualPath) {
     return std::filesystem::exists(virtualPath);
 }
 
 #endif
+
+// Shared by both builds: purely a filesystem probe, so it never blocks the Wasm stack.
+bool WebResourceFetcher::RequireResident(const std::string& virtualPath, const char* context) {
+    if (ResourceExists(virtualPath)) {
+        return true;
+    }
+
+    // Warn once per path: these fire from render-adjacent code, and a per-frame
+    // reload attempt would otherwise spam the console with the same line.
+    static std::unordered_set<std::string> s_warnedPaths;
+    if (s_warnedPaths.insert(virtualPath).second) {
+        std::cerr << "[WebResourceFetcher] " << (context ? context : "?") << ": '" << virtualPath
+                  << "' is not resident. It must be downloaded via DownloadFile() before use "
+                     "(core resources, a staged planet manifest, or TextureLoadingQueue); "
+                     "falling back." << std::endl;
+    }
+    return false;
+}

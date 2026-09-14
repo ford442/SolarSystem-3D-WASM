@@ -77,7 +77,8 @@ if [ ! -f "$ASSIMP_BUILD_DIR/lib/libassimp.a" ]; then
         -DASSIMP_BUILD_GLTF_IMPORTER=ON \
         -DASSIMP_BUILD_COLLADA_IMPORTER=ON \
         -DASSIMP_WARNINGS_AS_ERRORS=OFF \
-        -DCMAKE_CXX_FLAGS="-Wno-error -w" \
+        -DCMAKE_CXX_FLAGS="-Wno-error -w -fwasm-exceptions" \
+        -DCMAKE_EXE_LINKER_FLAGS="-fwasm-exceptions" \
         -DCMAKE_INSTALL_PREFIX="$PWD/install"
 
     # Build

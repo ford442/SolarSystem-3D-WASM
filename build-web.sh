@@ -75,14 +75,10 @@ echo "------------------------------------------------"
 BUILD_DIR="$PROJECT_ROOT/build-web"
 mkdir -p "$BUILD_DIR"
 
-# Get absolute path to the web directory for includes
-WEB_INCLUDE_DIR="$PROJECT_ROOT/web"
-
 # Run CMake (reconfigure when switching Debug↔Release; wipe build-web/ if flags look stale)
 echo "Running CMake configuration..."
 emcmake cmake \
     -DCMAKE_BUILD_TYPE="$BUILD_TYPE" \
-    -DCMAKE_CXX_FLAGS="-I/usr/local/include -I$WEB_INCLUDE_DIR" \
     -B "$BUILD_DIR" \
     "$PROJECT_ROOT"
 

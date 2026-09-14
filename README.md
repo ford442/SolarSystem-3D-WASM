@@ -275,7 +275,7 @@ placeholders stay in git and are also uploaded under `resource/textures_low/` fo
 
 Full matrix, production recommendations, and local testing: **[docs/CROSS_ORIGIN_HEADERS.md](docs/CROSS_ORIGIN_HEADERS.md)**.
 
-**Summary:** This build uses `ASYNCIFY` only (no pthreads / `SharedArrayBuffer`), so **COEP/COOP are optional**. The simplest production setup omits them on both app and CDN.
+**Summary:** This build uses no pthreads / `SharedArrayBuffer` (and no `ASYNCIFY`/`JSPI`), so **COEP/COOP are optional**. The simplest production setup omits them on both app and CDN.
 
 | Deployment | App origin (`app.example.com`) | Asset CDN (`cdn.example.com`) |
 |------------|-------------------------------|------------------------------|

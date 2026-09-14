@@ -130,13 +130,13 @@ The CMakeLists.txt has separate configurations for EMSCRIPTEN vs native builds, 
 
 **Memory Management**
 - Emscripten initial memory: 256 MB; max 1 GB; `ALLOW_MEMORY_GROWTH=1`
-- `ASYNCIFY=1` enables async fetch without blocking render loop
+- No `ASYNCIFY`/`JSPI`: downloads are callback-based, so nothing suspends the Wasm stack
 
 ## Key Architectural Decisions
 
 - **Modular celestial bodies**: Each planet/satellite is its own class inheriting from base classes (Planet, Satellite, Star), making it easy to add new bodies or customize appearance.
 - **Lazy texture loading**: Large DDS textures are not preloaded; `WebResourceFetcher` fetches them on-demand to avoid blocking initialization.
-- **Emscripten async support**: `ASYNCIFY` allows `emscripten_wget_data()` calls without explicit async wrappers, simplifying C++ code.
+- **No blocking fetches**: every download goes through callback-based `WebResourceFetcher::DownloadFile` (`emscripten_async_wget2`), and C++ only ever reads files that are already resident in MEMFS. That keeps the build free of `ASYNCIFY`/`JSPI` and lets it use native `-fwasm-exceptions`. Anything that needs a new asset must stage it through `DownloadFile` (core resources, a planet manifest, or `TextureLoadingQueue`) before the code that reads it runs — see `docs/plans/PORTING_GUIDE.md` §3b.
 - **Separate build paths**: CMakeLists.txt uses `if(EMSCRIPTEN)` to toggle library linking and compiler flags, avoiding duplication of core logic.
 - **High memory ceiling**: 1 GB max allows the entire Solar System to load with high-resolution textures in modern browsers.
 

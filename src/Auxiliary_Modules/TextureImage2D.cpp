@@ -47,8 +47,10 @@ TextureImage2D::TextureImage2D(const std::string& path, GLint wrapParam, GLint m
 }
 
 void TextureImage2D::LoadTextureFromFile(const std::string& path, GLint wrapParam, GLint minFilter, GLint magFilter, bool allowFallback) {
-    // Fetch texture on demand (no-op on native; async/sync download on web into MEMFS)
-    WebResourceFetcher::Fetch(path);
+    // On web the low tier is preloaded into the .data file and mid/high tiers arrive
+    // through TextureLoadingQueue's async download, so the file is resident by now;
+    // a miss falls through to CreateFallbackTexture() below.
+    WebResourceFetcher::RequireResident(path, "TextureImage2D");
 
     glGenTextures(1, &_textureID);
     glBindTexture(GL_TEXTURE_2D, _textureID);

@@ -10,7 +10,8 @@
 void Application::LoadPlanetSystemManifests() {
 #ifdef __EMSCRIPTEN__
     constexpr const char* kManifestPath = "resource/planet_manifest.json";
-    WebResourceFetcher::Fetch(kManifestPath);
+    // Preloaded into the .data file via --preload-file (see CMakeLists.txt).
+    WebResourceFetcher::RequireResident(kManifestPath, "LoadPlanetSystemManifests");
 
     int manifestVersion = 0;
     std::string error;

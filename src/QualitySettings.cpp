@@ -71,9 +71,9 @@ void LogQualityTier(const QualityTierSettings& settings, bool hdrEnabled, int sh
 bool ReadIsMobileWeb() {
     return EM_ASM_INT({
         try {
-            const init = window.__solarSystemInit;
-            if (init && typeof init.isMobileWeb === 'boolean') {
-                return init.isMobileWeb ? 1 : 0;
+            const init = window['__solarSystemInit'];
+            if (init && typeof init['isMobileWeb'] === 'boolean') {
+                return init['isMobileWeb'] ? 1 : 0;
             }
         } catch (error) {
             console.warn('[Quality] Could not read init config:', error);
@@ -85,9 +85,9 @@ bool ReadIsMobileWeb() {
 int ReadInitialQualityPreset() {
     return EM_ASM_INT({
         try {
-            const init = window.__solarSystemInit;
-            if (init && typeof init.qualityPreset === 'number') {
-                const preset = Math.max(0, Math.min(2, init.qualityPreset | 0));
+            const init = window['__solarSystemInit'];
+            if (init && typeof init['qualityPreset'] === 'number') {
+                const preset = Math.max(0, Math.min(2, init['qualityPreset'] | 0));
                 return preset;
             }
         } catch (error) {
@@ -100,9 +100,9 @@ int ReadInitialQualityPreset() {
 float ReadBackingStoreScale() {
     return static_cast<float>(EM_ASM_DOUBLE({
         try {
-            const init = window.__solarSystemInit;
-            if (init && typeof init.backingStoreScale === 'number' && init.backingStoreScale > 0) {
-                return init.backingStoreScale;
+            const init = window['__solarSystemInit'];
+            if (init && typeof init['backingStoreScale'] === 'number' && init['backingStoreScale'] > 0) {
+                return init['backingStoreScale'];
             }
         } catch (error) {
             console.warn('[Quality] Could not read init config:', error);
