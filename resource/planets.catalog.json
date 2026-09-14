@@ -3,7 +3,9 @@
   "generatedOutputs": [
     "web/public/planet_facts.json",
     "web/threejs/src/data/orbital-parameters.json",
-    "resource/planet_manifest.json"
+    "resource/planet_manifest.json",
+    "src/Solar_System/OrbitLayoutBodies.generated.inc",
+    "src/Solar_System/BodyCatalog.generated.h"
   ],
   "sceneNote": {
     "en": "Distances in the 3D scene are artistic. Toggle scale mode to compare compressed orbits vs AU-proportional spacing.",
@@ -73,10 +75,10 @@
           0,
           0
         ],
-        "inclinationDeg": 0.0,
+        "inclinationDeg": 0,
         "siderealRotationDays": 25.38,
         "orbitalPeriodDays": null,
-        "distanceAu": 0.0,
+        "distanceAu": 0,
         "axialTiltDegrees": 0,
         "earthRadiusScale": 1,
         "rotationRate": 0.005
@@ -111,9 +113,9 @@
           0,
           350
         ],
-        "inclinationDeg": 7.0,
+        "inclinationDeg": 7,
         "siderealRotationDays": 58.646,
-        "orbitalPeriodDays": 88.0,
+        "orbitalPeriodDays": 88,
         "distanceAu": 0.387,
         "axialTiltDegrees": 0,
         "earthRadiusScale": 0.38,
@@ -148,7 +150,7 @@
           "hasSpecularMap": true,
           "hasClouds": false
         },
-        "ambientFactor": 0.0,
+        "ambientFactor": 0,
         "lod": {
           "diffuse": "Mercury_Diffuse",
           "normal": "Mercury_Normal",
@@ -201,7 +203,8 @@
           1125,
           0,
           -1340
-        ]
+        ],
+        "hasAtmosphere": true
       },
       "assets": {
         "requiredLow": [
@@ -220,7 +223,7 @@
           "hasSpecularMap": false,
           "hasClouds": false
         },
-        "ambientFactor": 0.0,
+        "ambientFactor": 0,
         "lod": {
           "diffuse": "Venus_Diffuse",
           "normal": "Venus_Normal",
@@ -256,10 +259,10 @@
           0,
           0
         ],
-        "inclinationDeg": 0.0,
+        "inclinationDeg": 0,
         "siderealRotationDays": 0.99726968,
         "orbitalPeriodDays": 365.25,
-        "distanceAu": 1.0,
+        "distanceAu": 1,
         "axialTiltDegrees": -23.4,
         "earthRadiusScale": 1,
         "rotationRate": 0.0075
@@ -273,7 +276,9 @@
           1900,
           0,
           0
-        ]
+        ],
+        "hasAtmosphere": true,
+        "hasCloudLayer": true
       },
       "assets": {
         "requiredLow": [
@@ -306,7 +311,16 @@
         "lod": {
           "diffuse": "Earth_Day_Diffuse",
           "normal": "Earth_Normal",
-          "specular": "Earth_Specular"
+          "specular": "Earth_Specular",
+          "night": "Earth_Night_Diffuse",
+          "clouds": "Earth_Clouds_Diffuse"
+        },
+        "cloudLayer": {
+          "scaleFactor": 1.0055,
+          "diffuse": "Earth_Clouds_Diffuse",
+          "normal": "Earth_Clouds_Normal",
+          "spinDegPerSimSecond": 1.125,
+          "ambientFactor": 1
         }
       }
     },
@@ -340,7 +354,7 @@
         ],
         "inclinationDeg": 1.9,
         "siderealRotationDays": 1.025957,
-        "orbitalPeriodDays": 687.0,
+        "orbitalPeriodDays": 687,
         "distanceAu": 1.524,
         "axialTiltDegrees": -25.2,
         "earthRadiusScale": 0.53,
@@ -355,7 +369,9 @@
           -1732,
           0,
           1000
-        ]
+        ],
+        "hasAtmosphere": true,
+        "lightFarUsesPlanetDistance": true
       },
       "assets": {
         "requiredLow": [
@@ -379,7 +395,7 @@
           "hasSpecularMap": false,
           "hasClouds": false
         },
-        "ambientFactor": 0.0,
+        "ambientFactor": 0,
         "lod": {
           "diffuse": "Mars_Diffuse",
           "normal": "Mars_Normal",
@@ -417,7 +433,7 @@
         ],
         "inclinationDeg": 1.3,
         "siderealRotationDays": 0.41354,
-        "orbitalPeriodDays": 4333.0,
+        "orbitalPeriodDays": 4333,
         "distanceAu": 5.203,
         "axialTiltDegrees": -3.1,
         "earthRadiusScale": 11.2,
@@ -432,7 +448,9 @@
           1350,
           0,
           1737
-        ]
+        ],
+        "hasAtmosphere": true,
+        "atmosphereToneMapping": true
       },
       "assets": {
         "requiredLow": [
@@ -464,7 +482,7 @@
           "hasSpecularMap": false,
           "hasClouds": false
         },
-        "ambientFactor": 0.0,
+        "ambientFactor": 0,
         "lod": {
           "diffuse": "Jupiter_Diffuse",
           "normal": "Jupiter_Normal",
@@ -502,7 +520,7 @@
         ],
         "inclinationDeg": 2.5,
         "siderealRotationDays": 0.44401,
-        "orbitalPeriodDays": 10759.0,
+        "orbitalPeriodDays": 10759,
         "distanceAu": 9.537,
         "axialTiltDegrees": -26.7,
         "earthRadiusScale": 9.45,
@@ -517,7 +535,10 @@
           0,
           -100,
           2450
-        ]
+        ],
+        "hasAtmosphere": true,
+        "hasRings": true,
+        "atmosphereToneMapping": true
       },
       "assets": {
         "requiredLow": [
@@ -555,12 +576,13 @@
           "hasSpecularMap": false,
           "hasClouds": false
         },
-        "ambientFactor": 0.0,
+        "ambientFactor": 0,
         "lod": {
           "diffuse": "Saturn_Diffuse",
           "normal": "Saturn_Normal",
           "specular": null
-        }
+        },
+        "artTiltXDegrees": -15
       }
     },
     {
@@ -593,10 +615,10 @@
         ],
         "inclinationDeg": 0.8,
         "siderealRotationDays": -0.71833,
-        "orbitalPeriodDays": 30687.0,
+        "orbitalPeriodDays": 30687,
         "distanceAu": 19.191,
         "axialTiltDegrees": -97.8,
-        "earthRadiusScale": 4.0,
+        "earthRadiusScale": 4,
         "rotationRate": -0.012
       },
       "system": {
@@ -608,7 +630,11 @@
           0,
           0,
           -2650
-        ]
+        ],
+        "hasAtmosphere": true,
+        "hasCloudLayer": true,
+        "hasRings": true,
+        "atmosphereToneMapping": true
       },
       "assets": {
         "requiredLow": [
@@ -644,11 +670,19 @@
           "hasSpecularMap": false,
           "hasClouds": true
         },
-        "ambientFactor": 0.0,
+        "ambientFactor": 0,
         "lod": {
           "diffuse": "Uranus_Diffuse",
           "normal": "Uranus_Normal",
-          "specular": null
+          "specular": null,
+          "clouds": "Uranus_Clouds_Diffuse"
+        },
+        "cloudLayer": {
+          "scaleFactor": 3.98635,
+          "diffuse": "Uranus_Clouds_Diffuse",
+          "normal": "Uranus_Clouds_Normal",
+          "spinDegPerSimSecond": 3.447,
+          "ambientFactor": 0
         }
       }
     },
@@ -682,7 +716,7 @@
         ],
         "inclinationDeg": 1.8,
         "siderealRotationDays": 0.67125,
-        "orbitalPeriodDays": 60190.0,
+        "orbitalPeriodDays": 60190,
         "distanceAu": 30.069,
         "axialTiltDegrees": -28.3,
         "earthRadiusScale": 3.88,
@@ -697,7 +731,10 @@
           -2900,
           0,
           0
-        ]
+        ],
+        "hasAtmosphere": true,
+        "hasCloudLayer": true,
+        "atmosphereToneMapping": true
       },
       "assets": {
         "requiredLow": [
@@ -723,11 +760,19 @@
           "hasSpecularMap": false,
           "hasClouds": true
         },
-        "ambientFactor": 0.0,
+        "ambientFactor": 0,
         "lod": {
           "diffuse": "Neptune_Diffuse",
           "normal": "Neptune_Normal",
-          "specular": null
+          "specular": null,
+          "clouds": "Neptune_Clouds_Diffuse"
+        },
+        "cloudLayer": {
+          "scaleFactor": 3.87,
+          "diffuse": "Neptune_Clouds_Diffuse",
+          "normal": "Neptune_Clouds_Normal",
+          "spinDegPerSimSecond": 4.8,
+          "ambientFactor": 0
         }
       }
     },
@@ -761,7 +806,7 @@
         ],
         "inclinationDeg": 17.2,
         "siderealRotationDays": 6.3872,
-        "orbitalPeriodDays": 90560.0,
+        "orbitalPeriodDays": 90560,
         "distanceAu": 39.482,
         "axialTiltDegrees": -122.5,
         "earthRadiusScale": 0.18,
@@ -776,7 +821,9 @@
           2800,
           0,
           1757.73
-        ]
+        ],
+        "hasAtmosphere": true,
+        "atmosphereToneMapping": true
       },
       "assets": {
         "requiredLow": [
@@ -800,7 +847,7 @@
           "hasSpecularMap": true,
           "hasClouds": false
         },
-        "ambientFactor": 0.0,
+        "ambientFactor": 0,
         "lod": {
           "diffuse": "Pluto_Diffuse",
           "normal": "Pluto_Normal",
@@ -840,7 +887,7 @@
         "siderealRotationDays": 0.3781,
         "orbitalPeriodDays": 1679.85,
         "distanceAu": 2.7656,
-        "axialTiltDegrees": 4.0,
+        "axialTiltDegrees": 4,
         "earthRadiusScale": 0.0736,
         "rotationRate": 0.0132
       },
@@ -872,7 +919,7 @@
           "hasSpecularMap": false,
           "hasClouds": false
         },
-        "ambientFactor": 0.0,
+        "ambientFactor": 0,
         "lod": {
           "diffuse": "Ceres_Diffuse",
           "normal": "Ceres_Normal",
@@ -892,7 +939,7 @@
       "type": "asteroid",
       "facts": {
         "diameterKm": 525,
-        "massEarths": 4.34e-05,
+        "massEarths": 0.0000434,
         "siderealRotationDays": 0.2226,
         "orbitalPeriodDays": 1325.39,
         "distanceAu": 2.3614,
@@ -912,7 +959,7 @@
         "siderealRotationDays": 0.2226,
         "orbitalPeriodDays": 1325.39,
         "distanceAu": 2.3614,
-        "axialTiltDegrees": 27.0,
+        "axialTiltDegrees": 27,
         "earthRadiusScale": 0.0412,
         "rotationRate": 0.0224
       },
@@ -944,18 +991,1460 @@
           "hasSpecularMap": false,
           "hasClouds": false
         },
-        "ambientFactor": 0.0,
+        "ambientFactor": 0,
         "lod": {
           "diffuse": "Vesta_Diffuse",
           "normal": "Vesta_Normal",
           "specular": null
         }
       }
+    },
+    {
+      "id": "moon",
+      "index": 12,
+      "kind": "satellite",
+      "parent": "earth",
+      "displayName": {
+        "en": "Moon",
+        "ru": "Луна"
+      },
+      "type": "moon",
+      "facts": {
+        "diameterKm": 3474,
+        "massEarths": 0.0123,
+        "siderealRotationDays": 27.3,
+        "orbitalPeriodDays": 27.3,
+        "distanceAu": 0.0025695552897999907,
+        "moons": 0,
+        "summary": {
+          "en": "Earth's only natural satellite; tidally locked, with a heavily cratered far side.",
+          "ru": "Единственный естественный спутник Земли; приливно захвачен, обратная сторона сильно кратерирована."
+        }
+      },
+      "orbit": {
+        "compressedOffset": [
+          0,
+          0,
+          0
+        ],
+        "inclinationDeg": 5.145,
+        "siderealRotationDays": 27.3,
+        "orbitalPeriodDays": 27.3,
+        "distanceAu": 0.0025695552897999907,
+        "axialTiltDegrees": 0,
+        "earthRadiusScale": 0.2724,
+        "rotationRate": 0,
+        "sceneOrbitRadius": 25,
+        "orbitPlane": "xz",
+        "initialAnomalyRad": -1.57079633,
+        "spinDegPerSimSecond": -0.69,
+        "yawOffsetDegrees": -75,
+        "artRollDegrees": 0,
+        "keplerian": {
+          "aKm": 384400,
+          "e": 0.0549,
+          "iDeg": 5.145,
+          "OmegaDeg": 125.08,
+          "omegaDeg": 318.15,
+          "M0Deg": 135.27,
+          "nDegPerDay": 13.186813186813186
+        }
+      },
+      "includeInCompanion": false,
+      "render": {
+        "shaderFlags": {
+          "hasNightTexture": false,
+          "hasSpecularMap": false,
+          "hasClouds": false
+        },
+        "ambientFactor": 0,
+        "useSphereIntersect": true,
+        "mesh": null,
+        "lod": {
+          "diffuse": "Moon_Diffuse",
+          "normal": "Moon_Normal",
+          "specular": null
+        }
+      }
+    },
+    {
+      "id": "phobos",
+      "index": 13,
+      "kind": "satellite",
+      "parent": "mars",
+      "displayName": {
+        "en": "Phobos",
+        "ru": "Фобос"
+      },
+      "type": "moon",
+      "facts": {
+        "diameterKm": 22.2,
+        "massEarths": 1.78e-9,
+        "siderealRotationDays": 0.3189,
+        "orbitalPeriodDays": 0.3189,
+        "distanceAu": 0.00006267468885838895,
+        "moons": 0,
+        "summary": {
+          "en": "Inner moon of Mars; an irregular captured body that will eventually break up or impact Mars.",
+          "ru": "Внутренний спутник Марса; неправильное захваченное тело, которое со временем разрушится или упадёт на Марс."
+        }
+      },
+      "orbit": {
+        "compressedOffset": [
+          0,
+          0,
+          0
+        ],
+        "inclinationDeg": 1.093,
+        "siderealRotationDays": 0.3189,
+        "orbitalPeriodDays": 0.3189,
+        "distanceAu": 0.00006267468885838895,
+        "axialTiltDegrees": 0,
+        "earthRadiusScale": 0.001768,
+        "rotationRate": 0,
+        "sceneOrbitRadius": 2.5,
+        "orbitPlane": "xz",
+        "initialAnomalyRad": -1.57079633,
+        "spinDegPerSimSecond": -7.56,
+        "yawOffsetDegrees": 0,
+        "artRollDegrees": 0,
+        "keplerian": {
+          "aKm": 9376,
+          "e": 0.0151,
+          "iDeg": 1.093,
+          "OmegaDeg": 199.42,
+          "omegaDeg": 150.21,
+          "M0Deg": 0,
+          "nDegPerDay": 1128.8805268109124
+        }
+      },
+      "includeInCompanion": false,
+      "render": {
+        "shaderFlags": {
+          "hasNightTexture": false,
+          "hasSpecularMap": false,
+          "hasClouds": false
+        },
+        "ambientFactor": 0,
+        "useSphereIntersect": true,
+        "mesh": "resource/models/phobos.obj",
+        "lod": {
+          "diffuse": "Phobos_Diffuse",
+          "normal": "Phobos_Normal",
+          "specular": null
+        }
+      }
+    },
+    {
+      "id": "deimos",
+      "index": 14,
+      "kind": "satellite",
+      "parent": "mars",
+      "displayName": {
+        "en": "Deimos",
+        "ru": "Деймос"
+      },
+      "type": "moon",
+      "facts": {
+        "diameterKm": 12.6,
+        "massEarths": 2.4e-10,
+        "siderealRotationDays": 1.263,
+        "orbitalPeriodDays": 1.263,
+        "distanceAu": 0.00015684046764978456,
+        "moons": 0,
+        "summary": {
+          "en": "Outer moon of Mars; a small, dark, irregular body in a nearly circular orbit.",
+          "ru": "Внешний спутник Марса; небольшое тёмное тело неправильной формы на почти круговой орбите."
+        }
+      },
+      "orbit": {
+        "compressedOffset": [
+          0,
+          0,
+          0
+        ],
+        "inclinationDeg": 0.93,
+        "siderealRotationDays": 1.263,
+        "orbitalPeriodDays": 1.263,
+        "distanceAu": 0.00015684046764978456,
+        "axialTiltDegrees": 0,
+        "earthRadiusScale": 0.00097316,
+        "rotationRate": 0,
+        "sceneOrbitRadius": 2.95,
+        "orbitPlane": "xz",
+        "initialAnomalyRad": -1.57079633,
+        "spinDegPerSimSecond": -2.76,
+        "yawOffsetDegrees": 0,
+        "artRollDegrees": 0,
+        "keplerian": {
+          "aKm": 23463,
+          "e": 0.00033,
+          "iDeg": 0.93,
+          "OmegaDeg": 54.5,
+          "omegaDeg": 0,
+          "M0Deg": 0,
+          "nDegPerDay": 285.03562945368174
+        }
+      },
+      "includeInCompanion": false,
+      "render": {
+        "shaderFlags": {
+          "hasNightTexture": false,
+          "hasSpecularMap": false,
+          "hasClouds": false
+        },
+        "ambientFactor": 0,
+        "useSphereIntersect": true,
+        "mesh": "resource/models/deimos.obj",
+        "lod": {
+          "diffuse": "Deimos_Diffuse",
+          "normal": "Deimos_Normal",
+          "specular": null
+        }
+      }
+    },
+    {
+      "id": "io",
+      "index": 15,
+      "kind": "satellite",
+      "parent": "jupiter",
+      "displayName": {
+        "en": "Io",
+        "ru": "Ио"
+      },
+      "type": "moon",
+      "facts": {
+        "diameterKm": 3643,
+        "massEarths": 0.015,
+        "siderealRotationDays": 1.769,
+        "orbitalPeriodDays": 1.769,
+        "distanceAu": 0.0028195588481728304,
+        "moons": 0,
+        "summary": {
+          "en": "Innermost Galilean moon; the most volcanically active body in the Solar System.",
+          "ru": "Ближайший галилеев спутник; самое вулканически активное тело Солнечной системы."
+        }
+      },
+      "orbit": {
+        "compressedOffset": [
+          0,
+          0,
+          0
+        ],
+        "inclinationDeg": 0.05,
+        "siderealRotationDays": 1.769,
+        "orbitalPeriodDays": 1.769,
+        "distanceAu": 0.0028195588481728304,
+        "axialTiltDegrees": 0,
+        "earthRadiusScale": 0.28592,
+        "rotationRate": 0,
+        "sceneOrbitRadius": 65,
+        "orbitPlane": "xz",
+        "initialAnomalyRad": -1.57079633,
+        "spinDegPerSimSecond": -2.76,
+        "yawOffsetDegrees": 0,
+        "artRollDegrees": 0,
+        "keplerian": {
+          "aKm": 421800,
+          "e": 0.0041,
+          "iDeg": 0.05,
+          "OmegaDeg": 43.98,
+          "omegaDeg": 84.5,
+          "M0Deg": 342,
+          "nDegPerDay": 203.50480497456192
+        }
+      },
+      "includeInCompanion": false,
+      "render": {
+        "shaderFlags": {
+          "hasNightTexture": false,
+          "hasSpecularMap": false,
+          "hasClouds": false
+        },
+        "ambientFactor": 0,
+        "useSphereIntersect": true,
+        "mesh": null,
+        "lod": {
+          "diffuse": "Io_Diffuse",
+          "normal": "Io_Normal",
+          "specular": null
+        }
+      }
+    },
+    {
+      "id": "europa",
+      "index": 16,
+      "kind": "satellite",
+      "parent": "jupiter",
+      "displayName": {
+        "en": "Europa",
+        "ru": "Европа"
+      },
+      "type": "moon",
+      "facts": {
+        "diameterKm": 3122,
+        "massEarths": 0.008,
+        "siderealRotationDays": 3.551,
+        "orbitalPeriodDays": 3.551,
+        "distanceAu": 0.004486026417754354,
+        "moons": 0,
+        "summary": {
+          "en": "Icy Galilean moon with a subsurface ocean beneath a cracked ice crust.",
+          "ru": "Ледяной галилеев спутник с подповерхностным океаном под трещиноватой ледяной корой."
+        }
+      },
+      "orbit": {
+        "compressedOffset": [
+          0,
+          0,
+          0
+        ],
+        "inclinationDeg": 0.47,
+        "siderealRotationDays": 3.551,
+        "orbitalPeriodDays": 3.551,
+        "distanceAu": 0.004486026417754354,
+        "axialTiltDegrees": 0,
+        "earthRadiusScale": 0.244985,
+        "rotationRate": 0,
+        "sceneOrbitRadius": 74,
+        "orbitPlane": "xz",
+        "initialAnomalyRad": -1.57079633,
+        "spinDegPerSimSecond": -2.76,
+        "yawOffsetDegrees": 0,
+        "artRollDegrees": 0,
+        "keplerian": {
+          "aKm": 671100,
+          "e": 0.009,
+          "iDeg": 0.47,
+          "OmegaDeg": 219.1,
+          "omegaDeg": 88.97,
+          "M0Deg": 171,
+          "nDegPerDay": 101.37989298789073
+        }
+      },
+      "includeInCompanion": false,
+      "render": {
+        "shaderFlags": {
+          "hasNightTexture": false,
+          "hasSpecularMap": false,
+          "hasClouds": false
+        },
+        "ambientFactor": 0,
+        "useSphereIntersect": true,
+        "mesh": null,
+        "lod": {
+          "diffuse": "Europa_Diffuse",
+          "normal": "Europa_Normal",
+          "specular": null
+        }
+      }
+    },
+    {
+      "id": "ganymede",
+      "index": 17,
+      "kind": "satellite",
+      "parent": "jupiter",
+      "displayName": {
+        "en": "Ganymede",
+        "ru": "Ганимед"
+      },
+      "type": "moon",
+      "facts": {
+        "diameterKm": 5268,
+        "massEarths": 0.025,
+        "siderealRotationDays": 7.155,
+        "orbitalPeriodDays": 7.155,
+        "distanceAu": 0.007155182055676145,
+        "moons": 0,
+        "summary": {
+          "en": "Largest moon in the Solar System; the only one with its own magnetic field.",
+          "ru": "Крупнейший спутник Солнечной системы; единственный с собственным магнитным полем."
+        }
+      },
+      "orbit": {
+        "compressedOffset": [
+          0,
+          0,
+          0
+        ],
+        "inclinationDeg": 0.2,
+        "siderealRotationDays": 7.155,
+        "orbitalPeriodDays": 7.155,
+        "distanceAu": 0.007155182055676145,
+        "axialTiltDegrees": 0,
+        "earthRadiusScale": 0.41345,
+        "rotationRate": 0,
+        "sceneOrbitRadius": 83,
+        "orbitPlane": "xz",
+        "initialAnomalyRad": -1.57079633,
+        "spinDegPerSimSecond": -2.76,
+        "yawOffsetDegrees": 0,
+        "artRollDegrees": 0,
+        "keplerian": {
+          "aKm": 1070400,
+          "e": 0.0013,
+          "iDeg": 0.2,
+          "OmegaDeg": 63.55,
+          "omegaDeg": 192.4,
+          "M0Deg": 317.3,
+          "nDegPerDay": 50.31446540880503
+        }
+      },
+      "includeInCompanion": false,
+      "render": {
+        "shaderFlags": {
+          "hasNightTexture": false,
+          "hasSpecularMap": false,
+          "hasClouds": false
+        },
+        "ambientFactor": 0,
+        "useSphereIntersect": true,
+        "mesh": null,
+        "lod": {
+          "diffuse": "Ganymede_Diffuse",
+          "normal": "Ganymede_Normal",
+          "specular": null
+        }
+      }
+    },
+    {
+      "id": "callisto",
+      "index": 18,
+      "kind": "satellite",
+      "parent": "jupiter",
+      "displayName": {
+        "en": "Callisto",
+        "ru": "Каллисто"
+      },
+      "type": "moon",
+      "facts": {
+        "diameterKm": 4821,
+        "massEarths": 0.018,
+        "siderealRotationDays": 16.69,
+        "orbitalPeriodDays": 16.69,
+        "distanceAu": 0.012585072175094802,
+        "moons": 0,
+        "summary": {
+          "en": "Outermost Galilean moon; a heavily cratered ice-rock mix that never fully differentiated.",
+          "ru": "Внешний галилеев спутник; сильно кратерированная смесь льда и камня без полной дифференциации."
+        }
+      },
+      "orbit": {
+        "compressedOffset": [
+          0,
+          0,
+          0
+        ],
+        "inclinationDeg": 0.192,
+        "siderealRotationDays": 16.69,
+        "orbitalPeriodDays": 16.69,
+        "distanceAu": 0.012585072175094802,
+        "axialTiltDegrees": 0,
+        "earthRadiusScale": 0.3783236,
+        "rotationRate": 0,
+        "sceneOrbitRadius": 92,
+        "orbitPlane": "xz",
+        "initialAnomalyRad": -1.57079633,
+        "spinDegPerSimSecond": -2.76,
+        "yawOffsetDegrees": 0,
+        "artRollDegrees": 0,
+        "keplerian": {
+          "aKm": 1882700,
+          "e": 0.0074,
+          "iDeg": 0.192,
+          "OmegaDeg": 298.85,
+          "omegaDeg": 52.64,
+          "M0Deg": 181.4,
+          "nDegPerDay": 21.56980227681246
+        }
+      },
+      "includeInCompanion": false,
+      "render": {
+        "shaderFlags": {
+          "hasNightTexture": false,
+          "hasSpecularMap": false,
+          "hasClouds": false
+        },
+        "ambientFactor": 0,
+        "useSphereIntersect": true,
+        "mesh": null,
+        "lod": {
+          "diffuse": "Callisto_Diffuse",
+          "normal": "Callisto_Normal",
+          "specular": null
+        }
+      }
+    },
+    {
+      "id": "mimas",
+      "index": 19,
+      "kind": "satellite",
+      "parent": "saturn",
+      "displayName": {
+        "en": "Mimas",
+        "ru": "Мимас"
+      },
+      "type": "moon",
+      "facts": {
+        "diameterKm": 396,
+        "massEarths": 0.0000063,
+        "siderealRotationDays": 0.942,
+        "orbitalPeriodDays": 0.942,
+        "distanceAu": 0.0012402516100785653,
+        "moons": 0,
+        "summary": {
+          "en": "Innermost major Saturnian moon; Herschel crater makes it look like the Death Star.",
+          "ru": "Ближайший крупный спутник Сатурна; кратер Гершель придаёт ему вид «Звезды Смерти»."
+        }
+      },
+      "orbit": {
+        "compressedOffset": [
+          0,
+          0,
+          0
+        ],
+        "inclinationDeg": 1.574,
+        "siderealRotationDays": 0.942,
+        "orbitalPeriodDays": 0.942,
+        "distanceAu": 0.0012402516100785653,
+        "axialTiltDegrees": 0,
+        "earthRadiusScale": 0.03111,
+        "rotationRate": 0,
+        "sceneOrbitRadius": 60.5,
+        "orbitPlane": "xz",
+        "initialAnomalyRad": -1.57079633,
+        "spinDegPerSimSecond": -2.76,
+        "yawOffsetDegrees": 0,
+        "artRollDegrees": 0,
+        "keplerian": {
+          "aKm": 185539,
+          "e": 0.0196,
+          "iDeg": 1.574,
+          "OmegaDeg": 0,
+          "omegaDeg": 0,
+          "M0Deg": 0,
+          "nDegPerDay": 382.1656050955414
+        }
+      },
+      "includeInCompanion": false,
+      "render": {
+        "shaderFlags": {
+          "hasNightTexture": false,
+          "hasSpecularMap": false,
+          "hasClouds": false
+        },
+        "ambientFactor": 0,
+        "useSphereIntersect": true,
+        "mesh": null,
+        "lod": {
+          "diffuse": "Mimas_Diffuse",
+          "normal": "Mimas_Normal",
+          "specular": null
+        }
+      }
+    },
+    {
+      "id": "enceladus",
+      "index": 20,
+      "kind": "satellite",
+      "parent": "saturn",
+      "displayName": {
+        "en": "Enceladus",
+        "ru": "Энцелад"
+      },
+      "type": "moon",
+      "facts": {
+        "diameterKm": 504,
+        "massEarths": 0.000018,
+        "siderealRotationDays": 1.37,
+        "orbitalPeriodDays": 1.37,
+        "distanceAu": 0.0015905841365695323,
+        "moons": 0,
+        "summary": {
+          "en": "Icy Saturnian moon with south-polar water plumes feeding the E ring.",
+          "ru": "Ледяной спутник Сатурна с водяными плюмами у южного полюса, питающими кольцо E."
+        }
+      },
+      "orbit": {
+        "compressedOffset": [
+          0,
+          0,
+          0
+        ],
+        "inclinationDeg": 0.009,
+        "siderealRotationDays": 1.37,
+        "orbitalPeriodDays": 1.37,
+        "distanceAu": 0.0015905841365695323,
+        "axialTiltDegrees": 0,
+        "earthRadiusScale": 0.03957,
+        "rotationRate": 0,
+        "sceneOrbitRadius": 65,
+        "orbitPlane": "xz",
+        "initialAnomalyRad": -1.57079633,
+        "spinDegPerSimSecond": -2.76,
+        "yawOffsetDegrees": 0,
+        "artRollDegrees": 0,
+        "keplerian": {
+          "aKm": 237948,
+          "e": 0.0047,
+          "iDeg": 0.009,
+          "OmegaDeg": 0,
+          "omegaDeg": 0,
+          "M0Deg": 0,
+          "nDegPerDay": 262.7737226277372
+        }
+      },
+      "includeInCompanion": false,
+      "render": {
+        "shaderFlags": {
+          "hasNightTexture": false,
+          "hasSpecularMap": false,
+          "hasClouds": false
+        },
+        "ambientFactor": 0,
+        "useSphereIntersect": true,
+        "mesh": null,
+        "lod": {
+          "diffuse": "Enceladus_Diffuse",
+          "normal": "Enceladus_Normal",
+          "specular": null
+        }
+      }
+    },
+    {
+      "id": "tethys",
+      "index": 21,
+      "kind": "satellite",
+      "parent": "saturn",
+      "displayName": {
+        "en": "Tethys",
+        "ru": "Тефия"
+      },
+      "type": "moon",
+      "facts": {
+        "diameterKm": 1062,
+        "massEarths": 0.000103,
+        "siderealRotationDays": 1.888,
+        "orbitalPeriodDays": 1.888,
+        "distanceAu": 0.0019694063733756073,
+        "moons": 0,
+        "summary": {
+          "en": "Mid-sized icy Saturnian moon dominated by the giant Ithaca Chasma canyon.",
+          "ru": "Средний ледяной спутник Сатурна с гигантским каньоном Итака."
+        }
+      },
+      "orbit": {
+        "compressedOffset": [
+          0,
+          0,
+          0
+        ],
+        "inclinationDeg": 1.12,
+        "siderealRotationDays": 1.888,
+        "orbitalPeriodDays": 1.888,
+        "distanceAu": 0.0019694063733756073,
+        "axialTiltDegrees": 0,
+        "earthRadiusScale": 0.083346,
+        "rotationRate": 0,
+        "sceneOrbitRadius": 69.5,
+        "orbitPlane": "xz",
+        "initialAnomalyRad": -1.57079633,
+        "spinDegPerSimSecond": -2.76,
+        "yawOffsetDegrees": 0,
+        "artRollDegrees": 0,
+        "keplerian": {
+          "aKm": 294619,
+          "e": 0.0001,
+          "iDeg": 1.12,
+          "OmegaDeg": 0,
+          "omegaDeg": 0,
+          "M0Deg": 0,
+          "nDegPerDay": 190.67796610169492
+        }
+      },
+      "includeInCompanion": false,
+      "render": {
+        "shaderFlags": {
+          "hasNightTexture": false,
+          "hasSpecularMap": false,
+          "hasClouds": false
+        },
+        "ambientFactor": 0,
+        "useSphereIntersect": true,
+        "mesh": null,
+        "lod": {
+          "diffuse": "Tethys_Diffuse",
+          "normal": "Tethys_Normal",
+          "specular": null
+        }
+      }
+    },
+    {
+      "id": "dione",
+      "index": 22,
+      "kind": "satellite",
+      "parent": "saturn",
+      "displayName": {
+        "en": "Dione",
+        "ru": "Диона"
+      },
+      "type": "moon",
+      "facts": {
+        "diameterKm": 1123,
+        "massEarths": 0.000183,
+        "siderealRotationDays": 2.737,
+        "orbitalPeriodDays": 2.737,
+        "distanceAu": 0.0025227364415956223,
+        "moons": 0,
+        "summary": {
+          "en": "Icy Saturnian moon with bright wispy terrain of tectonic ice cliffs.",
+          "ru": "Ледяной спутник Сатурна с яркими «усами» тектонических ледяных обрывов."
+        }
+      },
+      "orbit": {
+        "compressedOffset": [
+          0,
+          0,
+          0
+        ],
+        "inclinationDeg": 0.019,
+        "siderealRotationDays": 2.737,
+        "orbitalPeriodDays": 2.737,
+        "distanceAu": 0.0025227364415956223,
+        "axialTiltDegrees": 0,
+        "earthRadiusScale": 0.08812,
+        "rotationRate": 0,
+        "sceneOrbitRadius": 74,
+        "orbitPlane": "xz",
+        "initialAnomalyRad": -1.57079633,
+        "spinDegPerSimSecond": -2.76,
+        "yawOffsetDegrees": 0,
+        "artRollDegrees": 0,
+        "keplerian": {
+          "aKm": 377396,
+          "e": 0.0022,
+          "iDeg": 0.019,
+          "OmegaDeg": 0,
+          "omegaDeg": 0,
+          "M0Deg": 0,
+          "nDegPerDay": 131.53087321885275
+        }
+      },
+      "includeInCompanion": false,
+      "render": {
+        "shaderFlags": {
+          "hasNightTexture": false,
+          "hasSpecularMap": false,
+          "hasClouds": false
+        },
+        "ambientFactor": 0,
+        "useSphereIntersect": true,
+        "mesh": null,
+        "lod": {
+          "diffuse": "Dione_Diffuse",
+          "normal": "Dione_Normal",
+          "specular": null
+        }
+      }
+    },
+    {
+      "id": "rhea",
+      "index": 23,
+      "kind": "satellite",
+      "parent": "saturn",
+      "displayName": {
+        "en": "Rhea",
+        "ru": "Рея"
+      },
+      "type": "moon",
+      "facts": {
+        "diameterKm": 1528,
+        "massEarths": 0.000386,
+        "siderealRotationDays": 4.518,
+        "orbitalPeriodDays": 4.518,
+        "distanceAu": 0.003523499348844676,
+        "moons": 0,
+        "summary": {
+          "en": "Saturn's second-largest moon; a heavily cratered ice world with a tenuous oxygen atmosphere.",
+          "ru": "Второй по величине спутник Сатурна; сильно кратерированный ледяной мир с разреженной кислородной атмосферой."
+        }
+      },
+      "orbit": {
+        "compressedOffset": [
+          0,
+          0,
+          0
+        ],
+        "inclinationDeg": 0.345,
+        "siderealRotationDays": 4.518,
+        "orbitalPeriodDays": 4.518,
+        "distanceAu": 0.003523499348844676,
+        "axialTiltDegrees": 0,
+        "earthRadiusScale": 0.119886,
+        "rotationRate": 0,
+        "sceneOrbitRadius": 78.5,
+        "orbitPlane": "xz",
+        "initialAnomalyRad": -1.57079633,
+        "spinDegPerSimSecond": -2.76,
+        "yawOffsetDegrees": 0,
+        "artRollDegrees": 0,
+        "keplerian": {
+          "aKm": 527108,
+          "e": 0.0013,
+          "iDeg": 0.345,
+          "OmegaDeg": 0,
+          "omegaDeg": 0,
+          "M0Deg": 0,
+          "nDegPerDay": 79.6812749003984
+        }
+      },
+      "includeInCompanion": false,
+      "render": {
+        "shaderFlags": {
+          "hasNightTexture": false,
+          "hasSpecularMap": false,
+          "hasClouds": false
+        },
+        "ambientFactor": 0,
+        "useSphereIntersect": true,
+        "mesh": null,
+        "lod": {
+          "diffuse": "Rhea_Diffuse",
+          "normal": "Rhea_Normal",
+          "specular": null
+        }
+      }
+    },
+    {
+      "id": "titan",
+      "index": 24,
+      "kind": "satellite",
+      "parent": "saturn",
+      "displayName": {
+        "en": "Titan",
+        "ru": "Титан"
+      },
+      "type": "moon",
+      "facts": {
+        "diameterKm": 5150,
+        "massEarths": 0.0225,
+        "siderealRotationDays": 15.95,
+        "orbitalPeriodDays": 15.95,
+        "distanceAu": 0.008167696467086146,
+        "moons": 0,
+        "summary": {
+          "en": "Largest Saturnian moon; thick nitrogen atmosphere and stable lakes of liquid methane.",
+          "ru": "Крупнейший спутник Сатурна; плотная азотная атмосфера и озёра жидкого метана."
+        }
+      },
+      "orbit": {
+        "compressedOffset": [
+          0,
+          0,
+          0
+        ],
+        "inclinationDeg": 0.3485,
+        "siderealRotationDays": 15.95,
+        "orbitalPeriodDays": 15.95,
+        "distanceAu": 0.008167696467086146,
+        "axialTiltDegrees": 0,
+        "earthRadiusScale": 0.404136,
+        "rotationRate": 0,
+        "sceneOrbitRadius": 87.5,
+        "orbitPlane": "xz",
+        "initialAnomalyRad": -1.57079633,
+        "spinDegPerSimSecond": -2.76,
+        "yawOffsetDegrees": 0,
+        "artRollDegrees": 0,
+        "keplerian": {
+          "aKm": 1221870,
+          "e": 0.0288,
+          "iDeg": 0.3485,
+          "OmegaDeg": 28.06,
+          "omegaDeg": 180.53,
+          "M0Deg": 163.31,
+          "nDegPerDay": 22.570532915360502
+        }
+      },
+      "includeInCompanion": false,
+      "render": {
+        "shaderFlags": {
+          "hasNightTexture": false,
+          "hasSpecularMap": false,
+          "hasClouds": false
+        },
+        "ambientFactor": 0,
+        "useSphereIntersect": true,
+        "mesh": null,
+        "lod": {
+          "diffuse": "Titan_Diffuse",
+          "normal": "Titan_Normal",
+          "specular": null
+        }
+      }
+    },
+    {
+      "id": "iapetus",
+      "index": 25,
+      "kind": "satellite",
+      "parent": "saturn",
+      "displayName": {
+        "en": "Iapetus",
+        "ru": "Япет"
+      },
+      "type": "moon",
+      "facts": {
+        "diameterKm": 1470,
+        "massEarths": 0.000302,
+        "siderealRotationDays": 79.32,
+        "orbitalPeriodDays": 79.32,
+        "distanceAu": 0.02380261151671593,
+        "moons": 0,
+        "summary": {
+          "en": "Two-toned Saturnian moon with a dark leading hemisphere and a bright trailing one.",
+          "ru": "Двухцветный спутник Сатурна: тёмное ведущее полушарие и светлое ведомое."
+        }
+      },
+      "orbit": {
+        "compressedOffset": [
+          0,
+          0,
+          0
+        ],
+        "inclinationDeg": 15.47,
+        "siderealRotationDays": 79.32,
+        "orbitalPeriodDays": 79.32,
+        "distanceAu": 0.02380261151671593,
+        "axialTiltDegrees": 0,
+        "earthRadiusScale": 0.115288,
+        "rotationRate": 0,
+        "sceneOrbitRadius": 96.5,
+        "orbitPlane": "xz",
+        "initialAnomalyRad": -1.57079633,
+        "spinDegPerSimSecond": -2.76,
+        "yawOffsetDegrees": 0,
+        "artRollDegrees": 0,
+        "keplerian": {
+          "aKm": 3560820,
+          "e": 0.0286,
+          "iDeg": 15.47,
+          "OmegaDeg": 0,
+          "omegaDeg": 0,
+          "M0Deg": 0,
+          "nDegPerDay": 4.538577912254161
+        }
+      },
+      "includeInCompanion": false,
+      "render": {
+        "shaderFlags": {
+          "hasNightTexture": false,
+          "hasSpecularMap": false,
+          "hasClouds": false
+        },
+        "ambientFactor": 0,
+        "useSphereIntersect": true,
+        "mesh": null,
+        "lod": {
+          "diffuse": "Iapetus_Diffuse",
+          "normal": "Iapetus_Normal",
+          "specular": null
+        }
+      }
+    },
+    {
+      "id": "miranda",
+      "index": 26,
+      "kind": "satellite",
+      "parent": "uranus",
+      "displayName": {
+        "en": "Miranda",
+        "ru": "Миранда"
+      },
+      "type": "moon",
+      "facts": {
+        "diameterKm": 472,
+        "massEarths": 0.000011,
+        "siderealRotationDays": 1.413,
+        "orbitalPeriodDays": 1.413,
+        "distanceAu": 0.0008649187277503142,
+        "moons": 0,
+        "summary": {
+          "en": "Innermost major Uranian moon; extreme geology including the 20 km Verona Rupes cliff.",
+          "ru": "Ближайший крупный спутник Урана; экстремальная геология, включая уступ Верона высотой 20 км."
+        }
+      },
+      "orbit": {
+        "compressedOffset": [
+          0,
+          0,
+          0
+        ],
+        "inclinationDeg": 4.338,
+        "siderealRotationDays": 1.413,
+        "orbitalPeriodDays": 1.413,
+        "distanceAu": 0.0008649187277503142,
+        "axialTiltDegrees": 0,
+        "earthRadiusScale": 0.0368858,
+        "rotationRate": 0,
+        "sceneOrbitRadius": 34.8,
+        "orbitPlane": "xy",
+        "initialAnomalyRad": 3.14159265,
+        "spinDegPerSimSecond": -2.76,
+        "yawOffsetDegrees": 0,
+        "artRollDegrees": 90,
+        "keplerian": {
+          "aKm": 129390,
+          "e": 0.0013,
+          "iDeg": 4.338,
+          "OmegaDeg": 0,
+          "omegaDeg": 0,
+          "M0Deg": 0,
+          "nDegPerDay": 254.77707006369425
+        }
+      },
+      "includeInCompanion": false,
+      "render": {
+        "shaderFlags": {
+          "hasNightTexture": false,
+          "hasSpecularMap": false,
+          "hasClouds": false
+        },
+        "ambientFactor": 0,
+        "useSphereIntersect": true,
+        "mesh": null,
+        "lod": {
+          "diffuse": "Miranda_Diffuse",
+          "normal": "Miranda_Normal",
+          "specular": null
+        }
+      }
+    },
+    {
+      "id": "ariel",
+      "index": 27,
+      "kind": "satellite",
+      "parent": "uranus",
+      "displayName": {
+        "en": "Ariel",
+        "ru": "Ариэль"
+      },
+      "type": "moon",
+      "facts": {
+        "diameterKm": 1158,
+        "massEarths": 0.000226,
+        "siderealRotationDays": 2.52,
+        "orbitalPeriodDays": 2.52,
+        "distanceAu": 0.0012768898320957185,
+        "moons": 0,
+        "summary": {
+          "en": "Brightest of the major Uranian moons, with canyons and cryovolcanic plains.",
+          "ru": "Самый яркий из крупных спутников Урана, с каньонами и криовулканическими равнинами."
+        }
+      },
+      "orbit": {
+        "compressedOffset": [
+          0,
+          0,
+          0
+        ],
+        "inclinationDeg": 0.041,
+        "siderealRotationDays": 2.52,
+        "orbitalPeriodDays": 2.52,
+        "distanceAu": 0.0012768898320957185,
+        "axialTiltDegrees": 0,
+        "earthRadiusScale": 0.090865,
+        "rotationRate": 0,
+        "sceneOrbitRadius": 44,
+        "orbitPlane": "xy",
+        "initialAnomalyRad": 3.14159265,
+        "spinDegPerSimSecond": -2.76,
+        "yawOffsetDegrees": 0,
+        "artRollDegrees": 90,
+        "keplerian": {
+          "aKm": 191020,
+          "e": 0.0012,
+          "iDeg": 0.041,
+          "OmegaDeg": 0,
+          "omegaDeg": 0,
+          "M0Deg": 0,
+          "nDegPerDay": 142.85714285714286
+        }
+      },
+      "includeInCompanion": false,
+      "render": {
+        "shaderFlags": {
+          "hasNightTexture": false,
+          "hasSpecularMap": false,
+          "hasClouds": false
+        },
+        "ambientFactor": 0,
+        "useSphereIntersect": true,
+        "mesh": null,
+        "lod": {
+          "diffuse": "Ariel_Diffuse",
+          "normal": "Ariel_Normal",
+          "specular": null
+        }
+      }
+    },
+    {
+      "id": "umbriel",
+      "index": 28,
+      "kind": "satellite",
+      "parent": "uranus",
+      "displayName": {
+        "en": "Umbriel",
+        "ru": "Умбриэль"
+      },
+      "type": "moon",
+      "facts": {
+        "diameterKm": 1169,
+        "massEarths": 0.0002,
+        "siderealRotationDays": 4.144,
+        "orbitalPeriodDays": 4.144,
+        "distanceAu": 0.0017781001745234067,
+        "moons": 0,
+        "summary": {
+          "en": "Darkest major Uranian moon; an ancient, heavily cratered icy surface.",
+          "ru": "Самый тёмный крупный спутник Урана; древняя, сильно кратерированная ледяная поверхность."
+        }
+      },
+      "orbit": {
+        "compressedOffset": [
+          0,
+          0,
+          0
+        ],
+        "inclinationDeg": 0.128,
+        "siderealRotationDays": 4.144,
+        "orbitalPeriodDays": 4.144,
+        "distanceAu": 0.0017781001745234067,
+        "axialTiltDegrees": 0,
+        "earthRadiusScale": 0.091775,
+        "rotationRate": 0,
+        "sceneOrbitRadius": 49,
+        "orbitPlane": "xy",
+        "initialAnomalyRad": 3.14159265,
+        "spinDegPerSimSecond": -2.76,
+        "yawOffsetDegrees": 0,
+        "artRollDegrees": 90,
+        "keplerian": {
+          "aKm": 266000,
+          "e": 0.0039,
+          "iDeg": 0.128,
+          "OmegaDeg": 0,
+          "omegaDeg": 0,
+          "M0Deg": 0,
+          "nDegPerDay": 86.87258687258687
+        }
+      },
+      "includeInCompanion": false,
+      "render": {
+        "shaderFlags": {
+          "hasNightTexture": false,
+          "hasSpecularMap": false,
+          "hasClouds": false
+        },
+        "ambientFactor": 0,
+        "useSphereIntersect": true,
+        "mesh": null,
+        "lod": {
+          "diffuse": "Umbriel_Diffuse",
+          "normal": "Umbriel_Normal",
+          "specular": null
+        }
+      }
+    },
+    {
+      "id": "titania",
+      "index": 29,
+      "kind": "satellite",
+      "parent": "uranus",
+      "displayName": {
+        "en": "Titania",
+        "ru": "Титания"
+      },
+      "type": "moon",
+      "facts": {
+        "diameterKm": 1578,
+        "massEarths": 0.00059,
+        "siderealRotationDays": 8.706,
+        "orbitalPeriodDays": 8.706,
+        "distanceAu": 0.002913878372468038,
+        "moons": 0,
+        "summary": {
+          "en": "Largest Uranian moon; ice-rock mix with huge fault valleys from past tectonic activity.",
+          "ru": "Крупнейший спутник Урана; смесь льда и камня с огромными разломными долинами."
+        }
+      },
+      "orbit": {
+        "compressedOffset": [
+          0,
+          0,
+          0
+        ],
+        "inclinationDeg": 0.079,
+        "siderealRotationDays": 8.706,
+        "orbitalPeriodDays": 8.706,
+        "distanceAu": 0.002913878372468038,
+        "axialTiltDegrees": 0,
+        "earthRadiusScale": 0.123748,
+        "rotationRate": 0,
+        "sceneOrbitRadius": 55,
+        "orbitPlane": "xy",
+        "initialAnomalyRad": 3.14159265,
+        "spinDegPerSimSecond": -2.76,
+        "yawOffsetDegrees": 0,
+        "artRollDegrees": 90,
+        "keplerian": {
+          "aKm": 435910,
+          "e": 0.0011,
+          "iDeg": 0.079,
+          "OmegaDeg": 0,
+          "omegaDeg": 0,
+          "M0Deg": 0,
+          "nDegPerDay": 41.35079255685734
+        }
+      },
+      "includeInCompanion": false,
+      "render": {
+        "shaderFlags": {
+          "hasNightTexture": false,
+          "hasSpecularMap": false,
+          "hasClouds": false
+        },
+        "ambientFactor": 0,
+        "useSphereIntersect": true,
+        "mesh": null,
+        "lod": {
+          "diffuse": "Titania_Diffuse",
+          "normal": "Titania_Normal",
+          "specular": null
+        }
+      }
+    },
+    {
+      "id": "oberon",
+      "index": 30,
+      "kind": "satellite",
+      "parent": "uranus",
+      "displayName": {
+        "en": "Oberon",
+        "ru": "Оберон"
+      },
+      "type": "moon",
+      "facts": {
+        "diameterKm": 1523,
+        "massEarths": 0.000507,
+        "siderealRotationDays": 13.46,
+        "orbitalPeriodDays": 13.46,
+        "distanceAu": 0.0039005902775860837,
+        "moons": 0,
+        "summary": {
+          "en": "Outermost major Uranian moon; ancient cratered ice with a hint of a carbon-rich darkening.",
+          "ru": "Внешний крупный спутник Урана; древний кратерированный лёд с углеродистым потемнением."
+        }
+      },
+      "orbit": {
+        "compressedOffset": [
+          0,
+          0,
+          0
+        ],
+        "inclinationDeg": 0.068,
+        "siderealRotationDays": 13.46,
+        "orbitalPeriodDays": 13.46,
+        "distanceAu": 0.0039005902775860837,
+        "axialTiltDegrees": 0,
+        "earthRadiusScale": 0.11951,
+        "rotationRate": 0,
+        "sceneOrbitRadius": 61,
+        "orbitPlane": "xy",
+        "initialAnomalyRad": 3.14159265,
+        "spinDegPerSimSecond": -2.76,
+        "yawOffsetDegrees": 0,
+        "artRollDegrees": 90,
+        "keplerian": {
+          "aKm": 583520,
+          "e": 0.0014,
+          "iDeg": 0.068,
+          "OmegaDeg": 0,
+          "omegaDeg": 0,
+          "M0Deg": 0,
+          "nDegPerDay": 26.745913818722137
+        }
+      },
+      "includeInCompanion": false,
+      "render": {
+        "shaderFlags": {
+          "hasNightTexture": false,
+          "hasSpecularMap": false,
+          "hasClouds": false
+        },
+        "ambientFactor": 0,
+        "useSphereIntersect": true,
+        "mesh": null,
+        "lod": {
+          "diffuse": "Oberon_Diffuse",
+          "normal": "Oberon_Normal",
+          "specular": null
+        }
+      }
+    },
+    {
+      "id": "triton",
+      "index": 31,
+      "kind": "satellite",
+      "parent": "neptune",
+      "displayName": {
+        "en": "Triton",
+        "ru": "Тритон"
+      },
+      "type": "moon",
+      "facts": {
+        "diameterKm": 2707,
+        "massEarths": 0.00358,
+        "siderealRotationDays": 5.877,
+        "orbitalPeriodDays": 5.877,
+        "distanceAu": 0.002371417442908832,
+        "moons": 0,
+        "summary": {
+          "en": "Neptune's captured retrograde moon; nitrogen geysers and a slowly decaying orbit.",
+          "ru": "Захваченный ретроградный спутник Нептуна; азотные гейзеры и медленно затухающая орбита."
+        }
+      },
+      "orbit": {
+        "compressedOffset": [
+          0,
+          0,
+          0
+        ],
+        "inclinationDeg": 156.885,
+        "siderealRotationDays": 5.877,
+        "orbitalPeriodDays": 5.877,
+        "distanceAu": 0.002371417442908832,
+        "axialTiltDegrees": 0,
+        "earthRadiusScale": 0.2724,
+        "rotationRate": 0,
+        "sceneOrbitRadius": 37.5,
+        "orbitPlane": "xz",
+        "initialAnomalyRad": -1.57079633,
+        "spinDegPerSimSecond": -2.76,
+        "yawOffsetDegrees": -75,
+        "artRollDegrees": 0,
+        "keplerian": {
+          "aKm": 354759,
+          "e": 0.000016,
+          "iDeg": 156.885,
+          "OmegaDeg": 177.61,
+          "omegaDeg": 66.14,
+          "M0Deg": 260.64,
+          "nDegPerDay": 61.25574272588055
+        }
+      },
+      "includeInCompanion": false,
+      "render": {
+        "shaderFlags": {
+          "hasNightTexture": false,
+          "hasSpecularMap": false,
+          "hasClouds": false
+        },
+        "ambientFactor": 0,
+        "useSphereIntersect": true,
+        "mesh": null,
+        "lod": {
+          "diffuse": "Triton_Diffuse",
+          "normal": "Triton_Normal",
+          "specular": null
+        }
+      }
+    },
+    {
+      "id": "charon",
+      "index": 32,
+      "kind": "satellite",
+      "parent": "pluto",
+      "displayName": {
+        "en": "Charon",
+        "ru": "Харон"
+      },
+      "type": "moon",
+      "facts": {
+        "diameterKm": 1212,
+        "massEarths": 0.00026,
+        "siderealRotationDays": 6.387,
+        "orbitalPeriodDays": 6.387,
+        "distanceAu": 0.00013095774631236113,
+        "moons": 0,
+        "summary": {
+          "en": "Pluto's binary companion; the two worlds orbit a barycenter above Pluto's surface.",
+          "ru": "Двойной компаньон Плутона; оба мира обращаются вокруг барицентра над поверхностью Плутона."
+        }
+      },
+      "orbit": {
+        "compressedOffset": [
+          0,
+          0,
+          0
+        ],
+        "inclinationDeg": 0.08,
+        "siderealRotationDays": 6.387,
+        "orbitalPeriodDays": 6.387,
+        "distanceAu": 0.00013095774631236113,
+        "axialTiltDegrees": 0,
+        "earthRadiusScale": 0.09512,
+        "rotationRate": 0,
+        "sceneOrbitRadius": 25,
+        "orbitPlane": "xz",
+        "initialAnomalyRad": -1.57079633,
+        "spinDegPerSimSecond": -2.76,
+        "yawOffsetDegrees": -75,
+        "artRollDegrees": 0,
+        "keplerian": {
+          "aKm": 19591,
+          "e": 0.0002,
+          "iDeg": 0.08,
+          "OmegaDeg": 223.05,
+          "omegaDeg": 0,
+          "M0Deg": 0,
+          "nDegPerDay": 56.36449037106623
+        }
+      },
+      "includeInCompanion": false,
+      "render": {
+        "shaderFlags": {
+          "hasNightTexture": false,
+          "hasSpecularMap": true,
+          "hasClouds": false
+        },
+        "ambientFactor": 0,
+        "useSphereIntersect": true,
+        "mesh": null,
+        "lod": {
+          "diffuse": "Charon_Diffuse",
+          "normal": "Charon_Normal",
+          "specular": "Charon_Specular"
+        }
+      }
     }
   ],
   "indexConvention": {
-    "description": "Focus indices match OrbitLayout::Body and planet_facts (Sun=0 … Pluto=9). WASM/TS focus APIs use this index; nearest-planet helpers may document +1 offsets relative to other lists.",
+    "description": "Focus indices match OrbitLayout::Body and planet_facts (Sun=0 … Vesta=11). Satellites occupy 12+ and are not focusable. WASM/TS focus APIs use focus index; nearest-planet helpers may document +1 offsets relative to other lists.",
     "sun": 0,
-    "pluto": 9
+    "pluto": 9,
+    "vesta": 11,
+    "firstSatellite": 12
+  },
+  "tiltConvention": {
+    "ssot": "catalog.orbit.axialTiltDegrees",
+    "axis": "Z",
+    "applyOrder": "Translate, Scale, Rotate(axialTiltDegrees, Z), Rotate(artTiltXDegrees, X), Rotate(spin, Y)",
+    "notes": [
+      "Catalog degrees are the single source of truth for both the WASM scene (CatalogBody) and the Three.js companion (orbital-parameters.json).",
+      "Uranus previously used Rotate(81.2, X) in C++ vs catalog −97.8°; C++ now uses the catalog Z tilt (IAU obliquity, same sign convention as Earth/Mars).",
+      "Neptune C++ previously used +28.3° Z vs catalog −28.3°; C++ now matches the catalog/companion sign.",
+      "Pluto had a catalog tilt of −122.5° but no C++ Rotate(); CatalogBody now applies it.",
+      "Saturn keeps an extra render.artTiltXDegrees = −15 art overlay so the rings match the established presentation; the IAU Z tilt remains −26.7°."
+    ]
   }
 }

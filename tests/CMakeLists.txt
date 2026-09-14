@@ -36,6 +36,7 @@ add_executable(SolarSystemTests
     test_asteroid_field.cpp
     test_magnetic_field.cpp
     test_sky_events.cpp
+    test_body_catalog.cpp
     stub_texture_image2d.cpp
     ${SOLARSYSTEM_TEST_SOURCES}
 )
@@ -43,8 +44,10 @@ add_executable(SolarSystemTests
 target_compile_definitions(SolarSystemTests PRIVATE SOLARSYSTEM_BUILD_TESTS)
 target_include_directories(SolarSystemTests PRIVATE
     ${CMAKE_SOURCE_DIR}/src
-    ${CMAKE_SOURCE_DIR}/external/glm
 )
+if(EXISTS "${CMAKE_SOURCE_DIR}/external/glm")
+    target_include_directories(SolarSystemTests PRIVATE ${CMAKE_SOURCE_DIR}/external/glm)
+endif()
 target_link_libraries(SolarSystemTests PRIVATE GTest::gtest_main)
 
 include(GoogleTest)

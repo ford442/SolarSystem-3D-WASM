@@ -2,8 +2,9 @@
 #define SOLARSYSTEM_STAR_H
 #include "SpaceObject.h"
 #include "../Auxiliary_Modules/TextureImage2D.h"
-#include <vector>
+#include <array>
 #include <optional>
+#include <vector>
 
 struct StarInfo {
     MeshHolder starModel;

@@ -25,10 +25,15 @@ jobs:
       - name: Install build tools
         run: |
           sudo apt-get update
-          sudo apt-get install -y --no-install-recommends build-essential cmake ninja-build
+          sudo apt-get install -y --no-install-recommends \
+            build-essential cmake ninja-build libglm-dev \
+            libgl1-mesa-dev libglew-dev libglfw3-dev \
+            libsdl2-dev libsdl2-image-dev libsdl2-mixer-dev \
+            libfreetype-dev libassimp-dev
 
       - name: Configure and build unit tests
         run: |
+          rm -rf build-test
           cmake -G Ninja -DCMAKE_BUILD_TYPE=Release -DSOLARSYSTEM_BUILD_TESTS=ON -B build-test
           cmake --build build-test --target SolarSystemTests
 

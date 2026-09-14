@@ -29,13 +29,19 @@ fi
 
 # --- 2. Assimp (Static Library for WebAssembly) ---
 ASSIMP_DIR="$EXTERNAL_DIR/assimp"
-if [ ! -d "$ASSIMP_DIR" ]; then
-    echo "Fetching Assimp..."
-    git clone https://github.com/assimp/assimp.git "$ASSIMP_DIR"
-    # Checkout a stable version to avoid surprises
-    cd "$ASSIMP_DIR"
-    git checkout v5.3.1
-    cd ../..
+# CI restores only external/assimp/build-wasm/ (the .a). That creates ASSIMP_DIR
+# without include/assimp/types.h, so a mere directory check would skip the clone.
+if [ ! -f "$ASSIMP_DIR/include/assimp/types.h" ]; then
+    echo "Fetching Assimp sources..."
+    SRC_TMP=$(mktemp -d)
+    git clone --depth 1 --branch v5.3.1 https://github.com/assimp/assimp.git "$SRC_TMP/assimp"
+    mkdir -p "$ASSIMP_DIR"
+    rm -rf "$ASSIMP_DIR/include"
+    cp -a "$SRC_TMP/assimp/include" "$ASSIMP_DIR/include"
+    if [ ! -f "$ASSIMP_DIR/CMakeLists.txt" ]; then
+        cp -a "$SRC_TMP/assimp/." "$ASSIMP_DIR/"
+    fi
+    rm -rf "$SRC_TMP"
 else
     echo "Assimp already exists in $ASSIMP_DIR"
 fi

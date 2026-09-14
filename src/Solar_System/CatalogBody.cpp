@@ -8,6 +8,8 @@ CatalogBody::CatalogBody(const PlanetInfo& planetInfo, std::shared_ptr<Star> par
       _entry(entry),
       _body(static_cast<OrbitLayout::Body>(entry.index)),
       _hasSpecular(entry.lod.specular != nullptr),
+      _hasNight(entry.shaderFlags.hasNightTexture),
+      _hasClouds(entry.shaderFlags.hasClouds),
       _diffuses(planetInfo.diffuseTextures),
       _normalMap(planetInfo.normalMap),
       _specular(planetInfo.specularTexture) {
@@ -39,27 +41,50 @@ void CatalogBody::AdjustToParent(float /*timeScale*/) {
     LoadIdentityModelMatrix();
     Translate(_parentStar->GetPosition() + OrbitLayout::GetOffset(_body));
     Scale(glm::vec3(_earthSizeCoefficient));
+    Rotate(_entry.axialTiltDegrees, glm::vec3(0.0f, 0.0f, 1.0f));
+    if (_entry.artTiltXDegrees != 0.0f) {
+        Rotate(_entry.artTiltXDegrees, glm::vec3(1.0f, 0.0f, 0.0f));
+    }
     Rotate(OrbitLayout::GetAxialSpinDegrees(_body), glm::vec3(0.0f, 1.0f, 0.0f));
     UpdateModelMatrix();
 }
 
 void CatalogBody::Render() const {
-    GetShader().SetBool("hasNightTexture", _entry.shaderFlags.hasNightTexture);
+    GetShader().SetBool("hasNightTexture", _hasNight);
     GetShader().SetBool("hasSpecularMap", _hasSpecular);
     GetShader().SetBool("hasSpecular", _hasSpecular);
-    GetShader().SetBool("isUseSphereIntersect", false);
-    GetShader().SetInt("mainDiffuseTexture", 0);
-    GetShader().SetInt("normalMap", 1);
+    GetShader().SetBool("hasClouds", _hasClouds);
+    GetShader().SetBool("isUseSphereIntersect", _entry.useSphereIntersect);
     GetShader().SetFloat("ambientFactor", _entry.ambientFactor);
 
-    glBindTextureUnit(0, _diffuses.at(0).GetTexture());
-    glBindTextureUnit(1, _normalMap.GetTexture());
+    int unit = 0;
+    GetShader().SetInt("mainDiffuseTexture", unit);
+    glBindTextureUnit(unit++, _diffuses.at(0).GetTexture());
+
+    if (_hasClouds && _diffuses.size() > 1) {
+        GetShader().SetInt("cloudTexture", unit);
+        glBindTextureUnit(unit++, _diffuses.at(1).GetTexture());
+    }
+    if (_hasNight) {
+        const size_t nightIndex = _hasClouds ? 2 : 1;
+        if (_diffuses.size() > nightIndex) {
+            GetShader().SetInt("nightTexture", unit);
+            glBindTextureUnit(unit++, _diffuses.at(nightIndex).GetTexture());
+        }
+    }
+
+    GetShader().SetInt("normalMap", unit);
+    glBindTextureUnit(unit++, _normalMap.GetTexture());
     if (_hasSpecular) {
-        GetShader().SetInt("specularMap", 2);
-        glBindTextureUnit(2, _specular.GetTexture());
+        GetShader().SetInt("specularMap", unit);
+        glBindTextureUnit(unit, _specular.GetTexture());
     }
 
     SpaceObject::Render();
+
+    if (_hasClouds) {
+        GetShader().SetBool("hasClouds", false);
+    }
 }
 
 void CatalogBody::LoadHighResIfClose(const glm::vec3& cameraPos) {

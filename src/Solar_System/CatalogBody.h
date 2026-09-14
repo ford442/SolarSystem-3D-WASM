@@ -8,16 +8,13 @@
 /**
  * A planet built entirely from a catalog row — no per-body C++ class.
  *
- * Mercury/Venus/… each have a hand-written class because they carry unique art decisions
- * (fixed tilts, atmospheres, clouds, rings). Bodies whose only distinguishing features fit
- * in a BodyCatalog::Entry — a diffuse/normal/optional-specular set, a few shader flags, an
- * orbit row — go through this class instead, so adding one is a catalog edit plus a factory
- * line. Ceres and Vesta are the first two.
+ * Mercury–Pluto, Ceres, and Vesta all go through this class. Unique shader layouts
+ * (Earth night+clouds, Uranus/Neptune cloud maps) are selected from BodyCatalog::Entry
+ * flags and extra LOD ids, not from subclasses. Axial tilt is the catalog SSOT:
+ * Rotate(axialTiltDegrees, Z) then optional artTiltXDegrees (Saturn).
  *
- * Orbit and spin come from OrbitLayout (ephemeris-driven), exactly as for the hand-written
- * planets. Axial tilt is deliberately not applied: catalog tilts do not match the hand-tuned
- * art rotations the existing classes use, and reconciling that is a separate pass (see
- * BodyCatalog.generated.h).
+ * Atmospheres, ring geometry, and cloud *shells* are attached by the factory
+ * (SystemVisuals + CatalogClouds), not here. The Sun stays a dedicated class.
  */
 class CatalogBody : public Planet {
 public:
@@ -29,13 +26,15 @@ public:
     void LoadHighResIfClose(const glm::vec3& cameraPos) override;
     void UnloadHighResIfFar(const glm::vec3& cameraPos) override;
 
-    /** Focus-index body this row describes (OrbitLayout::Body::Ceres for "ceres", …). */
     OrbitLayout::Body GetBody() const { return _body; }
+    const BodyCatalog::Entry& GetEntry() const { return _entry; }
 
 private:
     const BodyCatalog::Entry& _entry;
     OrbitLayout::Body _body;
     bool _hasSpecular;
+    bool _hasNight;
+    bool _hasClouds;
 
     std::vector<TextureImage2D> _diffuses;
     TextureImage2D _normalMap, _specular;

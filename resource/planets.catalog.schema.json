@@ -42,13 +42,41 @@
           },
           "type": { "type": "string" },
           "facts": { "type": "object" },
-          "orbit": { "type": "object" },
+          "orbit": {
+            "type": "object",
+            "properties": {
+              "axialTiltDegrees": {
+                "type": "number",
+                "description": "IAU-style tilt SSOT. CatalogBody applies Rotate(Z); the Three.js companion uses the same value."
+              },
+              "keplerian": {
+                "type": "object",
+                "description": "Osculating elements for satellites (stored for the eclipse follow-up; runtime still uses circular sceneOrbitRadius until then).",
+                "required": ["aKm", "e", "iDeg", "OmegaDeg", "omegaDeg", "M0Deg", "nDegPerDay"],
+                "properties": {
+                  "aKm": { "type": "number" },
+                  "e": { "type": "number" },
+                  "iDeg": { "type": "number" },
+                  "OmegaDeg": { "type": "number" },
+                  "omegaDeg": { "type": "number" },
+                  "M0Deg": { "type": "number" },
+                  "nDegPerDay": { "type": "number" }
+                }
+              },
+              "sceneOrbitRadius": { "type": "number" },
+              "orbitPlane": { "type": "string", "enum": ["xz", "xy"] },
+              "initialAnomalyRad": { "type": "number" },
+              "spinDegPerSimSecond": { "type": "number" },
+              "yawOffsetDegrees": { "type": "number" },
+              "artRollDegrees": { "type": "number" }
+            }
+          },
           "system": { "type": "object" },
           "assets": { "type": "object" },
           "includeInCompanion": { "type": "boolean" },
           "render": {
             "type": "object",
-            "description": "Optional. Drives BodyCatalog.generated.h (see generate-planet-metadata.mjs). Present today only for planets/dwarf planets with no unique shader needs; the Sun, ring systems, and moons remain hand-maintained C++ classes.",
+            "description": "Drives BodyCatalog.generated.h. Planets/dwarf planets/moons with a render block are built by CatalogBody/CatalogSatellite — no per-body C++ class. The Sun and ring geometry stay hand-maintained.",
             "properties": {
               "shaderFlags": {
                 "type": "object",
@@ -59,13 +87,50 @@
                 }
               },
               "ambientFactor": { "type": "number" },
+              "useSphereIntersect": { "type": "boolean" },
+              "artTiltXDegrees": { "type": "number", "description": "Optional extra Rotate(X) overlay (Saturn rings)." },
+              "mesh": { "type": ["string", "null"], "description": "Optional non-sphere mesh path (Phobos/Deimos)." },
               "lod": {
                 "type": "object",
                 "properties": {
                   "diffuse": { "type": "string" },
                   "normal": { "type": "string" },
-                  "specular": { "type": ["string", "null"] }
+                  "specular": { "type": ["string", "null"] },
+                  "night": { "type": ["string", "null"] },
+                  "clouds": { "type": ["string", "null"] }
                 }
+              },
+              "cloudLayer": {
+                "type": "object",
+                "description": "Optional outer-shell cloud layer (Earth/Uranus/Neptune). Not the same as shaderFlags.hasClouds.",
+                "properties": {
+                  "scaleFactor": { "type": "number" },
+                  "diffuse": { "type": "string" },
+                  "normal": { "type": "string" },
+                  "spinDegPerSimSecond": { "type": "number" },
+                  "ambientFactor": { "type": "number" }
+                }
+              }
+            }
+          }
+        },
+        "if": {
+          "properties": { "kind": { "const": "satellite" } },
+          "required": ["kind"]
+        },
+        "then": {
+          "required": ["parent"],
+          "properties": {
+            "parent": { "type": "string", "minLength": 1 },
+            "orbit": {
+              "type": "object",
+              "required": ["keplerian", "sceneOrbitRadius"],
+              "properties": {
+                "keplerian": {
+                  "type": "object",
+                  "required": ["aKm", "e", "iDeg", "OmegaDeg", "omegaDeg", "M0Deg", "nDegPerDay"]
+                },
+                "sceneOrbitRadius": { "type": "number", "exclusiveMinimum": 0 }
               }
             }
           }

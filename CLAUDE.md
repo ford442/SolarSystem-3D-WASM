@@ -81,16 +81,17 @@ The CMakeLists.txt has separate configurations for EMSCRIPTEN vs native builds, 
   - `SpaceObject.h/cpp` — Abstract base for all celestial bodies
   - `Transformable.h/cpp` — Rotation/translation transformations
   - `Planet.h/cpp`, `Satellite.h/cpp`, `Star.h/cpp` — Specializations
+  - `CatalogBody` / `CatalogSatellite` / `CatalogClouds` — catalog-driven construction (Mercury–Pluto, moons, cloud shells)
   
-- Specific celestial bodies organized by system:
+- Specific celestial bodies that still have dedicated classes:
   - `Sun/Sun.h/cpp` — Star with corona and lens flare
-  - `Earth_System/` — Earth, Moon, EarthClouds
-  - `Mars_System/` — Mars, Phobos, Deimos
-  - `Jupiter_System/` — Jupiter, Io, Europa, Ganymede, Callisto
-  - `Saturn_System/` — Saturn, SaturnRing, Mimas, Enceladus, Tethys, Dione, Rhea, Titan, Iapetus
-  - `Uranus_System/` — Uranus, UranusRing, Ariel, Miranda, Umbriel, Titania, Oberon, UranusClouds
-  - `Neptune_System/` — Neptune, NeptuneClouds, Triton
-  - `Pluto_System/` — Pluto, Charon
+  - `Saturn_System/SaturnRing`, `Uranus_System/UranusRing` — ring meshes
+  - Atmosphere/ring *numbers* live in `SystemVisuals.h`; everything else is a catalog row
+  
+- Atmosphere/rings:
+  - `Atmosphere.h/cpp` — Atmospheric scattering shader
+  - `PlanetaryRing.h/cpp`, `SaturnRing.h/cpp`, `UranusRing.h/cpp` — Ring rendering
+  - `Clouds.h/cpp`, `OuterShell.h/cpp` — Cloud layer and outer atmospheric shells
   
 - Atmosphere/rings:
   - `Atmosphere.h/cpp` — Atmospheric scattering shader
@@ -146,19 +147,16 @@ The CMakeLists.txt has separate configurations for EMSCRIPTEN vs native builds, 
 **Catalog-driven path (preferred for a body with no unique shader needs).** No new class:
 1. Add a body to `resource/planets.catalog.json` with a `render` block, `system.initTag` (also on `initTagAllowlist`), and `assets.requiredLow`
 2. Run `node scripts/generate-planet-metadata.mjs`
-3. Add the `OrbitLayout::Body` enum value and its `BodyFromName` mapping
+3. Add the `OrbitLayout::Body` enum value and its `BodyFromName` mapping (focus indices 0–11 are frozen)
 4. Add Keplerian elements to `Ephemeris.cpp` if the body is not in the Standish table
-5. Call `InitCatalogBody(*_sphereModel, OrbitLayout::Body::X)` from `InitStarSystem()` (desktop) and add an initTag branch in `MakePlanetInitFunc` (staged web loading)
+5. No factory edit: `InitStarSystem()` / `MakePlanetInitFunc` construct any catalog primary via `InitCatalogSystem`
 
-Ceres and Vesta are the worked example. `scripts/make_placeholder_dds.py` writes the stand-in
-textures that `resource/textures_low/` ships until real ones are uploaded.
+Ceres, Vesta, Mercury–Pluto, the Moon, and the Galileans are the worked examples. Moons need `parent`, `orbit.keplerian`, and `orbit.sceneOrbitRadius` (runtime still uses circular offsets until the eclipse ticket). `scripts/make_placeholder_dds.py` writes the stand-in textures that `resource/textures_low/` ships until real ones are uploaded.
 
-**Hand-written path (atmosphere, rings, clouds, or a fixed art tilt).**
-1. Create a new class in the appropriate system folder (e.g., `Saturn_System/NewSatellite.h/cpp`)
-2. Inherit from `Satellite` or `Planet` as appropriate
-3. Override `update()` and `render()` if needed; use parent implementations for default behavior
-4. Register the body in `SolarSystem.h` constructor or initialization
-5. Add textures/models to `resource/` and ensure they are accessible to the loader
+**Hand-written path (Sun, ring meshes, or a shader that does not fit catalog flags).**
+1. Keep or add a dedicated class (e.g., `Sun`, `SaturnRing`)
+2. Register atmosphere/ring *numbers* in `src/Solar_System/SystemVisuals.h` rather than a new `Init*System`
+3. Add textures/models to `resource/` and ensure they are accessible to the loader
 
 ### Modifying Shaders
 - Shaders are in `resource/shaders/`
