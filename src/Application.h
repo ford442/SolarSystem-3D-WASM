@@ -20,6 +20,7 @@
 #endif
 
 #ifdef SOLARSYSTEM_USE_SDL_MIXER
+#include <SDL.h>
 #include <SDL_mixer.h>
 #else
 #include <irrKlang.h>
