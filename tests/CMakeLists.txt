@@ -44,8 +44,10 @@ add_executable(SolarSystemTests
 target_compile_definitions(SolarSystemTests PRIVATE SOLARSYSTEM_BUILD_TESTS)
 target_include_directories(SolarSystemTests PRIVATE
     ${CMAKE_SOURCE_DIR}/src
-    ${CMAKE_SOURCE_DIR}/external/glm
 )
+if(EXISTS "${CMAKE_SOURCE_DIR}/external/glm")
+    target_include_directories(SolarSystemTests PRIVATE ${CMAKE_SOURCE_DIR}/external/glm)
+endif()
 target_link_libraries(SolarSystemTests PRIVATE GTest::gtest_main)
 
 include(GoogleTest)

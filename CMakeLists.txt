@@ -3,7 +3,9 @@ project(SolarSystem)
 
 set(CMAKE_CXX_STANDARD 17)
 
-include_directories(${CMAKE_SOURCE_DIR}/external/glm)
+if(EXISTS "${CMAKE_SOURCE_DIR}/external/glm")
+    include_directories(${CMAKE_SOURCE_DIR}/external/glm)
+endif()
 
 if(EMSCRIPTEN)
     include_directories(${CMAKE_SOURCE_DIR}/external/assimp/include)
