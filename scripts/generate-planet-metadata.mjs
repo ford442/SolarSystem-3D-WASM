@@ -102,10 +102,14 @@ function validateCatalog(catalog) {
         throw new Error(`Satellite ${body.id} requires a parent id`);
       }
       const k = body.orbit?.keplerian;
-      if (!k || typeof k.aKm !== 'number' || typeof k.e !== 'number') {
+      const keplerianFields = ['aKm', 'e', 'iDeg', 'OmegaDeg', 'omegaDeg', 'M0Deg', 'nDegPerDay'];
+      if (!k || keplerianFields.some((field) => typeof k[field] !== 'number')) {
         throw new Error(
           `Satellite ${body.id} requires orbit.keplerian {aKm, e, iDeg, OmegaDeg, omegaDeg, M0Deg, nDegPerDay}`,
         );
+      }
+      if (typeof body.orbit?.sceneOrbitRadius !== 'number' || body.orbit.sceneOrbitRadius <= 0) {
+        throw new Error(`Satellite ${body.id} requires orbit.sceneOrbitRadius > 0`);
       }
     }
 
@@ -270,8 +274,14 @@ function buildPlanetManifest(catalog) {
 
 /** Format a JSON number as an unambiguous C++ float literal. */
 function cppFloat(n) {
-  const value = n ?? 0;
+  const value = Number(n ?? 0);
+  if (!Number.isFinite(value)) {
+    throw new Error(`cppFloat expected a finite number, got ${n}`);
+  }
   const text = String(value);
+  if (/[eE]/.test(text)) {
+    return `${text}f`;
+  }
   return `${text.includes('.') ? text : `${text}.0`}f`;
 }
 

@@ -45,6 +45,10 @@
           "orbit": {
             "type": "object",
             "properties": {
+              "axialTiltDegrees": {
+                "type": "number",
+                "description": "IAU-style tilt SSOT. CatalogBody applies Rotate(Z); the Three.js companion uses the same value."
+              },
               "keplerian": {
                 "type": "object",
                 "description": "Osculating elements for satellites (stored for the eclipse follow-up; runtime still uses circular sceneOrbitRadius until then).",
@@ -106,6 +110,27 @@
                   "spinDegPerSimSecond": { "type": "number" },
                   "ambientFactor": { "type": "number" }
                 }
+              }
+            }
+          }
+        },
+        "if": {
+          "properties": { "kind": { "const": "satellite" } },
+          "required": ["kind"]
+        },
+        "then": {
+          "required": ["parent"],
+          "properties": {
+            "parent": { "type": "string", "minLength": 1 },
+            "orbit": {
+              "type": "object",
+              "required": ["keplerian", "sceneOrbitRadius"],
+              "properties": {
+                "keplerian": {
+                  "type": "object",
+                  "required": ["aKm", "e", "iDeg", "OmegaDeg", "omegaDeg", "M0Deg", "nDegPerDay"]
+                },
+                "sceneOrbitRadius": { "type": "number", "exclusiveMinimum": 0 }
               }
             }
           }
