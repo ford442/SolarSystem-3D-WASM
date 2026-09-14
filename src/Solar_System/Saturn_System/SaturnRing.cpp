@@ -1,4 +1,6 @@
 #include "SaturnRing.h"
+#include "../BodyCatalog.generated.h"
+#include "../OrbitLayout.h"
 
 SaturnRing::SaturnRing(const PlanetaryRingInfo& planetaryRingInfo, std::shared_ptr<Planet> parent) : PlanetaryRing(planetaryRingInfo, std::move(parent)) {
     ConfigureDiffuseLOD("resource/textures_low/Saturn_Rings_Low.dds",
@@ -7,11 +9,14 @@ SaturnRing::SaturnRing(const PlanetaryRingInfo& planetaryRingInfo, std::shared_p
 }
 
 void SaturnRing::AdjustToParent() {
+    const BodyCatalog::Entry* entry = BodyCatalog::FindByIndex(static_cast<int>(OrbitLayout::Body::Saturn));
+    const float tiltZ = entry ? entry->axialTiltDegrees : -26.7f;
+    const float tiltX = entry ? entry->artTiltXDegrees : -15.0f;
+
     LoadIdentityModelMatrix();
     Translate(_parentPlanet->GetPosition());
-    //Rotate(13.35f, glm::vec3(0, 0, 1));
-    Rotate(-26.7f, glm::vec3(0, 0, 1));
-    Rotate(-15.f, glm::vec3(1, 0, 0));
+    Rotate(tiltZ, glm::vec3(0, 0, 1));
+    Rotate(tiltX, glm::vec3(1, 0, 0));
     UpdateRingNormal();
     UpdateModelMatrix();
 }

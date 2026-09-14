@@ -11,6 +11,7 @@
 #include "XrState.h"
 #include <atomic>
 #include <functional>
+#include <string>
 #include <unordered_set>
 
 #ifdef __EMSCRIPTEN__
@@ -171,16 +172,9 @@ private:
     void InitStarSystem();
     void LoadPlanetSystemManifests(); // WASM: parse resource/planet_manifest.json
     std::function<void()> MakePlanetInitFunc(const std::string& initTag);
-    void InitMercury(const MeshHolder& sphereModel);
-    void InitVenus(const MeshHolder& sphereModel);
-    void InitEarthSystem(const MeshHolder& sphereModel);
-    void InitMarsSystem(const MeshHolder& sphereModel);
-    void InitJupiterSystem(const MeshHolder& sphereModel);
-    void InitSaturnSystem(const MeshHolder& sphereModel);
-    void InitUranusSystem(const MeshHolder& sphereModel);
-    void InitNeptuneSystem(const MeshHolder& sphereModel);
-    void InitPlutoSystem(const MeshHolder& sphereModel);
-    /** Build a body straight from its BodyCatalog row (Ceres, Vesta) — no per-body class. */
+    /** Build a catalog system (planet + moons + atmosphere/clouds/rings flags) from an initTag. */
+    void InitCatalogSystem(const MeshHolder& sphereModel, const std::string& initTag);
+    /** Focus-index wrapper around InitCatalogSystem (Ceres, Vesta, or any catalog primary). */
     void InitCatalogBody(const MeshHolder& sphereModel, OrbitLayout::Body body);
     void InitSongList();
     void Dispose();

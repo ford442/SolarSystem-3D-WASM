@@ -6,6 +6,8 @@
  *   - web/public/planet_facts.json
  *   - web/threejs/src/data/orbital-parameters.json
  *   - resource/planet_manifest.json
+ *   - src/Solar_System/OrbitLayoutBodies.generated.inc
+ *   - src/Solar_System/BodyCatalog.generated.h
  *
  * Usage:
  *   node scripts/generate-planet-metadata.mjs
@@ -16,7 +18,8 @@
  * --write-checksums  Fill sha256 for existing files listed in asset-manifest.json.
  *
  * Index convention (generated into comments where applicable):
- *   Focus body indices: Sun=0 … Pluto=9 (matches OrbitLayout::Body / explorer panel).
+ *   Focus body indices: Sun=0 … Vesta=11 (matches OrbitLayout::Body / explorer panel).
+ *   Satellites occupy 12+ and are catalog-built; they are not focusable.
  */
 import { createHash } from 'node:crypto';
 import {
@@ -59,6 +62,12 @@ function normalizeJsonText(text) {
   return stableStringify(JSON.parse(text));
 }
 
+const FOCUS_KINDS = new Set(['star', 'planet', 'dwarf_planet']);
+
+function isFocusBody(body) {
+  return FOCUS_KINDS.has(body.kind);
+}
+
 function validateCatalog(catalog) {
   if (catalog.schemaVersion !== 1) {
     throw new Error(`Unsupported schemaVersion: ${catalog.schemaVersion}`);
@@ -83,34 +92,61 @@ function validateCatalog(catalog) {
     }
     if (indices.has(body.index)) {
       throw new Error(
-        `Duplicate focus index ${body.index}: ${indices.get(body.index)} and ${body.id}`,
+        `Duplicate index ${body.index}: ${indices.get(body.index)} and ${body.id}`,
       );
     }
     indices.set(body.index, body.id);
 
-    if (body.system?.initTag) {
+    if (body.kind === 'satellite') {
+      if (!body.parent) {
+        throw new Error(`Satellite ${body.id} requires a parent id`);
+      }
+      const k = body.orbit?.keplerian;
+      if (!k || typeof k.aKm !== 'number' || typeof k.e !== 'number') {
+        throw new Error(
+          `Satellite ${body.id} requires orbit.keplerian {aKm, e, iDeg, OmegaDeg, omegaDeg, M0Deg, nDegPerDay}`,
+        );
+      }
+    }
+
+    if (body.system?.initTag && body.system.name) {
       const allow = catalog.initTagAllowlist;
       if (Array.isArray(allow) && allow.length > 0 && !allow.includes(body.system.initTag)) {
         throw new Error(
           `Body ${body.id} initTag "${body.system.initTag}" not in initTagAllowlist ` +
-            '(must match PlanetSystemLoader::MakePlanetInitFunc)',
+            '(must match PlanetSystemLoader::MakePlanetInitFunc generic InitCatalogSystem path)',
         );
       }
     }
   }
 
-  // Focusable primary bodies must form a contiguous 0..N-1 range (Sun=0).
-  const sorted = [...indices.keys()].sort((a, b) => a - b);
-  for (let i = 0; i < sorted.length; i++) {
-    if (sorted[i] !== i) {
+  for (const body of catalog.bodies) {
+    if (body.parent && !ids.has(body.parent)) {
+      throw new Error(`Body ${body.id} parent "${body.parent}" is not in the catalog`);
+    }
+  }
+
+  // Focusable primary bodies (star/planet/dwarf_planet) must form a contiguous 0..N-1 range.
+  const focusIndices = catalog.bodies
+    .filter(isFocusBody)
+    .map((b) => b.index)
+    .sort((a, b) => a - b);
+  for (let i = 0; i < focusIndices.length; i++) {
+    if (focusIndices[i] !== i) {
       throw new Error(
-        `Focus indices must be contiguous from 0; missing index ${i} (have ${sorted.join(',')})`,
+        `Focus indices must be contiguous from 0 among star/planet/dwarf_planet; ` +
+          `missing index ${i} (have ${focusIndices.join(',')})`,
       );
     }
   }
 
   if (indices.get(0) !== 'sun') {
     throw new Error('Index 0 must be id "sun" (canonical OrbitLayout / explorer convention)');
+  }
+
+  const vesta = catalog.bodies.find((b) => b.id === 'vesta');
+  if (!vesta || vesta.index !== 11) {
+    throw new Error('Focus index 11 must remain id "vesta" (Sun=0 … Vesta=11 frozen)');
   }
 
   // Lightweight schema presence check (full AJV optional).
@@ -124,6 +160,7 @@ function validateCatalog(catalog) {
 
 function buildPlanetFacts(catalog) {
   const bodies = [...catalog.bodies]
+    .filter(isFocusBody)
     .sort((a, b) => a.index - b.index)
     .map((body) => {
       const f = body.facts || {};
@@ -162,8 +199,8 @@ function buildPlanetFacts(catalog) {
   return {
     version: 2,
     generatedFrom: 'resource/planets.catalog.json',
-    // Canonical focus indices: Sun=0 … last body (Pluto=9 today).
-    indexConvention: 'Sun=0; matches OrbitLayout::Body and Module focus APIs',
+    // Canonical focus indices: Sun=0 … Vesta=11. Satellites are omitted from explorer facts.
+    indexConvention: 'Sun=0 … Vesta=11; matches OrbitLayout::Body and Module focus APIs',
     sceneNote: catalog.sceneNote?.en ?? '',
     bodies,
     scaleModes,
@@ -172,7 +209,7 @@ function buildPlanetFacts(catalog) {
 
 function buildOrbitalParameters(catalog) {
   const bodies = catalog.bodies
-    .filter((b) => b.includeInCompanion && b.kind !== 'star')
+    .filter((b) => b.includeInCompanion && isFocusBody(b) && b.kind !== 'star')
     .sort((a, b) => a.index - b.index)
     .map((body) => {
       const o = body.orbit || {};
@@ -201,7 +238,7 @@ function buildOrbitalParameters(catalog) {
 
 function buildPlanetManifest(catalog) {
   const systems = catalog.bodies
-    .filter((b) => b.system && b.assets)
+    .filter((b) => b.system && b.system.name && b.assets)
     .sort((a, b) => a.index - b.index)
     .map((body) => {
       const sys = body.system;
@@ -239,17 +276,17 @@ function cppFloat(n) {
 }
 
 /**
- * Generates the body-physics table OrbitLayout::kBodies[] used to hand-maintain (see
- * OrbitLayout.cpp): heliocentric compressed-art offset, AU distance, orbital period,
- * inclination, and sidereal rotation, one row per body in focus-index order (Sun=0).
- * Deliberately excludes axialTiltDegrees/earthRadiusScale — those per-body catalog fields
- * currently only feed the Three.js companion and do not match the hand-tuned art tilts each
- * planet's Render()/AdjustToParent() applies in C++ (e.g. Uranus/Neptune/Pluto differ in
- * sign, axis, or presence). Reconciling that is a separate, deliberate follow-up — see
- * docs/plans/PORTING_GUIDE.md-style notes in the planet-render-architecture writeup.
+ * Generates the body-physics table OrbitLayout::kBodies[] (see OrbitLayout.cpp):
+ * heliocentric compressed-art offset, AU distance, orbital period, inclination, and
+ * sidereal rotation, one row per *focus* body in index order (Sun=0 … Vesta=11).
+ * Satellites are excluded — their scene orbits live on BodyCatalog::Entry.
+ *
+ * Axial tilt is applied by CatalogBody from BodyCatalog::Entry.axialTiltDegrees
+ * (catalog SSOT; see docs/ARCHITECTURE.md §2.1). This table stays tilt-free because
+ * OrbitLayout only needs ephemeris radius/period/spin.
  */
 function buildOrbitLayoutBodiesInc(catalog) {
-  const bodies = [...catalog.bodies].sort((a, b) => a.index - b.index);
+  const bodies = [...catalog.bodies].filter(isFocusBody).sort((a, b) => a.index - b.index);
   const rows = bodies.map((body) => {
     const o = body.orbit || {};
     const [ox, oy, oz] = o.compressedOffset || [0, 0, 0];
@@ -263,7 +300,7 @@ function buildOrbitLayoutBodiesInc(catalog) {
     '// AUTO-GENERATED by scripts/generate-planet-metadata.mjs from resource/planets.catalog.json.',
     '// Do not edit directly — run: node scripts/generate-planet-metadata.mjs',
     "// Included into OrbitLayout.cpp's kBodies[] initializer. Row order is focus index order",
-    '// (Sun=0), matching OrbitLayout::Body and the bodyIndex() lookup.',
+    '// (Sun=0 … Vesta=11). Satellites (index 12+) are not rows here.',
     ...rows,
   ].join('\n');
 }
@@ -278,23 +315,49 @@ function cppWideString(s) {
   return `L"${s}"`;
 }
 
+function cppNullableString(s) {
+  return s ? cppString(s) : 'nullptr';
+}
+
+function cppKind(kind) {
+  switch (kind) {
+    case 'star':
+      return 'Kind::Star';
+    case 'dwarf_planet':
+      return 'Kind::DwarfPlanet';
+    case 'satellite':
+      return 'Kind::Satellite';
+    default:
+      return 'Kind::Planet';
+  }
+}
+
+function cppOrbitPlane(plane) {
+  return plane === 'xy' ? 'OrbitPlane::XY' : 'OrbitPlane::XZ';
+}
+
+function strEqHelper() {
+  return [
+    'inline constexpr bool StrEq(const char* a, const char* b) {',
+    '    if (!a || !b) {',
+    '        return a == b;',
+    '    }',
+    '    while (*a && *a == *b) {',
+    '        ++a;',
+    '        ++b;',
+    '    }',
+    '    return *a == *b;',
+    '}',
+  ];
+}
+
 /**
- * Generates a render-descriptor table for catalog bodies that carry a `render` block (today:
- * planets/dwarf planets with no unique shader needs). CatalogBody consumes it to build a body
- * with no hand-written C++ class — that is the path Ceres and Vesta take. The eight planets
- * plus Pluto still have their own classes and hardcode the same values; their rows exist so
- * they can migrate one at a time. The Sun, ring systems, and moons stay hand-maintained;
- * moons are not in the catalog at all yet (orbits hardcoded per-file — see Moon.cpp et al.).
- *
- * Deliberately excludes axial tilt: catalog `orbit.axialTiltDegrees` only feeds the Three.js
- * companion today and does not match the hand-tuned art rotations C++ applies for
- * Uranus/Neptune/Pluto (different sign, axis, or presence entirely) — reconciling that is a
- * separate, deliberate decision, not something this table should paper over. `earthRadiusScale`
- * has the same caveat: the existing planet classes pass their own hand-tuned coefficient to
- * PlanetInfo (Pluto 0.18651 vs catalog 0.18), so this field is authoritative only for bodies
- * actually built through CatalogBody.
+ * Render + orbit descriptors consumed by CatalogBody / CatalogSatellite / CatalogClouds.
+ * Mercury–Pluto and all catalog moons are built from these rows. Axial tilt is SSOT:
+ * catalog orbit.axialTiltDegrees, applied as Rotate(degrees, Z) then optional artTiltX.
  */
 function buildBodyCatalogHeader(catalog) {
+  const byId = new Map(catalog.bodies.map((b) => [b.id, b]));
   const bodies = catalog.bodies
     .filter((b) => b.render)
     .sort((a, b) => a.index - b.index);
@@ -303,16 +366,37 @@ function buildBodyCatalogHeader(catalog) {
     const r = body.render;
     const flags = r.shaderFlags || {};
     const lod = r.lod || {};
+    const o = body.orbit || {};
+    const k = o.keplerian || {};
+    const cloud = r.cloudLayer || {};
+    const parent = body.parent ? byId.get(body.parent) : null;
+    const initTag = body.system?.initTag ?? parent?.system?.initTag ?? body.id;
+    const kind = cppKind(body.kind);
     return (
-      `    {${body.index}, ${cppString(body.id)}, ${cppString(body.system?.initTag ?? body.id)}, ` +
+      `    {${body.index}, ${cppString(body.id)}, ${cppNullableString(body.parent)}, ` +
+      `${cppString(initTag)}, ${kind}, ` +
       `${cppWideString(body.displayName?.en ?? body.id)}, ` +
       `${cppWideString(body.displayName?.ru ?? body.displayName?.en ?? body.id)}, ` +
-      `${cppFloat(body.orbit?.distanceAu)}, ${cppFloat(body.orbit?.orbitalPeriodDays)}, ` +
-      `${cppFloat(body.orbit?.earthRadiusScale ?? 1)}, ` +
+      `${cppFloat(o.distanceAu)}, ${cppFloat(o.orbitalPeriodDays)}, ` +
+      `${cppFloat(o.earthRadiusScale ?? 1)}, ${cppFloat(o.axialTiltDegrees)}, ` +
+      `${cppFloat(r.artTiltXDegrees)}, ${cppFloat(o.yawOffsetDegrees)}, ` +
+      `${cppFloat(o.artRollDegrees)}, ` +
       `{${!!flags.hasNightTexture}, ${!!flags.hasSpecularMap}, ${!!flags.hasClouds}}, ` +
+      `${!!(r.useSphereIntersect ?? body.kind === 'satellite')}, ` +
       `${cppFloat(r.ambientFactor)}, ` +
       `{${cppString(lod.diffuse ?? '')}, ${cppString(lod.normal ?? '')}, ` +
-      `${lod.specular ? cppString(lod.specular) : 'nullptr'}}}, // ${body.id}`
+      `${cppNullableString(lod.specular)}, ${cppNullableString(lod.night)}, ` +
+      `${cppNullableString(lod.clouds)}}, ${cppNullableString(r.mesh)}, ` +
+      `${cppFloat(o.sceneOrbitRadius)}, ${cppOrbitPlane(o.orbitPlane)}, ` +
+      `${cppFloat(o.initialAnomalyRad)}, ${cppFloat(o.spinDegPerSimSecond)}, ` +
+      `{${cppFloat(k.aKm)}, ${cppFloat(k.e)}, ${cppFloat(k.iDeg)}, ${cppFloat(k.OmegaDeg)}, ` +
+      `${cppFloat(k.omegaDeg)}, ${cppFloat(k.M0Deg)}, ${cppFloat(k.nDegPerDay)}}, ` +
+      `{${cppNullableString(cloud.diffuse)}, ${cppNullableString(cloud.normal)}, ` +
+      `${cppFloat(cloud.scaleFactor)}, ${cppFloat(cloud.spinDegPerSimSecond)}, ` +
+      `${cppFloat(cloud.ambientFactor)}}, ` +
+      `${!!body.system?.hasAtmosphere}, ${!!body.system?.hasCloudLayer}, ` +
+      `${!!body.system?.hasRings}, ${!!body.system?.atmosphereToneMapping}, ` +
+      `${!!body.system?.lightFarUsesPlanetDistance}}, // ${body.id}`
     );
   });
 
@@ -321,21 +405,17 @@ function buildBodyCatalogHeader(catalog) {
     '// AUTO-GENERATED by scripts/generate-planet-metadata.mjs from resource/planets.catalog.json.',
     '// Do not edit directly — run: node scripts/generate-planet-metadata.mjs',
     '//',
-    '// Render descriptors for catalog bodies with no unique shader needs (see the `render`',
-    '// block in planets.catalog.json). Consumed by Solar_System/CatalogBody, which builds a',
-    '// renderable body straight from a row — that is how Ceres and Vesta exist without a C++',
-    '// class of their own. Rows for the eight planets and Pluto are not yet used: those still',
-    '// have hand-written classes that hardcode the same values, and can migrate one at a time.',
-    '// The Sun, ring systems, and moons remain hand-maintained; moons are not in the catalog.',
-    '//',
-    '// Deliberately excludes axial tilt — see OrbitLayoutBodies.generated.inc header comment',
-    '// for why catalog orbit.axialTiltDegrees cannot drive this without a reconciliation pass.',
-    '// earthRadiusScale carries the same caveat: authoritative only for CatalogBody bodies,',
-    '// because each hand-written planet class passes its own coefficient to PlanetInfo.',
+    '// CatalogBody / CatalogSatellite / CatalogClouds consume these rows. Mercury–Pluto and',
+    '// catalog moons are constructed from this table (plus SystemVisuals for atmospheres/rings).',
+    '// Axial tilt SSOT is orbit.axialTiltDegrees, applied as Rotate(Z) then optional artTiltX.',
+    '// See docs/ARCHITECTURE.md §2.1.',
     '',
     '#include <cstdint>',
     '',
     'namespace BodyCatalog {',
+    '',
+    'enum class Kind : uint8_t { Star = 0, Planet = 1, DwarfPlanet = 2, Satellite = 3 };',
+    'enum class OrbitPlane : uint8_t { XZ = 0, XY = 1 };',
     '',
     'struct ShaderFlags {',
     '    bool hasNightTexture;',
@@ -347,30 +427,90 @@ function buildBodyCatalogHeader(catalog) {
     '    const char* diffuse;',
     '    const char* normal;',
     '    const char* specular; // nullptr if this body has no specular map.',
+    '    const char* night;    // nullptr if no night map (Earth).',
+    '    const char* clouds;   // nullptr if the surface shader has no cloud map.',
+    '};',
+    '',
+    'struct Keplerian {',
+    '    float aKm;',
+    '    float e;',
+    '    float iDeg;',
+    '    float OmegaDeg;',
+    '    float omegaDeg;',
+    '    float M0Deg;',
+    '    float nDegPerDay;',
+    '};',
+    '',
+    'struct CloudLayer {',
+    '    const char* diffuse; // nullptr => no cloud shell.',
+    '    const char* normal;',
+    '    float scaleFactor;',
+    '    float spinDegPerSimSecond;',
+    '    float ambientFactor;',
     '};',
     '',
     'struct Entry {',
     '    int index;',
     '    const char* id;',
+    '    const char* parentId; // nullptr for heliocentric bodies.',
     '    const char* initTag;',
+    '    Kind kind;',
     '    const wchar_t* displayNameEn;',
     '    const wchar_t* displayNameRu;',
     '    float auDistance;',
     '    float orbitalPeriodDays;',
     '    float earthRadiusScale;',
+    '    float axialTiltDegrees; // catalog SSOT; Rotate(Z) in CatalogBody.',
+    '    float artTiltXDegrees;  // Saturn ring-presentation overlay; else 0.',
+    '    float yawOffsetDegrees;',
+    '    float artRollDegrees;',
     '    ShaderFlags shaderFlags;',
+    '    bool useSphereIntersect;',
     '    float ambientFactor;',
     '    TextureLodIds lod;',
+    '    const char* meshPath; // nullptr => unit sphere.',
+    '    float sceneOrbitRadius;',
+    '    OrbitPlane orbitPlane;',
+    '    float initialAnomalyRad;',
+    '    float spinDegPerSimSecond;',
+    '    Keplerian keplerian;',
+    '    CloudLayer cloudLayer;',
+    '    bool hasAtmosphere;',
+    '    bool hasCloudLayer;',
+    '    bool hasRings;',
+    '    bool atmosphereToneMapping;',
+    '    bool lightFarUsesPlanetDistance;',
     '};',
     '',
     'inline constexpr Entry kEntries[] = {',
     ...entries,
     '};',
     '',
-    '/** Row for a focus index, or nullptr when that body has no render descriptor. */',
+    ...strEqHelper(),
+    '',
+    '/** Row for a catalog index, or nullptr when that body has no render descriptor. */',
     'inline constexpr const Entry* FindByIndex(int index) {',
     '    for (const Entry& entry : kEntries) {',
     '        if (entry.index == index) {',
+    '            return &entry;',
+    '        }',
+    '    }',
+    '    return nullptr;',
+    '}',
+    '',
+    'inline constexpr const Entry* FindById(const char* id) {',
+    '    for (const Entry& entry : kEntries) {',
+    '        if (StrEq(entry.id, id)) {',
+    '            return &entry;',
+    '        }',
+    '    }',
+    '    return nullptr;',
+    '}',
+    '',
+    '/** Primary (non-satellite) body for a staged-loading initTag, or nullptr. */',
+    'inline constexpr const Entry* FindPrimaryByInitTag(const char* initTag) {',
+    '    for (const Entry& entry : kEntries) {',
+    '        if (entry.kind != Kind::Satellite && StrEq(entry.initTag, initTag)) {',
     '            return &entry;',
     '        }',
     '    }',

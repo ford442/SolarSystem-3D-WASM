@@ -22,9 +22,11 @@ npm run generate:planet-metadata:check
 
 | File | Consumer |
 |------|----------|
-| `web/public/planet_facts.json` | Explorer panel (`planetExplorer.ts`) |
+| `web/public/planet_facts.json` | Explorer panel (`planetExplorer.ts`) — focus bodies only (Sun=0 … Vesta=11) |
 | `web/threejs/src/data/orbital-parameters.json` | Three.js companion |
 | `resource/planet_manifest.json` | WASM staged loading |
+| `src/Solar_System/OrbitLayoutBodies.generated.inc` | Heliocentric orbit table |
+| `src/Solar_System/BodyCatalog.generated.h` | CatalogBody / CatalogSatellite / CatalogClouds rows (includes moons) |
 
 ## Asset checksums
 
@@ -36,4 +38,4 @@ python3 web/deploy.py assets --update-manifest --dry-run …
 
 ## Focus indices
 
-`Sun=0 … Pluto=9` — keep in lockstep with `OrbitLayout::Body` and focus APIs.
+`Sun=0 … Vesta=11` — keep in lockstep with `OrbitLayout::Body` and focus APIs. Satellites occupy catalog indices 12+ and are not focusable.

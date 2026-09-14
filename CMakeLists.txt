@@ -42,8 +42,6 @@ set(SOLARSYSTEM_SOURCES
     src/Solar_System/SpaceObject.h
     src/Solar_System/Planet.cpp
     src/Solar_System/Planet.h
-    src/Solar_System/Earth_System/Earth.cpp
-    src/Solar_System/Earth_System/Earth.h
     src/Solar_System/Transformable.cpp
     src/Solar_System/Transformable.h
     src/Application.cpp
@@ -80,8 +78,6 @@ set(SOLARSYSTEM_SOURCES
     src/Solar_System/Sun/Sun.h
     src/Solar_System/Satellite.cpp
     src/Solar_System/Satellite.h
-    src/Solar_System/Earth_System/Moon.cpp
-    src/Solar_System/Earth_System/Moon.h
     src/3rdparty/nv_dds.cpp
     src/3rdparty/nv_dds.h
     src/Auxiliary_Modules/ShadowMapFBO.cpp
@@ -106,66 +102,10 @@ set(SOLARSYSTEM_SOURCES
     src/Auxiliary_Modules/MagneticFieldBloom.h
     src/Auxiliary_Modules/Ephemeris.cpp
     src/Auxiliary_Modules/Ephemeris.h
-    src/Solar_System/Mercury/Mercury.cpp
-    src/Solar_System/Mercury/Mercury.h
-    src/Solar_System/Venus/Venus.cpp
-    src/Solar_System/Venus/Venus.h
-    src/Solar_System/Mars_System/Mars.cpp
-    src/Solar_System/Mars_System/Mars.h
-    src/Solar_System/Mars_System/Phobos.cpp
-    src/Solar_System/Mars_System/Phobos.h
-    src/Solar_System/Mars_System/Deimos.cpp
-    src/Solar_System/Mars_System/Deimos.h
     src/Auxiliary_Modules/TextRenderer.cpp
     src/Auxiliary_Modules/TextRenderer.h
-    src/Solar_System/Pluto_System/Pluto.cpp
-    src/Solar_System/Pluto_System/Pluto.h
-    src/Solar_System/Pluto_System/Charon.cpp
-    src/Solar_System/Pluto_System/Charon.h
-    src/Solar_System/Neptune_System/Neptune.cpp
-    src/Solar_System/Neptune_System/Neptune.h
-    src/Solar_System/Neptune_System/Triton.cpp
-    src/Solar_System/Neptune_System/Triton.h
     src/Solar_System/PlanetaryRing.cpp
     src/Solar_System/PlanetaryRing.h
-    src/Solar_System/Uranus_System/Uranus.cpp
-    src/Solar_System/Uranus_System/Uranus.h
-    src/Solar_System/Uranus_System/Ariel.cpp
-    src/Solar_System/Uranus_System/Ariel.h
-    src/Solar_System/Uranus_System/Miranda.cpp
-    src/Solar_System/Uranus_System/Miranda.h
-    src/Solar_System/Uranus_System/Umbriel.cpp
-    src/Solar_System/Uranus_System/Umbriel.h
-    src/Solar_System/Uranus_System/Titania.cpp
-    src/Solar_System/Uranus_System/Titania.h
-    src/Solar_System/Uranus_System/Oberon.cpp
-    src/Solar_System/Uranus_System/Oberon.h
-    src/Solar_System/Saturn_System/Saturn.cpp
-    src/Solar_System/Saturn_System/Saturn.h
-    src/Solar_System/Saturn_System/Mimas.cpp
-    src/Solar_System/Saturn_System/Mimas.h
-    src/Solar_System/Saturn_System/Enceladus.cpp
-    src/Solar_System/Saturn_System/Enceladus.h
-    src/Solar_System/Saturn_System/Tethys.cpp
-    src/Solar_System/Saturn_System/Tethys.h
-    src/Solar_System/Saturn_System/Dione.cpp
-    src/Solar_System/Saturn_System/Dione.h
-    src/Solar_System/Saturn_System/Rhea.cpp
-    src/Solar_System/Saturn_System/Rhea.h
-    src/Solar_System/Saturn_System/Titan.cpp
-    src/Solar_System/Saturn_System/Titan.h
-    src/Solar_System/Saturn_System/Iapetus.cpp
-    src/Solar_System/Saturn_System/Iapetus.h
-    src/Solar_System/Jupiter_System/Jupiter.cpp
-    src/Solar_System/Jupiter_System/Jupiter.h
-    src/Solar_System/Jupiter_System/Io.cpp
-    src/Solar_System/Jupiter_System/Io.h
-    src/Solar_System/Jupiter_System/Europa.cpp
-    src/Solar_System/Jupiter_System/Europa.h
-    src/Solar_System/Jupiter_System/Ganymede.cpp
-    src/Solar_System/Jupiter_System/Ganymede.h
-    src/Solar_System/Jupiter_System/Callisto.cpp
-    src/Solar_System/Jupiter_System/Callisto.h
     src/Solar_System/SkyBox.cpp
     src/Solar_System/SkyBox.h
     src/Solar_System/Saturn_System/SaturnRing.cpp
@@ -181,12 +121,6 @@ set(SOLARSYSTEM_SOURCES
     src/Auxiliary_Modules/HDR.h
     src/Auxiliary_Modules/AuxiliaryModules.h
     src/SystemModules.h
-    src/Solar_System/Uranus_System/UranusClouds.cpp
-    src/Solar_System/Uranus_System/UranusClouds.h
-    src/Solar_System/Neptune_System/NeptuneClouds.cpp
-    src/Solar_System/Neptune_System/NeptuneClouds.h
-    src/Solar_System/Earth_System/EarthClouds.cpp
-    src/Solar_System/Earth_System/EarthClouds.h
     src/Solar_System/OrbitLayout.cpp
     src/Solar_System/OrbitLayout.h
     src/Solar_System/AsteroidOrbit.cpp
@@ -195,6 +129,11 @@ set(SOLARSYSTEM_SOURCES
     src/Solar_System/AsteroidField.h
     src/Solar_System/CatalogBody.cpp
     src/Solar_System/CatalogBody.h
+    src/Solar_System/CatalogSatellite.cpp
+    src/Solar_System/CatalogSatellite.h
+    src/Solar_System/CatalogClouds.cpp
+    src/Solar_System/CatalogClouds.h
+    src/Solar_System/SystemVisuals.h
     src/Solar_System/BodyCatalog.generated.h
     src/Auxiliary_Modules/SkyEvents.cpp
     src/Auxiliary_Modules/SkyEvents.h

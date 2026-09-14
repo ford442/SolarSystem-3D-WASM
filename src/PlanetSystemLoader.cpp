@@ -36,18 +36,10 @@ void Application::LoadPlanetSystemManifests() {
 }
 
 std::function<void()> Application::MakePlanetInitFunc(const std::string& initTag) {
-    if (initTag == "Mercury") return [this] { InitMercury(*_sphereModel); };
-    if (initTag == "Venus") return [this] { InitVenus(*_sphereModel); };
-    if (initTag == "EarthSystem") return [this] { InitEarthSystem(*_sphereModel); };
-    if (initTag == "MarsSystem") return [this] { InitMarsSystem(*_sphereModel); };
-    if (initTag == "JupiterSystem") return [this] { InitJupiterSystem(*_sphereModel); };
-    if (initTag == "SaturnSystem") return [this] { InitSaturnSystem(*_sphereModel); };
-    if (initTag == "UranusSystem") return [this] { InitUranusSystem(*_sphereModel); };
-    if (initTag == "NeptuneSystem") return [this] { InitNeptuneSystem(*_sphereModel); };
-    if (initTag == "PlutoSystem") return [this] { InitPlutoSystem(*_sphereModel); };
-    if (initTag == "Ceres") return [this] { InitCatalogBody(*_sphereModel, OrbitLayout::Body::Ceres); };
-    if (initTag == "Vesta") return [this] { InitCatalogBody(*_sphereModel, OrbitLayout::Body::Vesta); };
-    return {};
+    if (!BodyCatalog::FindPrimaryByInitTag(initTag.c_str())) {
+        return {};
+    }
+    return [this, initTag] { InitCatalogSystem(*_sphereModel, initTag); };
 }
 void Application::UpdatePlanetSystemLoading() {
 #ifdef __EMSCRIPTEN__

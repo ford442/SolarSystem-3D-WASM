@@ -1,4 +1,6 @@
 #include "UranusRing.h"
+#include "../BodyCatalog.generated.h"
+#include "../OrbitLayout.h"
 
 UranusRing::UranusRing(const PlanetaryRingInfo& planetaryRingInfo, std::shared_ptr<Planet> parent) : PlanetaryRing(planetaryRingInfo, std::move(parent))
 {
@@ -8,11 +10,16 @@ UranusRing::UranusRing(const PlanetaryRingInfo& planetaryRingInfo, std::shared_p
 }
 
 void UranusRing::AdjustToParent() {
+    const BodyCatalog::Entry* entry = BodyCatalog::FindByIndex(static_cast<int>(OrbitLayout::Body::Uranus));
+    const float tiltZ = entry ? entry->axialTiltDegrees : -97.8f;
+    const float tiltX = entry ? entry->artTiltXDegrees : 0.0f;
+
     LoadIdentityModelMatrix();
     Translate(_parentPlanet->GetPosition());
-    //Rotate(97.8f, glm::vec3(1, 0, 0));
-    Rotate(81.2f, glm::vec3(1, 0, 0));
-    //Rotate(50.2f, glm::vec3(1, 0, 0));
+    Rotate(tiltZ, glm::vec3(0, 0, 1));
+    if (tiltX != 0.0f) {
+        Rotate(tiltX, glm::vec3(1, 0, 0));
+    }
     UpdateRingNormal();
     UpdateModelMatrix();
 }
