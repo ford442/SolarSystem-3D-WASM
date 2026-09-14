@@ -116,7 +116,7 @@ Flags live in named lists in `CMakeLists.txt` and are applied **once** via
 
 | Config | Opts |
 | :--- | :--- |
-| **Release** (default via `./build-web.sh`) | `-O3 -flto` (no `--closure 1` — see below) |
+| **Release** (default via `./build-web.sh`) | `-O3 -flto`, link `--closure 1` (see below) |
 | **Debug** (`./build-web.sh --debug`) | `-O0 -g`, link `-sASSERTIONS=1 -sGL_ASSERTIONS=1` |
 
 Both configs compile with `-Wall -Wextra` (compile-only; they would be dead arguments
@@ -191,6 +191,31 @@ mixing ABIs is a `wasm-ld` error, not a silent mis-build. The CI Assimp cache ke
 carries a `wasmeh-` marker (`.github/workflows/web-build.yml`) so a stale
 JS-exceptions `libassimp.a` cannot be restored across the flag change.
 
+### `--closure 1`
+
+**Enabled for Release** (`CMakeLists.txt`, link-only). It halves the JS glue — 183 380 B
+→ 87 678 B, see the size table below — and costs nothing in Wasm size.
+
+The historical blocker was Closure's property renaming mangling the `Module.foo` /
+`window.__solarSystemFoo` reads inside `EM_ASM`/`EM_JS` blocks. Those are all now written
+with **bracket notation**, which Closure never renames:
+
+* `JsBridge.cpp` — `Module['onSettingsChanged']`, `Module['updateLoadingProgress']`,
+  `Module['updateStreamingProgress']`, `Module['onPlanetFocused']`. The TypeScript side
+  (`web/src/wasmCallbacks.ts`) already assigns these through string keys, so the two
+  halves agree by construction.
+* `QualitySettings.cpp` — `window['__solarSystemInit']` and its
+  `['isMobileWeb']` / `['qualityPreset']` / `['backingStoreScale']` fields.
+* `WebResourceFetcher.cpp` — `window['__solarSystemAssetBase']`.
+
+No Closure externs file is needed as a result. The remaining `EM_ASM` blocks touch only
+things Closure already has externs for: DOM (`document.getElementById`, `canvas.style`)
+in `PlatformWindow.cpp`, and Emscripten's own `GLctx` in `GlCapabilities.cpp`.
+
+**If you add a new JS bridge, use `Module['name']` / `window['name']`, never dotted
+access** — a dotted read will be silently renamed and the callback will just never fire in
+a Release build, while working fine in Debug.
+
 ### Memory / heap views
 
 `GROWABLE_ARRAYBUFFERS` defaults to `0` (fixed-buffer growth: a new `ArrayBuffer` plus a
@@ -220,7 +245,23 @@ every `EMSCRIPTEN_KEEPALIVE` export now also gets a generated JS wrapper on `Mod
 whatever the linker happened to keep reachable. It buys an auditable, CI-checked export
 surface (a prerequisite for `--closure 1`), which is worth the ~2.5% size cost.
 
-Wipe `build-web/` when switching Debug↔Release or changing LTO/exception/ASYNCIFY flags.
+#### Dropping ASYNCIFY and enabling Closure (2026-09-14)
+
+All three columns below were built from the **same tree and the same toolchain**
+(Emscripten 6.0.0, Release, `-O3 -flto`), so they are directly comparable. The
+2026-09-07 row above came from a different Emscripten build and is not a
+like-for-like control, which is why a fresh `ASYNCIFY=1` control was measured:
+
+| Artifact | `ASYNCIFY=1` + JS exceptions (control) | no ASYNCIFY + `-fwasm-exceptions` | …plus `--closure 1` (shipping) |
+| :--- | ---: | ---: | ---: |
+| `SolarSystem.wasm` | 3 749 301 B | 2 589 589 B (**−30.9%**) | 2 589 589 B (−30.9%) |
+| `SolarSystem.js` | 202 930 B | 183 380 B (−9.6%) | 87 678 B (**−56.8%**) |
+
+Closure only rewrites the JS glue and never touches the Wasm, so the two wins are
+independent and both are kept. Link time drops noticeably too, since ASYNCIFY's
+whole-binary instrumentation pass is gone.
+
+Wipe `build-web/` when switching Debug↔Release or changing LTO/exception/Closure flags.
 
 ## 3c. WebGL context creation, resize/DPI, and capability probing (2026-09-07)
 

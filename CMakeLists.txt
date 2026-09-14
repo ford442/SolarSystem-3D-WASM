@@ -232,11 +232,15 @@ if(EMSCRIPTEN)
         set(SOLAR_EM_LINK_OPT_FLAGS -O0 -g "SHELL:-sASSERTIONS=1" "SHELL:-sGL_ASSERTIONS=1")
     else()
         # Release (default) and RelWithDebInfo / empty CMAKE_BUILD_TYPE.
-        # --closure 1 is measured and rejected, not untried: see the "--closure 1"
-        # section of docs/plans/PORTING_GUIDE.md §3b for the numbers and the
-        # EM_ASM property-renaming breakage behind the decision.
+        # --closure 1 halves the JS glue (183 380 B -> 87 678 B). The old blocker was
+        # Closure renaming the Module.foo / window.__solarSystemFoo properties read from
+        # EM_ASM; those are all bracket-notation now (JsBridge.cpp, QualitySettings.cpp,
+        # WebResourceFetcher.cpp), which Closure never renames, so no externs file is
+        # needed. New JS bridges MUST use Module['name'], not Module.name -- a dotted
+        # read is silently renamed and the callback simply never fires in Release.
+        # See the "--closure 1" section of docs/plans/PORTING_GUIDE.md §3b.
         set(SOLAR_EM_COMPILE_OPT_FLAGS -O3 -flto)
-        set(SOLAR_EM_LINK_OPT_FLAGS -O3 -flto)
+        set(SOLAR_EM_LINK_OPT_FLAGS -O3 -flto "SHELL:--closure 1")
     endif()
 
     target_compile_options(${PROJECT_NAME} PRIVATE
