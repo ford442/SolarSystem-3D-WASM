@@ -38,6 +38,7 @@ export interface CachedCwrapExports {
     setMagneticFieldMode: (...args: number[]) => void;
     getMagneticFieldMode: () => number;
     setXrSessionActive: (...args: number[]) => void;
+    setXrBaseLayerFramebuffer: (...args: number[]) => void;
     setXrEyeCount: (...args: number[]) => void;
     setXrEyeViewport: (...args: number[]) => void;
     getXrMatrixScratch: () => number;
@@ -88,6 +89,7 @@ export function createCachedCwrapExports(cwrap: SolarSystemCwrap): CachedCwrapEx
     setMagneticFieldMode: cwrap('SetMagneticFieldMode', null, ['number']) as (...args: number[]) => void,
     getMagneticFieldMode: cwrap('GetMagneticFieldMode', 'number', []) as () => number,
     setXrSessionActive: cwrap('SetXrSessionActive', null, ['number']) as (...args: number[]) => void,
+    setXrBaseLayerFramebuffer: cwrap('SetXrBaseLayerFramebuffer', null, ['number']) as (...args: number[]) => void,
     setXrEyeCount: cwrap('SetXrEyeCount', null, ['number']) as (...args: number[]) => void,
     setXrEyeViewport: cwrap('SetXrEyeViewport', null, ['number', 'number', 'number', 'number', 'number']) as (...args: number[]) => void,
     getXrMatrixScratch: cwrap('GetXrMatrixScratch', 'number', []) as () => number,
@@ -101,4 +103,4 @@ export function createCachedCwrapExports(cwrap: SolarSystemCwrap): CachedCwrapEx
     };
 }
 
-export const EXPORT_COUNT = 46;
+export const EXPORT_COUNT = 47;

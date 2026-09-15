@@ -28,9 +28,16 @@ TextureLodTier GetMaxTextureLodTier();
 const char* TextureLodTierName(TextureLodTier tier);
 void LogQualityTier(const QualityTierSettings& settings, bool hdrEnabled, int shadowQuality);
 
+/**
+ * Quality tier to build the GL context from, before any UI exists. Web reads
+ * window.__solarSystemInit (set from the ?quality= query parameter); native reads the
+ * SOLARSYSTEM_QUALITY environment variable ("low"/"medium"/"full" or 0/1/2). Defaults to
+ * 2 ("full"). This is the only point where MSAA can still be chosen — see LogQualityTier.
+ */
+int ReadInitialQualityPreset();
+
 #ifdef __EMSCRIPTEN__
 bool ReadIsMobileWeb();
-int ReadInitialQualityPreset();
 float ReadBackingStoreScale();
 #endif
 

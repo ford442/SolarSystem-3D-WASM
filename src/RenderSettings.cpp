@@ -39,6 +39,8 @@ void Application::ApplyRenderResources(uint16_t shadowResolution, bool enableHdr
 
     if (_hdr) {
         _hdr->SetEnabled(enableHdr, _displayWidth, _displayHeight);
+        // SetEnabled can refuse (no renderable float buffers / incomplete FBO).
+        _hdrEnabled = _hdr->IsEnabled();
     }
     if (_magneticFieldBloom) {
         const auto bloomSettings = GetQualitySettings(gSimState->qualityPreset, gSimState->isMobileWeb);

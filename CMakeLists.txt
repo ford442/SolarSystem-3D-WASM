@@ -213,7 +213,10 @@ if(EMSCRIPTEN)
         "SHELL:--preload-file ${CMAKE_SOURCE_DIR}/resource/textures_low@/resource/textures_low"
         "SHELL:-sMODULARIZE=1"
         "SHELL:-sEXPORT_ES6=1"
-        "SHELL:-sEXPORTED_RUNTIME_METHODS=['ccall','cwrap','HEAPF32']"
+        # 'GL' is needed so web/src/wasmBridge.ts can register the XRWebGLLayer's opaque
+        # framebuffer in Emscripten's GL name table; without a name the WASM side cannot
+        # rebind it after an off-screen pass (see SceneRenderer.cpp ShadowMapPass).
+        "SHELL:-sEXPORTED_RUNTIME_METHODS=['ccall','cwrap','HEAPF32','GL']"
         # Default list (see emscripten/src/settings.js INCOMING_MODULE_JS_API) plus
         # 'preinitializedWebGLContext' — web/src/bootstrap.ts creates the WebGL2 context
         # itself (see web/src/webglContext.ts) so GLFW's context creation can reuse it

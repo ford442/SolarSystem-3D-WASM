@@ -15,6 +15,13 @@ struct XrEyeState {
 
 struct XrFrameState {
     bool active = false;
+    /**
+     * Emscripten GL name for the XRWebGLLayer's opaque framebuffer, registered by
+     * web/src/webxr.ts and 0 outside a session. This — not FBO 0 — is the default draw
+     * target while a session runs, so every pass that renders off-screen must rebind
+     * *this* on the way out or the eye images are lost.
+     */
+    unsigned int baseLayerFramebuffer = 0;
     int eyeCount = 0;
     int currentEye = 0;
     XrEyeState eyes[2]{};

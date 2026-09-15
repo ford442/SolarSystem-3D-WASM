@@ -36,6 +36,7 @@
   "_SetMagneticFieldMode",
   "_GetMagneticFieldMode",
   "_SetXrSessionActive",
+  "_SetXrBaseLayerFramebuffer",
   "_SetXrEyeCount",
   "_SetXrEyeViewport",
   "_GetXrMatrixScratch",

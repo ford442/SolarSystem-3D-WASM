@@ -71,6 +71,12 @@ export interface SolarSystemRuntime {
     setMagneticFieldMode(enabled: boolean): void;
     getMagneticFieldMode(): boolean;
     setXrSessionActive(active: boolean): void;
+    setXrBaseLayerFramebuffer(framebuffer: number): void;
+    /**
+     * Give an externally created WebGLFramebuffer (the XRWebGLLayer's) a name in
+     * Emscripten's GL table so C++ can bind it. Returns 0 when that is not possible.
+     */
+    registerXrFramebuffer(framebuffer: WebGLFramebuffer | null): number;
     setXrEyeCount(count: number): void;
     setXrEyeViewport(eye: number, x: number, y: number, width: number, height: number): void;
     getXrMatrixScratchPtr(): number;
@@ -145,6 +151,24 @@ export function createSolarSystemRuntime(instance: SolarSystemModule): SolarSyst
         setMagneticFieldMode: (enabled) => exports.setMagneticFieldMode(enabled ? 1 : 0),
         getMagneticFieldMode: () => exports.getMagneticFieldMode() !== 0,
         setXrSessionActive: (active) => exports.setXrSessionActive(active ? 1 : 0),
+        setXrBaseLayerFramebuffer: exports.setXrBaseLayerFramebuffer,
+        registerXrFramebuffer: (framebuffer) => {
+            const gl = instance.GL;
+            if (!framebuffer || !gl || typeof gl.getNewId !== 'function' || !gl.framebuffers) {
+                console.warn('[WebXR] Emscripten GL table unavailable; cannot name the XR framebuffer');
+                return 0;
+            }
+            // Emscripten stamps the table index onto the object as `name`; reuse it so a
+            // per-frame call does not leak a new id every frame.
+            const named = framebuffer as WebGLFramebuffer & { name?: number };
+            if (typeof named.name === 'number' && gl.framebuffers[named.name] === framebuffer) {
+                return named.name;
+            }
+            const id = gl.getNewId(gl.framebuffers);
+            named.name = id;
+            gl.framebuffers[id] = framebuffer;
+            return id;
+        },
         setXrEyeCount: exports.setXrEyeCount,
         setXrEyeViewport: exports.setXrEyeViewport,
         getXrMatrixScratchPtr: exports.getXrMatrixScratch,

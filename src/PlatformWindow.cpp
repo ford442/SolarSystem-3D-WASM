@@ -40,7 +40,15 @@ void Application::InitSystems() {
     gSimState->isMobileWeb = ReadIsMobileWeb();
     gSimState->qualityPreset = ReadInitialQualityPreset();
     gSimState->backingStoreScale = ReadBackingStoreScale();
+#else
+    gSimState->qualityPreset = ReadInitialQualityPreset();
+#endif
+    // MSAA is fixed when the context is created, so it must come from the *initial*
+    // quality preset; ApplyQualityPreset cannot change it later (same restriction as
+    // web, where the WebGL context's `antialias` is decided in bootstrap.ts).
     const auto qualitySettings = GetQualitySettings(gSimState->qualityPreset, gSimState->isMobileWeb);
+
+#ifdef __EMSCRIPTEN__
     glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 3);
     glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 0);
     glfwWindowHint(GLFW_CLIENT_API, GLFW_OPENGL_ES_API);
@@ -53,7 +61,7 @@ void Application::InitSystems() {
     glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 4);
     glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 6);
     glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
-    glfwWindowHint(GLFW_SAMPLES, 4);
+    glfwWindowHint(GLFW_SAMPLES, qualitySettings.requestedMsaaSamples);
 #endif
 
     glfwWindowHint(GLFW_VISIBLE, GLFW_FALSE);
@@ -117,12 +125,16 @@ void Application::InitSystems() {
 
     glfwMakeContextCurrent(_mainWindow);
 
-#ifdef __EMSCRIPTEN__
     GLint actualSamples = 0;
     glGetIntegerv(GL_SAMPLES, &actualSamples);
     std::cout << "[Quality] Requested " << qualitySettings.requestedMsaaSamples
               << "x MSAA, context provides " << actualSamples << " samples" << std::endl;
-#endif
+
+    // The UI reports _isVertSyncEnabled from startup, but only the F-key toggle used to
+    // call through to the driver — so the reported state could disagree with reality
+    // until the user pressed it. Apply the initial state here instead.
+    VertSync(_isVertSyncEnabled);
+
     GetGlCapabilities(); // Probed once here (context is current); logs its findings.
 
     glfwSetWindowUserPointer(_mainWindow, this);
@@ -143,7 +155,14 @@ void Application::InitSystems() {
 
     FT_Init_FreeType(&_ft);
 
-#ifndef __EMSCRIPTEN__
+#ifdef __EMSCRIPTEN__
+    // SDL_INIT_EVERYTHING pulls in video/joystick subsystems we do not want on web
+    // (GLFW owns the canvas), but SDL_mixer and SDL_image below still need SDL itself
+    // initialized, so bring up just the subsystems they use.
+    if (SDL_Init(SDL_INIT_AUDIO | SDL_INIT_EVENTS)) {
+        std::cerr << "[SDL] Failed to init audio/events subsystem: " << SDL_GetError() << std::endl;
+    }
+#else
     if (SDL_Init(SDL_INIT_EVERYTHING)) {
         Dispose();
         throw runtime_error("Failed to init SDL");
@@ -176,12 +195,15 @@ void Application::InitSystems() {
 
     glEnable(GL_DEPTH_TEST);
 #ifndef __EMSCRIPTEN__
-    glEnable(GL_MULTISAMPLE);
+    if (actualSamples > 1) {
+        glEnable(GL_MULTISAMPLE);
+    }
 #endif
     glEnable(GL_CULL_FACE);
 
 #ifndef __EMSCRIPTEN__
-    glEnable(GL_POLYGON_SMOOTH);
+    // No GL_POLYGON_SMOOTH: it is deprecated in core profiles, needs sorted blended
+    // geometry to look right, and MSAA above is the antialiasing path we actually use.
     LoadWindowIcon();
 #endif
 
@@ -217,12 +239,16 @@ void Application::DisplaySystemInformation() const {
     cout << "OpenGL version: " << majorVersion << '.' << minorVersion << endl;
 
 #ifndef __EMSCRIPTEN__
-    GLint totalMemoryKb;
-    glGetIntegerv(GL_GPU_MEMORY_INFO_TOTAL_AVAILABLE_MEMORY_NVX, &totalMemoryKb);
+    // GL_GPU_MEMORY_INFO_*_NVX comes from NV_NVX_gpu_memory_info; querying it on AMD or
+    // Intel just raises GL_INVALID_ENUM and prints garbage.
+    if (glewIsSupported("GL_NVX_gpu_memory_info")) {
+        GLint totalMemoryKb = 0;
+        glGetIntegerv(GL_GPU_MEMORY_INFO_TOTAL_AVAILABLE_MEMORY_NVX, &totalMemoryKb);
 
-    GLint currentMemoryKb;
-    glGetIntegerv(GL_GPU_MEMORY_INFO_CURRENT_AVAILABLE_VIDMEM_NVX, &currentMemoryKb);
-    cout << "Total GPU Memory: " << totalMemoryKb << " kb\nFree GPU Memory: " << currentMemoryKb << " kb" << endl;
+        GLint currentMemoryKb = 0;
+        glGetIntegerv(GL_GPU_MEMORY_INFO_CURRENT_AVAILABLE_VIDMEM_NVX, &currentMemoryKb);
+        cout << "Total GPU Memory: " << totalMemoryKb << " kb\nFree GPU Memory: " << currentMemoryKb << " kb" << endl;
+    }
 #endif
 
     GLint maxTextureSize;

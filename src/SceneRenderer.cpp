@@ -43,11 +43,15 @@ void Application::ProcessSceneComponentsRendering() {
 }
 
 void Application::ShadowMapPass(const RenderableSceneComponent& component) {
+    // Under WebXR the frame composites into the XRWebGLLayer framebuffer, not FBO 0, so
+    // every exit below restores DefaultFramebuffer() instead of hardcoding 0. Getting
+    // that wrong is what used to force the whole pass to be skipped in VR, leaving the
+    // lighting shaders reading a cleared depth map as "fully lit".
 #ifdef __EMSCRIPTEN__
-    // XR presents into XRWebGLLayer's framebuffer (bound by JS). The normal
-    // shadow pass rebinds FBO 0 on exit, which would break stereo output — skip
-    // self-shadow maps in VR for now (lighting reads a cleared map as fully lit).
-    if (_xr.active) {
+    if (_xr.active && _xr.baseLayerFramebuffer == 0) {
+        // No layer framebuffer to return to (JS could not register it). Fall back to the
+        // old behaviour rather than composite the eyes into FBO 0; RenderXrStereoFrame
+        // logs the reason once per session.
         return;
     }
 #endif
@@ -59,7 +63,7 @@ void Application::ShadowMapPass(const RenderableSceneComponent& component) {
     // lighting shaders interpret as fully lit. Keep the texture bound but skip
     // all shadow geometry when shadows are disabled.
     if (gSimState->shadowQuality == 0) {
-        glBindFramebuffer(GL_FRAMEBUFFER, 0);
+        glBindFramebuffer(GL_FRAMEBUFFER, DefaultFramebuffer());
         return;
     }
 
@@ -75,7 +79,7 @@ void Application::ShadowMapPass(const RenderableSceneComponent& component) {
     }
 
     RenderPlanetaryRing(*_shadowMapShader, component.planetaryRing.get(), component.lightSpaceMatrix);
-    glBindFramebuffer(GL_FRAMEBUFFER, 0);
+    glBindFramebuffer(GL_FRAMEBUFFER, DefaultFramebuffer());
 }
 
 void Application::RenderPass(const RenderableSceneComponent& component) {
@@ -279,14 +283,14 @@ void Application::RenderStarEffects() const {
         _sun->RenderGlow(_cameraProjection, _cameraView, _camera.GetFrontVector() - _camera.GetRightVector(), _camera.GetAspect(),
                          CalculateSpaceObjectDistance(_sun.get()), ringCameraInfo, _starTemperatureInKelvin);
     } else {
-        glBindFramebuffer(GL_FRAMEBUFFER, 0);
+        glBindFramebuffer(GL_FRAMEBUFFER, DefaultFramebuffer());
         glEnable(GL_BLEND);
         glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
         _sun->RenderGlow(_cameraProjection, _cameraView, _camera.GetFrontVector() - _camera.GetRightVector(), _camera.GetAspect(),
                          CalculateSpaceObjectDistance(_sun.get()), ringCameraInfo, _starTemperatureInKelvin);
     }
 
-    glBindFramebuffer(GL_FRAMEBUFFER, 0);
+    glBindFramebuffer(GL_FRAMEBUFFER, DefaultFramebuffer());
     glDisable(GL_DEPTH_TEST);
     glDepthMask(GL_FALSE);
     glEnable(GL_BLEND);

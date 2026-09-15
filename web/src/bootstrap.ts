@@ -157,6 +157,8 @@ void Module(moduleConfig).then((instance) => {
             getQualityPreset: runtime.getQualityPreset.bind(runtime),
             getCameraPosition: () => runtime.getCameraPosition(),
             setXrSessionActive: runtime.setXrSessionActive.bind(runtime),
+            setXrBaseLayerFramebuffer: runtime.setXrBaseLayerFramebuffer.bind(runtime),
+            registerXrFramebuffer: runtime.registerXrFramebuffer.bind(runtime),
             setXrEyeCount: runtime.setXrEyeCount.bind(runtime),
             setXrEyeViewport: runtime.setXrEyeViewport.bind(runtime),
             commitXrEyeMatrices: runtime.commitXrEyeMatrices.bind(runtime),

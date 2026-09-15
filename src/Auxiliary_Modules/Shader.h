@@ -4,6 +4,12 @@
 #ifdef __EMSCRIPTEN__
 // Emscripten's glew/SDL_opengl declare DSA entry points that WebGL 2 does not
 // implement. Macro (not inline) so -flto cannot emit an unresolved import.
+//
+// NOTE: this polyfill is GL_TEXTURE_2D ONLY, while the native glBindTextureUnit it
+// stands in for is target-agnostic. A cube map (or any other target) bound through it
+// works natively and silently binds nothing on web — see SkyBox::Render, which guards
+// the call with #ifndef __EMSCRIPTEN__ and binds GL_TEXTURE_CUBE_MAP by hand. Treat this
+// as `BindTexture2D` at every call site. Mirrored in src/SystemModules.h.
 #undef glBindTextureUnit
 #define glBindTextureUnit(unit, texture) \
     do { \
@@ -20,7 +26,13 @@
 
 class Shader {
 public:
-    explicit Shader(const std::string& vertexPath, const std::string& fragmentPath, const std::string& geometryPath = "");
+    Shader(const std::string& vertexPath, const std::string& fragmentPath);
+#ifndef __EMSCRIPTEN__
+    // Geometry shaders are desktop-only: WebGL 2 / GLES 3.0 have no geometry stage, so
+    // this overload does not exist in the Emscripten build and passing a geometry path
+    // there is a compile error rather than a shader that silently fails to link.
+    Shader(const std::string& vertexPath, const std::string& fragmentPath, const std::string& geometryPath);
+#endif
     ~Shader();
     
     // Delete copy to prevent double-free
@@ -70,6 +82,7 @@ private:
 
     GLint GetUniformLocation(const std::string& name) const;
     void Release();
+    void Build(const std::string& vertexPath, const std::string& fragmentPath, const std::string& geometryPath);
 
     static void CheckCompileErrors(size_t shader, ShaderType type, const std::string& path = "");
     static std::string ShaderTypeToString(ShaderType type);

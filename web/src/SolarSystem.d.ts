@@ -266,6 +266,11 @@ export interface SolarSystemCwrap {
     argTypes: ['number'],
   ): (...args: number[]) => void;
   (
+    ident: 'SetXrBaseLayerFramebuffer',
+    returnType: null,
+    argTypes: ['number'],
+  ): (...args: number[]) => void;
+  (
     ident: 'SetXrEyeCount',
     returnType: null,
     argTypes: ['number'],
@@ -352,11 +357,23 @@ export interface SolarSystemModuleConfig {
   preinitializedWebGLContext?: WebGL2RenderingContext;
 }
 
+/**
+ * The slice of Emscripten's GL runtime object we use. Exported from the module by
+ * `-sEXPORTED_RUNTIME_METHODS=[...,'GL']` (see CMakeLists.txt). WebGL objects the browser
+ * creates outside Emscripten — notably `XRWebGLLayer.framebuffer` — have no GL name the
+ * WASM side can bind, so they must be inserted into this table first.
+ */
+export interface EmscriptenGL {
+  framebuffers: (WebGLFramebuffer | null)[];
+  getNewId: (table: unknown[]) => number;
+}
+
 export interface SolarSystemModule {
   canvas: HTMLCanvasElement;
   cwrap: SolarSystemCwrap;
   HEAPF32: Float32Array;
   HEAP8: Int8Array;
+  GL?: EmscriptenGL;
   _main: (argc: number, argv: number) => number;
   // BEGIN GENERATED MODULE EXPORTS
   _SetCameraPose: (...args: number[]) => void;
@@ -395,6 +412,7 @@ export interface SolarSystemModule {
   _SetMagneticFieldMode: (...args: number[]) => void;
   _GetMagneticFieldMode: () => number;
   _SetXrSessionActive: (...args: number[]) => void;
+  _SetXrBaseLayerFramebuffer: (...args: number[]) => void;
   _SetXrEyeCount: (...args: number[]) => void;
   _SetXrEyeViewport: (...args: number[]) => void;
   _GetXrMatrixScratch: () => number;

@@ -1,4 +1,5 @@
 #include "MagneticFieldBloom.h"
+#include "GlCapabilities.h"
 
 #include <algorithm>
 #include <iostream>
@@ -149,6 +150,15 @@ void MagneticFieldBloom::InitQuad() {
 }
 
 void MagneticFieldBloom::InitTargets(uint16_t width, uint16_t height) {
+    // Same RGBA16F requirement as HDR: without EXT_color_buffer_float on WebGL 2 the
+    // targets below can only ever come back incomplete, so refuse up front.
+    if (!GetGlCapabilities().colorBufferFloat) {
+        std::cout << "[MagneticField] Renderable float color buffers unsupported "
+                     "(no EXT_color_buffer_float); disabling bloom" << std::endl;
+        _enabled = false;
+        return;
+    }
+
     HalfRes(width, height, _width, _height);
     CreateColorTarget(_capture, _width, _height, true);
     CreateColorTarget(_ping, _width, _height, false);
@@ -171,6 +181,11 @@ void MagneticFieldBloom::DestroyTargets() {
 
 void MagneticFieldBloom::CreateColorTarget(Target& target, uint16_t width, uint16_t height, bool withDepth) {
     DestroyTarget(target);
+
+    // Restore the caller's binding rather than FBO 0 — under WebXR the default draw
+    // target is the XRWebGLLayer framebuffer, not 0.
+    GLint previousFbo = 0;
+    glGetIntegerv(GL_FRAMEBUFFER_BINDING, &previousFbo);
 
     glGenFramebuffers(1, &target.fbo);
     glGenTextures(1, &target.color);
@@ -200,7 +215,7 @@ void MagneticFieldBloom::CreateColorTarget(Target& target, uint16_t width, uint1
     }
 
     const GLenum status = glCheckFramebufferStatus(GL_FRAMEBUFFER);
-    glBindFramebuffer(GL_FRAMEBUFFER, 0);
+    glBindFramebuffer(GL_FRAMEBUFFER, static_cast<GLuint>(previousFbo));
     if (status != GL_FRAMEBUFFER_COMPLETE) {
         DestroyTarget(target);
     }
