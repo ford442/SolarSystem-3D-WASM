@@ -197,3 +197,29 @@ TEST_F(OrbitLayoutTest, AdvanceUpdatesJulianDate) {
     OrbitLayout::Advance(OrbitLayout::kEarthOrbitSecondsAt1x);
     EXPECT_NEAR(OrbitLayout::GetJulianDate(), before + 365.25, 1e-4);
 }
+
+TEST_F(OrbitLayoutTest, EarthSpinTracksGmstAndIsReversible) {
+    // Earth's spin is a function of the epoch, not an accumulator, so the same date always
+    // gives the same terminator and scrubbing backwards undoes itself exactly. Every other
+    // body still accumulates, which is why Mars is checked the other way round.
+    const double epoch = Ephemeris::JulianDateFromYmd(2017, 8, 21) + 0.77;
+
+    OrbitLayout::SetJulianDate(epoch);
+    const float earthAtEpoch = OrbitLayout::GetAxialSpinDegrees(OrbitLayout::Body::Earth);
+
+    OrbitLayout::SetJulianDate(epoch + 400.0);
+    EXPECT_NE(OrbitLayout::GetAxialSpinDegrees(OrbitLayout::Body::Earth), earthAtEpoch);
+
+    OrbitLayout::SetJulianDate(epoch);
+    EXPECT_FLOAT_EQ(OrbitLayout::GetAxialSpinDegrees(OrbitLayout::Body::Earth), earthAtEpoch);
+
+    // It is GMST, not an arbitrary angle: the value must match the ephemeris directly.
+    EXPECT_NEAR(earthAtEpoch,
+                static_cast<float>(Ephemeris::GreenwichMeanSiderealTimeDeg(epoch)), 1e-2f);
+}
+
+TEST_F(OrbitLayoutTest, NonEarthSpinStillAccumulatesWithSimTime) {
+    const float before = OrbitLayout::GetAxialSpinDegrees(OrbitLayout::Body::Mars);
+    OrbitLayout::Advance(1.0f);
+    EXPECT_GT(OrbitLayout::GetAxialSpinDegrees(OrbitLayout::Body::Mars), before);
+}

@@ -64,6 +64,12 @@ public:
      * backwards, not every frame.
      */
     const SkyEvents::Conjunction& GetNextConjunction() const;
+    /**
+     * Next sky event of any kind (conjunction, eclipse, transit, shadow transit) at the
+     * current simulation epoch. Cached on the same terms as GetNextConjunction() — the
+     * multi-kind search is the more expensive of the two, so it must not run per frame.
+     */
+    const SkyEvents::SkyEvent& GetNextSkyEvent() const;
     int GetNearestPlanetIndexForJs() const;
     void SetMusicVolume(float volume);
     float GetMusicVolume() const;
@@ -166,6 +172,11 @@ private:
     mutable double _nextConjunctionComputedJd = 0.0;
     mutable bool _nextConjunctionCached = false;
 
+    // Next-sky-event cache — see GetNextSkyEvent().
+    mutable SkyEvents::SkyEvent _nextSkyEvent;
+    mutable double _nextSkyEventComputedJd = 0.0;
+    mutable bool _nextSkyEventCached = false;
+
     // Pre-allocated containers for RenderHints to eliminate per-frame allocations
     mutable std::deque<wchar_t> _distanceInfoCache;
     mutable std::deque<std::wstring> _fpsHintCache;
@@ -229,6 +240,8 @@ private:
     void RenderTextureLoadingProgress() const;
     void ConfigureMainShaders();
     void ConfigureMainPlanetShader(const RenderableSceneComponent& renderableComponent);
+    /** Upload (or clear) the one moon currently casting an umbra on this component's planet. */
+    void ConfigureEclipseUmbra(const RenderableSceneComponent& renderableComponent);
     void UpdateOcclusionQuery();
     void ProcessInput(GLFWwindow* window);
     float CalculateSpaceObjectDistance(const SpaceObject* spaceObject) const;

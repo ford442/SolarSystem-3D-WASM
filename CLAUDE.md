@@ -152,7 +152,7 @@ The CMakeLists.txt has separate configurations for EMSCRIPTEN vs native builds, 
 4. Add Keplerian elements to `Ephemeris.cpp` if the body is not in the Standish table
 5. No factory edit: `InitStarSystem()` / `MakePlanetInitFunc` construct any catalog primary via `InitCatalogSystem`
 
-Ceres, Vesta, Mercury–Pluto, the Moon, and the Galileans are the worked examples. Moons need `parent`, `orbit.keplerian`, and `orbit.sceneOrbitRadius` (runtime still uses circular offsets until the eclipse ticket). `scripts/make_placeholder_dds.py` writes the stand-in textures that `resource/textures_low/` ships until real ones are uploaded.
+Ceres, Vesta, Mercury–Pluto, the Moon, and the Galileans are the worked examples. Moons need `parent`, `orbit.keplerian` (elements plus the `OmegaDotDegPerDay` / `omegaDotDegPerDay` secular rates), and `orbit.sceneOrbitRadius`. A moon is only *placed* from those elements once its index is listed in `kKeplerianSatellites` in `Ephemeris.cpp`; until then it keeps the circular `SatelliteOrbit` offset, which is the right default while a row still carries placeholder node/periapsis angles. See docs/ARCHITECTURE.md § 11. `scripts/make_placeholder_dds.py` writes the stand-in textures that `resource/textures_low/` ships until real ones are uploaded.
 
 **Hand-written path (Sun, ring meshes, or a shader that does not fit catalog flags).**
 1. Keep or add a dedicated class (e.g., `Sun`, `SaturnRing`)

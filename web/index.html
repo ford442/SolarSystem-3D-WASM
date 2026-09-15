@@ -98,9 +98,12 @@
             <button id="simulation-date-now" class="settings-date-btn" type="button">Now</button>
           </div>
           <small id="simulation-date-help">Heliocentric positions from Julian date (Standish approx.)</small>
-          <div id="next-conjunction" class="conjunction-chip" hidden>
-            <p id="next-conjunction-text" class="conjunction-chip-text"></p>
-            <button id="next-conjunction-jump" class="conjunction-chip-jump" type="button">Jump to conjunction</button>
+          <div id="next-sky-event" class="conjunction-chip" hidden>
+            <p id="next-sky-event-text" class="conjunction-chip-text"></p>
+            <div class="conjunction-chip-actions">
+              <button id="next-sky-event-jump" class="conjunction-chip-jump" type="button">Jump to event</button>
+              <button id="next-sky-event-landmark" class="conjunction-chip-jump" type="button">Play</button>
+            </div>
           </div>
 
           <label class="settings-slider" for="time-scale">

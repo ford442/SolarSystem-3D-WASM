@@ -41,9 +41,10 @@ const musicMutedInput = document.getElementById('music-muted') as HTMLInputEleme
 const settingsReset = document.getElementById('settings-reset') as HTMLButtonElement;
 const copyViewLinkButton = document.getElementById('copy-view-link') as HTMLButtonElement;
 const settingsStatus = document.getElementById('settings-status') as HTMLElement;
-const conjunctionChip = document.getElementById('next-conjunction') as HTMLElement;
-const conjunctionText = document.getElementById('next-conjunction-text') as HTMLElement;
-const conjunctionJump = document.getElementById('next-conjunction-jump') as HTMLButtonElement;
+const skyEventChip = document.getElementById('next-sky-event') as HTMLElement;
+const skyEventText = document.getElementById('next-sky-event-text') as HTMLElement;
+const skyEventJump = document.getElementById('next-sky-event-jump') as HTMLButtonElement;
+const skyEventLandmark = document.getElementById('next-sky-event-landmark') as HTMLButtonElement;
 const enterVrButton = document.getElementById('enter-vr') as HTMLButtonElement;
 const exitVrButton = document.getElementById('exit-vr') as HTMLButtonElement;
 const explorerPanel = document.getElementById('explorer-panel') as HTMLElement;
@@ -199,9 +200,10 @@ void Module(moduleConfig).then((instance) => {
             settingsReset,
             copyViewLinkButton,
             settingsStatus,
-            conjunctionChip,
-            conjunctionText,
-            conjunctionJump,
+            skyEventChip,
+            skyEventText,
+            skyEventJump,
+            skyEventLandmark,
         },
         runtime,
         deepLink,

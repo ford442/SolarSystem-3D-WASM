@@ -313,6 +313,24 @@ const SkyEvents::Conjunction& Application::GetNextConjunction() const {
     return _nextConjunction;
 }
 
+const SkyEvents::SkyEvent& Application::GetNextSkyEvent() const {
+    // Same cache policy as GetNextConjunction(): recompute once the event is behind us,
+    // once time is scrubbed backwards, or after a quiet stretch when nothing was found.
+    constexpr double kEmptyRetryDays = 30.0;
+
+    const double jd = OrbitLayout::GetJulianDate();
+    const bool passed = _nextSkyEvent.valid && jd > _nextSkyEvent.julianDate;
+    const bool rewound = jd < _nextSkyEventComputedJd - 0.5;
+    const bool retryEmpty = !_nextSkyEvent.valid && jd > _nextSkyEventComputedJd + kEmptyRetryDays;
+
+    if (!_nextSkyEventCached || passed || rewound || retryEmpty) {
+        _nextSkyEvent = SkyEvents::NextEvent(jd);
+        _nextSkyEventComputedJd = jd;
+        _nextSkyEventCached = true;
+    }
+    return _nextSkyEvent;
+}
+
 int Application::GetNearestPlanetIndexForJs() const {
     if (_nearestPlanetIndex < 0) {
         return -1;

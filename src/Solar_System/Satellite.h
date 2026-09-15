@@ -34,6 +34,24 @@ public:
     void LoadHighResIfClose(const glm::vec3& cameraPosition);
     virtual void AdjustToParent(float timeScale) = 0;
 
+    /**
+     * Whether this moon is currently placed from the ephemeris rather than from a circular
+     * art orbit. Only an ephemeris-placed moon may cast an eclipse shadow: a circular moon
+     * sits exactly in its parent's equatorial plane, so its shadow would strike every
+     * single orbit instead of on the rare occasions a real one does.
+     */
+    virtual bool IsEphemerisPlaced() const { return false; }
+
+    /**
+     * Scene units per kilometre for this moon's orbit, or 0 when unknown.
+     *
+     * The scene draws bodies, moon orbits, and planet orbits at three different scales, so
+     * "how big is this in scene units" has no single answer. This is the conversion for the
+     * moon-orbit scale specifically, which is the frame eclipse geometry lives in — see
+     * docs/ARCHITECTURE.md § 11.
+     */
+    virtual float OrbitSceneUnitsPerKm() const { return 0.0f; }
+
 protected:
     std::shared_ptr<SpaceObject> _parent;
     float _radius = 2.0; // Radius of the earth 3d model in Blender

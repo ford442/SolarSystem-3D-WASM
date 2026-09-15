@@ -29,6 +29,7 @@
   "_GetNextConjunctionBodyA",
   "_GetNextConjunctionBodyB",
   "_GetNextConjunctionSeparationDeg",
+  "_GetNextSkyEventJson",
   "_SetOrbitLines",
   "_GetOrbitLines",
   "_SetMagneticFields",

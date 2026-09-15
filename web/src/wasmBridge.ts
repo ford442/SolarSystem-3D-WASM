@@ -7,6 +7,7 @@ import type {
     SolarSystemModule,
 } from './SolarSystem.js';
 import type { NextConjunction } from './conjunction.js';
+import { parseSkyEventJson, type NextSkyEvent } from './skyEvents.js';
 import { createCachedCwrapExports } from './wasmBridge.exports.js';
 import { clearWasmCallback, registerWasmCallbacks } from './wasmCallbacks.js';
 
@@ -18,6 +19,7 @@ import { clearWasmCallback, registerWasmCallbacks } from './wasmCallbacks.js';
  */
 export type { PlanetIndex, QualityPreset, SettingsChangeField, ShadowQuality, OrbitScaleMode };
 export type { NextConjunction };
+export type { NextSkyEvent };
 
 /** Map quality preset + shadows toggle to C++ shadow quality (0=off, 1–3 = low…full). */
 export function shadowQualityForPreset(preset: QualityPreset, shadowsEnabled: boolean): ShadowQuality {
@@ -64,6 +66,8 @@ export interface SolarSystemRuntime {
     getFocusedPlanetIndex(): number;
     getPlanetSceneDistance(index: PlanetIndex): number;
     getNextConjunction(): NextConjunction;
+    /** Next event of any kind — conjunction, eclipse, transit or shadow transit. */
+    getNextSkyEvent(): NextSkyEvent;
     setOrbitLines(enabled: boolean): void;
     getOrbitLines(): boolean;
     setMagneticFields(enabled: boolean): void;
@@ -144,6 +148,7 @@ export function createSolarSystemRuntime(instance: SolarSystemModule): SolarSyst
                 separationDeg,
             };
         },
+        getNextSkyEvent: () => parseSkyEventJson(exports.getNextSkyEventJson()),
         setOrbitLines: (enabled) => exports.setOrbitLines(enabled ? 1 : 0),
         getOrbitLines: () => exports.getOrbitLines() !== 0,
         setMagneticFields: (enabled) => exports.setMagneticFields(enabled ? 1 : 0),

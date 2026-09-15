@@ -37,6 +37,13 @@ uniform bool isUseSphereIntersect; // To avoid the ring shadow while behind a pl
 uniform vec3 parentPlanetCenter; // Center of parent planet with planetary ring in eye space
 uniform float parentPlanetRadiusSquared;
 
+// Eclipse umbra decal: one sphere occluding the star, projected onto this surface in the
+// lighting pass. No extra FBO and no geometry shader — see Application::ConfigureMainPlanetShader.
+uniform bool hasEclipseCaster;
+uniform vec3 eclipseCasterCenter; // Same space as vFragPos / lightPos
+uniform float eclipseCasterRadius;
+uniform float eclipseStarRadius;  // 0.0 => hard-edged disc (Low quality preset)
+
 uniform vec3 ringCenter; // Center of disk in eye space
 uniform vec3 ringNormal; // Disk plane normal in eye space
 uniform vec2 ringInnerOuterRadiuses; // x = Inner, y = Outer
@@ -120,6 +127,47 @@ bool intersectDisk(vec3 n, vec3 p0, float radius, vec3 l0, vec3 l, out float int
     }
 
     return false;
+}
+
+/**
+ * Fraction of the star still reaching this fragment past the eclipse caster, in [0, 1].
+ *
+ * Treats the caster as a sphere on the segment between the fragment and the star centre.
+ * Inside the geometric umbra radius the star is fully blocked; out to the penumbra radius
+ * it fades, both from similar triangles on the shadow cone.
+ *
+ * The caller passes radii already converted into the caster's own orbital scale (see
+ * Application::ConfigureEclipseUmbra), so the cone here is close to the real one even
+ * though the planet under it is drawn several times oversized. The planet's exaggerated
+ * radius is the remaining error and it makes the shadow track across the disc faster than
+ * life; it does not change whether the eclipse happens, which is decided on the CPU at
+ * true scale.
+ */
+float EclipseVisibility() {
+    if (!hasEclipseCaster)
+        return 1.0;
+
+    vec3 toLight = lightPos - vFragPos;
+    float lightDist = length(toLight);
+    if (lightDist < 1e-4)
+        return 1.0;
+    vec3 lightDirNorm = toLight / lightDist;
+
+    vec3 toCaster = eclipseCasterCenter - vFragPos;
+    float along = dot(toCaster, lightDirNorm);
+    // Caster behind this fragment, or past the star: it cannot shadow us.
+    if (along <= 0.0 || along >= lightDist)
+        return 1.0;
+
+    float miss = length(toCaster - lightDirNorm * along);
+
+    // Shadow cone cross-section at the caster's distance from the fragment.
+    float spread = along / max(lightDist - along, 1e-4);
+    float umbra = max(eclipseCasterRadius - (eclipseStarRadius - eclipseCasterRadius) * spread, 0.0);
+    float penumbra = eclipseCasterRadius + (eclipseStarRadius + eclipseCasterRadius) * spread;
+    penumbra = max(penumbra, umbra + 1e-4);
+
+    return smoothstep(umbra, penumbra, miss);
 }
 
 // https://www.youtube.com/watch?v=yn5UJzMqxj0
@@ -256,7 +304,7 @@ void main() {
         specular = spec * starGlowTint;
     }
 
-    float shadow = CalculateShadow(vFragPosLightSpace);
+    float shadow = CalculateShadow(vFragPosLightSpace) * EclipseVisibility();
 
     if (shadow < 0.05)
         ambient *= 0.1;

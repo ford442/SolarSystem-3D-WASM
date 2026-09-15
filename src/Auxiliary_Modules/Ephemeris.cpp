@@ -1,5 +1,7 @@
 #include "Ephemeris.h"
 
+#include "../Solar_System/BodyCatalog.generated.h"
+
 #include <algorithm>
 #include <chrono>
 #include <cmath>
@@ -13,6 +15,32 @@ constexpr double kTwoPi = 6.28318530717958647692;
 constexpr double kDegToRad = kPi / 180.0;
 constexpr double kRadToDeg = 180.0 / kPi;
 constexpr double kDaysPerCentury = 36525.0;
+constexpr double kKmPerAu = 149597870.7;
+
+// Catalog satellites whose orbit.keplerian row carries real angles for all six elements.
+// Every other satellite row still ships OmegaDeg / omegaDeg / M0Deg = 0 placeholders, which
+// would swing the moon into a plainly wrong plane, so those keep the circular
+// SatelliteOrbit offset. Add an id here once its catalog row gets measured angles.
+//
+// Two documented approximations:
+//  - Elements are J2000-epoch mean elements. The node and periapsis rates the row carries
+//    are applied (the Moon's are what make its eclipse seasons land on the right month);
+//    the large periodic terms are not — evection (1.27 deg) and variation (0.66 deg) for
+//    the Moon, the Laplace resonance for the Galileans. Good enough to put a shadow on the
+//    right day, not to time a contact.
+//  - We treat i / Omega / omega as referred to the J2000 ecliptic. For the Moon and Triton
+//    that is the published frame. For the Galileans and Titan the published frame is the
+//    parent's Laplace plane, so their orbit planes come out tilted by the parent's own
+//    obliquity (~3.1 deg for Jupiter, ~26.7 deg for Saturn) from the truth.
+constexpr int kKeplerianSatellites[] = {
+    12, // Moon
+    15, // Io
+    16, // Europa
+    17, // Ganymede
+    18, // Callisto
+    24, // Titan
+    31, // Triton
+};
 
 struct Elements {
     double a0, aDot;   // AU, AU/Cy
@@ -115,7 +143,9 @@ double solveKepler(double MRad, double e) {
     return E;
 }
 
-HelioLB fromOrbitalPlane(double a, double e, double IDeg, double OmDeg, double wDeg, double MDeg) {
+/** Ecliptic-of-J2000 Cartesian position for a classical element set (same units as `a`). */
+void orbitalPlaneToEcliptic(double a, double e, double IDeg, double OmDeg, double wDeg,
+                            double MDeg, double out[3]) {
     const double I = IDeg * kDegToRad;
     const double Om = OmDeg * kDegToRad;
     const double w = wDeg * kDegToRad;
@@ -138,15 +168,33 @@ HelioLB fromOrbitalPlane(double a, double e, double IDeg, double OmDeg, double w
         (cosW * sinOm + sinW * cosOm * cosI) * xp + (-sinW * sinOm + cosW * cosOm * cosI) * yp;
     const double ze = (sinW * sinI) * xp + (cosW * sinI) * yp;
 
-    const double r = std::sqrt(xe * xe + ye * ye + ze * ze);
+    out[0] = xe;
+    out[1] = ye;
+    out[2] = ze;
+}
+
+HelioLB fromOrbitalPlane(double a, double e, double IDeg, double OmDeg, double wDeg, double MDeg) {
+    double xyz[3] = {0.0, 0.0, 0.0};
+    orbitalPlaneToEcliptic(a, e, IDeg, OmDeg, wDeg, MDeg, xyz);
+
+    const double r = std::sqrt(xyz[0] * xyz[0] + xyz[1] * xyz[1] + xyz[2] * xyz[2]);
     HelioLB out;
     out.rAu = r;
     if (r < 1e-12) {
         return out;
     }
-    out.lonRad = wrapRadTwoPi(std::atan2(ye, xe));
-    out.latRad = std::asin(std::clamp(ze / r, -1.0, 1.0));
+    out.lonRad = wrapRadTwoPi(std::atan2(xyz[1], xyz[0]));
+    out.latRad = std::asin(std::clamp(xyz[2] / r, -1.0, 1.0));
     return out;
+}
+
+bool hasKeplerianSolution(int satelliteId) {
+    for (const int id : kKeplerianSatellites) {
+        if (id == satelliteId) {
+            return true;
+        }
+    }
+    return false;
 }
 
 HelioLB standishPosition(const Elements& el, double jd) {
@@ -231,6 +279,29 @@ public:
         }
         return standishPosition(kStandish[bodyIndex - 1], julianDate);
     }
+
+    bool SatelliteParentRelative(int satelliteId, double julianDate,
+                                 double outXyzAu[3]) const override {
+        outXyzAu[0] = outXyzAu[1] = outXyzAu[2] = 0.0;
+        if (!hasKeplerianSolution(satelliteId)) {
+            return false;
+        }
+
+        const BodyCatalog::Entry* entry = BodyCatalog::FindByIndex(satelliteId);
+        if (!entry || entry->kind != BodyCatalog::Kind::Satellite ||
+            entry->keplerian.aKm <= 0.0f || entry->keplerian.nDegPerDay == 0.0f) {
+            return false;
+        }
+
+        // Catalog angles are all J2000 epoch values; there is no epoch column by design.
+        const BodyCatalog::Keplerian& k = entry->keplerian;
+        const double days = julianDate - kJ2000;
+        const double M = wrapDeg180(k.M0Deg + k.nDegPerDay * days);
+        const double Om = k.OmegaDeg + k.OmegaDotDegPerDay * days;
+        const double w = k.omegaDeg + k.omegaDotDegPerDay * days;
+        orbitalPlaneToEcliptic(k.aKm / kKmPerAu, k.e, k.iDeg, Om, w, M, outXyzAu);
+        return true;
+    }
 };
 
 const IEphemeris* g_backend = nullptr;
@@ -252,6 +323,23 @@ void SetBackend(const IEphemeris* backend) {
 
 HelioLB Position(int bodyIndex, double julianDate) {
     return GetBackend().PlanetHeliocentric(bodyIndex, julianDate);
+}
+
+bool SatellitePosition(int satelliteId, double julianDate, double outXyzAu[3]) {
+    return GetBackend().SatelliteParentRelative(satelliteId, julianDate, outXyzAu);
+}
+
+double GreenwichMeanSiderealTimeDeg(double julianDate) {
+    // IAU 1982 GMST series (Aoki et al.), expressed in degrees. See the header for why
+    // feeding UTC rather than UT1/TT is good enough here.
+    const double T = (julianDate - kJ2000) / kDaysPerCentury;
+    const double seconds = 67310.54841 + (876600.0 * 3600.0 + 8640184.812866) * T +
+                           0.093104 * T * T - 6.2e-6 * T * T * T;
+    double deg = std::fmod(seconds / 240.0, 360.0); // 240 s of GMST == 1 degree
+    if (deg < 0.0) {
+        deg += 360.0;
+    }
+    return deg;
 }
 
 } // namespace Ephemeris

@@ -1,5 +1,6 @@
 #include "Application.h"
 #include "JsBridge.h"
+#include "Solar_System/EclipseCaster.h"
 #include "SimState.h"
 #include "Solar_System/OrbitLayout.h"
 #include "Auxiliary_Modules/Ephemeris.h"
@@ -99,6 +100,9 @@ void Application::RenderPass(const RenderableSceneComponent& component) {
     component.planet->SetShader(*_mainPlanetShader);
     component.planet->Render();
 
+    // The moons share _mainPlanetShader with their primary, so the umbra decal has to come
+    // back off before they draw — otherwise the caster would shadow its own night side.
+    _mainPlanetShader->SetBool("hasEclipseCaster", false);
     for (const auto& satellite : component.satellites) {
         satellite->SetShader(*_mainPlanetShader);
         satellite->Render();
@@ -403,8 +407,8 @@ void Application::RenderHints() const {
 
     // Sky event driven by the ephemeris, not a baked animation — see SkyEvents.h.
     deque<wstring> conjunctionHint;
-    if (const SkyEvents::Conjunction& next = GetNextConjunction(); next.valid) {
-        const std::string line = SkyEvents::Format(next);
+    if (const SkyEvents::SkyEvent& next = GetNextSkyEvent(); next.valid) {
+        const std::string line = SkyEvents::FormatEvent(next);
         conjunctionHint.emplace_back(line.begin(), line.end()); // ASCII only, see SkyEvents
     }
 
@@ -669,9 +673,91 @@ void Application::ConfigureMainShaders() {
     _mainRingShader->SetInt("shadowMap", 5);
     glBindTextureUnit(5, _shadowMapFBO->GetShadowMap());
 }
+void Application::ConfigureEclipseUmbra(const RenderableSceneComponent& renderableComponent) {
+    // Real physical constants, because the eclipse *decision* has to be made at true scale.
+    // The scene draws body radii, moon orbits, and planet orbits at three different
+    // exaggerations; at art scale the Moon sits 12.5 Earth-radii away instead of 60, so its
+    // 5.1 deg of inclination cannot clear Earth's disc and a shadow would land on nearly
+    // every new moon. Deciding in kilometres and only *drawing* at art scale is what keeps
+    // eclipses as rare as they are. See docs/ARCHITECTURE.md § 11.
+    constexpr float kEarthRadiusKm = 6371.0f;
+    constexpr float kSunRadiusKm = 695700.0f;
+    constexpr float kAuKm = 149597870.7f;
+
+    const std::shared_ptr<Planet>& planet = renderableComponent.planet;
+    if (!planet || !_sun || renderableComponent.satellites.empty()) {
+        _mainPlanetShader->SetBool("hasEclipseCaster", false);
+        return;
+    }
+
+    const glm::vec3 planetPosition = planet->GetPosition();
+    const glm::vec3 sunPosition = _sun->GetPosition();
+    const float planetRadiusKm = planet->GetEarthSizeCoefficient() * kEarthRadiusKm;
+
+    // Pick the moon whose shadow axis passes closest to the planet's centre. Only one
+    // caster is uploaded: two simultaneous umbrae on the same body are rare enough that
+    // paying for an array every frame would be the wrong trade.
+    const Satellite* caster = nullptr;
+    float casterUnitsPerKm = 0.0f;
+    float bestMiss = 0.0f;
+    for (const std::shared_ptr<Satellite>& satellite : renderableComponent.satellites) {
+        // A circular art orbit lies exactly in its parent's equatorial plane, so it would
+        // eclipse every revolution. Only ephemeris-placed moons are allowed to cast.
+        if (!satellite || !satellite->IsEphemerisPlaced()) {
+            continue;
+        }
+        const float unitsPerKm = satellite->OrbitSceneUnitsPerKm();
+        if (unitsPerKm <= 0.0f) {
+            continue;
+        }
+
+        const float miss =
+            EclipseCaster::ShadowAxisMissDistance(planetPosition, sunPosition, satellite->GetPosition());
+        if (miss < 0.0f) {
+            continue;
+        }
+
+        // True radii expressed in this moon's orbital scale — the frame `miss` is already in.
+        const float moonRadiusKm = satellite->GetEarthSizeCoefficient() * kEarthRadiusKm;
+        const float limit = (planetRadiusKm + moonRadiusKm) * unitsPerKm;
+        if (miss < limit && (!caster || miss < bestMiss)) {
+            caster = satellite.get();
+            casterUnitsPerKm = unitsPerKm;
+            bestMiss = miss;
+        }
+    }
+
+    if (!caster) {
+        _mainPlanetShader->SetBool("hasEclipseCaster", false);
+        return;
+    }
+
+    // Draw radius: the moon's real radius in its own orbital scale, not the exaggerated
+    // radius it is rendered at. That keeps the shadow spot's size sane relative to the
+    // planet's disc instead of blanketing a quarter of it.
+    const float casterRadius = caster->GetEarthSizeCoefficient() * kEarthRadiusKm * casterUnitsPerKm;
+
+    // The shader only uses the star radius through its angular size at the caster, so pass
+    // the radius that reproduces the Sun's *true* angular size at the scene's light
+    // distance. Using the drawn Sun radius would widen the penumbra by the full art-scale
+    // mismatch between the moon orbit and the planet orbit.
+    const float lightDistance = glm::length(sunPosition - planetPosition);
+    const float starRadius = lightDistance * (kSunRadiusKm / kAuKm);
+
+    // Low drops the penumbra entirely: a zero-radius star gives a hard-edged disc, which is
+    // one smoothstep and no extra bandwidth.
+    const bool softPenumbra = gSimState->qualityPreset >= 2;
+
+    _mainPlanetShader->SetBool("hasEclipseCaster", true);
+    _mainPlanetShader->SetVec3("eclipseCasterCenter", caster->GetPosition());
+    _mainPlanetShader->SetFloat("eclipseCasterRadius", casterRadius);
+    _mainPlanetShader->SetFloat("eclipseStarRadius", softPenumbra ? starRadius : 0.0f);
+}
+
 void Application::ConfigureMainPlanetShader(const RenderableSceneComponent& renderableComponent) {
     _mainPlanetShader->SetMat4("lightSpaceMatrix", renderableComponent.lightSpaceMatrix);
     _mainPlanetShader->SetBool("isNearbyPlanetaryRing", renderableComponent.planetaryRing != nullptr);
+    ConfigureEclipseUmbra(renderableComponent);
 
     if (renderableComponent.planetaryRing) {
         _mainPlanetShader->SetVec3("ringCenter", renderableComponent.planetaryRing->GetPosition());
