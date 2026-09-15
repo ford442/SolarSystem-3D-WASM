@@ -220,6 +220,7 @@ private:
     void UpdateLOD();             // Central LOD manager: upgrade textures for nearest planets (WASM)
     void RenderPlanetProxyMarkers() const; // Show orbital markers for unloaded planets (WASM)
     void RenderOrbitPaths() const;
+    void LoadMissionCatalog();
     void LoadMissions();
     void RebuildMissionPaths();
     void RenderMissionPaths() const;

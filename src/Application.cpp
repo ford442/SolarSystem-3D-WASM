@@ -165,6 +165,9 @@ void Application::RenderFrameContent() {
 
 void Application::InitScene() {
 #ifdef __EMSCRIPTEN__
+    // Catalog JSON is in the .data preload; parse it before the first JS frame so
+    // Explorer / deep links see Voyager rows before InitSceneObjects builds GL meshes.
+    LoadMissionCatalog();
     LoadCoreResources();
     LoadOptionalSounds();
 #else

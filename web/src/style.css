@@ -681,6 +681,11 @@ input {
   pointer-events: none;
 }
 
+.xr-hud[hidden],
+.xr-controllers[hidden] {
+  display: none !important;
+}
+
 .xr-tooltip {
   margin: 0;
   padding: 6px 12px;

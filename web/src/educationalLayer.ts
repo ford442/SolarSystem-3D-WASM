@@ -26,22 +26,7 @@ export function initEducationalLayer(options: {
         settingsStatus,
     } = options;
 
-    const catalog = runtime.getMissionCatalog();
-    missionsRoot.hidden = catalog.length === 0;
-    missionList.replaceChildren();
-    for (const mission of catalog) {
-        const button = document.createElement('button');
-        button.type = 'button';
-        button.className = 'explorer-body-btn';
-        button.dataset.missionIndex = String(mission.index);
-        button.textContent = mission.name;
-        button.addEventListener('click', () => {
-            runtime.focusMission(mission.index);
-            settingsStatus.textContent = `Following ${mission.name}`;
-            highlightMission(mission.index);
-        });
-        missionList.appendChild(button);
-    }
+    let missionDeepLinkApplied = false;
 
     const highlightMission = (index: number): void => {
         for (const button of missionList.querySelectorAll<HTMLButtonElement>('.explorer-body-btn')) {
@@ -49,16 +34,46 @@ export function initEducationalLayer(options: {
         }
     };
 
-    window.setInterval(() => {
-        highlightMission(runtime.getFocusedMissionIndex());
-    }, 750);
-
-    if (deepLink.mission) {
-        const match = catalog.find((mission) => mission.id === deepLink.mission);
-        if (match) {
-            highlightMission(match.index);
+    const renderMissionList = (): void => {
+        const catalog = runtime.getMissionCatalog();
+        missionsRoot.hidden = catalog.length === 0;
+        if (catalog.length === 0) {
+            return;
         }
-    }
+        if (missionList.childElementCount === catalog.length) {
+            highlightMission(runtime.getFocusedMissionIndex());
+            return;
+        }
+        missionList.replaceChildren();
+        for (const mission of catalog) {
+            const button = document.createElement('button');
+            button.type = 'button';
+            button.className = 'explorer-body-btn';
+            button.dataset.missionIndex = String(mission.index);
+            button.textContent = mission.name;
+            button.addEventListener('click', () => {
+                runtime.focusMission(mission.index);
+                settingsStatus.textContent = `Following ${mission.name}`;
+                highlightMission(mission.index);
+            });
+            missionList.appendChild(button);
+        }
+        if (deepLink.mission && !missionDeepLinkApplied) {
+            const match = catalog.find((mission) => mission.id === deepLink.mission);
+            if (match) {
+                runtime.focusMission(match.index);
+                highlightMission(match.index);
+                missionDeepLinkApplied = true;
+            }
+        } else {
+            highlightMission(runtime.getFocusedMissionIndex());
+        }
+    };
+
+    renderMissionList();
+    window.setInterval(() => {
+        renderMissionList();
+    }, 750);
 
     const player = createTourPlayer({
         runtime,

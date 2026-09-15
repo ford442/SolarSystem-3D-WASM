@@ -47,6 +47,26 @@ test('WASM module boots and staged loading reacts to camera pose', async ({ page
     { timeout: 10_000 },
   );
 
+  await page.waitForFunction(
+    () => document.querySelectorAll('#explorer-mission-list button').length >= 1,
+    undefined,
+    { timeout: 20_000 },
+  );
+  await expect(page.locator('#explorer-missions')).not.toHaveAttribute('hidden');
+  await expect(page.locator('#explorer-mission-list button')).toHaveCount(2);
+  await page.locator('#explorer-mission-list button', { hasText: 'Voyager 1' }).click();
+  await page.waitForFunction(() => window.getFocusedMission?.()?.id === 'voyager1', undefined, {
+    timeout: 5_000,
+  });
+
+  await page.locator('#tour-play').evaluate((el: HTMLButtonElement) => el.click());
+  await expect(page.locator('#tour-caption')).not.toHaveAttribute('hidden');
+  await expect(page.locator('#tour-stop')).not.toHaveAttribute('hidden');
+  await page.locator('#tour-stop').evaluate((el: HTMLButtonElement) => el.click());
+
+  await expect(page.locator('#enter-vr')).toBeHidden();
+  await expect(page.locator('#xr-hud')).toBeHidden();
+
   await expect
     .poll(() => consoleLogs.some((line) => line.includes('SolarSystem WASM initialized')), {
       timeout: 15_000,
@@ -60,6 +80,7 @@ test('WASM module boots and staged loading reacts to camera pose', async ({ page
 
   await page.locator('#canvas').hover();
   await page.evaluate(() => {
+    window.focusMission?.(-1);
     window.setCameraPose?.(1200, 0, 350, 0, 0);
   });
 

@@ -195,16 +195,21 @@ void Application::RenderOrbitPaths() const {
     glDisable(GL_BLEND);
 }
 
-void Application::LoadMissions() {
+void Application::LoadMissionCatalog() {
     std::string error;
     if (!MissionCatalog::LoadFromFile("resource/missions/catalog.json", _missionCatalog, error)) {
         std::cout << "[Missions] " << error << std::endl;
         _missionCatalog = {};
-        _missionPathMeshes.clear();
         return;
     }
     std::cout << "[Missions] Loaded " << _missionCatalog.missions.size()
               << " trajectory path(s) from catalog.json" << std::endl;
+}
+
+void Application::LoadMissions() {
+    if (_missionCatalog.missions.empty()) {
+        LoadMissionCatalog();
+    }
     RebuildMissionPaths();
 }
 
