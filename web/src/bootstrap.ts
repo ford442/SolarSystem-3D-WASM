@@ -41,6 +41,9 @@ const musicMutedInput = document.getElementById('music-muted') as HTMLInputEleme
 const settingsReset = document.getElementById('settings-reset') as HTMLButtonElement;
 const copyViewLinkButton = document.getElementById('copy-view-link') as HTMLButtonElement;
 const settingsStatus = document.getElementById('settings-status') as HTMLElement;
+const conjunctionChip = document.getElementById('next-conjunction') as HTMLElement;
+const conjunctionText = document.getElementById('next-conjunction-text') as HTMLElement;
+const conjunctionJump = document.getElementById('next-conjunction-jump') as HTMLButtonElement;
 const enterVrButton = document.getElementById('enter-vr') as HTMLButtonElement;
 const exitVrButton = document.getElementById('exit-vr') as HTMLButtonElement;
 const explorerPanel = document.getElementById('explorer-panel') as HTMLElement;
@@ -117,6 +120,8 @@ void Module(moduleConfig).then((instance) => {
         getPlanetSceneDistance: runtime.getPlanetSceneDistance.bind(runtime),
         getOrbitScaleMode: () => runtime.getOrbitScaleMode(),
         setOrbitScaleMode: runtime.setOrbitScaleMode.bind(runtime),
+        getNextConjunction: () => runtime.getNextConjunction(),
+        setSimulationEpoch: runtime.setSimulationEpoch.bind(runtime),
     }, {
         skipPlanetRestore: deepLink.planet !== undefined || deepLink.camera !== undefined,
         initialOrbitScale: deepLink.orbitScale,
@@ -192,6 +197,9 @@ void Module(moduleConfig).then((instance) => {
             settingsReset,
             copyViewLinkButton,
             settingsStatus,
+            conjunctionChip,
+            conjunctionText,
+            conjunctionJump,
         },
         runtime,
         deepLink,

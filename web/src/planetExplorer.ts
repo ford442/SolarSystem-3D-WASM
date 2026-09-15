@@ -1,4 +1,5 @@
 import type { OrbitScaleMode, PlanetIndex } from './SolarSystem.js';
+import { bindConjunctionChip, type NextConjunction } from './conjunction.js';
 import { registerWasmCallbacks } from './wasmCallbacks.js';
 
 export interface PlanetFactBody {
@@ -36,6 +37,8 @@ export interface PlanetExplorerBindings {
     getPlanetSceneDistance?: (index: PlanetIndex) => number;
     getOrbitScaleMode?: () => OrbitScaleMode;
     setOrbitScaleMode?: (mode: OrbitScaleMode) => void;
+    getNextConjunction?: () => NextConjunction;
+    setSimulationEpoch?: (julianDate: number) => void;
 }
 
 interface PlanetExplorerElements {
@@ -51,6 +54,9 @@ interface PlanetExplorerElements {
     cardFacts: HTMLElement;
     scaleSelect: HTMLSelectElement;
     scaleHelp: HTMLElement;
+    conjunctionChip: HTMLElement;
+    conjunctionText: HTMLElement;
+    conjunctionJump: HTMLButtonElement;
     status: HTMLElement;
 }
 
@@ -151,6 +157,7 @@ export class PlanetExplorer {
     private readonly locale: ExplorerLocale;
     private skipPlanetRestore = false;
     private initialOrbitScale: OrbitScaleMode | undefined;
+    private conjunctionRefresh: (() => void) | null = null;
 
     constructor(root: HTMLElement) {
         this.locale = detectLocale();
@@ -167,6 +174,9 @@ export class PlanetExplorer {
             cardFacts: root.querySelector('#planet-info-facts') as HTMLElement,
             scaleSelect: root.querySelector('#orbit-scale-mode') as HTMLSelectElement,
             scaleHelp: root.querySelector('#orbit-scale-help') as HTMLElement,
+            conjunctionChip: root.querySelector('#explorer-conjunction') as HTMLElement,
+            conjunctionText: root.querySelector('#explorer-conjunction-text') as HTMLElement,
+            conjunctionJump: root.querySelector('#explorer-conjunction-jump') as HTMLButtonElement,
             status: root.querySelector('#explorer-status') as HTMLElement,
         };
 
@@ -218,6 +228,7 @@ export class PlanetExplorer {
             this.updateScaleHelp();
         }
         this.syncScaleFromRuntime();
+        this.bindConjunction();
         this.elements.status.textContent = 'Explorer ready';
         this.startPolling();
         registerWasmCallbacks({
@@ -252,6 +263,7 @@ export class PlanetExplorer {
                 this.highlightNearest(nearest as PlanetIndex);
             }
             this.syncScaleFromRuntime();
+            this.conjunctionRefresh?.();
         }, 750);
     }
 
@@ -262,6 +274,26 @@ export class PlanetExplorer {
             this.elements.scaleSelect.value = String(mode);
         }
         this.updateScaleHelp();
+    }
+
+    private bindConjunction(): void {
+        if (
+            !this.elements.conjunctionChip
+            || !this.elements.conjunctionText
+            || !this.elements.conjunctionJump
+            || !this.bindings.getNextConjunction
+            || !this.bindings.setSimulationEpoch
+        ) {
+            return;
+        }
+        const { refresh } = bindConjunctionChip({
+            chip: this.elements.conjunctionChip,
+            text: this.elements.conjunctionText,
+            jumpButton: this.elements.conjunctionJump,
+            getNextConjunction: this.bindings.getNextConjunction,
+            setSimulationEpoch: this.bindings.setSimulationEpoch,
+        });
+        this.conjunctionRefresh = refresh;
     }
 
     private updateScaleHelp(): void {

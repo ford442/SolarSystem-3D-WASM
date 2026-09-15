@@ -1,7 +1,8 @@
 import { defineConfig } from 'vite';
 
-// Match production cross-origin isolation on the app origin only.
-// Asset CDNs should emit CORS + CORP, not COEP/COOP (see docs/CROSS_ORIGIN_HEADERS.md).
+// Dev/preview rehearse Option B (COEP+COOP) for a future pthread / SharedArrayBuffer
+// build. Production stays Option A (no COEP) until pthreads ship — see
+// docs/CROSS_ORIGIN_HEADERS.md. Asset CDNs should emit CORS + CORP, not COEP/COOP.
 const appIsolationHeaders = {
   'Cross-Origin-Embedder-Policy': 'require-corp',
   'Cross-Origin-Opener-Policy': 'same-origin',

@@ -2,9 +2,11 @@ import type {
     OrbitScaleMode,
     PlanetIndex,
     QualityPreset,
+    SettingsChangeField,
     ShadowQuality,
     SolarSystemModule,
 } from './SolarSystem.js';
+import type { NextConjunction } from './conjunction.js';
 import { createCachedCwrapExports } from './wasmBridge.exports.js';
 import { clearWasmCallback, registerWasmCallbacks } from './wasmCallbacks.js';
 
@@ -14,24 +16,13 @@ import { clearWasmCallback, registerWasmCallbacks } from './wasmCallbacks.js';
  * GetNearestPlanetIndex returns 1–11 for the nearest loaded planet, or -1 when unknown
  * (C++ adds +1 offset via GetNearestPlanetIndexForJs).
  */
-export type { PlanetIndex, QualityPreset, ShadowQuality, OrbitScaleMode };
+export type { PlanetIndex, QualityPreset, SettingsChangeField, ShadowQuality, OrbitScaleMode };
+export type { NextConjunction };
 
 /** Map quality preset + shadows toggle to C++ shadow quality (0=off, 1–3 = low…full). */
 export function shadowQualityForPreset(preset: QualityPreset, shadowsEnabled: boolean): ShadowQuality {
     return shadowsEnabled ? (preset + 1) as ShadowQuality : 0;
 }
-
-export type SettingsChangeField =
-    | 'quality'
-    | 'timeScale'
-    | 'paused'
-    | 'shadowQuality'
-    | 'musicVolume'
-    | 'musicMuted'
-    | 'simulationEpoch'
-    | 'orbitLines'
-    | 'magneticFields'
-    | 'magneticFieldMode';
 
 export interface CameraPose {
     x: number;
@@ -46,6 +37,7 @@ export interface SolarSystemRuntime {
     readonly heapF32: Float32Array;
 
     setCameraPose(x: number, y: number, z: number, yaw: number, pitch: number): void;
+    getCameraPose(): CameraPose;
     setQualityPreset(preset: QualityPreset): void;
     getQualityPreset(): QualityPreset;
     setTimeScale(scale: number): void;
@@ -71,6 +63,7 @@ export interface SolarSystemRuntime {
     getNearestPlanetIndex(): number;
     getFocusedPlanetIndex(): number;
     getPlanetSceneDistance(index: PlanetIndex): number;
+    getNextConjunction(): NextConjunction;
     setOrbitLines(enabled: boolean): void;
     getOrbitLines(): boolean;
     setMagneticFields(enabled: boolean): void;
@@ -101,6 +94,13 @@ export function createSolarSystemRuntime(instance: SolarSystemModule): SolarSyst
         heapF32: instance.HEAPF32,
 
         setCameraPose: exports.setCameraPose,
+        getCameraPose: () => ({
+            x: exports.getCameraPositionX(),
+            y: exports.getCameraPositionY(),
+            z: exports.getCameraPositionZ(),
+            yaw: exports.getCameraYaw(),
+            pitch: exports.getCameraPitch(),
+        }),
         setQualityPreset: (preset) => exports.setQualityPreset(preset),
         getQualityPreset: () => exports.getQualityPreset() as QualityPreset,
         setTimeScale: exports.setTimeScale,
@@ -125,6 +125,19 @@ export function createSolarSystemRuntime(instance: SolarSystemModule): SolarSyst
         getNearestPlanetIndex: exports.getNearestPlanetIndex,
         getFocusedPlanetIndex: exports.getFocusedPlanetIndex,
         getPlanetSceneDistance: (index) => exports.getPlanetSceneDistance(index),
+        getNextConjunction: () => {
+            const bodyA = exports.getNextConjunctionBodyA();
+            const bodyB = exports.getNextConjunctionBodyB();
+            const julianDate = exports.getNextConjunctionJulianDate();
+            const separationDeg = exports.getNextConjunctionSeparationDeg();
+            return {
+                valid: bodyA >= 0 && bodyB >= 0,
+                bodyA,
+                bodyB,
+                julianDate,
+                separationDeg,
+            };
+        },
         setOrbitLines: (enabled) => exports.setOrbitLines(enabled ? 1 : 0),
         getOrbitLines: () => exports.getOrbitLines() !== 0,
         setMagneticFields: (enabled) => exports.setMagneticFields(enabled ? 1 : 0),
@@ -150,9 +163,11 @@ export function createSolarSystemRuntime(instance: SolarSystemModule): SolarSyst
     return runtime;
 }
 
-/** Console helper documented in AGENTS.md — thin alias over the typed bridge. */
+/** Console helpers documented in AGENTS.md — thin aliases over the typed bridge. */
 export function exposeConsoleHelpers(runtime: SolarSystemRuntime): void {
     window.setCameraPose = runtime.setCameraPose.bind(runtime);
+    window.setQualityPreset = runtime.setQualityPreset.bind(runtime);
+    window.getQualityPreset = runtime.getQualityPreset.bind(runtime);
 }
 
 export function subscribeSettingsChanges(

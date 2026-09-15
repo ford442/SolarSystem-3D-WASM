@@ -29,10 +29,22 @@ test('WASM module boots and staged loading reacts to camera pose', async ({ page
   await page.waitForFunction(() => typeof window.setCameraPose === 'function', undefined, {
     timeout: 45_000,
   });
+  await page.waitForFunction(() => typeof window.setQualityPreset === 'function', undefined, {
+    timeout: 5_000,
+  });
   await page.waitForFunction(
     () => document.getElementById('settings-status')?.textContent === 'Controls ready',
     undefined,
     { timeout: 30_000 },
+  );
+  await page.waitForFunction(
+    () => {
+      const chip = document.getElementById('next-conjunction');
+      const text = document.getElementById('next-conjunction-text')?.textContent ?? '';
+      return !!chip && !chip.hasAttribute('hidden') && /conjunction/i.test(text);
+    },
+    undefined,
+    { timeout: 10_000 },
   );
 
   await expect

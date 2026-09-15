@@ -8,16 +8,24 @@ How HTTP response headers interact with the WASM host page, a separate asset CDN
 
 ## 1. Does this app need COEP?
 
-**No — not with the current build.** The Emscripten link flags use `ASYNCIFY` only; there is no `-s PTHREAD` / `-s SHARED_MEMORY`. The runtime does not require `SharedArrayBuffer` or `crossOriginIsolated`.
+**No — not with the current build.** There is no `-sPTHREAD` / `-sSHARED_MEMORY` and
+**no `ASYNCIFY`**. The runtime does not require `SharedArrayBuffer` or `crossOriginIsolated`.
 
 | Build flag | Present? | Needs COEP+COOP? |
 |------------|----------|------------------|
-| `ASYNCIFY=1` | Yes | No |
+| `ASYNCIFY` / `JSPI` | No | No |
 | `PTHREAD` / `SHARED_MEMORY` | No | Yes (for `SharedArrayBuffer`) |
 
-**Recommendation:** Prefer **Option A** (no COEP) for production unless you add pthreads later. COEP simplifies nothing today and forces every cross-origin asset to opt in via CORP.
+**Policy (pick one and keep it consistent):**
 
-If you add pthreads later, switch to **Option B**.
+| Environment | Isolation | Why |
+|-------------|-----------|-----|
+| **Production** | **Option A** (no COEP/COOP) | Simpler ops; no pthreads yet; COEP would force CORP on every cross-origin asset |
+| **Vite `dev` / `preview`** | **Option B** (COEP+COOP on the app origin) | Rehearsal for a future pthread build and for `npm run verify:cross-origin` |
+
+Do not copy Vite’s isolation headers into production until pthreads ship. Then switch production to Option B.
+
+If you add pthreads later, switch production to **Option B**.
 
 ---
 
@@ -158,9 +166,11 @@ add_header Cross-Origin-Resource-Policy "cross-origin" always;
 
 ## 6. Local testing
 
-### Vite dev / preview (app isolation headers)
+### Vite dev / preview (Option B rehearsal)
 
-`web/vite.config.ts` sets COEP+COOP on the **app server** so you can reproduce Option B locally:
+`web/vite.config.ts` sets COEP+COOP on the **app server** so agents and
+`verify:cross-origin` can reproduce Option B locally. This is **not** the
+production header set (Option A) until pthreads ship.
 
 ```bash
 ./build-web.sh
@@ -234,5 +244,5 @@ npm run verify:textures           # full WASM load + skybox path
 Same-origin assets     → no CORS/CORP/COEP needed
 Subdomain CDN          → ACAO + CORP:cross-origin on assets; COEP only on app (if pthreads)
 test.1ink.us pattern   → works but COEP on DDS should be removed from CDN config
-This build (ASYNCIFY)  → COEP optional; omit for simpler ops
+This build (no ASYNCIFY, no pthreads)  → production: Option A (omit COEP); Vite: Option B rehearsal
 ```

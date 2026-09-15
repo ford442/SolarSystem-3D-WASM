@@ -1,4 +1,4 @@
-import type { SettingsChangeField } from './wasmBridge.js';
+import type { SettingsChangeField } from './SolarSystem.js';
 
 export interface WasmModuleCallbacks {
     updateLoadingProgress?: (loaded: number, total: number) => void;

@@ -482,6 +482,7 @@ In the browser console:
 
 ```js
 window.setCameraPose(1850, 20, 30, 90, -10);  // approach Earth proxy
+window.setQualityPreset(0);                     // 0=low, 1=medium, 2=full
 ```
 
 Expect proxy labels → staged download → low-res planet → LOD streaming overlay when close. With placeholders only, visual quality change is minimal; console logs and UI prove the code paths.

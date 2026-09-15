@@ -5,6 +5,8 @@ export interface DeepLinkViewState {
     timeScale?: number;
     paused?: boolean;
     simulationDate?: string;
+    /** Precise epoch from `?jd=`; wins over `date` when both are present. */
+    julianDate?: number;
     orbitScale?: OrbitScaleMode;
     shadows?: boolean;
     orbitLines?: boolean;
@@ -22,16 +24,23 @@ export interface DeepLinkViewState {
 export interface DeepLinkRuntimeReaders {
     getQualityPreset?: () => QualityPreset;
     getTimeScale?: () => number;
-    getPaused?: () => number;
+    getPaused?: () => boolean;
     getSimulationEpoch?: () => number;
     getOrbitScaleMode?: () => OrbitScaleMode;
     getShadowQuality?: () => number;
-    getOrbitLines?: () => number;
-    getMagneticFields?: () => number;
+    getOrbitLines?: () => boolean;
+    getMagneticFields?: () => boolean;
     getFocusedPlanetIndex?: () => number;
     getCameraPosition?: () => { x: number; y: number; z: number };
     getCameraYaw?: () => number;
     getCameraPitch?: () => number;
+    getCameraPose?: () => {
+        x: number;
+        y: number;
+        z: number;
+        yaw: number;
+        pitch: number;
+    };
     isoDateFromJulianDate?: (jd: number) => string;
 }
 
@@ -126,6 +135,7 @@ export function parseDeepLinkFromUrl(search = window.location.search): DeepLinkV
     const timeScale = parseFiniteNumber(params.get('time') ?? params.get('ts'));
     const paused = parseBooleanParam(params.get('paused') ?? params.get('p'));
     const simulationDate = parseSimulationDate(params.get('date'));
+    const julianDate = parseFiniteNumber(params.get('jd'));
     const orbitScale = parseOrbitScale(params.get('orbit') ?? params.get('scale'));
     const shadows = parseBooleanParam(params.get('shadows'));
     const orbitLines = parseBooleanParam(params.get('orbits') ?? params.get('orbitLines'));
@@ -147,6 +157,7 @@ export function parseDeepLinkFromUrl(search = window.location.search): DeepLinkV
         timeScale,
         paused,
         simulationDate,
+        julianDate,
         orbitScale,
         shadows,
         orbitLines,
@@ -184,8 +195,11 @@ export function buildShareableUrl(
     }
 
     const jd = readers.getSimulationEpoch?.();
-    if (jd !== undefined && Number.isFinite(jd) && readers.isoDateFromJulianDate) {
-        url.searchParams.set('date', readers.isoDateFromJulianDate(jd));
+    if (jd !== undefined && Number.isFinite(jd)) {
+        url.searchParams.set('jd', String(Math.round(jd * 10000) / 10000));
+        if (readers.isoDateFromJulianDate) {
+            url.searchParams.set('date', readers.isoDateFromJulianDate(jd));
+        }
     }
 
     const orbitScale = readers.getOrbitScaleMode?.();
@@ -213,9 +227,10 @@ export function buildShareableUrl(
         url.searchParams.set('planet', PLANET_ID_BY_INDEX[focusedPlanet as PlanetIndex]);
     }
 
-    const position = readers.getCameraPosition?.();
-    const yaw = readers.getCameraYaw?.();
-    const pitch = readers.getCameraPitch?.();
+    const pose = readers.getCameraPose?.();
+    const position = pose ?? readers.getCameraPosition?.();
+    const yaw = pose?.yaw ?? readers.getCameraYaw?.();
+    const pitch = pose?.pitch ?? readers.getCameraPitch?.();
     if (position && yaw !== undefined && pitch !== undefined) {
         url.searchParams.set('x', String(roundCoord(position.x)));
         url.searchParams.set('y', String(roundCoord(position.y)));

@@ -204,7 +204,7 @@ shared link reproduces exactly what you were looking at.
 | **Date scrubber** | Simulation panel, or `P` / `+` / `-` / `.` keys; `?date=` in a deep link | Moves the simulation epoch. Planet positions come from JPL's Standish series; Pluto, Ceres, and Vesta from fixed Keplerian elements. |
 | **Scale toggle** | Simulation panel, or `?scale=realistic` | Switches between artistic compressed orbits and AU-proportional spacing. |
 | **Magnetic fields** | `M` key or `?fields=1` | Dipole / toroidal ribbons (visual, not SI values) — see the note above. |
-| **Next conjunction** | Text hints overlay (`TAB`) | The next date two of Mercury, Venus, and Mars share a geocentric ecliptic longitude, with their apparent separation. Recomputed from the ephemeris whenever you scrub the date. |
+| **Next conjunction** | Simulation / Explorer chips, or text hints overlay (`TAB`) | The next date two of Mercury, Venus, and Mars share a geocentric ecliptic longitude, with their apparent separation. Recomputed from the ephemeris whenever you scrub the date. Jump-to-date uses the same `SetSimulationEpoch` / `?jd=` path. |
 | **Ceres and Vesta** | Focus index 10 and 11, or `?planet=ceres` / `?planet=vesta` | The two largest main-belt bodies, orbiting inside the existing asteroid field with the same staged LOD texture path as the planets. |
 
 Accuracy is deliberately "visualiser grade": positions are good to roughly an arcminute for the
