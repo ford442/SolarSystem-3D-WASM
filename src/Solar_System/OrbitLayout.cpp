@@ -157,6 +157,14 @@ float AuToSceneDistance(float au) {
     return last.scene * (au / last.au);
 }
 
+glm::vec3 HelioAuToScene(const glm::vec3& auSceneAxes) {
+    const float r = glm::length(auSceneAxes);
+    if (r < 1.0e-8f) {
+        return glm::vec3(0.0f);
+    }
+    return auSceneAxes * (AuToSceneDistance(r) / r);
+}
+
 float GetOrbitalPeriodDays(Body body) {
     return kBodies[bodyIndex(body)].orbitalPeriodDays;
 }

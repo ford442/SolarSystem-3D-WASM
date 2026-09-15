@@ -111,6 +111,15 @@ TEST_F(OrbitLayoutTest, AuToSceneDistanceRealisticIsLinear) {
     EXPECT_TRUE(Near(OrbitLayout::AuToSceneDistance(2.5f), 2.5f * OrbitLayout::kAuToSceneUnits));
 }
 
+TEST_F(OrbitLayoutTest, HelioAuToScenePreservesDirection) {
+    OrbitLayout::SetScaleMode(OrbitLayout::ScaleMode::Realistic);
+    const glm::vec3 au(3.0f, 0.0f, 4.0f);
+    const glm::vec3 scene = OrbitLayout::HelioAuToScene(au);
+    EXPECT_NEAR(glm::length(scene), 5.0f * OrbitLayout::kAuToSceneUnits, 0.01f);
+    EXPECT_NEAR(scene.x / scene.z, 3.0f / 4.0f, 1.0e-4f);
+    EXPECT_TRUE(Near(OrbitLayout::HelioAuToScene(glm::vec3(0.0f)), glm::vec3(0.0f)));
+}
+
 TEST_F(OrbitLayoutTest, AuToSceneDistanceCompressedPlacesBeltBetweenMarsAndJupiter) {
     OrbitLayout::SetScaleMode(OrbitLayout::ScaleMode::Compressed);
     const float marsR = OrbitLayout::GetOrbitRadius(OrbitLayout::Body::Mars);

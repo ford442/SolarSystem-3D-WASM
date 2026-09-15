@@ -310,6 +310,11 @@ export function initSettingsPanel(options: SettingsPanelInitOptions): void {
             deepLink.camera.yaw,
             deepLink.camera.pitch,
         );
+    } else if (deepLink.mission) {
+        const match = runtime.getMissionCatalog().find((mission) => mission.id === deepLink.mission);
+        if (match) {
+            runtime.focusMission(match.index);
+        }
     } else if (deepLink.planet !== undefined) {
         runtime.focusPlanet(deepLink.planet);
     }
@@ -409,6 +414,7 @@ export function initSettingsPanel(options: SettingsPanelInitOptions): void {
             getOrbitLines: () => runtime.getOrbitLines(),
             getMagneticFields: () => runtime.getMagneticFields(),
             getFocusedPlanetIndex: () => runtime.getFocusedPlanetIndex(),
+            getFocusedMission: () => runtime.getFocusedMission(),
             getCameraPose: () => runtime.getCameraPose(),
             isoDateFromJulianDate,
         })

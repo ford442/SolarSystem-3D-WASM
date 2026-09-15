@@ -21,6 +21,7 @@
   <ul>
     <li><a href="#overview">Overview</a></li>
     <li><a href="#features">Features</a></li>
+    <li><a href="#educational-mode">Educational mode</a></li>
     <li><a href="#dependencies">Dependencies</a></li>
     <li><a href="#building">Building</a></li>
     <li><a href="#runtime-asset-hosting">Runtime asset hosting</a></li>
@@ -69,6 +70,20 @@ The project is an animated 3D scene with a model of the Solar System.
 - ⚙️ FreeType status hints plus a browser settings panel for quality, time control, pause,
   shadows, and magnetic field ribbons
 - ⚙️ Using 3D models with `obj` extension for planets, satellites, planetary rings, etc.
+
+<h2 id="educational-mode">Educational mode</h2>
+
+The web build is a small orrery you can send a URL into. None of this talks to live astronomy APIs — epochs, trajectories, and tour beats are sampled or computed locally.
+
+- **Date scrubber** — Simulation panel sets a Julian date; heliocentric positions come from the Standish/Keplerian ephemeris already in the WASM module.
+- **Orbit scale toggle** — Explorer **Orbit scale**: compressed (art spacing for navigation) vs realistic AU. Shareable as `?orbit=0` / `?orbit=1`.
+- **Magnetic fields** — Simulation toggle (also `M` on native) draws dipole/toroidal ribbons. Bloom on Medium/Full.
+- **Sky-event overlays** — Next conjunction, eclipse, or transit chip plus documented landmarks (for example the 2017-08-21 total solar eclipse).
+- **Mission paths** — Sampled Voyager 1/2 polylines (`resource/missions/catalog.json`). Click a mission in Explorer to follow the probe; share with `?mission=voyager1&jd=…`. Low quality draws fewer samples.
+- **Guided tours** — **Play inner-system tour** runs a 60-second playlist (Sun → Earth scale modes → Saturn → 2017 eclipse). `?tour=inner-system&step=2` deep-links a beat; **Copy link to this tour step** reuses the share URL.
+- **VR** — Enter VR when `navigator.xr` reports immersive-vr. Controller rays and a focus-planet tooltip show in-headset (HTML overlay and/or a tiny GL ribbon). Non-XR browsers never see the button.
+
+Console helpers: `window.focusMission(0)`, `window.startTour('inner-system')`.
 
 <h2 id="documentation">Documentation</h2>
 

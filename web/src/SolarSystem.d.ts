@@ -186,6 +186,31 @@ export interface SolarSystemCwrap {
     argTypes: ['number'],
   ): (...args: number[]) => void;
   (
+    ident: 'FocusMission',
+    returnType: null,
+    argTypes: ['number'],
+  ): (...args: number[]) => void;
+  (
+    ident: 'GetFocusedMissionIndex',
+    returnType: 'number',
+    argTypes: [],
+  ): (...args: number[]) => number;
+  (
+    ident: 'GetMissionCount',
+    returnType: 'number',
+    argTypes: [],
+  ): (...args: number[]) => number;
+  (
+    ident: 'GetMissionCatalogJson',
+    returnType: 'string',
+    argTypes: [],
+  ): (...args: number[]) => string;
+  (
+    ident: 'GetFocusedMissionJson',
+    returnType: 'string',
+    argTypes: [],
+  ): (...args: number[]) => string;
+  (
     ident: 'SetOrbitScaleMode',
     returnType: null,
     argTypes: ['number'],
@@ -301,6 +326,11 @@ export interface SolarSystemCwrap {
     argTypes: [],
   ): (...args: number[]) => void;
   (
+    ident: 'SetXrControllerRay',
+    returnType: null,
+    argTypes: ['number', 'number', 'number', 'number', 'number', 'number', 'number', 'number'],
+  ): (...args: number[]) => void;
+  (
     ident: 'GetCameraPositionX',
     returnType: 'number',
     argTypes: [],
@@ -401,6 +431,11 @@ export interface SolarSystemModule {
   _SetMusicMuted: (...args: number[]) => void;
   _GetMusicMuted: () => number;
   _FocusPlanet: (...args: number[]) => void;
+  _FocusMission: (...args: number[]) => void;
+  _GetFocusedMissionIndex: () => number;
+  _GetMissionCount: () => number;
+  _GetMissionCatalogJson: () => number;
+  _GetFocusedMissionJson: () => number;
   _SetOrbitScaleMode: (...args: number[]) => void;
   _GetOrbitScaleMode: () => number;
   _GetNearestPlanetIndex: () => number;
@@ -424,6 +459,7 @@ export interface SolarSystemModule {
   _GetXrMatrixScratch: () => number;
   _CommitXrEyeMatrices: (...args: number[]) => void;
   _RunXrFrame: () => void;
+  _SetXrControllerRay: (...args: number[]) => void;
   _GetCameraPositionX: () => number;
   _GetCameraPositionY: () => number;
   _GetCameraPositionZ: () => number;
@@ -451,6 +487,16 @@ declare global {
       julianDate: number;
       separationDeg: number;
     };
+    focusMission?: (index: number) => void;
+    getFocusedMission?: () => {
+      valid: boolean;
+      id: string;
+      index: number;
+      x: number;
+      y: number;
+      z: number;
+    };
+    startTour?: (id?: string) => void;
     /** Runtime asset base URL for WebResourceFetcher. */
     __solarSystemAssetBase?: string;
     /** Init config published before Module() — read by QualitySettings.cpp. */

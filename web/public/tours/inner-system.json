@@ -1,0 +1,64 @@
+{
+  "id": "inner-system",
+  "title": "Inner solar system",
+  "durationSec": 60,
+  "steps": [
+    {
+      "atSec": 0,
+      "label": "The Sun",
+      "narrationCue": "The Sun sits at the origin. Compressed orbit scale keeps every world within a few thousand scene units.",
+      "view": {
+        "planet": 0,
+        "orbitScale": 0,
+        "paused": true,
+        "julianDate": 2451545.0,
+        "orbitLines": true,
+        "magneticFields": false
+      }
+    },
+    {
+      "atSec": 10,
+      "label": "Earth, compressed",
+      "narrationCue": "Earth in the artistic layout — close enough to fly between worlds without a year of travel.",
+      "view": {
+        "planet": 3,
+        "orbitScale": 0,
+        "paused": true,
+        "julianDate": 2451545.0
+      }
+    },
+    {
+      "atSec": 22,
+      "label": "Earth, realistic AU",
+      "narrationCue": "The same epoch with AU-proportional spacing. Inner planets recede; the date scrubber still drives Standish positions.",
+      "view": {
+        "planet": 3,
+        "orbitScale": 1,
+        "paused": true,
+        "julianDate": 2451545.0
+      }
+    },
+    {
+      "atSec": 36,
+      "label": "Saturn's rings",
+      "narrationCue": "Back to compressed scale for Saturn. Ring shadows and the ice giants stay in one navigable orrery.",
+      "view": {
+        "planet": 6,
+        "orbitScale": 0,
+        "paused": true,
+        "julianDate": 2451545.0
+      }
+    },
+    {
+      "atSec": 48,
+      "label": "2017 total solar eclipse",
+      "narrationCue": "The Great American Eclipse of 21 August 2017. Epoch from a documented landmark; geometry comes back out of the ephemeris.",
+      "view": {
+        "planet": 3,
+        "orbitScale": 0,
+        "paused": true,
+        "landmark": "gae2017"
+      }
+    }
+  ]
+}

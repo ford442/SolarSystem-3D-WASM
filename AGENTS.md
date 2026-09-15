@@ -50,6 +50,8 @@ cd web && npm run preview                   # http://localhost:4173/solar-system
 window.setCameraPose(x, y, z, yaw, pitch);  // yaw=0 → +X, yaw=90 → +Z
 window.setQualityPreset(0);                 // 0=low, 1=medium, 2=full; no LOD upgrades on 0
 window.getQualityPreset();                  // read the active preset
+window.focusMission(0);                     // follow Voyager 1
+window.startTour('inner-system');           // 60s guided tour
 ```
 
 Planets load when the camera enters each manifest's activation radius (800–1500 units). Use teleport to trigger staged loading without flying across orbital distances.

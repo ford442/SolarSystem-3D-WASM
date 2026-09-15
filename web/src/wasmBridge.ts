@@ -21,6 +21,79 @@ export type { PlanetIndex, QualityPreset, SettingsChangeField, ShadowQuality, Or
 export type { NextConjunction };
 export type { NextSkyEvent };
 
+export interface MissionInfo {
+    id: string;
+    name: string;
+    index: number;
+}
+
+export interface FocusedMission {
+    valid: boolean;
+    id: string;
+    index: number;
+    x: number;
+    y: number;
+    z: number;
+}
+
+const INVALID_FOCUSED_MISSION: FocusedMission = {
+    valid: false,
+    id: '',
+    index: -1,
+    x: 0,
+    y: 0,
+    z: 0,
+};
+
+function parseMissionCatalogJson(json: string): MissionInfo[] {
+    try {
+        const raw = JSON.parse(json) as unknown;
+        if (!Array.isArray(raw)) {
+            return [];
+        }
+        const out: MissionInfo[] = [];
+        for (const entry of raw) {
+            if (typeof entry !== 'object' || entry === null) {
+                continue;
+            }
+            const record = entry as Record<string, unknown>;
+            const id = typeof record.id === 'string' ? record.id : '';
+            const name = typeof record.name === 'string' ? record.name : id;
+            const index = typeof record.index === 'number' && Number.isInteger(record.index) ? record.index : -1;
+            if (!id || index < 0) {
+                continue;
+            }
+            out.push({ id, name, index });
+        }
+        return out;
+    } catch {
+        return [];
+    }
+}
+
+function parseFocusedMissionJson(json: string): FocusedMission {
+    try {
+        const raw = JSON.parse(json) as unknown;
+        if (typeof raw !== 'object' || raw === null) {
+            return INVALID_FOCUSED_MISSION;
+        }
+        const record = raw as Record<string, unknown>;
+        if (record.valid !== true || typeof record.id !== 'string') {
+            return INVALID_FOCUSED_MISSION;
+        }
+        return {
+            valid: true,
+            id: record.id,
+            index: typeof record.index === 'number' ? record.index : -1,
+            x: typeof record.x === 'number' ? record.x : 0,
+            y: typeof record.y === 'number' ? record.y : 0,
+            z: typeof record.z === 'number' ? record.z : 0,
+        };
+    } catch {
+        return INVALID_FOCUSED_MISSION;
+    }
+}
+
 /** Map quality preset + shadows toggle to C++ shadow quality (0=off, 1–3 = low…full). */
 export function shadowQualityForPreset(preset: QualityPreset, shadowsEnabled: boolean): ShadowQuality {
     return shadowsEnabled ? (preset + 1) as ShadowQuality : 0;
@@ -68,6 +141,11 @@ export interface SolarSystemRuntime {
     getNextConjunction(): NextConjunction;
     /** Next event of any kind — conjunction, eclipse, transit or shadow transit. */
     getNextSkyEvent(): NextSkyEvent;
+    focusMission(index: number): void;
+    getFocusedMissionIndex(): number;
+    getMissionCount(): number;
+    getMissionCatalog(): MissionInfo[];
+    getFocusedMission(): FocusedMission;
     setOrbitLines(enabled: boolean): void;
     getOrbitLines(): boolean;
     setMagneticFields(enabled: boolean): void;
@@ -89,6 +167,7 @@ export interface SolarSystemRuntime {
     getCameraPosition(): { x: number; y: number; z: number };
     getCameraYaw(): number;
     getCameraPitch(): number;
+    setXrControllerRay(hand: number, ox: number, oy: number, oz: number, dx: number, dy: number, dz: number, visible: boolean): void;
 }
 
 let activeRuntime: SolarSystemRuntime | null = null;
@@ -149,6 +228,11 @@ export function createSolarSystemRuntime(instance: SolarSystemModule): SolarSyst
             };
         },
         getNextSkyEvent: () => parseSkyEventJson(exports.getNextSkyEventJson()),
+        focusMission: (index) => exports.focusMission(index),
+        getFocusedMissionIndex: exports.getFocusedMissionIndex,
+        getMissionCount: exports.getMissionCount,
+        getMissionCatalog: () => parseMissionCatalogJson(exports.getMissionCatalogJson()),
+        getFocusedMission: () => parseFocusedMissionJson(exports.getFocusedMissionJson()),
         setOrbitLines: (enabled) => exports.setOrbitLines(enabled ? 1 : 0),
         getOrbitLines: () => exports.getOrbitLines() !== 0,
         setMagneticFields: (enabled) => exports.setMagneticFields(enabled ? 1 : 0),
@@ -186,6 +270,9 @@ export function createSolarSystemRuntime(instance: SolarSystemModule): SolarSyst
         }),
         getCameraYaw: exports.getCameraYaw,
         getCameraPitch: exports.getCameraPitch,
+        setXrControllerRay: (hand, ox, oy, oz, dx, dy, dz, visible) => {
+            exports.setXrControllerRay(hand, ox, oy, oz, dx, dy, dz, visible ? 1 : 0);
+        },
     };
 
     activeRuntime = runtime;
@@ -198,6 +285,8 @@ export function exposeConsoleHelpers(runtime: SolarSystemRuntime): void {
     window.setQualityPreset = runtime.setQualityPreset.bind(runtime);
     window.getQualityPreset = runtime.getQualityPreset.bind(runtime);
     window.getNextConjunction = runtime.getNextConjunction.bind(runtime);
+    window.focusMission = runtime.focusMission.bind(runtime);
+    window.getFocusedMission = runtime.getFocusedMission.bind(runtime);
 }
 
 export function subscribeSettingsChanges(

@@ -58,6 +58,12 @@ public:
     void ApplyOrbitScaleMode(int mode);
     void FocusPlanetByIndex(int idx);
     int GetFocusedPlanetIndex() const;
+    void FocusMissionByIndex(int idx);
+    int GetFocusedMissionIndex() const;
+    int GetMissionCount() const;
+    std::string GetMissionCatalogJson() const;
+    std::string GetFocusedMissionJson() const;
+    void SetXrControllerRay(int hand, float ox, float oy, float oz, float dx, float dy, float dz, int visible);
     /**
      * Next inner-planet conjunction at the current simulation epoch. Cached: the search costs
      * a couple of milliseconds, so it only re-runs when the event passes or time is scrubbed
@@ -160,6 +166,11 @@ private:
     std::unique_ptr<Shader> _hdrShader, _lensFlareShader, _starGlowShader;
     std::unique_ptr<LensFlare> _lensFlare;
     std::unique_ptr<OrbitPathRenderer> _orbitPathRenderer;
+    std::unique_ptr<XrPointerRenderer> _xrPointerRenderer;
+    MissionCatalog::Catalog _missionCatalog;
+    std::vector<std::unique_ptr<MissionPathRenderer>> _missionPathMeshes;
+    int _focusedMissionIndex = -1;
+    bool _missionFollowActive = false;
     std::unique_ptr<MagneticFieldLineRenderer> _magneticFieldRenderer;
     std::unique_ptr<MagneticFieldBloom> _magneticFieldBloom;
     std::unique_ptr<AsteroidField> _asteroidField;
@@ -209,6 +220,15 @@ private:
     void UpdateLOD();             // Central LOD manager: upgrade textures for nearest planets (WASM)
     void RenderPlanetProxyMarkers() const; // Show orbital markers for unloaded planets (WASM)
     void RenderOrbitPaths() const;
+    void LoadMissionCatalog();
+    void LoadMissions();
+    void RebuildMissionPaths();
+    void RenderMissionPaths() const;
+    void UpdateMissionFollow();
+    void StopMissionFollow();
+    bool SampleMissionScenePosition(int idx, glm::vec3& outScene) const;
+    void UpdateMusicDucking();
+    void RenderXrPointers() const;
     void EnsureMagneticFieldsBuilt();
     void RenderMagneticFields();
     void RenderAsteroidField();

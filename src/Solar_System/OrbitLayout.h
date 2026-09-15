@@ -71,6 +71,12 @@ float GetAuDistance(Body body);
  */
 float AuToSceneDistance(float au);
 
+/**
+ * Map a heliocentric AU vector in scene axes (ecliptic x,z,y) to scene units.
+ * Preserves direction; length uses AuToSceneDistance so compressed/realistic both work.
+ */
+glm::vec3 HelioAuToScene(const glm::vec3& auSceneAxes);
+
 /** Orbit radius in scene units (scale-mode aware; independent of anomaly). */
 float GetOrbitRadius(Body body);
 

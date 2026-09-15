@@ -39,13 +39,23 @@ test('WASM module boots and staged loading reacts to camera pose', async ({ page
   );
   await page.waitForFunction(
     () => {
-      const chip = document.getElementById('next-conjunction');
-      const text = document.getElementById('next-conjunction-text')?.textContent ?? '';
-      return !!chip && !chip.hasAttribute('hidden') && /conjunction/i.test(text);
+      const chip = document.getElementById('next-sky-event');
+      const text = document.getElementById('next-sky-event-text')?.textContent ?? '';
+      return !!chip && !chip.hasAttribute('hidden') && /Next /i.test(text);
     },
     undefined,
     { timeout: 10_000 },
   );
+
+  await page.waitForFunction(
+    () => document.querySelectorAll('#explorer-mission-list button').length >= 1,
+    undefined,
+    { timeout: 20_000 },
+  );
+  await expect(page.locator('#explorer-missions')).not.toHaveAttribute('hidden');
+  await expect(page.locator('#explorer-mission-list button')).toHaveCount(2);
+  await expect(page.locator('#enter-vr')).toBeHidden();
+  await expect(page.locator('#xr-hud')).toBeHidden();
 
   await expect
     .poll(() => consoleLogs.some((line) => line.includes('SolarSystem WASM initialized')), {
@@ -73,6 +83,16 @@ test('WASM module boots and staged loading reacts to camera pose', async ({ page
       { timeout: 15_000 },
     )
     .toBe(true);
+
+  await page.locator('#explorer-mission-list button', { hasText: 'Voyager 1' }).click();
+  await page.waitForFunction(() => window.getFocusedMission?.()?.id === 'voyager1', undefined, {
+    timeout: 5_000,
+  });
+
+  await page.locator('#tour-play').evaluate((el: HTMLButtonElement) => el.click());
+  await expect(page.locator('#tour-caption')).not.toHaveAttribute('hidden');
+  await expect(page.locator('#tour-stop')).not.toHaveAttribute('hidden');
+  await page.locator('#tour-stop').evaluate((el: HTMLButtonElement) => el.click());
 
   const fatalConsoleErrors = consoleErrors.filter(
     (line) => !allowedConsoleErrorPatterns.some((pattern) => pattern.test(line)),
