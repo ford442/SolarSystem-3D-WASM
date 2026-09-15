@@ -21,6 +21,7 @@ set(SOLARSYSTEM_TEST_SOURCES
     ${CMAKE_SOURCE_DIR}/src/QualitySettings.cpp
     ${CMAKE_SOURCE_DIR}/src/SimState.cpp
     ${CMAKE_SOURCE_DIR}/src/Auxiliary_Modules/PlanetManifestLoader.cpp
+    ${CMAKE_SOURCE_DIR}/src/Auxiliary_Modules/MissionCatalog.cpp
     ${CMAKE_SOURCE_DIR}/src/Auxiliary_Modules/TextureLoadingQueue.cpp
     ${CMAKE_SOURCE_DIR}/src/Auxiliary_Modules/TextureLODController.cpp
     ${CMAKE_SOURCE_DIR}/src/Auxiliary_Modules/WebResourceFetcher.cpp
@@ -38,6 +39,7 @@ add_executable(SolarSystemTests
     test_sky_events.cpp
     test_satellite_orbit.cpp
     test_eclipse_caster.cpp
+    test_mission_catalog.cpp
     test_body_catalog.cpp
     stub_texture_image2d.cpp
     ${SOLARSYSTEM_TEST_SOURCES}

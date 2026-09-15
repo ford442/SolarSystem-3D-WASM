@@ -12,7 +12,7 @@ Exploratory WebXR path for the C++/Emscripten WebGL 2 app. Companion Three.js no
   3. Pauses the Emscripten main loop (`emscripten_pause_main_loop`)
   4. Drives frames with `session.requestAnimationFrame`
   5. Defaults quality to **medium** (or keeps **low** if already low)
-- Controllers: left stick → `SetTouchMovement`, right stick Y → vertical, right stick X → snap yaw via `AddTouchLook`, left grip → climb.
+- Controllers: left stick → `SetTouchMovement`, right stick Y → vertical, right stick X → snap yaw via `AddTouchLook`, left grip → climb. Target-ray poses feed `SetXrControllerRay` (camera-facing ribbons; skipped on Low). A DOM-overlay HUD shows the focused/nearest planet name when the optional `dom-overlay` feature is granted.
 - Exit VR resumes the 2-D main loop and restores the previous quality preset.
 
 ## C++ stereo path

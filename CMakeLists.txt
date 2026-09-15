@@ -90,6 +90,12 @@ set(SOLARSYSTEM_SOURCES
     src/Auxiliary_Modules/LensFlare.h
     src/Auxiliary_Modules/OrbitPathRenderer.cpp
     src/Auxiliary_Modules/OrbitPathRenderer.h
+    src/Auxiliary_Modules/MissionCatalog.cpp
+    src/Auxiliary_Modules/MissionCatalog.h
+    src/Auxiliary_Modules/MissionPathRenderer.cpp
+    src/Auxiliary_Modules/MissionPathRenderer.h
+    src/Auxiliary_Modules/XrPointerRenderer.cpp
+    src/Auxiliary_Modules/XrPointerRenderer.h
     src/Auxiliary_Modules/MagneticFieldParams.cpp
     src/Auxiliary_Modules/MagneticFieldParams.h
     src/Auxiliary_Modules/MagneticFieldModel.cpp
@@ -208,6 +214,7 @@ if(EMSCRIPTEN)
         "SHELL:-sMAXIMUM_MEMORY=1GB"
         "SHELL:--preload-file ${CMAKE_SOURCE_DIR}/resource/shaders@/resource/shaders"
         "SHELL:--preload-file ${CMAKE_SOURCE_DIR}/resource/planet_manifest.json@/resource/planet_manifest.json"
+        "SHELL:--preload-file ${CMAKE_SOURCE_DIR}/resource/missions@/resource/missions"
         "SHELL:--preload-file ${CMAKE_SOURCE_DIR}/resource/fonts@/resource/fonts"
         "SHELL:--preload-file ${CMAKE_SOURCE_DIR}/resource/icons@/resource/icons"
         "SHELL:--preload-file ${CMAKE_SOURCE_DIR}/resource/textures_low@/resource/textures_low"

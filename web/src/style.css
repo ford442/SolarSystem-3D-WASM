@@ -631,6 +631,96 @@ input {
   font-size: 0.82rem;
 }
 
+.explorer-missions {
+  margin: 12px 0 4px;
+}
+
+.explorer-missions-label {
+  margin: 0 0 6px;
+  color: #9fdfff;
+  font-size: 0.75rem;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.tour-controls {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.tour-caption {
+  position: fixed;
+  left: 50%;
+  bottom: max(28px, env(safe-area-inset-bottom));
+  transform: translateX(-50%);
+  z-index: 850;
+  max-width: min(640px, calc(100vw - 32px));
+  padding: 10px 16px;
+  color: #f7fbff;
+  background: rgba(7, 13, 24, 0.82);
+  border: 1px solid rgba(112, 203, 255, 0.35);
+  border-radius: 10px;
+  font-size: 0.95rem;
+  line-height: 1.35;
+  pointer-events: none;
+  text-align: center;
+}
+
+.xr-hud {
+  position: fixed;
+  left: 50%;
+  top: max(16px, env(safe-area-inset-top));
+  transform: translateX(-50%);
+  z-index: 950;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  pointer-events: none;
+}
+
+.xr-tooltip {
+  margin: 0;
+  padding: 6px 12px;
+  color: #f7fbff;
+  background: rgba(7, 13, 24, 0.8);
+  border: 1px solid rgba(112, 203, 255, 0.4);
+  border-radius: 999px;
+  font-size: 0.9rem;
+  min-height: 1.2em;
+}
+
+.xr-controllers {
+  display: flex;
+  gap: 12px;
+}
+
+.xr-controller-ray {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  border: 2px solid rgba(160, 235, 255, 0.35);
+  color: rgba(160, 235, 255, 0.45);
+  display: grid;
+  place-items: center;
+  font-size: 0.75rem;
+  font-weight: 700;
+}
+
+.xr-controller-ray.is-active {
+  border-color: #7ce7ff;
+  color: #7ce7ff;
+  box-shadow: 0 0 12px rgba(124, 231, 255, 0.45);
+}
+
+.xr-controller-ray[data-hand="right"].is-active {
+  border-color: #ffb06a;
+  color: #ffb06a;
+  box-shadow: 0 0 12px rgba(255, 176, 106, 0.45);
+}
+
 @media (max-width: 600px) {
   .explorer-panel {
     top: max(8px, env(safe-area-inset-top));

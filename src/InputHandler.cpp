@@ -5,6 +5,7 @@
 #include "SimState.h"
 #include "WasmExports.h"
 #include <algorithm>
+#include <cmath>
 
 using namespace std;
 
@@ -27,21 +28,27 @@ void Application::ProcessInput(GLFWwindow* window) {
         glfwSetWindowShouldClose(window, true);
     }
     if (glfwGetKey(window, GLFW_KEY_W) == GLFW_PRESS) {
+        StopMissionFollow();
         _camera.ProcessKeyboard(CameraVector::FORWARD, _deltaTime * shiftIncrease);
     }
     if (glfwGetKey(window, GLFW_KEY_S) == GLFW_PRESS) {
+        StopMissionFollow();
         _camera.ProcessKeyboard(CameraVector::BACKWARD, _deltaTime * shiftIncrease);
     }
     if (glfwGetKey(window, GLFW_KEY_A) == GLFW_PRESS) {
+        StopMissionFollow();
         _camera.ProcessKeyboard(CameraVector::LEFT, _deltaTime * shiftIncrease);
     }
     if (glfwGetKey(window, GLFW_KEY_D) == GLFW_PRESS) {
+        StopMissionFollow();
         _camera.ProcessKeyboard(CameraVector::RIGHT, _deltaTime * shiftIncrease);
     }
     if (glfwGetKey(window, GLFW_KEY_SPACE) == GLFW_PRESS) {
+        StopMissionFollow();
         _camera.ProcessKeyboard(CameraVector::WORLD_UP, _deltaTime * shiftIncrease);
     }
     if (glfwGetKey(window, GLFW_KEY_C) == GLFW_PRESS) {
+        StopMissionFollow();
         _camera.ProcessKeyboard(CameraVector::WORLD_DOWN, _deltaTime * shiftIncrease);
     }
 
@@ -124,6 +131,9 @@ void Application::ProcessInput(GLFWwindow* window) {
     const float touchForward = GetTouchForward();
     const float touchRight = GetTouchRight();
     const float touchVertical = GetTouchVertical();
+    if (std::abs(touchForward) > 0.01f || std::abs(touchRight) > 0.01f || std::abs(touchVertical) > 0.01f) {
+        StopMissionFollow();
+    }
     if (touchForward > 0.01f) {
         _camera.ProcessKeyboard(CameraVector::FORWARD, static_cast<float>(_deltaTime) * touchForward);
     } else if (touchForward < -0.01f) {

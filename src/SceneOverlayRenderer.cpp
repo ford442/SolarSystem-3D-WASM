@@ -195,6 +195,90 @@ void Application::RenderOrbitPaths() const {
     glDisable(GL_BLEND);
 }
 
+void Application::LoadMissions() {
+    std::string error;
+    if (!MissionCatalog::LoadFromFile("resource/missions/catalog.json", _missionCatalog, error)) {
+        std::cout << "[Missions] " << error << std::endl;
+        _missionCatalog = {};
+        _missionPathMeshes.clear();
+        return;
+    }
+    std::cout << "[Missions] Loaded " << _missionCatalog.missions.size()
+              << " trajectory path(s) from catalog.json" << std::endl;
+    RebuildMissionPaths();
+}
+
+void Application::RebuildMissionPaths() {
+    _missionPathMeshes.clear();
+    _missionPathMeshes.reserve(_missionCatalog.missions.size());
+    for (const auto& mission : _missionCatalog.missions) {
+        auto renderer = std::make_unique<MissionPathRenderer>();
+        const auto auSamples = MissionCatalog::DownsampledAu(mission, gSimState->qualityPreset);
+        std::vector<glm::vec3> scene;
+        scene.reserve(auSamples.size());
+        const glm::vec3 sunPos = _sun ? _sun->GetPosition() : glm::vec3(0.0f);
+        for (const auto& au : auSamples) {
+            scene.push_back(sunPos + OrbitLayout::HelioAuToScene(au));
+        }
+        renderer->Upload(scene);
+        _missionPathMeshes.push_back(std::move(renderer));
+    }
+}
+
+void Application::RenderMissionPaths() const {
+    if (_missionPathMeshes.empty()) {
+        return;
+    }
+    glEnable(GL_BLEND);
+    glBlendFunc(GL_SRC_ALPHA, GL_ONE);
+    glEnable(GL_DEPTH_TEST);
+    glDepthMask(GL_FALSE);
+    glDisable(GL_CULL_FACE);
+
+    const float zCoef = static_cast<float>(2.0 / glm::log2(_camera.GetFar() + 1.0));
+    const glm::vec3 camPos = _camera.GetPosition();
+    for (size_t i = 0; i < _missionPathMeshes.size(); ++i) {
+        if (!_missionPathMeshes[i] || _missionPathMeshes[i]->Empty()) {
+            continue;
+        }
+        const auto& mission = _missionCatalog.missions[i];
+        const bool focused = static_cast<int>(i) == _focusedMissionIndex;
+        _missionPathMeshes[i]->Draw(_cameraProjection, _cameraView, camPos, zCoef, mission.color,
+                                    focused ? 0.85f : 0.45f, focused);
+        glm::vec3 probe(0.0f);
+        if (SampleMissionScenePosition(static_cast<int>(i), probe)) {
+            _missionPathMeshes[i]->DrawProbe(_cameraProjection, _cameraView, camPos,
+                                             _camera.GetRightVector(), _camera.GetUpVector(), zCoef,
+                                             probe, mission.color);
+        }
+    }
+
+    glEnable(GL_CULL_FACE);
+    glDepthMask(GL_TRUE);
+    glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+    glDisable(GL_BLEND);
+}
+
+void Application::RenderXrPointers() const {
+#ifdef __EMSCRIPTEN__
+    if (!_xr.active || !_xrPointerRenderer || gSimState->qualityPreset <= 0) {
+        return;
+    }
+    glEnable(GL_BLEND);
+    glBlendFunc(GL_SRC_ALPHA, GL_ONE);
+    glDepthMask(GL_FALSE);
+    glDisable(GL_CULL_FACE);
+    const float zCoef = static_cast<float>(2.0 / glm::log2(_camera.GetFar() + 1.0));
+    _xrPointerRenderer->Draw(_cameraProjection, _cameraView, _camera.GetPosition(), zCoef);
+    glEnable(GL_CULL_FACE);
+    glDepthMask(GL_TRUE);
+    glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+    glDisable(GL_BLEND);
+#else
+    (void)0;
+#endif
+}
+
 void Application::RenderAsteroidField() {
     if (!_asteroidField || !_sun) {
         return;

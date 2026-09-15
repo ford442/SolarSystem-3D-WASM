@@ -12,6 +12,9 @@ export interface DeepLinkViewState {
     orbitLines?: boolean;
     magneticFields?: boolean;
     planet?: PlanetIndex;
+    mission?: string;
+    tour?: string;
+    tourStep?: number;
     camera?: {
         x: number;
         y: number;
@@ -31,6 +34,7 @@ export interface DeepLinkRuntimeReaders {
     getOrbitLines?: () => boolean;
     getMagneticFields?: () => boolean;
     getFocusedPlanetIndex?: () => number;
+    getFocusedMission?: () => { valid: boolean; id: string } | null;
     getCameraPosition?: () => { x: number; y: number; z: number };
     getCameraYaw?: () => number;
     getCameraPitch?: () => number;
@@ -120,6 +124,16 @@ function parseSimulationDate(value: string | null): string | undefined {
     return /^\d{4}-\d{2}-\d{2}$/.test(value) ? value : undefined;
 }
 
+function parseMissionId(value: string | null): string | undefined {
+    if (!value) return undefined;
+    const normalized = value.toLowerCase();
+    return /^[a-z][a-z0-9-]{0,31}$/.test(normalized) ? normalized : undefined;
+}
+
+function parseTourId(value: string | null): string | undefined {
+    return parseMissionId(value);
+}
+
 function roundCoord(value: number): number {
     return Math.round(value * 100) / 100;
 }
@@ -141,6 +155,9 @@ export function parseDeepLinkFromUrl(search = window.location.search): DeepLinkV
     const orbitLines = parseBooleanParam(params.get('orbits') ?? params.get('orbitLines'));
     const magneticFields = parseBooleanParam(params.get('fields') ?? params.get('magneticFields'));
     const planet = parsePlanetIndex(params.get('planet') ?? params.get('focus'));
+    const mission = parseMissionId(params.get('mission') ?? params.get('probe'));
+    const tour = parseTourId(params.get('tour'));
+    const tourStep = parseFiniteNumber(params.get('step'));
 
     const x = parseFiniteNumber(params.get('x'));
     const y = parseFiniteNumber(params.get('y'));
@@ -163,6 +180,11 @@ export function parseDeepLinkFromUrl(search = window.location.search): DeepLinkV
         orbitLines,
         magneticFields,
         planet,
+        mission,
+        tour,
+        tourStep: tourStep !== undefined && Number.isInteger(tourStep) && tourStep >= 0
+            ? tourStep
+            : undefined,
         camera,
     };
 }
@@ -225,6 +247,11 @@ export function buildShareableUrl(
     const focusedPlanet = readers.getFocusedPlanetIndex?.() ?? -1;
     if (focusedPlanet >= 0 && focusedPlanet <= 11) {
         url.searchParams.set('planet', PLANET_ID_BY_INDEX[focusedPlanet as PlanetIndex]);
+    }
+
+    const mission = readers.getFocusedMission?.();
+    if (mission?.valid && mission.id) {
+        url.searchParams.set('mission', mission.id);
     }
 
     const pose = readers.getCameraPose?.();

@@ -28,11 +28,12 @@ interface XRRenderStateInit {
 
 type XRReferenceSpaceType = 'local' | 'local-floor' | 'bounded-floor' | 'unbounded' | 'viewer';
 
-interface XRReferenceSpace extends EventTarget {}
+interface XRReferenceSpace extends XRSpace {}
 
 interface XRFrame {
   session: XRSession;
   getViewerPose(referenceSpace: XRReferenceSpace): XRViewerPose | null;
+  getPose(space: XRSpace, baseSpace: XRSpace): XRPose | null;
 }
 
 interface XRViewerPose {
@@ -48,7 +49,15 @@ interface XRView {
 interface XRRigidTransform {
   matrix: Float32Array;
   inverse: XRRigidTransform;
+  position: DOMPointReadOnly;
+  orientation: DOMPointReadOnly;
 }
+
+interface XRPose {
+  transform: XRRigidTransform;
+}
+
+interface XRSpace extends EventTarget {}
 
 interface XRWebGLLayerInit {
   antialias?: boolean;
@@ -77,6 +86,7 @@ type XRHandedness = 'none' | 'left' | 'right';
 interface XRInputSource {
   handedness: XRHandedness;
   gamepad: Gamepad | null;
+  targetRaySpace: XRSpace;
 }
 
 type XRFrameRequestCallback = (time: DOMHighResTimeStamp, frame: XRFrame) => void;
@@ -84,6 +94,7 @@ type XRFrameRequestCallback = (time: DOMHighResTimeStamp, frame: XRFrame) => voi
 interface XRSessionInit {
   requiredFeatures?: string[];
   optionalFeatures?: string[];
+  domOverlay?: { root: Element };
 }
 
 interface XRSystem {

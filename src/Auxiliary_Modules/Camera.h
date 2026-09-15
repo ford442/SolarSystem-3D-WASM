@@ -54,6 +54,8 @@ public:
 
     // Updates any active smooth transition (call every frame with deltaTime)
     void UpdateTransition(float deltaTime);
+
+    bool IsTransitionActive() const { return _transitionActive; }
 private:
     glm::vec3 _position;
     glm::vec3 _frontVector;

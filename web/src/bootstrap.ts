@@ -1,6 +1,7 @@
 import './style.css';
 import Module, { type SolarSystemModuleConfig } from './SolarSystem.js';
 import { parseDeepLinkFromUrl } from './deepLink';
+import { initEducationalLayer } from './educationalLayer';
 import { publishInitConfig, resolveInitConfig } from './initialSettings';
 import { PlanetExplorer } from './planetExplorer';
 import { createProgressCallbacks } from './progressOverlay';
@@ -48,6 +49,15 @@ const skyEventLandmark = document.getElementById('next-sky-event-landmark') as H
 const enterVrButton = document.getElementById('enter-vr') as HTMLButtonElement;
 const exitVrButton = document.getElementById('exit-vr') as HTMLButtonElement;
 const explorerPanel = document.getElementById('explorer-panel') as HTMLElement;
+const explorerMissions = document.getElementById('explorer-missions') as HTMLElement;
+const explorerMissionList = document.getElementById('explorer-mission-list') as HTMLElement;
+const tourPlay = document.getElementById('tour-play') as HTMLButtonElement;
+const tourStop = document.getElementById('tour-stop') as HTMLButtonElement;
+const tourCopyStep = document.getElementById('tour-copy-step') as HTMLButtonElement;
+const tourCaption = document.getElementById('tour-caption') as HTMLElement;
+const xrHud = document.getElementById('xr-hud') as HTMLElement;
+const xrTooltip = document.getElementById('xr-tooltip') as HTMLElement;
+const xrControllers = document.getElementById('xr-controllers') as HTMLElement;
 
 const deployedBaseUrl = new URL(import.meta.env.BASE_URL, window.location.href);
 const isMobileDevice = isMobileLikeDevice();
@@ -124,7 +134,7 @@ void Module(moduleConfig).then((instance) => {
         getNextConjunction: () => runtime.getNextConjunction(),
         setSimulationEpoch: runtime.setSimulationEpoch.bind(runtime),
     }, {
-        skipPlanetRestore: deepLink.planet !== undefined || deepLink.camera !== undefined,
+        skipPlanetRestore: deepLink.planet !== undefined || deepLink.camera !== undefined || deepLink.mission !== undefined,
         initialOrbitScale: deepLink.orbitScale,
     }).catch((error: unknown) => {
         console.error('Failed to initialize planet explorer:', error);
@@ -150,13 +160,18 @@ void Module(moduleConfig).then((instance) => {
         canvas,
         enterVrButton,
         exitVrButton,
-        overlayRoots: [settingsPanel, explorerPanel],
+        overlayRoots: [settingsPanel, explorerPanel, tourCaption],
+        hudRoot: xrHud,
+        tooltip: xrTooltip,
+        controllersRoot: xrControllers,
         bindings: {
             setTouchMovement: runtime.setTouchMovement.bind(runtime),
             addTouchLook: runtime.addTouchLook.bind(runtime),
             setQualityPreset: runtime.setQualityPreset.bind(runtime),
             getQualityPreset: runtime.getQualityPreset.bind(runtime),
             getCameraPosition: () => runtime.getCameraPosition(),
+            getNearestPlanetIndex: () => runtime.getNearestPlanetIndex(),
+            getFocusedPlanetIndex: () => runtime.getFocusedPlanetIndex(),
             setXrSessionActive: runtime.setXrSessionActive.bind(runtime),
             setXrBaseLayerFramebuffer: runtime.setXrBaseLayerFramebuffer.bind(runtime),
             registerXrFramebuffer: runtime.registerXrFramebuffer.bind(runtime),
@@ -166,6 +181,7 @@ void Module(moduleConfig).then((instance) => {
             getXrMatrixScratchPtr: runtime.getXrMatrixScratchPtr.bind(runtime),
             runXrFrame: runtime.runXrFrame.bind(runtime),
             getHeapF32: () => runtime.heapF32,
+            setXrControllerRay: runtime.setXrControllerRay.bind(runtime),
         },
     }).then((controller) => {
         if (controller) {
@@ -210,7 +226,19 @@ void Module(moduleConfig).then((instance) => {
         isMobileDevice,
     });
 
-    if (deepLink.planet !== undefined) {
+    initEducationalLayer({
+        runtime,
+        deepLink,
+        missionList: explorerMissionList,
+        missionsRoot: explorerMissions,
+        tourPlay,
+        tourStop,
+        tourCopyStep,
+        tourCaption,
+        settingsStatus,
+    });
+
+    if (deepLink.planet !== undefined && !deepLink.mission && !deepLink.tour) {
         explorer.applyDeepLinkPlanet(deepLink.planet, { focusCamera: false });
     }
 }).catch((error: unknown) => {

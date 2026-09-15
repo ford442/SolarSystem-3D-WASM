@@ -10,6 +10,8 @@ export type XrBindings = {
   setQualityPreset: (preset: 0 | 1 | 2) => void;
   getQualityPreset: () => number;
   getCameraPosition: () => { x: number; y: number; z: number };
+  getNearestPlanetIndex?: () => number;
+  getFocusedPlanetIndex?: () => number;
   setXrSessionActive: (active: boolean) => void;
   setXrBaseLayerFramebuffer: (framebuffer: number) => void;
   registerXrFramebuffer: (framebuffer: WebGLFramebuffer | null) => number;
@@ -19,6 +21,16 @@ export type XrBindings = {
   getXrMatrixScratchPtr: () => number;
   runXrFrame: () => void;
   getHeapF32: () => Float32Array;
+  setXrControllerRay?: (
+    hand: number,
+    ox: number,
+    oy: number,
+    oz: number,
+    dx: number,
+    dy: number,
+    dz: number,
+    visible: boolean,
+  ) => void;
 };
 
 export type WebXrController = {
@@ -32,6 +44,26 @@ const XR_DEPTH_NEAR = 0.001;
 const XR_DEPTH_FAR = 20000;
 const SNAP_TURN_DEG = 30;
 const SNAP_TURN_COOLDOWN_MS = 350;
+
+const XR_BODY_NAMES = [
+  'Sun', 'Mercury', 'Venus', 'Earth', 'Mars', 'Jupiter', 'Saturn',
+  'Uranus', 'Neptune', 'Pluto', 'Ceres', 'Vesta',
+] as const;
+
+function rotateVectorByQuat(
+  x: number, y: number, z: number, w: number,
+  vx: number, vy: number, vz: number,
+): { x: number; y: number; z: number } {
+  const ix = w * vx + y * vz - z * vy;
+  const iy = w * vy + z * vx - x * vz;
+  const iz = w * vz + x * vy - y * vx;
+  const iw = -x * vx - y * vy - z * vz;
+  return {
+    x: ix * w + iw * -x + iy * z - iz * y,
+    y: iy * w + iw * -y + iz * x - ix * z,
+    z: iz * w + iw * -z + ix * y - iy * x,
+  };
+}
 
 function multiplyMat4(a: Float32Array, b: Float32Array, out: Float32Array): void {
   const r = new Float32Array(16);
@@ -75,13 +107,28 @@ export async function initWebXr(options: {
   enterVrButton: HTMLButtonElement;
   exitVrButton?: HTMLButtonElement | null;
   overlayRoots?: HTMLElement[];
+  hudRoot?: HTMLElement | null;
+  tooltip?: HTMLElement | null;
+  controllersRoot?: HTMLElement | null;
   bindings: XrBindings;
 }): Promise<WebXrController | null> {
-  const { canvas, enterVrButton, exitVrButton, overlayRoots = [], bindings } = options;
+  const {
+    canvas,
+    enterVrButton,
+    exitVrButton,
+    overlayRoots = [],
+    hudRoot = null,
+    tooltip = null,
+    controllersRoot = null,
+    bindings,
+  } = options;
 
   const xr = navigator.xr;
   if (!xr || typeof xr.isSessionSupported !== 'function') {
     enterVrButton.hidden = true;
+    if (hudRoot) {
+      hudRoot.hidden = true;
+    }
     console.log('[WebXR] navigator.xr unavailable — staying 2D');
     return null;
   }
@@ -103,6 +150,9 @@ export async function initWebXr(options: {
 
   if (!supported) {
     enterVrButton.hidden = true;
+    if (hudRoot) {
+      hudRoot.hidden = true;
+    }
     console.log('[WebXR] immersive-vr not supported — staying 2D');
     return null;
   }
@@ -155,6 +205,8 @@ export async function initWebXr(options: {
     referenceSpace = null;
     namedBaseLayerFramebuffer = null;
     bindings.setTouchMovement(0, 0, 0);
+    bindings.setXrControllerRay?.(0, 0, 0, 0, 0, 0, -1, false);
+    bindings.setXrControllerRay?.(1, 0, 0, 0, 0, 0, -1, false);
     bindings.setXrSessionActive(false);
     if (qualityBeforeVr !== null) {
       bindings.setQualityPreset(qualityBeforeVr as 0 | 1 | 2);
@@ -164,47 +216,100 @@ export async function initWebXr(options: {
     enterVrButton.hidden = false;
     enterVrButton.textContent = 'Enter VR';
     enterVrButton.disabled = false;
+    if (hudRoot) {
+      hudRoot.hidden = true;
+    }
     console.log('[WebXR] Session ended — resumed 2D main loop');
   };
 
   const pollControllers = (frame: XRFrame) => {
-    if (!session) {
+    if (!session || !referenceSpace) {
       return;
     }
     let forward = 0;
     let right = 0;
     let vertical = 0;
     let lookX = 0;
+    let leftConnected = false;
+    let rightConnected = false;
+    const cam = bindings.getCameraPosition();
 
     for (const source of session.inputSources) {
       const pad = source.gamepad;
+      const handedness = source.handedness;
+      const handIndex = handedness === 'right' ? 1 : 0;
+      if (handedness === 'right') {
+        rightConnected = true;
+      } else {
+        leftConnected = true;
+      }
+
+      const rayPose = frame.getPose?.(source.targetRaySpace, referenceSpace) ?? null;
+      if (rayPose && bindings.setXrControllerRay) {
+        const pos = rayPose.transform.position;
+        const ori = rayPose.transform.orientation;
+        const dir = rotateVectorByQuat(ori.x, ori.y, ori.z, ori.w, 0, 0, -1);
+        bindings.setXrControllerRay(
+          handIndex,
+          cam.x + pos.x,
+          cam.y + pos.y,
+          cam.z + pos.z,
+          dir.x,
+          dir.y,
+          dir.z,
+          true,
+        );
+      }
+
       if (!pad) {
         continue;
       }
       // xr-standard: axes 2/3 = thumbstick; fall back to 0/1.
       const ax = clampAxis(pad.axes[2] ?? pad.axes[0] ?? 0);
       const ay = clampAxis(pad.axes[3] ?? pad.axes[1] ?? 0);
-      const handedness = source.handedness;
 
       if (handedness === 'left' || handedness === 'none') {
         // Match touch joystick: forward = -Y, right = +X
         forward += -ay;
         right += ax;
         if (pad.buttons[1]?.pressed) {
-          // Grip → boost vertical climb when also pressing stick? Use grip as up.
           vertical += 0.85;
         }
       } else if (handedness === 'right') {
         vertical += -ay;
-        // Snap-turn on strong X deflection
         const now = performance.now();
         if (Math.abs(ax) > 0.7 && now - lastSnapTurnMs > SNAP_TURN_COOLDOWN_MS) {
           lookX = ax > 0 ? SNAP_TURN_DEG : -SNAP_TURN_DEG;
           lastSnapTurnMs = now;
         }
       }
+    }
 
-      void frame; // pose reserved for future hand/controller models
+    if (!leftConnected) {
+      bindings.setXrControllerRay?.(0, 0, 0, 0, 0, 0, -1, false);
+    }
+    if (!rightConnected) {
+      bindings.setXrControllerRay?.(1, 0, 0, 0, 0, 0, -1, false);
+    }
+    if (controllersRoot) {
+      controllersRoot.hidden = !(leftConnected || rightConnected);
+      const leftEl = controllersRoot.querySelector('[data-hand="left"]');
+      const rightEl = controllersRoot.querySelector('[data-hand="right"]');
+      if (leftEl instanceof HTMLElement) {
+        leftEl.classList.toggle('is-active', leftConnected);
+      }
+      if (rightEl instanceof HTMLElement) {
+        rightEl.classList.toggle('is-active', rightConnected);
+      }
+    }
+
+    const focused = bindings.getFocusedPlanetIndex?.() ?? -1;
+    const nearest = bindings.getNearestPlanetIndex?.() ?? -1;
+    const bodyIndex = focused >= 0 ? focused : nearest;
+    if (tooltip) {
+      tooltip.textContent = bodyIndex >= 0 && bodyIndex < XR_BODY_NAMES.length
+        ? XR_BODY_NAMES[bodyIndex]
+        : '';
     }
 
     const mag = Math.hypot(forward, right, vertical);
@@ -292,10 +397,23 @@ export async function initWebXr(options: {
         await gl.makeXRCompatible();
       }
 
-      session = await xr.requestSession('immersive-vr', {
+      if (hudRoot) {
+        hudRoot.hidden = false;
+      }
+      const sessionOptions: XRSessionInit = {
         requiredFeatures: ['local-floor'],
-        optionalFeatures: ['local', 'bounded-floor'],
-      });
+        optionalFeatures: ['local', 'bounded-floor', 'dom-overlay'],
+        ...(hudRoot ? { domOverlay: { root: hudRoot } } : {}),
+      };
+      try {
+        session = await xr.requestSession('immersive-vr', sessionOptions);
+      } catch (overlayError) {
+        console.warn('[WebXR] Session with DOM overlay failed, retrying without it:', overlayError);
+        session = await xr.requestSession('immersive-vr', {
+          requiredFeatures: ['local-floor'],
+          optionalFeatures: ['local', 'bounded-floor'],
+        });
+      }
 
       const layer = new XRWebGLLayer(session, gl, {
         antialias: false,
@@ -319,6 +437,9 @@ export async function initWebXr(options: {
       session.addEventListener('end', onSessionEnded);
       bindings.setXrSessionActive(true);
       setOverlaysVisible(false);
+      if (hudRoot) {
+        hudRoot.hidden = false;
+      }
       if (exitVrButton) {
         exitVrButton.hidden = false;
       }

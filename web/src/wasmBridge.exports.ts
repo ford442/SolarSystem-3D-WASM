@@ -22,6 +22,11 @@ export interface CachedCwrapExports {
     setMusicMuted: (...args: number[]) => void;
     getMusicMuted: () => number;
     focusPlanet: (...args: number[]) => void;
+    focusMission: (...args: number[]) => void;
+    getFocusedMissionIndex: () => number;
+    getMissionCount: () => number;
+    getMissionCatalogJson: () => string;
+    getFocusedMissionJson: () => string;
     setOrbitScaleMode: (...args: number[]) => void;
     getOrbitScaleMode: () => number;
     getNearestPlanetIndex: () => number;
@@ -45,6 +50,7 @@ export interface CachedCwrapExports {
     getXrMatrixScratch: () => number;
     commitXrEyeMatrices: (...args: number[]) => void;
     runXrFrame: () => void;
+    setXrControllerRay: (...args: number[]) => void;
     getCameraPositionX: () => number;
     getCameraPositionY: () => number;
     getCameraPositionZ: () => number;
@@ -74,6 +80,11 @@ export function createCachedCwrapExports(cwrap: SolarSystemCwrap): CachedCwrapEx
     setMusicMuted: cwrap('SetMusicMuted', null, ['number']) as (...args: number[]) => void,
     getMusicMuted: cwrap('GetMusicMuted', 'number', []) as () => number,
     focusPlanet: cwrap('FocusPlanet', null, ['number']) as (...args: number[]) => void,
+    focusMission: cwrap('FocusMission', null, ['number']) as (...args: number[]) => void,
+    getFocusedMissionIndex: cwrap('GetFocusedMissionIndex', 'number', []) as () => number,
+    getMissionCount: cwrap('GetMissionCount', 'number', []) as () => number,
+    getMissionCatalogJson: cwrap('GetMissionCatalogJson', 'string', []) as () => string,
+    getFocusedMissionJson: cwrap('GetFocusedMissionJson', 'string', []) as () => string,
     setOrbitScaleMode: cwrap('SetOrbitScaleMode', null, ['number']) as (...args: number[]) => void,
     getOrbitScaleMode: cwrap('GetOrbitScaleMode', 'number', []) as () => number,
     getNearestPlanetIndex: cwrap('GetNearestPlanetIndex', 'number', []) as () => number,
@@ -97,6 +108,7 @@ export function createCachedCwrapExports(cwrap: SolarSystemCwrap): CachedCwrapEx
     getXrMatrixScratch: cwrap('GetXrMatrixScratch', 'number', []) as () => number,
     commitXrEyeMatrices: cwrap('CommitXrEyeMatrices', null, ['number']) as (...args: number[]) => void,
     runXrFrame: cwrap('RunXrFrame', null, []) as () => void,
+    setXrControllerRay: cwrap('SetXrControllerRay', null, ['number', 'number', 'number', 'number', 'number', 'number', 'number', 'number']) as (...args: number[]) => void,
     getCameraPositionX: cwrap('GetCameraPositionX', 'number', []) as () => number,
     getCameraPositionY: cwrap('GetCameraPositionY', 'number', []) as () => number,
     getCameraPositionZ: cwrap('GetCameraPositionZ', 'number', []) as () => number,
@@ -105,4 +117,4 @@ export function createCachedCwrapExports(cwrap: SolarSystemCwrap): CachedCwrapEx
     };
 }
 
-export const EXPORT_COUNT = 48;
+export const EXPORT_COUNT = 54;

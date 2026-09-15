@@ -14,7 +14,9 @@
 #include <algorithm>
 #include <chrono>
 #include <cmath>
+#include <cstdio>
 #include <iostream>
+#include <sstream>
 #include <thread>
 
 using namespace std;
@@ -93,10 +95,12 @@ void Application::RunOneFrame() {
 #endif
 
     _camera.UpdateTransition(_deltaTime);
+    UpdateMissionFollow();
 
     ProcessInput(_mainWindow);
     UpdatePlanetSystemLoading();
     UpdateLOD();
+    UpdateMusicDucking();
 
 #ifdef __EMSCRIPTEN__
     if (_xr.active) {
@@ -142,6 +146,8 @@ void Application::RenderFrameContent() {
     ConfigureMainShaders();
     _skyBox->Render(*_mainSkyBoxShader);
     RenderOrbitPaths();
+    RenderMissionPaths();
+    RenderXrPointers();
     RenderStarCorona();
     ProcessSceneComponentsRendering();
     RenderAsteroidField();
@@ -216,6 +222,8 @@ void Application::InitSceneObjects() {
                 FlareSprite{false, 2.75, 2.0, 7}
             }});
     _orbitPathRenderer = make_unique<OrbitPathRenderer>();
+    _xrPointerRenderer = make_unique<XrPointerRenderer>();
+    LoadMissions();
     _magneticFieldRenderer = make_unique<MagneticFieldLineRenderer>();
     {
         const auto fieldQuality = GetQualitySettings(gSimState->qualityPreset, gSimState->isMobileWeb);
@@ -241,6 +249,7 @@ void Application::InitSceneObjects() {
 }
 
 void Application::FocusPlanetByIndex(int idx) {
+    StopMissionFollow();
     idx = std::clamp(idx, 0, OrbitLayout::kBodyCount - 1);
     _focusedPlanetIndex = idx;
 
@@ -293,6 +302,116 @@ void Application::FocusPlanetByIndex(int idx) {
 
 int Application::GetFocusedPlanetIndex() const {
     return _focusedPlanetIndex;
+}
+
+void Application::StopMissionFollow() {
+    _missionFollowActive = false;
+    _focusedMissionIndex = -1;
+}
+
+bool Application::SampleMissionScenePosition(int idx, glm::vec3& outScene) const {
+    if (idx < 0 || idx >= static_cast<int>(_missionCatalog.missions.size())) {
+        return false;
+    }
+    glm::vec3 au{0.0f};
+    if (!MissionCatalog::InterpolateAu(_missionCatalog.missions[static_cast<size_t>(idx)],
+                                      OrbitLayout::GetJulianDate(), au)) {
+        return false;
+    }
+    outScene = OrbitLayout::HelioAuToScene(au);
+    if (_sun) {
+        outScene += _sun->GetPosition();
+    }
+    return true;
+}
+
+void Application::FocusMissionByIndex(int idx) {
+    if (idx < 0) {
+        StopMissionFollow();
+        return;
+    }
+    if (idx >= static_cast<int>(_missionCatalog.missions.size())) {
+        return;
+    }
+    _focusedPlanetIndex = -1;
+    _focusedMissionIndex = idx;
+    _missionFollowActive = true;
+
+    glm::vec3 target(0.0f);
+    if (!SampleMissionScenePosition(idx, target)) {
+        return;
+    }
+    const glm::vec3 offset = glm::normalize(glm::vec3(0.7f, 0.3f, 0.7f)) * 45.0f;
+    const glm::vec3 cameraPos = target + offset;
+    const glm::vec3 lookDir = glm::normalize(target - cameraPos);
+    const float yaw = glm::degrees(std::atan2(lookDir.z, lookDir.x));
+    const float pitch = glm::degrees(std::asin(glm::clamp(lookDir.y, -1.0f, 1.0f)));
+    _camera.StartTransitionTo(cameraPos, yaw, pitch, 2.0f);
+}
+
+int Application::GetFocusedMissionIndex() const {
+    return _focusedMissionIndex;
+}
+
+int Application::GetMissionCount() const {
+    return static_cast<int>(_missionCatalog.missions.size());
+}
+
+std::string Application::GetMissionCatalogJson() const {
+    std::ostringstream ss;
+    ss << '[';
+    for (size_t i = 0; i < _missionCatalog.missions.size(); ++i) {
+        const auto& mission = _missionCatalog.missions[i];
+        if (i > 0) {
+            ss << ',';
+        }
+        ss << R"({"id":")" << mission.id << R"(","name":")" << mission.name
+           << R"(","index":)" << i << '}';
+    }
+    ss << ']';
+    return ss.str();
+}
+
+std::string Application::GetFocusedMissionJson() const {
+    if (_focusedMissionIndex < 0 ||
+        _focusedMissionIndex >= static_cast<int>(_missionCatalog.missions.size())) {
+        return R"({"valid":false})";
+    }
+    glm::vec3 pos{0.0f};
+    if (!SampleMissionScenePosition(_focusedMissionIndex, pos)) {
+        return R"({"valid":false})";
+    }
+    const auto& mission = _missionCatalog.missions[static_cast<size_t>(_focusedMissionIndex)];
+    char buffer[384];
+    std::snprintf(buffer, sizeof(buffer),
+                  R"({"valid":true,"id":"%s","index":%d,"x":%.4f,"y":%.4f,"z":%.4f})",
+                  mission.id.c_str(), _focusedMissionIndex, pos.x, pos.y, pos.z);
+    return buffer;
+}
+
+void Application::UpdateMissionFollow() {
+    if (!_missionFollowActive || _focusedMissionIndex < 0 || _camera.IsTransitionActive()) {
+        return;
+    }
+    glm::vec3 target(0.0f);
+    if (!SampleMissionScenePosition(_focusedMissionIndex, target)) {
+        return;
+    }
+    const glm::vec3 offset = glm::normalize(glm::vec3(0.7f, 0.3f, 0.7f)) * 45.0f;
+    const glm::vec3 cameraPos = target + offset;
+    const glm::vec3 lookDir = glm::normalize(target - cameraPos);
+    const float yaw = glm::degrees(std::atan2(lookDir.z, lookDir.x));
+    const float pitch = glm::degrees(std::asin(glm::clamp(lookDir.y, -1.0f, 1.0f)));
+    _camera.SetPosition(cameraPos);
+    _camera.SetYawPitch(yaw, pitch);
+}
+
+void Application::SetXrControllerRay(int hand, float ox, float oy, float oz, float dx, float dy, float dz,
+                                     int visible) {
+    if (!_xrPointerRenderer) {
+        return;
+    }
+    _xrPointerRenderer->SetRay(hand, glm::vec3(ox, oy, oz), glm::vec3(dx, dy, dz), visible != 0);
 }
 
 const SkyEvents::Conjunction& Application::GetNextConjunction() const {

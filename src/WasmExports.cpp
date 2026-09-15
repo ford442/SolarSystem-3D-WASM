@@ -137,6 +137,29 @@ extern "C" {
             activeApplication->FocusPlanetByIndex(idx);
         }
     }
+    EMSCRIPTEN_KEEPALIVE void FocusMission(int idx) {
+        if (activeApplication) {
+            activeApplication->FocusMissionByIndex(idx);
+        }
+    }
+    EMSCRIPTEN_KEEPALIVE int GetFocusedMissionIndex() {
+        return activeApplication ? activeApplication->GetFocusedMissionIndex() : -1;
+    }
+    EMSCRIPTEN_KEEPALIVE int GetMissionCount() {
+        return activeApplication ? activeApplication->GetMissionCount() : 0;
+    }
+    // Mission list / focused probe pose as JSON — same rationale as GetNextSkyEventJson:
+    // one string keeps C++ authoritative instead of a GetProbeX/Y/Z scalar cluster.
+    EMSCRIPTEN_KEEPALIVE const char* GetMissionCatalogJson() {
+        static std::string json = "[]";
+        json = activeApplication ? activeApplication->GetMissionCatalogJson() : "[]";
+        return json.c_str();
+    }
+    EMSCRIPTEN_KEEPALIVE const char* GetFocusedMissionJson() {
+        static std::string json = R"({"valid":false})";
+        json = activeApplication ? activeApplication->GetFocusedMissionJson() : R"({"valid":false})";
+        return json.c_str();
+    }
     EMSCRIPTEN_KEEPALIVE void SetOrbitScaleMode(int mode) {
         if (activeApplication) {
             activeApplication->ApplyOrbitScaleMode(mode);
@@ -271,6 +294,12 @@ extern "C" {
     EMSCRIPTEN_KEEPALIVE void RunXrFrame() {
         if (activeApplication) {
             activeApplication->RunOneFrame();
+        }
+    }
+    EMSCRIPTEN_KEEPALIVE void SetXrControllerRay(int hand, float ox, float oy, float oz, float dx, float dy,
+                                                 float dz, int visible) {
+        if (activeApplication) {
+            activeApplication->SetXrControllerRay(hand, ox, oy, oz, dx, dy, dz, visible);
         }
     }
     EMSCRIPTEN_KEEPALIVE float GetCameraPositionX() {

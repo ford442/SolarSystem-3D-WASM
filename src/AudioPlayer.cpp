@@ -181,3 +181,28 @@ void Application::StopPlayBackgroundMusic() {
         _backgroundMusicThread->join();
 #endif
 }
+
+void Application::UpdateMusicDucking() {
+#ifdef SOLARSYSTEM_USE_SDL_MIXER
+    if (!_mixerInitialized || _musicMuted || !Mix_PlayingMusic()) {
+        return;
+    }
+    float duck = 1.0f;
+    if (_nearestPlanetIndex >= 0
+        && static_cast<size_t>(_nearestPlanetIndex) < _renderableSceneComponents.size()) {
+        const Planet* planet = _renderableSceneComponents[static_cast<size_t>(_nearestPlanetIndex)].planet.get();
+        if (planet) {
+            const float dist = CalculateSpaceObjectDistance(planet);
+            constexpr float kDuckStart = 90.0f;
+            constexpr float kDuckEnd = 18.0f;
+            if (dist < kDuckStart) {
+                const float t = glm::clamp((dist - kDuckEnd) / (kDuckStart - kDuckEnd), 0.0f, 1.0f);
+                duck = glm::mix(0.32f, 1.0f, t);
+            }
+        }
+    }
+    Mix_VolumeMusic(static_cast<int>(MIX_MAX_VOLUME * _musicVolume * duck));
+#else
+    (void)0;
+#endif
+}

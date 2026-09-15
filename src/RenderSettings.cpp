@@ -23,6 +23,7 @@ void Application::ApplyQualityPreset(int preset) {
     if (_asteroidField) {
         _asteroidField->SetInstanceCount(settings.asteroidInstanceCount);
     }
+    RebuildMissionPaths();
     if (_magneticFieldsEnabled) {
         _magneticFieldsBuilt = false;
         EnsureMagneticFieldsBuilt();
@@ -70,6 +71,7 @@ void Application::ApplyOrbitScaleMode(int mode) {
     if (_asteroidField) {
         _asteroidField->Update(0.0f); // rebuild instance matrices for new AU→scene mapping
     }
+    RebuildMissionPaths();
     std::cout << "[OrbitScale] " << (scaleMode == OrbitLayout::ScaleMode::Realistic ? "realistic" : "compressed")
               << " distances active" << std::endl;
 }

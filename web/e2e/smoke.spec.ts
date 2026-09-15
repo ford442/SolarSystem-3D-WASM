@@ -39,9 +39,9 @@ test('WASM module boots and staged loading reacts to camera pose', async ({ page
   );
   await page.waitForFunction(
     () => {
-      const chip = document.getElementById('next-conjunction');
-      const text = document.getElementById('next-conjunction-text')?.textContent ?? '';
-      return !!chip && !chip.hasAttribute('hidden') && /conjunction/i.test(text);
+      const chip = document.getElementById('next-sky-event');
+      const text = document.getElementById('next-sky-event-text')?.textContent ?? '';
+      return !!chip && !chip.hasAttribute('hidden') && /Next /i.test(text);
     },
     undefined,
     { timeout: 10_000 },
