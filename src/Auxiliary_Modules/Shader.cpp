@@ -1,97 +1,127 @@
 #include "Shader.h"
 
+namespace {
+
+// The shader sources in resource/shaders/ are authored once, in GLSL ES 3.00, because
+// that is the only dialect WebGL 2 accepts. The native build runs an OpenGL 4.6 core
+// context, where `#version 300 es` is only accepted via ARB_ES3_compatibility — widely
+// implemented, but not guaranteed. Rewriting the version directive to the matching
+// desktop dialect (GLSL ES 3.00 is a subset of desktop GLSL 4.60, precision qualifiers
+// included) removes that dependency. The replacement keeps the directive on its own
+// first line so compiler error line numbers still match the file on disk.
+// See docs/ARCHITECTURE.md §9.1.
+#ifndef __EMSCRIPTEN__
+constexpr const char* kNativeVersionDirective = "#version 460 core";
+
+void PatchVersionDirective(std::string& source) {
+    const size_t directive = source.find("#version");
+    if (directive == std::string::npos) {
+        return; // Empty/unreadable file; the compile error below will report it.
+    }
+    size_t lineEnd = source.find('\n', directive);
+    if (lineEnd == std::string::npos) {
+        lineEnd = source.size();
+    }
+    const std::string original = source.substr(directive, lineEnd - directive);
+    if (original.find("es") == std::string::npos) {
+        return; // Already a desktop directive; leave it alone.
+    }
+    source.replace(directive, lineEnd - directive, kNativeVersionDirective);
+}
+#endif
+
+std::string ReadShaderFile(const std::string& path) {
+    std::ifstream file;
+    file.exceptions(std::ifstream::failbit | std::ifstream::badbit);
+    std::string source;
+    try {
+        file.open(path);
+        std::ostringstream stream;
+        stream << file.rdbuf();
+        file.close();
+        source = stream.str();
+    } catch (const std::ifstream::failure&) {
+        std::cerr << "ERROR::SHADER::FILE_NOT_SUCCESFULLY_READ: " << path << std::endl;
+        return source;
+    }
+#ifndef __EMSCRIPTEN__
+    PatchVersionDirective(source);
+#endif
+    return source;
+}
+
+} // namespace
+
+Shader::Shader(const std::string& vertexPath, const std::string& fragmentPath) {
+    Build(vertexPath, fragmentPath, "");
+}
+
+#ifndef __EMSCRIPTEN__
 Shader::Shader(const std::string& vertexPath, const std::string& fragmentPath, const std::string& geometryPath) {
+    Build(vertexPath, fragmentPath, geometryPath);
+}
+#endif
+
+void Shader::Build(const std::string& vertexPath, const std::string& fragmentPath, const std::string& geometryPath) {
     _shaderProgramID = 0;
 
-    std::string vertexCode;
-    std::string fragmentCode;
-    std::string geometryCode;
-    std::ifstream vShaderFile;
-    std::ifstream fShaderFile;
-    std::ifstream gShaderFile;
+#ifdef __EMSCRIPTEN__
+    // Defence in depth behind the missing 3-arg constructor: nothing in the web build can
+    // reach a geometry stage, because WebGL 2 does not have one.
+    (void)geometryPath;
+#endif
 
-    // Убеждаемся, что объекты ifstream могут выбросить исключение
-    vShaderFile.exceptions(std::ifstream::failbit | std::ifstream::badbit);
-    fShaderFile.exceptions(std::ifstream::failbit | std::ifstream::badbit);
-    gShaderFile.exceptions(std::ifstream::failbit | std::ifstream::badbit);
-
-    try {
-        // Открываем файлы
-        vShaderFile.open(vertexPath);
-        fShaderFile.open(fragmentPath);
-        std::ostringstream vShaderStream, fShaderStream;
-
-        // Считываем содержимое файловых буферов в потоки
-        vShaderStream << vShaderFile.rdbuf();
-        fShaderStream << fShaderFile.rdbuf();
-
-        // Закрываем файлы
-        vShaderFile.close();
-        fShaderFile.close();
-
-        // Конвертируем данные из потока в строковые переменные
-        vertexCode = vShaderStream.str();
-        fragmentCode = fShaderStream.str();
-
-        if(!geometryPath.empty()) {
-            gShaderFile.open(geometryPath);
-            std::stringstream gShaderStream;
-            gShaderStream << gShaderFile.rdbuf();
-            gShaderFile.close();
-            geometryCode = gShaderStream.str();
-        }
-    }
-
-    catch (const std::ifstream::failure& e) {
-        std::cerr << "ERROR::SHADER::FILE_NOT_SUCCESFULLY_READ" << std::endl;
-    }
+    const std::string vertexCode = ReadShaderFile(vertexPath);
+    const std::string fragmentCode = ReadShaderFile(fragmentPath);
 
     const char* vShaderCode = vertexCode.c_str();
     const char* fShaderCode = fragmentCode.c_str();
 
-    // Этап №2: Компилируем шейдеры
-    size_t vertex, fragment;
-
-    // Вершинный шейдер
-    vertex = glCreateShader(GL_VERTEX_SHADER);
+    const GLuint vertex = glCreateShader(GL_VERTEX_SHADER);
     glShaderSource(vertex, 1, &vShaderCode, nullptr);
     glCompileShader(vertex);
     CheckCompileErrors(vertex, ShaderType::VertexShader, vertexPath);
 
-    // Фрагментный шейдер
-    fragment = glCreateShader(GL_FRAGMENT_SHADER);
+    const GLuint fragment = glCreateShader(GL_FRAGMENT_SHADER);
     glShaderSource(fragment, 1, &fShaderCode, nullptr);
     glCompileShader(fragment);
     CheckCompileErrors(fragment, ShaderType::FragmentShader, fragmentPath);
 
-    // Геометрический шейдер (если есть)
-    size_t geometry;
-    if(!geometryPath.empty()) {
+#ifndef __EMSCRIPTEN__
+    GLuint geometry = 0;
+    const bool hasGeometry = !geometryPath.empty();
+    std::string geometryCode;
+    if (hasGeometry) {
+        geometryCode = ReadShaderFile(geometryPath);
         const char* gShaderCode = geometryCode.c_str();
         geometry = glCreateShader(GL_GEOMETRY_SHADER);
         glShaderSource(geometry, 1, &gShaderCode, nullptr);
         glCompileShader(geometry);
         CheckCompileErrors(geometry, ShaderType::GeometryShader, geometryPath);
     }
+#endif
 
-    // Шейдерная программа
     _shaderProgramID = glCreateProgram();
-    glAttachShader(_shaderProgramID, vertex); // Прикрепление вершинного шейдера
-    glAttachShader(_shaderProgramID, fragment); // Прикрепление фрагментного шейдера
-    if (!geometryPath.empty())
-        glAttachShader(_shaderProgramID, geometry); // Прикрепление геометрического шейдера
-    glLinkProgram(_shaderProgramID); // Сборка шейдерной программы из прикреплённых шейдеров
+    glAttachShader(_shaderProgramID, vertex);
+    glAttachShader(_shaderProgramID, fragment);
+#ifndef __EMSCRIPTEN__
+    if (hasGeometry) {
+        glAttachShader(_shaderProgramID, geometry);
+    }
+#endif
+    glLinkProgram(_shaderProgramID);
     CheckCompileErrors(_shaderProgramID, ShaderType::ShaderProgram, fragmentPath);
 
-    // Удаление шейдеров
     glDetachShader(_shaderProgramID, vertex);
     glDeleteShader(vertex);
     glDetachShader(_shaderProgramID, fragment);
     glDeleteShader(fragment);
-    if (!geometryPath.empty()) {
+#ifndef __EMSCRIPTEN__
+    if (hasGeometry) {
         glDetachShader(_shaderProgramID, geometry);
         glDeleteShader(geometry);
     }
+#endif
 }
 
 Shader::~Shader() {

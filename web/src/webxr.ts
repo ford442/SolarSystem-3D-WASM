@@ -11,6 +11,8 @@ export type XrBindings = {
   getQualityPreset: () => number;
   getCameraPosition: () => { x: number; y: number; z: number };
   setXrSessionActive: (active: boolean) => void;
+  setXrBaseLayerFramebuffer: (framebuffer: number) => void;
+  registerXrFramebuffer: (framebuffer: WebGLFramebuffer | null) => number;
   setXrEyeCount: (count: number) => void;
   setXrEyeViewport: (eye: number, x: number, y: number, w: number, h: number) => void;
   commitXrEyeMatrices: (eye: number) => void;
@@ -114,6 +116,10 @@ export async function initWebXr(options: {
   let qualityBeforeVr: number | null = null;
   let lastSnapTurnMs = 0;
   let rafHandle = 0;
+  // The XRWebGLLayer's framebuffer, once it has a name in Emscripten's GL table. C++
+  // rebinds it after the shadow pass instead of FBO 0; without it the shadow pass is
+  // skipped entirely (see Application::DefaultFramebuffer).
+  let namedBaseLayerFramebuffer: WebGLFramebuffer | null = null;
 
   const scratchView = new Float32Array(16);
   const scratchPlayerInv = new Float32Array(16);
@@ -147,6 +153,7 @@ export async function initWebXr(options: {
     }
     session = null;
     referenceSpace = null;
+    namedBaseLayerFramebuffer = null;
     bindings.setTouchMovement(0, 0, 0);
     bindings.setXrSessionActive(false);
     if (qualityBeforeVr !== null) {
@@ -225,6 +232,12 @@ export async function initWebXr(options: {
     }
 
     pollControllers(frame);
+
+    if (layer.framebuffer !== namedBaseLayerFramebuffer) {
+      // A session can swap its base layer; re-register whenever it changes.
+      namedBaseLayerFramebuffer = layer.framebuffer;
+      bindings.setXrBaseLayerFramebuffer(bindings.registerXrFramebuffer(layer.framebuffer));
+    }
 
     gl.bindFramebuffer(gl.FRAMEBUFFER, layer.framebuffer);
     gl.clearColor(0, 0, 0, 1);

@@ -1,5 +1,6 @@
 #include "QualitySettings.h"
 #include "SimState.h"
+#include <cstdlib>
 #include <cstring>
 #include <iomanip>
 #include <iostream>
@@ -67,6 +68,9 @@ void LogQualityTier(const QualityTierSettings& settings, bool hdrEnabled, int sh
 #ifdef __EMSCRIPTEN__
     std::cout << "[Quality] WebGL MSAA is fixed when the context is created; reload with ?quality="
               << settings.name << " to change it." << std::endl;
+#else
+    std::cout << "[Quality] MSAA is fixed when the GL context is created; restart with "
+                 "SOLARSYSTEM_QUALITY=low|medium|full to change the sample count." << std::endl;
 #endif
 }
 
@@ -112,5 +116,26 @@ float ReadBackingStoreScale() {
         }
         return 1.0;
     }));
+}
+#endif
+
+#ifndef __EMSCRIPTEN__
+int ReadInitialQualityPreset() {
+    const char* requested = std::getenv("SOLARSYSTEM_QUALITY");
+    if (requested == nullptr) {
+        return 2;
+    }
+    if (std::strcmp(requested, "low") == 0 || std::strcmp(requested, "0") == 0) {
+        return 0;
+    }
+    if (std::strcmp(requested, "medium") == 0 || std::strcmp(requested, "1") == 0) {
+        return 1;
+    }
+    if (std::strcmp(requested, "full") == 0 || std::strcmp(requested, "2") == 0) {
+        return 2;
+    }
+    std::cerr << "[Quality] Unrecognized SOLARSYSTEM_QUALITY=\"" << requested
+              << "\"; using \"full\"." << std::endl;
+    return 2;
 }
 #endif

@@ -1,4 +1,6 @@
 #include "HDR.h"
+#include "GlCapabilities.h"
+#include <iostream>
 
 HDR::HDR(const Shader& shader, uint16_t width, uint16_t height, bool enabled)
     : _hdrShader(&shader), _enabled(enabled), _width(width), _height(height) {
@@ -112,6 +114,21 @@ void HDR::InitQuadBuffers() {
 }
 
 void HDR::InitFBO(uint16_t width, uint16_t height) {
+    // Renderable float/half-float color attachments are an extension on WebGL 2
+    // (EXT_color_buffer_float). Without it the RGBA16F attachment below silently
+    // yields an incomplete FBO and every subsequent draw into it is dropped.
+    if (!GetGlCapabilities().colorBufferFloat) {
+        std::cerr << "[HDR] Renderable float color buffers unsupported "
+                     "(no EXT_color_buffer_float); disabling HDR" << std::endl;
+        _enabled = false;
+        return;
+    }
+
+    // Never assume FBO 0 is the default target: under WebXR the XRWebGLLayer
+    // framebuffer is bound while we run, so restore whatever was bound on entry.
+    GLint previousFbo = 0;
+    glGetIntegerv(GL_FRAMEBUFFER_BINDING, &previousFbo);
+
     glGenFramebuffers(1, &_hdrFrameBuffer);
 
     glGenTextures(1, &_colorBuffer);
@@ -135,5 +152,13 @@ void HDR::InitFBO(uint16_t width, uint16_t height) {
     glBindFramebuffer(GL_FRAMEBUFFER, _hdrFrameBuffer);
     glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, _colorBuffer, 0);
     glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_RENDERBUFFER, _rboDepth);
-    glBindFramebuffer(GL_FRAMEBUFFER, 0);
+
+    const GLenum status = glCheckFramebufferStatus(GL_FRAMEBUFFER);
+    glBindFramebuffer(GL_FRAMEBUFFER, static_cast<GLuint>(previousFbo));
+    if (status != GL_FRAMEBUFFER_COMPLETE) {
+        std::cerr << "[HDR] Framebuffer incomplete (0x" << std::hex << status << std::dec
+                  << "); disabling HDR" << std::endl;
+        DestroyFBO();
+        _enabled = false;
+    }
 }

@@ -1,4 +1,5 @@
 #include "ShadowMapFBO.h"
+#include <iostream>
 
 ShadowMapFBO::ShadowMapFBO(uint16_t shadowMapWidth, uint16_t shadowMapHeight) : _shadowMapWidth(shadowMapWidth), _shadowMapHeight(shadowMapHeight) {
     InitFBO();
@@ -67,6 +68,9 @@ void ShadowMapFBO::InitFBO() {
     glTexParameterfv(GL_TEXTURE_2D, GL_TEXTURE_BORDER_COLOR, borderColor);
 #endif
 
+    GLint previousFbo = 0;
+    glGetIntegerv(GL_FRAMEBUFFER_BINDING, &previousFbo);
+
     glBindFramebuffer(GL_FRAMEBUFFER, _frameBuffer);
     glFramebufferTexture2D(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_TEXTURE_2D, _shadowMap, 0);
 #ifdef __EMSCRIPTEN__
@@ -76,5 +80,13 @@ void ShadowMapFBO::InitFBO() {
     glDrawBuffer(GL_NONE);
 #endif
     glReadBuffer(GL_NONE);
-    glBindFramebuffer(GL_FRAMEBUFFER, 0);
+
+    const GLenum status = glCheckFramebufferStatus(GL_FRAMEBUFFER);
+    // Restore the caller's binding, not FBO 0: in WebXR the default target is the
+    // XRWebGLLayer framebuffer and a resize can happen mid-session.
+    glBindFramebuffer(GL_FRAMEBUFFER, static_cast<GLuint>(previousFbo));
+    if (status != GL_FRAMEBUFFER_COMPLETE) {
+        std::cerr << "[Shadows] Shadow map framebuffer incomplete (0x" << std::hex << status
+                  << std::dec << ")" << std::endl;
+    }
 }

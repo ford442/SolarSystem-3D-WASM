@@ -37,10 +37,22 @@ public:
     void SetXrActive(bool active);
     bool IsXrActive() const { return _xr.active; }
     void SetXrEyeCount(int count);
+    void SetXrBaseLayerFramebuffer(unsigned int framebuffer);
     void SetXrEyeViewport(int eye, int x, int y, int width, int height);
     float* GetXrMatrixScratch();
     void CommitXrEyeMatrices(int eye);
 #endif
+    /**
+     * Framebuffer the frame composites into. FBO 0 normally; under WebXR the
+     * XRWebGLLayer framebuffer, which JS binds before handing the frame to us.
+     */
+    GLuint DefaultFramebuffer() const {
+#ifdef __EMSCRIPTEN__
+        return _xr.active ? static_cast<GLuint>(_xr.baseLayerFramebuffer) : 0u;
+#else
+        return 0u;
+#endif
+    }
     void ApplyQualityPreset(int preset);
     void ApplyShadowQuality(int quality);
     void ApplyOrbitScaleMode(int mode);

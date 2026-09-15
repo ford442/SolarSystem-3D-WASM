@@ -8,11 +8,19 @@
 #include <iostream>
 #include <glm/gtc/type_ptr.hpp>
 
+void Application::SetXrBaseLayerFramebuffer(unsigned int framebuffer) {
+    // JS registers the XRWebGLLayer's opaque WebGLFramebuffer in Emscripten's GL table
+    // and hands the name over here; see registerXrFramebuffer() in web/src/webxr.ts.
+    _xr.baseLayerFramebuffer = framebuffer;
+    std::cout << "[WebXR] base layer framebuffer = " << framebuffer << std::endl;
+}
+
 void Application::SetXrActive(bool active) {
     _xr.active = active;
     _xr.currentEye = 0;
     if (!active) {
         _xr.eyeCount = 0;
+        _xr.baseLayerFramebuffer = 0;
         glBindFramebuffer(GL_FRAMEBUFFER, 0);
         glViewport(0, 0, _displayWidth, _displayHeight);
         glDisable(GL_SCISSOR_TEST);
@@ -49,7 +57,18 @@ void Application::CommitXrEyeMatrices(int eye) {
 }
 
 void Application::RenderXrStereoFrame() {
-    // JS has already bound the XRWebGLLayer framebuffer and cleared it.
+    // JS has already bound the XRWebGLLayer framebuffer and cleared it. Passes that
+    // render off-screen (the shadow map) restore DefaultFramebuffer(), which resolves to
+    // that same layer framebuffer while the session is active.
+    if (_xr.baseLayerFramebuffer == 0) {
+        static bool warned = false;
+        if (!warned) {
+            warned = true;
+            std::cerr << "[WebXR] No base layer framebuffer registered; off-screen passes "
+                         "would composite into FBO 0 and lose the stereo image. "
+                         "Skipping shadow maps this session." << std::endl;
+        }
+    }
     const int eyes = std::clamp(_xr.eyeCount, 0, 2);
     for (int eye = 0; eye < eyes; ++eye) {
         _xr.currentEye = eye;

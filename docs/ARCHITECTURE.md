@@ -407,10 +407,25 @@ Rebuild WASM after C++ changes: `./build-web.sh` then refresh the browser.
 
 | Aspect | Native | Web |
 |--------|--------|-----|
-| Version | `#version 460 core` | `#version 300 es` |
-| Precision | N/A | `precision highp float;` in fragments |
-| Geometry/compute shaders | Allowed | **Not supported** |
+| Version in `resource/shaders/` | `#version 300 es` (single source) | `#version 300 es` |
+| Version actually compiled | `#version 460 core` (rewritten at load) | `#version 300 es` |
+| Precision | Qualifiers accepted and ignored | `precision highp float;` in fragments |
+| Geometry/compute shaders | Geometry allowed | **Not supported** — no 3-arg `Shader` ctor exists |
 | Double uniforms | `glUniform1d` | Cast to float via `Shader` class |
+
+**One source, two dialects.** Every file in `resource/shaders/` is written once in GLSL
+ES 3.00, because that is the only dialect WebGL 2 accepts. The native build runs an
+OpenGL 4.6 **core** context, which accepts `#version 300 es` only through
+`ARB_ES3_compatibility` — widely implemented, but not guaranteed. So `ReadShaderFile` in
+`src/Auxiliary_Modules/Shader.cpp` rewrites the leading `#version 300 es` directive to
+`#version 460 core` on native builds only (GLSL ES 3.00 is a subset of desktop GLSL 4.60,
+precision qualifiers included). The replacement stays on the directive's own line, so
+compiler error line numbers still match the file on disk. Web builds compile the file
+byte-for-byte as authored.
+
+**No geometry stage on web.** WebGL 2 has no geometry shader, so the `Shader` constructor
+overload taking a `geometryPath` is compiled out under `__EMSCRIPTEN__`: passing one in a
+web build is a compile error, not a shader that silently fails to link.
 
 **Uniform locations:** `Shader::Set*` resolves each uniform name with `glGetUniformLocation` on first use and caches the `GLint` (including `-1` for missing names) in a per-program map. Subsequent sets reuse the cache — do not call `glGetUniformLocation` at render call sites. The cache is cleared when the program is deleted (`Release` / destructor). If a re-link path is added later, clear the cache after a successful `glLinkProgram`.
 

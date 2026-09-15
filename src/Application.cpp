@@ -55,7 +55,7 @@ void Application::RunOneFrame() {
         if (!_xr.active)
 #endif
         {
-            glBindFramebuffer(GL_FRAMEBUFFER, 0);
+            glBindFramebuffer(GL_FRAMEBUFFER, DefaultFramebuffer());
         }
         glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
         glClear(GL_COLOR_BUFFER_BIT);
@@ -111,7 +111,7 @@ void Application::RunOneFrame() {
     }
 #endif
 
-    glBindFramebuffer(GL_FRAMEBUFFER, 0);
+    glBindFramebuffer(GL_FRAMEBUFFER, DefaultFramebuffer());
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
     RenderFrameContent();
 
@@ -183,6 +183,9 @@ void Application::InitSceneObjects() {
     _hdrEnabled = qualitySettings.enableHdr;
     _hdrShader = make_unique<Shader>("resource/shaders/passThrough.vs", "resource/shaders/hdr.fs");
     _hdr = make_unique<HDR>(*_hdrShader, _displayWidth, _displayHeight, _hdrEnabled);
+    // HDR turns itself off when the GPU cannot give it a complete float FBO; follow it,
+    // otherwise the composite path would keep sampling an empty buffer.
+    _hdrEnabled = _hdr->IsEnabled();
     LogQualityTier(qualitySettings, _hdrEnabled, gSimState->shadowQuality);
 
     const vector<string> skyBoxFaces = GetSkyBoxFaces();

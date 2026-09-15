@@ -212,6 +212,11 @@ extern "C" {
             emscripten_resume_main_loop();
         }
     }
+    EMSCRIPTEN_KEEPALIVE void SetXrBaseLayerFramebuffer(int framebuffer) {
+        if (activeApplication) {
+            activeApplication->SetXrBaseLayerFramebuffer(static_cast<unsigned int>(framebuffer < 0 ? 0 : framebuffer));
+        }
+    }
     EMSCRIPTEN_KEEPALIVE void SetXrEyeCount(int count) {
         if (activeApplication) {
             activeApplication->SetXrEyeCount(count);
