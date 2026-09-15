@@ -31,6 +31,7 @@ export interface CachedCwrapExports {
     getNextConjunctionBodyA: () => number;
     getNextConjunctionBodyB: () => number;
     getNextConjunctionSeparationDeg: () => number;
+    getNextSkyEventJson: () => string;
     setOrbitLines: (...args: number[]) => void;
     getOrbitLines: () => number;
     setMagneticFields: (...args: number[]) => void;
@@ -82,6 +83,7 @@ export function createCachedCwrapExports(cwrap: SolarSystemCwrap): CachedCwrapEx
     getNextConjunctionBodyA: cwrap('GetNextConjunctionBodyA', 'number', []) as () => number,
     getNextConjunctionBodyB: cwrap('GetNextConjunctionBodyB', 'number', []) as () => number,
     getNextConjunctionSeparationDeg: cwrap('GetNextConjunctionSeparationDeg', 'number', []) as () => number,
+    getNextSkyEventJson: cwrap('GetNextSkyEventJson', 'string', []) as () => string,
     setOrbitLines: cwrap('SetOrbitLines', null, ['number']) as (...args: number[]) => void,
     getOrbitLines: cwrap('GetOrbitLines', 'number', []) as () => number,
     setMagneticFields: cwrap('SetMagneticFields', null, ['number']) as (...args: number[]) => void,
@@ -103,4 +105,4 @@ export function createCachedCwrapExports(cwrap: SolarSystemCwrap): CachedCwrapEx
     };
 }
 
-export const EXPORT_COUNT = 47;
+export const EXPORT_COUNT = 48;

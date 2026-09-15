@@ -201,10 +201,12 @@ shared link reproduces exactly what you were looking at.
 
 | Feature | How to reach it | What it shows |
 |---------|-----------------|---------------|
-| **Date scrubber** | Simulation panel, or `P` / `+` / `-` / `.` keys; `?date=` in a deep link | Moves the simulation epoch. Planet positions come from JPL's Standish series; Pluto, Ceres, and Vesta from fixed Keplerian elements. |
+| **Date scrubber** | Simulation panel, or `P` / `+` / `-` / `.` keys; `?date=` in a deep link | Moves the simulation epoch. Planet positions come from JPL's Standish series; Pluto, Ceres, and Vesta from fixed Keplerian elements; the Moon, the four Galileans, Titan, and Triton from catalog Keplerian elements with secular node/periapsis rates. Earth's rotation follows GMST at the scrubbed date, so the night side is where it belongs for that UTC — and scrubbing back is exact. |
 | **Scale toggle** | Simulation panel, or `?scale=realistic` | Switches between artistic compressed orbits and AU-proportional spacing. |
 | **Magnetic fields** | `M` key or `?fields=1` | Dipole / toroidal ribbons (visual, not SI values) — see the note above. |
-| **Next conjunction** | Simulation / Explorer chips, or text hints overlay (`TAB`) | The next date two of Mercury, Venus, and Mars share a geocentric ecliptic longitude, with their apparent separation. Recomputed from the ephemeris whenever you scrub the date. Jump-to-date uses the same `SetSimulationEpoch` / `?jd=` path. |
+| **Next sky event** | Simulation panel chip, or text hints overlay (`TAB`) | The next conjunction, solar or lunar eclipse, Mercury/Venus transit, or Galilean shadow transit. All four searches read the live ephemeris — nothing is baked — so scrubbing the date re-runs them. **Jump to event** moves the epoch to what the search found; **Play &lt;date&gt;** jumps to a documented landmark instead (2017-08-21 by default). Both go through `SetSimulationEpoch` / `?jd=`, so the resulting view is shareable. |
+| **Next conjunction** | Explorer chip | The conjunction-only chip, kept for the explorer panel: the next date two of Mercury, Venus, and Mars share a geocentric ecliptic longitude, with their apparent separation. |
+| **Eclipse shadows** | Automatic — scrub to an eclipse date and watch Earth | The Moon's umbra on Earth, and a Galilean moon's shadow on Jupiter, projected in the lighting pass from the moon's real ephemeris position. Whether a shadow happens is decided in kilometres, not in scene units, so over 2017–2019 the umbra appears on the real eclipse dates rather than at every new moon. Low quality draws a hard-edged disc; Full adds the penumbra falloff. |
 | **Ceres and Vesta** | Focus index 10 and 11, or `?planet=ceres` / `?planet=vesta` | The two largest main-belt bodies, orbiting inside the existing asteroid field with the same staged LOD texture path as the planets. |
 
 Accuracy is deliberately "visualiser grade": positions are good to roughly an arcminute for the
@@ -212,6 +214,20 @@ planets near the present day, and the belt bodies drift about half a degree per 
 their element epoch because nothing models Jupiter's perturbations. Conjunction dates are
 therefore reliable to within a day, not a minute. `tests/test_sky_events.cpp` and
 `tests/test_ephemeris.cpp` pin these against JPL Horizons.
+
+The moons are held to the same bar. Their elements are a least-squares fit of Horizons
+osculating elements over 2000–2036, carried forward with secular node and periapsis rates but
+**no periodic terms**: measured direction error over that span is under 0.1° for Titan and the
+outer Galileans, under 0.7° for Io and Triton, and up to 2.4° for the Moon, whose evection
+(1.27°) and variation (0.66°) are not modelled. Those two terms very nearly cancel at new and
+full moon, which is why eclipse *dates* still come out right — every solar and lunar eclipse in
+the 2017–2019 canon is found on its published day — while the *time of day* can be a couple of
+hours off greatest eclipse. Treat none of it as observing-grade: these are not contact times.
+The umbra is drawn on a planet rendered several times oversized relative to its moon's orbit,
+so the spot tracks across the disc faster than life and, on Jupiter, cannot reach the poles —
+but *whether* it appears is decided from real radii and distances, which is why it shows up on
+the right days. Time is handled as UTC throughout; the ~69 s UTC↔TT offset and leap seconds
+are not modelled, which is far below the arcminute the planet series itself provides.
 
 <h2 id="runtime-asset-hosting">Runtime asset hosting</h2>
 

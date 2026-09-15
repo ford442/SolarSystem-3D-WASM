@@ -34,6 +34,12 @@ function mapCType(cType) {
     if (t === 'int' || t === 'float' || t === 'double' || t === 'bool') {
         return { tsReturn: 'number', cwrapReturn: 'number' };
     }
+    // A returned C string is handed to JS through cwrap's 'string' marshalling, which copies
+    // it out with UTF8ToString. The raw Module._Export member is still a pointer (number) —
+    // only the cwrap façade sees a string.
+    if (t === 'const char*' || t === 'char*') {
+        return { tsReturn: 'string', cwrapReturn: 'string', moduleReturn: 'number' };
+    }
     if (t.endsWith('*')) return { tsReturn: 'number', cwrapReturn: 'number' };
     return { tsReturn: 'number', cwrapReturn: 'number' };
 }
@@ -70,21 +76,21 @@ function generateCwrapOverload({ name, ret, args }) {
     ident: '${name}',
     returnType: ${ret.cwrapReturn === 'null' ? 'null' : `'${ret.cwrapReturn}'`},
     argTypes: ${argTypesTuple},
-  ): (...args: number[]) => ${ret.cwrapReturn === 'null' ? 'void' : 'number'};`;
+  ): (...args: number[]) => ${ret.tsReturn};`;
 }
 
 function generateCachedBinding({ name, ret, args }) {
     const key = toCamelCase(name);
     const argTypes = args.map(() => "'number'").join(', ');
     const returnType = ret.cwrapReturn === 'null' ? 'null' : `'${ret.cwrapReturn}'`;
-    const tsReturn = ret.cwrapReturn === 'null' ? 'void' : 'number';
+    const tsReturn = ret.tsReturn;
     const callSig = args.length ? '(...args: number[])' : '()';
     return `    ${key}: cwrap('${name}', ${returnType}, [${argTypes}]) as ${callSig} => ${tsReturn},`;
 }
 
 function generateCachedExportType({ name, ret, args }) {
     const key = toCamelCase(name);
-    const tsReturn = ret.cwrapReturn === 'null' ? 'void' : 'number';
+    const tsReturn = ret.tsReturn;
     if (args.length === 0) {
         return `    ${key}: () => ${tsReturn};`;
     }
@@ -93,7 +99,7 @@ function generateCachedExportType({ name, ret, args }) {
 
 /** Raw `_Export` members on SolarSystemModule — numbers only, no façade brands. */
 function generateModuleExport({ name, ret, args }) {
-    const tsReturn = ret.cwrapReturn === 'null' ? 'void' : 'number';
+    const tsReturn = ret.moduleReturn ?? (ret.cwrapReturn === 'null' ? 'void' : 'number');
     if (args.length === 0) {
         return `  _${name}: () => ${tsReturn};`;
     }

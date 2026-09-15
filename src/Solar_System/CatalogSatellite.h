@@ -6,9 +6,10 @@
 /**
  * A moon built from a catalog row — no per-body C++ class.
  *
- * Scene motion is still the circular SatelliteOrbit offset (XZ or XY) using
- * catalog sceneOrbitRadius / orbitalPeriodDays. Keplerian elements are stored on
- * the row for the eclipse follow-up and are not integrated here.
+ * Scene motion prefers the active ephemeris backend's Keplerian solution for the row
+ * (inclined, eccentric, epoch-driven — Moon, the Galileans, Titan, Triton today). Rows the
+ * backend has no solution for fall back to the circular SatelliteOrbit offset (XZ or XY)
+ * using catalog sceneOrbitRadius / orbitalPeriodDays.
  */
 class CatalogSatellite : public Satellite {
 public:
@@ -18,6 +19,9 @@ public:
     void AdjustToParent(float timeScale) override;
     void Render() const override;
 
+    bool IsEphemerisPlaced() const override { return _ephemerisPlaced; }
+    float OrbitSceneUnitsPerKm() const override;
+
     const BodyCatalog::Entry& GetEntry() const { return _entry; }
 
 private:
@@ -25,6 +29,7 @@ private:
     bool _hasSpecular;
     float _anomaly;
     float _spinDegrees;
+    bool _ephemerisPlaced = false;
 
     std::vector<TextureImage2D> _diffuses;
     TextureImage2D _normalMap;

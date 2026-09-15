@@ -128,7 +128,17 @@
               "properties": {
                 "keplerian": {
                   "type": "object",
-                  "required": ["aKm", "e", "iDeg", "OmegaDeg", "omegaDeg", "M0Deg", "nDegPerDay"]
+                  "required": [
+                    "aKm",
+                    "e",
+                    "iDeg",
+                    "OmegaDeg",
+                    "omegaDeg",
+                    "M0Deg",
+                    "nDegPerDay",
+                    "OmegaDotDegPerDay",
+                    "omegaDotDegPerDay"
+                  ]
                 },
                 "sceneOrbitRadius": { "type": "number", "exclusiveMinimum": 0 }
               }

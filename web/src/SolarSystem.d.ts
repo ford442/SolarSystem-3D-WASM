@@ -231,6 +231,11 @@ export interface SolarSystemCwrap {
     argTypes: [],
   ): (...args: number[]) => number;
   (
+    ident: 'GetNextSkyEventJson',
+    returnType: 'string',
+    argTypes: [],
+  ): (...args: number[]) => string;
+  (
     ident: 'SetOrbitLines',
     returnType: null,
     argTypes: ['number'],
@@ -405,6 +410,7 @@ export interface SolarSystemModule {
   _GetNextConjunctionBodyA: () => number;
   _GetNextConjunctionBodyB: () => number;
   _GetNextConjunctionSeparationDeg: () => number;
+  _GetNextSkyEventJson: () => number;
   _SetOrbitLines: (...args: number[]) => void;
   _GetOrbitLines: () => number;
   _SetMagneticFields: (...args: number[]) => void;

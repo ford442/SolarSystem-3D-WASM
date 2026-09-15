@@ -21,6 +21,9 @@ struct BodyData {
 
 constexpr float kEarthYearDays = 365.25f;
 
+/** Art offset aligning the Earth diffuse map's prime meridian with GMST zero. */
+constexpr float kEarthPrimeMeridianOffsetDeg = 0.0f;
+
 // NASA fact-sheet averages for periods/inclination/sidereal day.
 // Sidereal rotation days: Venus and Uranus are retrograde (negative).
 // Generated from resource/planets.catalog.json — see OrbitLayoutBodies.generated.inc header
@@ -178,6 +181,23 @@ float GetSceneDistance(Body body) {
 }
 
 float GetAxialSpinDegrees(Body body) {
+    // Earth's spin is a function of the epoch, not an accumulator: it is GMST at the
+    // current UTC Julian date. That makes scrubbing the date reversible (rewinding puts
+    // the terminator back exactly where it was) and makes the night side honest for a
+    // given UTC, which the accumulator could not do — it only ever counted forward from
+    // whenever the app happened to start.
+    //
+    // kEarthPrimeMeridianOffsetDeg is art, not astronomy: it lines the diffuse texture's
+    // prime meridian up with the GMST zero point. It has not been calibrated against a
+    // reference image, so treat Earth's absolute longitude under the terminator as
+    // approximate; the rate and the epoch behaviour are the honest parts.
+    //
+    // Other bodies keep the accumulated spin — we have no measured prime-meridian epoch
+    // for them in the catalog.
+    if (body == Body::Earth) {
+        return static_cast<float>(Ephemeris::GreenwichMeanSiderealTimeDeg(g_julianDate)) +
+               kEarthPrimeMeridianOffsetDeg;
+    }
     return g_axialSpinDeg[bodyIndex(body)];
 }
 

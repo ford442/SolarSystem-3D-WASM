@@ -102,10 +102,21 @@ function validateCatalog(catalog) {
         throw new Error(`Satellite ${body.id} requires a parent id`);
       }
       const k = body.orbit?.keplerian;
-      const keplerianFields = ['aKm', 'e', 'iDeg', 'OmegaDeg', 'omegaDeg', 'M0Deg', 'nDegPerDay'];
+      const keplerianFields = [
+        'aKm',
+        'e',
+        'iDeg',
+        'OmegaDeg',
+        'omegaDeg',
+        'M0Deg',
+        'nDegPerDay',
+        // Secular rates; 0 for a row with no measured precession.
+        'OmegaDotDegPerDay',
+        'omegaDotDegPerDay',
+      ];
       if (!k || keplerianFields.some((field) => typeof k[field] !== 'number')) {
         throw new Error(
-          `Satellite ${body.id} requires orbit.keplerian {aKm, e, iDeg, OmegaDeg, omegaDeg, M0Deg, nDegPerDay}`,
+          `Satellite ${body.id} requires orbit.keplerian {${keplerianFields.join(', ')}}`,
         );
       }
       if (typeof body.orbit?.sceneOrbitRadius !== 'number' || body.orbit.sceneOrbitRadius <= 0) {
@@ -400,7 +411,8 @@ function buildBodyCatalogHeader(catalog) {
       `${cppFloat(o.sceneOrbitRadius)}, ${cppOrbitPlane(o.orbitPlane)}, ` +
       `${cppFloat(o.initialAnomalyRad)}, ${cppFloat(o.spinDegPerSimSecond)}, ` +
       `{${cppFloat(k.aKm)}, ${cppFloat(k.e)}, ${cppFloat(k.iDeg)}, ${cppFloat(k.OmegaDeg)}, ` +
-      `${cppFloat(k.omegaDeg)}, ${cppFloat(k.M0Deg)}, ${cppFloat(k.nDegPerDay)}}, ` +
+      `${cppFloat(k.omegaDeg)}, ${cppFloat(k.M0Deg)}, ${cppFloat(k.nDegPerDay)}, ` +
+      `${cppFloat(k.OmegaDotDegPerDay)}, ${cppFloat(k.omegaDotDegPerDay)}}, ` +
       `{${cppNullableString(cloud.diffuse)}, ${cppNullableString(cloud.normal)}, ` +
       `${cppFloat(cloud.scaleFactor)}, ${cppFloat(cloud.spinDegPerSimSecond)}, ` +
       `${cppFloat(cloud.ambientFactor)}}, ` +
@@ -445,10 +457,12 @@ function buildBodyCatalogHeader(catalog) {
     '    float aKm;',
     '    float e;',
     '    float iDeg;',
-    '    float OmegaDeg;',
-    '    float omegaDeg;',
-    '    float M0Deg;',
-    '    float nDegPerDay;',
+    '    float OmegaDeg;   // longitude of ascending node at J2000',
+    '    float omegaDeg;   // argument of periapsis at J2000',
+    '    float M0Deg;      // mean anomaly at J2000',
+    '    float nDegPerDay; // mean-anomaly rate; anomalistic where the periapsis precesses',
+    '    float OmegaDotDegPerDay;',
+    '    float omegaDotDegPerDay;',
     '};',
     '',
     'struct CloudLayer {',

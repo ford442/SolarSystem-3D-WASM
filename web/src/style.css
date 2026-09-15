@@ -410,6 +410,19 @@ input {
   line-height: 1.4;
 }
 
+/* Two-button chip (jump to the computed event, or to a documented landmark date). The
+   single-button chip in the explorer panel keeps the plain full-width button below. */
+.conjunction-chip-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.conjunction-chip-actions .conjunction-chip-jump {
+  flex: 1 1 140px;
+  min-width: 0;
+}
+
 .conjunction-chip-jump {
   width: 100%;
   min-height: 40px;

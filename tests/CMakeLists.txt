@@ -36,6 +36,8 @@ add_executable(SolarSystemTests
     test_asteroid_field.cpp
     test_magnetic_field.cpp
     test_sky_events.cpp
+    test_satellite_orbit.cpp
+    test_eclipse_caster.cpp
     test_body_catalog.cpp
     stub_texture_image2d.cpp
     ${SOLARSYSTEM_TEST_SOURCES}

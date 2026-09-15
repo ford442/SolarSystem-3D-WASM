@@ -1043,11 +1043,13 @@
         "keplerian": {
           "aKm": 384400,
           "e": 0.0549,
-          "iDeg": 5.145,
-          "OmegaDeg": 125.08,
-          "omegaDeg": 318.15,
-          "M0Deg": 135.27,
-          "nDegPerDay": 13.186813186813186
+          "iDeg": 5.1454,
+          "OmegaDeg": 125.0445,
+          "omegaDeg": 318.3087,
+          "M0Deg": 134.9634,
+          "nDegPerDay": 13.0649931,
+          "OmegaDotDegPerDay": -0.0529539,
+          "omegaDotDegPerDay": 0.1643574
         }
       },
       "includeInCompanion": false,
@@ -1115,7 +1117,9 @@
           "OmegaDeg": 199.42,
           "omegaDeg": 150.21,
           "M0Deg": 0,
-          "nDegPerDay": 1128.8805268109124
+          "nDegPerDay": 1128.8805268109124,
+          "OmegaDotDegPerDay": 0,
+          "omegaDotDegPerDay": 0
         }
       },
       "includeInCompanion": false,
@@ -1183,7 +1187,9 @@
           "OmegaDeg": 54.5,
           "omegaDeg": 0,
           "M0Deg": 0,
-          "nDegPerDay": 285.03562945368174
+          "nDegPerDay": 285.03562945368174,
+          "OmegaDotDegPerDay": 0,
+          "omegaDotDegPerDay": 0
         }
       },
       "includeInCompanion": false,
@@ -1245,13 +1251,16 @@
         "yawOffsetDegrees": 0,
         "artRollDegrees": 0,
         "keplerian": {
-          "aKm": 421800,
-          "e": 0.0041,
-          "iDeg": 0.05,
-          "OmegaDeg": 43.98,
-          "omegaDeg": 84.5,
-          "M0Deg": 342,
-          "nDegPerDay": 203.50480497456192
+          "aKm": 422029.1,
+          "e": 0.004128,
+          "iDeg": 2.2129,
+          "OmegaDeg": 337.8716,
+          "omegaDeg": 69.529,
+          "M0Deg": 330.777,
+          "nDegPerDay": 203.3283065,
+          "OmegaDotDegPerDay": -2.2e-06,
+          "omegaDotDegPerDay": 0.1606539
+        
         }
       },
       "includeInCompanion": false,
@@ -1313,13 +1322,16 @@
         "yawOffsetDegrees": 0,
         "artRollDegrees": 0,
         "keplerian": {
-          "aKm": 671100,
-          "e": 0.009,
-          "iDeg": 0.47,
-          "OmegaDeg": 219.1,
-          "omegaDeg": 88.97,
-          "M0Deg": 171,
-          "nDegPerDay": 101.37989298789073
+          "aKm": 671262.2,
+          "e": 0.009368,
+          "iDeg": 2.172,
+          "OmegaDeg": 345.1275,
+          "omegaDeg": 242.6817,
+          "M0Deg": 344.9269,
+          "nDegPerDay": 101.2142751,
+          "OmegaDotDegPerDay": -0.0010529,
+          "omegaDotDegPerDay": 0.1615026
+        
         }
       },
       "includeInCompanion": false,
@@ -1381,13 +1393,16 @@
         "yawOffsetDegrees": 0,
         "artRollDegrees": 0,
         "keplerian": {
-          "aKm": 1070400,
-          "e": 0.0013,
-          "iDeg": 0.2,
-          "OmegaDeg": 63.55,
-          "omegaDeg": 192.4,
-          "M0Deg": 317.3,
-          "nDegPerDay": 50.31446540880503
+          "aKm": 1070619.7,
+          "e": 0.001835,
+          "iDeg": 2.2971,
+          "OmegaDeg": 343.2765,
+          "omegaDeg": 310.0789,
+          "M0Deg": 286.6576,
+          "nDegPerDay": 50.3131988,
+          "OmegaDotDegPerDay": -0.0004511,
+          "omegaDotDegPerDay": 0.0048602
+        
         }
       },
       "includeInCompanion": false,
@@ -1449,13 +1464,16 @@
         "yawOffsetDegrees": 0,
         "artRollDegrees": 0,
         "keplerian": {
-          "aKm": 1882700,
-          "e": 0.0074,
-          "iDeg": 0.192,
-          "OmegaDeg": 298.85,
-          "omegaDeg": 52.64,
-          "M0Deg": 181.4,
-          "nDegPerDay": 21.56980227681246
+          "aKm": 1883132.1,
+          "e": 0.007304,
+          "iDeg": 1.9733,
+          "OmegaDeg": 337.6738,
+          "omegaDeg": 15.6011,
+          "M0Deg": 85.9223,
+          "nDegPerDay": 21.5692957,
+          "OmegaDotDegPerDay": -8.49e-05,
+          "omegaDotDegPerDay": 0.0018625
+        
         }
       },
       "includeInCompanion": false,
@@ -1523,7 +1541,9 @@
           "OmegaDeg": 0,
           "omegaDeg": 0,
           "M0Deg": 0,
-          "nDegPerDay": 382.1656050955414
+          "nDegPerDay": 382.1656050955414,
+          "OmegaDotDegPerDay": 0,
+          "omegaDotDegPerDay": 0
         }
       },
       "includeInCompanion": false,
@@ -1591,7 +1611,9 @@
           "OmegaDeg": 0,
           "omegaDeg": 0,
           "M0Deg": 0,
-          "nDegPerDay": 262.7737226277372
+          "nDegPerDay": 262.7737226277372,
+          "OmegaDotDegPerDay": 0,
+          "omegaDotDegPerDay": 0
         }
       },
       "includeInCompanion": false,
@@ -1659,7 +1681,9 @@
           "OmegaDeg": 0,
           "omegaDeg": 0,
           "M0Deg": 0,
-          "nDegPerDay": 190.67796610169492
+          "nDegPerDay": 190.67796610169492,
+          "OmegaDotDegPerDay": 0,
+          "omegaDotDegPerDay": 0
         }
       },
       "includeInCompanion": false,
@@ -1727,7 +1751,9 @@
           "OmegaDeg": 0,
           "omegaDeg": 0,
           "M0Deg": 0,
-          "nDegPerDay": 131.53087321885275
+          "nDegPerDay": 131.53087321885275,
+          "OmegaDotDegPerDay": 0,
+          "omegaDotDegPerDay": 0
         }
       },
       "includeInCompanion": false,
@@ -1795,7 +1821,9 @@
           "OmegaDeg": 0,
           "omegaDeg": 0,
           "M0Deg": 0,
-          "nDegPerDay": 79.6812749003984
+          "nDegPerDay": 79.6812749003984,
+          "OmegaDotDegPerDay": 0,
+          "omegaDotDegPerDay": 0
         }
       },
       "includeInCompanion": false,
@@ -1857,13 +1885,16 @@
         "yawOffsetDegrees": 0,
         "artRollDegrees": 0,
         "keplerian": {
-          "aKm": 1221870,
-          "e": 0.0288,
-          "iDeg": 0.3485,
-          "OmegaDeg": 28.06,
-          "omegaDeg": 180.53,
-          "M0Deg": 163.31,
-          "nDegPerDay": 22.570532915360502
+          "aKm": 1221946.9,
+          "e": 0.028688,
+          "iDeg": 27.7041,
+          "OmegaDeg": 169.2016,
+          "omegaDeg": 164.3077,
+          "M0Deg": 163.5719,
+          "nDegPerDay": 22.5755606,
+          "OmegaDotDegPerDay": -1.5e-05,
+          "omegaDotDegPerDay": 0.0014296
+        
         }
       },
       "includeInCompanion": false,
@@ -1931,7 +1962,9 @@
           "OmegaDeg": 0,
           "omegaDeg": 0,
           "M0Deg": 0,
-          "nDegPerDay": 4.538577912254161
+          "nDegPerDay": 4.538577912254161,
+          "OmegaDotDegPerDay": 0,
+          "omegaDotDegPerDay": 0
         }
       },
       "includeInCompanion": false,
@@ -1999,7 +2032,9 @@
           "OmegaDeg": 0,
           "omegaDeg": 0,
           "M0Deg": 0,
-          "nDegPerDay": 254.77707006369425
+          "nDegPerDay": 254.77707006369425,
+          "OmegaDotDegPerDay": 0,
+          "omegaDotDegPerDay": 0
         }
       },
       "includeInCompanion": false,
@@ -2067,7 +2102,9 @@
           "OmegaDeg": 0,
           "omegaDeg": 0,
           "M0Deg": 0,
-          "nDegPerDay": 142.85714285714286
+          "nDegPerDay": 142.85714285714286,
+          "OmegaDotDegPerDay": 0,
+          "omegaDotDegPerDay": 0
         }
       },
       "includeInCompanion": false,
@@ -2135,7 +2172,9 @@
           "OmegaDeg": 0,
           "omegaDeg": 0,
           "M0Deg": 0,
-          "nDegPerDay": 86.87258687258687
+          "nDegPerDay": 86.87258687258687,
+          "OmegaDotDegPerDay": 0,
+          "omegaDotDegPerDay": 0
         }
       },
       "includeInCompanion": false,
@@ -2203,7 +2242,9 @@
           "OmegaDeg": 0,
           "omegaDeg": 0,
           "M0Deg": 0,
-          "nDegPerDay": 41.35079255685734
+          "nDegPerDay": 41.35079255685734,
+          "OmegaDotDegPerDay": 0,
+          "omegaDotDegPerDay": 0
         }
       },
       "includeInCompanion": false,
@@ -2271,7 +2312,9 @@
           "OmegaDeg": 0,
           "omegaDeg": 0,
           "M0Deg": 0,
-          "nDegPerDay": 26.745913818722137
+          "nDegPerDay": 26.745913818722137,
+          "OmegaDotDegPerDay": 0,
+          "omegaDotDegPerDay": 0
         }
       },
       "includeInCompanion": false,
@@ -2333,13 +2376,16 @@
         "yawOffsetDegrees": -75,
         "artRollDegrees": 0,
         "keplerian": {
-          "aKm": 354759,
-          "e": 0.000016,
-          "iDeg": 156.885,
-          "OmegaDeg": 177.61,
-          "omegaDeg": 66.14,
-          "M0Deg": 260.64,
-          "nDegPerDay": 61.25574272588055
+          "aKm": 354766.3,
+          "e": 0.000128,
+          "iDeg": 129.4889,
+          "OmegaDeg": 215.8459,
+          "omegaDeg": 95.766,
+          "M0Deg": 338.8725,
+          "nDegPerDay": 61.2565801,
+          "OmegaDotDegPerDay": 0.000718,
+          "omegaDotDegPerDay": 0.0012525
+        
         }
       },
       "includeInCompanion": false,
@@ -2407,7 +2453,9 @@
           "OmegaDeg": 223.05,
           "omegaDeg": 0,
           "M0Deg": 0,
-          "nDegPerDay": 56.36449037106623
+          "nDegPerDay": 56.36449037106623,
+          "OmegaDotDegPerDay": 0,
+          "omegaDotDegPerDay": 0
         }
       },
       "includeInCompanion": false,

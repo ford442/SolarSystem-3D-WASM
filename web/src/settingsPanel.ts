@@ -1,5 +1,5 @@
 import { copyShareableLink, type DeepLinkViewState } from './deepLink';
-import { bindConjunctionChip } from './conjunction';
+import { bindSkyEventChip } from './skyEvents';
 import {
     isoDateFromJulianDate,
     isoDateUtcNow,
@@ -47,9 +47,10 @@ export interface SettingsPanelElements {
     settingsReset: HTMLButtonElement;
     copyViewLinkButton: HTMLButtonElement;
     settingsStatus: HTMLElement;
-    conjunctionChip: HTMLElement;
-    conjunctionText: HTMLElement;
-    conjunctionJump: HTMLButtonElement;
+    skyEventChip: HTMLElement;
+    skyEventText: HTMLElement;
+    skyEventJump: HTMLButtonElement;
+    skyEventLandmark: HTMLButtonElement;
 }
 
 export interface SettingsPanelInitOptions {
@@ -125,9 +126,10 @@ export function initSettingsPanel(options: SettingsPanelInitOptions): void {
         settingsReset,
         copyViewLinkButton,
         settingsStatus,
-        conjunctionChip,
-        conjunctionText,
-        conjunctionJump,
+        skyEventChip,
+        skyEventText,
+        skyEventJump,
+        skyEventLandmark,
     } = elements;
 
     function currentPanelSettings(): PersistedSettings {
@@ -446,23 +448,24 @@ export function initSettingsPanel(options: SettingsPanelInitOptions): void {
         persistPanelSettings();
     });
 
-    const conjunction = bindConjunctionChip({
-        chip: conjunctionChip,
-        text: conjunctionText,
-        jumpButton: conjunctionJump,
-        getNextConjunction: () => runtime.getNextConjunction(),
+    const skyEvent = bindSkyEventChip({
+        chip: skyEventChip,
+        text: skyEventText,
+        jumpButton: skyEventJump,
+        landmarkButton: skyEventLandmark,
+        getNextSkyEvent: () => runtime.getNextSkyEvent(),
         setSimulationEpoch: (jd) => runtime.setSimulationEpoch(jd),
-        onJumped: (next) => {
-            simulationDateInput.value = isoDateFromJulianDate(next.julianDate);
-            settingsStatus.textContent = `Date set to conjunction (${simulationDateInput.value})`;
+        onJumped: (julianDate) => {
+            simulationDateInput.value = isoDateFromJulianDate(julianDate);
+            settingsStatus.textContent = `Date set to ${simulationDateInput.value}`;
             persistPanelSettings();
         },
     });
     subscribeSettingsChanges((field) => {
         syncFieldFromRuntime(field);
         if (field === 'simulationEpoch') {
-            conjunction.refresh();
+            skyEvent.refresh();
         }
     });
-    window.setInterval(() => conjunction.refresh(), 2000);
+    window.setInterval(() => skyEvent.refresh(), 2000);
 }

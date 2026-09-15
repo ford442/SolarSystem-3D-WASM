@@ -20,9 +20,16 @@ void CatalogSatellite::AdjustToParent(float /*timeScale*/) {
     SatelliteOrbit::AdvanceAnomaly(_anomaly, _entry.orbitalPeriodDays);
     SatelliteOrbit::AdvanceSpin(_spinDegrees, _entry.spinDegPerSimSecond);
 
-    const glm::vec3 offset = _entry.orbitPlane == BodyCatalog::OrbitPlane::XY
-                                 ? SatelliteOrbit::OffsetXY(_entry.sceneOrbitRadius, _anomaly)
-                                 : SatelliteOrbit::Offset(_entry.sceneOrbitRadius, _anomaly);
+    // Keplerian placement where the backend has a solution (Moon, Galileans, Titan,
+    // Triton); the mean-anomaly circle above still runs so a moon that loses its solution
+    // — a backend swap at runtime — picks up where the epoch left it rather than snapping.
+    glm::vec3 offset;
+    _ephemerisPlaced = SatelliteOrbit::EphemerisOffset(_entry, OrbitLayout::GetJulianDate(), offset);
+    if (!_ephemerisPlaced) {
+        offset = _entry.orbitPlane == BodyCatalog::OrbitPlane::XY
+                     ? SatelliteOrbit::OffsetXY(_entry.sceneOrbitRadius, _anomaly)
+                     : SatelliteOrbit::Offset(_entry.sceneOrbitRadius, _anomaly);
+    }
 
     LoadIdentityModelMatrix();
     Translate(_parent->GetPosition() + offset);
@@ -35,6 +42,15 @@ void CatalogSatellite::AdjustToParent(float /*timeScale*/) {
     }
     Rotate(_spinDegrees, glm::vec3(0.0f, 1.0f, 0.0f));
     UpdateModelMatrix();
+}
+
+float CatalogSatellite::OrbitSceneUnitsPerKm() const {
+    if (_entry.keplerian.aKm <= 0.0f || _entry.sceneOrbitRadius <= 0.0f) {
+        return 0.0f;
+    }
+    // EphemerisOffset maps the semi-major axis onto sceneOrbitRadius, so this is exactly the
+    // factor that relates a real length near this orbit to its length on screen.
+    return _entry.sceneOrbitRadius / _entry.keplerian.aKm;
 }
 
 void CatalogSatellite::Render() const {

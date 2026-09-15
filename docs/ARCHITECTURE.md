@@ -376,6 +376,8 @@ See [README.md § Runtime asset hosting](../README.md#runtime-asset-hosting) for
 | `WebResourceFetcher` | `DownloadFile` (async, callback-based) + `RequireResident` (residency probe) — WASM only |
 | `TextureLoadingQueue` | Serialized high-res LOD downloads |
 | `OrbitPathRenderer` | Faint heliocentric `GL_LINE_LOOP` guides |
+| `Ephemeris` | `IEphemeris` backend: Standish planets, Keplerian Pluto/belt bodies, Keplerian moons, GMST |
+| `SkyEvents` | Conjunction, eclipse, transit, and shadow-transit searches over the active backend |
 | `MagneticFieldTracer` / `MagneticFieldLineRenderer` / `MagneticFieldBloom` | Optional dipole+toroidal ribbons (static VBO, GPU flow, half-res bloom on Medium+) |
 
 ### 7.3 Scene objects
@@ -458,7 +460,11 @@ with a `render` block, textures, and an `initTag` on `initTagAllowlist`. Codegen
 `BodyCatalog.generated.h`; `InitCatalogSystem` / `MakePlanetInitFunc` pick it up with **no new
 `.h/.cpp`**. If it is a new *focus* body, also add an `OrbitLayout::Body` value, a
 `BodyFromName` mapping, and Keplerian elements in `Ephemeris.cpp` if it is not in the Standish
-table. Keep focus indices **0–11 frozen** (Sun=0 … Vesta=11); new focus bodies continue at 12+
+table. A **moon** gets its Keplerian elements from its own catalog row
+(`orbit.keplerian`, including the `OmegaDotDegPerDay` / `omegaDotDegPerDay` secular rates)
+rather than from `Ephemeris.cpp`; it is only placed from those elements once its id is added
+to `kKeplerianSatellites` in `Ephemeris.cpp`, which is the gate that keeps rows still carrying
+placeholder angles on the old circular `SatelliteOrbit::Offset` path. See § Ephemeris accuracy. Keep focus indices **0–11 frozen** (Sun=0 … Vesta=11); new focus bodies continue at 12+
 only after moons (moons already occupy 12+ as non-focus catalog rows).
 
 The steps below are for bodies with their own atmosphere scattering numbers, rings, or shaders
@@ -472,7 +478,53 @@ that do not fit `CatalogBody` flags (today: the Sun; Saturn/Uranus ring *meshes*
 
 ---
 
-## 11. Common pitfalls
+## 11. Ephemeris accuracy and the eclipse path
+
+Everything positional hangs off one interface, `Ephemeris::IEphemeris`. `Ephemeris::Position`
+answers heliocentric questions (Standish Table 1 for Mercury–Neptune; fixed Keplerian elements
+for Pluto, Ceres, and Vesta) and `Ephemeris::SatellitePosition` answers parent-relative ones for
+moons. `SkyEvents`, `OrbitLayout`, and `CatalogSatellite` all read through those two calls, so
+swapping in a different backend — a truncated VSOP87D, say — moves every consumer at once.
+
+**Moons.** A satellite is placed from its catalog `orbit.keplerian` row only when its index is
+listed in `kKeplerianSatellites` (`Ephemeris.cpp`): today the Moon, Io, Europa, Ganymede,
+Callisto, Titan, and Triton. Everything else still uses the circular `SatelliteOrbit::Offset` /
+`OffsetXY` helpers, because its row's node and periapsis angles are placeholder zeros and a
+confidently wrong orbital plane is worse than an obviously simplified one. `SatelliteOrbit::
+EphemerisOffset` rescales the AU vector so the semi-major axis lands on the catalog
+`sceneOrbitRadius` — the orbit keeps its real shape and tilt, not its real size, the same art
+compression `OrbitLayout` applies to the planets.
+
+Elements are J2000 mean elements with secular node and periapsis rates and **no periodic
+terms**. Frames: the Moon's and Triton's are genuinely ecliptic; the Galileans' and Titan's are
+fits of Horizons ecliptic osculating elements, so their inclinations carry the parent's
+obliquity (2.2° for Jupiter, 27.7° for Saturn) rather than being Laplace-plane values.
+
+**Earth's rotation** is GMST at the epoch, not an accumulator, so a given UTC always gives the
+same terminator and scrubbing backwards is exact. The texture's prime meridian is aligned by an
+art constant that has not been calibrated against a reference image — the rate and the epoch
+behaviour are the honest parts.
+
+**Time scale.** Julian dates are treated as UTC throughout. UTC↔TT (~69 s, leap seconds and all)
+and UT1↔UTC (< 0.9 s) are not modelled; both are far below the arcminute the planet series
+provides. Do not read event times as contact times.
+
+**Umbra rendering** is a decal in the lighting pass, not a second shadow map.
+`Application::ConfigureEclipseUmbra` picks at most one moon per planet — the one whose shadow
+axis passes nearest the planet's centre — and uploads its scene-space centre and radius;
+`planetLighting.fs` multiplies the shadow term by `EclipseVisibility()`, a sphere-occluder
+falloff between the geometric umbra and penumbra radii. There is no extra FBO and no geometry
+shader. The Low quality preset sets the star radius to zero, collapsing the falloff to a
+hard-edged disc; Full uses the real cone plus an art softening factor, because the Sun is drawn
+far smaller than life and the true penumbra at this scale is only a few scene units wide. The
+caster is cleared before the moons draw, since they share `_mainPlanetShader` with their primary.
+
+**Web surface.** `GetNextSkyEventJson` is the one structured export: a single JSON string rather
+than a fan of `GetEclipseX/Y/Z` scalars, because an event's body pair only means something
+alongside its kind tag. `web/src/skyEvents.ts` parses it and owns the chip; `web/src/
+conjunction.ts` remains for the explorer's conjunction-only chip.
+
+## 12. Common pitfalls
 
 1. Do not use a blocking main loop on WASM.
 2. Do not spawn `std::thread` in the web build.
@@ -485,7 +537,7 @@ that do not fit `CatalogBody` flags (today: the Sun; Saturn/Uranus ring *meshes*
 
 ---
 
-## 12. Local verification (summary)
+## 13. Local verification (summary)
 
 ```bash
 ./build-web.sh
@@ -506,7 +558,7 @@ Full scenarios: [docs/plans/TESTING_GUIDE.md](plans/TESTING_GUIDE.md).
 
 ---
 
-## 13. Related documentation
+## 14. Related documentation
 
 | Document | Purpose |
 |----------|---------|

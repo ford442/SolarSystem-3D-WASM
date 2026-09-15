@@ -6,7 +6,9 @@
 #include "Solar_System/OrbitLayout.h"
 #include <algorithm>
 #include <cmath>
+#include <cstdio>
 #include <glm/glm.hpp>
+#include <string>
 
 namespace {
     Application* activeApplication = nullptr;
@@ -177,6 +179,37 @@ extern "C" {
         if (!activeApplication) return -1.0;
         const auto& next = activeApplication->GetNextConjunction();
         return next.valid ? next.separationDeg : -1.0;
+    }
+    // Next sky event of any kind, as one JSON object. This is deliberately NOT four more
+    // GetFooX scalars: an event carries a kind tag and a body pair whose meaning depends on
+    // that tag, so a scalar-per-field surface would push the assembly rules into JS and
+    // break the moment a new kind lands. One string keeps the C++ struct authoritative and
+    // still costs a single cwrap — see the ABI note at the top of this block.
+    //
+    // The buffer is function-local static: JS copies it out inside cwrap's UTF8ToString
+    // before any other call can run, since the whole control surface is synchronous.
+    EMSCRIPTEN_KEEPALIVE const char* GetNextSkyEventJson() {
+        static std::string json;
+        if (!activeApplication) {
+            json = R"({"valid":false})";
+            return json.c_str();
+        }
+
+        const SkyEvents::SkyEvent& event = activeApplication->GetNextSkyEvent();
+        if (!event.valid) {
+            json = R"({"valid":false})";
+            return json.c_str();
+        }
+
+        char buffer[320];
+        std::snprintf(buffer, sizeof(buffer),
+                      R"({"valid":true,"kind":"%s","bodyA":%d,"bodyB":%d,"bodyAName":"%s",)"
+                      R"("bodyBName":"%s","julianDate":%.6f,"missDeg":%.6f,"limitDeg":%.6f})",
+                      SkyEvents::EventKindSlug(event.kind), event.bodyA, event.bodyB,
+                      SkyEvents::BodyName(event.bodyA), SkyEvents::BodyName(event.bodyB),
+                      event.julianDate, event.missDeg, event.limitDeg);
+        json = buffer;
+        return json.c_str();
     }
     EMSCRIPTEN_KEEPALIVE void SetOrbitLines(int enabled) {
         if (activeApplication) {
