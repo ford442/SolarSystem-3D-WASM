@@ -54,16 +54,6 @@ test('WASM module boots and staged loading reacts to camera pose', async ({ page
   );
   await expect(page.locator('#explorer-missions')).not.toHaveAttribute('hidden');
   await expect(page.locator('#explorer-mission-list button')).toHaveCount(2);
-  await page.locator('#explorer-mission-list button', { hasText: 'Voyager 1' }).click();
-  await page.waitForFunction(() => window.getFocusedMission?.()?.id === 'voyager1', undefined, {
-    timeout: 5_000,
-  });
-
-  await page.locator('#tour-play').evaluate((el: HTMLButtonElement) => el.click());
-  await expect(page.locator('#tour-caption')).not.toHaveAttribute('hidden');
-  await expect(page.locator('#tour-stop')).not.toHaveAttribute('hidden');
-  await page.locator('#tour-stop').evaluate((el: HTMLButtonElement) => el.click());
-
   await expect(page.locator('#enter-vr')).toBeHidden();
   await expect(page.locator('#xr-hud')).toBeHidden();
 
@@ -80,7 +70,6 @@ test('WASM module boots and staged loading reacts to camera pose', async ({ page
 
   await page.locator('#canvas').hover();
   await page.evaluate(() => {
-    window.focusMission?.(-1);
     window.setCameraPose?.(1200, 0, 350, 0, 0);
   });
 
@@ -94,6 +83,16 @@ test('WASM module boots and staged loading reacts to camera pose', async ({ page
       { timeout: 15_000 },
     )
     .toBe(true);
+
+  await page.locator('#explorer-mission-list button', { hasText: 'Voyager 1' }).click();
+  await page.waitForFunction(() => window.getFocusedMission?.()?.id === 'voyager1', undefined, {
+    timeout: 5_000,
+  });
+
+  await page.locator('#tour-play').evaluate((el: HTMLButtonElement) => el.click());
+  await expect(page.locator('#tour-caption')).not.toHaveAttribute('hidden');
+  await expect(page.locator('#tour-stop')).not.toHaveAttribute('hidden');
+  await page.locator('#tour-stop').evaluate((el: HTMLButtonElement) => el.click());
 
   const fatalConsoleErrors = consoleErrors.filter(
     (line) => !allowedConsoleErrorPatterns.some((pattern) => pattern.test(line)),
