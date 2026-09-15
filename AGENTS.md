@@ -48,7 +48,8 @@ cd web && npm run preview                   # http://localhost:4173/solar-system
 ```js
 // Browser console — teleport camera (Sun at origin)
 window.setCameraPose(x, y, z, yaw, pitch);  // yaw=0 → +X, yaw=90 → +Z
-Module.SetQualityPreset(0);                  // force low-res, no LOD upgrades
+window.setQualityPreset(0);                 // 0=low, 1=medium, 2=full; no LOD upgrades on 0
+window.getQualityPreset();                  // read the active preset
 ```
 
 Planets load when the camera enters each manifest's activation radius (800–1500 units). Use teleport to trigger staged loading without flying across orbital distances.

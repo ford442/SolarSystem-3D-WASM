@@ -1,7 +1,11 @@
 #!/usr/bin/env node
 /**
  * Scan WasmExports.cpp for EMSCRIPTEN_KEEPALIVE exports and emit TypeScript
- * fragments for SolarSystem.d.ts (SolarSystemCwrap overloads) and wasmBridge.exports.ts.
+ * fragments for SolarSystem.d.ts (SolarSystemCwrap overloads + SolarSystemModule
+ * `_Export` members) and wasmBridge.exports.ts.
+ *
+ * Raw module / cwrap types stay unbranded (`number`). QualityPreset / PlanetIndex
+ * brands live on the wasmBridge façade only.
  *
  * Usage: node scripts/generate-wasm-exports.mjs [--check]
  *   --check  Exit 1 if generated output would differ from committed files.
@@ -15,6 +19,11 @@ const wasmExportsCpp = join(root, 'src/WasmExports.cpp');
 const dtsPath = join(root, 'web/src/SolarSystem.d.ts');
 const bridgeExportsPath = join(root, 'web/src/wasmBridge.exports.ts');
 const exportedFunctionsPath = join(root, 'scripts/wasm-exports.json');
+
+const CWRAP_BEGIN = '// BEGIN GENERATED CWARP OVERLOADS';
+const CWRAP_END = '// END GENERATED CWARP OVERLOADS';
+const MODULE_BEGIN = '// BEGIN GENERATED MODULE EXPORTS';
+const MODULE_END = '// END GENERATED MODULE EXPORTS';
 
 const EXPORT_RE = /EMSCRIPTEN_KEEPALIVE\s+([\w\s*]+?)\s+(\w+)\s*\(([^)]*)\)/g;
 
@@ -69,7 +78,6 @@ function generateCachedBinding({ name, ret, args }) {
     const argTypes = args.map(() => "'number'").join(', ');
     const returnType = ret.cwrapReturn === 'null' ? 'null' : `'${ret.cwrapReturn}'`;
     const tsReturn = ret.cwrapReturn === 'null' ? 'void' : 'number';
-    const argSig = args.length ? `...args: number[]` : '';
     const callSig = args.length ? '(...args: number[])' : '()';
     return `    ${key}: cwrap('${name}', ${returnType}, [${argTypes}]) as ${callSig} => ${tsReturn},`;
 }
@@ -83,6 +91,29 @@ function generateCachedExportType({ name, ret, args }) {
     return `    ${key}: (...args: number[]) => ${tsReturn};`;
 }
 
+/** Raw `_Export` members on SolarSystemModule — numbers only, no façade brands. */
+function generateModuleExport({ name, ret, args }) {
+    const tsReturn = ret.cwrapReturn === 'null' ? 'void' : 'number';
+    if (args.length === 0) {
+        return `  _${name}: () => ${tsReturn};`;
+    }
+    return `  _${name}: (...args: number[]) => ${tsReturn};`;
+}
+
+function escapeRegExp(value) {
+    return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
+function replaceMarkedSection(source, beginComment, endComment, inner) {
+    const re = new RegExp(
+        `[ \\t]*${escapeRegExp(beginComment)}[\\s\\S]*?[ \\t]*${escapeRegExp(endComment)}`,
+    );
+    if (!re.test(source)) {
+        throw new Error(`Missing markers in SolarSystem.d.ts: ${beginComment} / ${endComment}`);
+    }
+    return source.replace(re, `  ${beginComment}\n${inner}\n  ${endComment}`);
+}
+
 function main() {
     const source = readFileSync(wasmExportsCpp, 'utf8');
     const exports = parseExports(source);
@@ -92,6 +123,7 @@ function main() {
     }
 
     const cwrapBlock = exports.map(generateCwrapOverload).join('\n');
+    const moduleBlock = exports.map(generateModuleExport).join('\n');
     const cachedBindings = exports.map(generateCachedBinding).join('\n');
     const cachedTypes = exports.map(generateCachedExportType).join('\n');
 
@@ -116,28 +148,9 @@ ${cachedBindings}
 export const EXPORT_COUNT = ${exports.length};
 `;
 
-    const markerStart = '  // BEGIN GENERATED CWARP OVERLOADS';
-    const markerEnd = '  // END GENERATED CWARP OVERLOADS';
     let dts = readFileSync(dtsPath, 'utf8');
-
-    const generatedSection = `${markerStart}\n${cwrapBlock}\n  ${markerEnd}`;
-
-    if (dts.includes(markerStart)) {
-        dts = dts.replace(
-            new RegExp(`${markerStart}[\\s\\S]*?${markerEnd}`),
-            generatedSection,
-        );
-    } else {
-        dts = dts.replace(
-            /export interface SolarSystemCwrap \{/,
-            `export interface SolarSystemCwrap {\n${generatedSection}`,
-        );
-    }
-
-    dts = dts.replace(
-        new RegExp(`(${markerEnd})\\s*\\([\\s\\S]*?\\n\\}`),
-        '$1\n}',
-    );
+    dts = replaceMarkedSection(dts, CWRAP_BEGIN, CWRAP_END, cwrapBlock);
+    dts = replaceMarkedSection(dts, MODULE_BEGIN, MODULE_END, moduleBlock);
 
     const check = process.argv.includes('--check');
 
@@ -161,7 +174,7 @@ export const EXPORT_COUNT = ${exports.length};
             console.error('Generated wasm export bindings are out of date. Run: npm run generate:wasm-exports');
             process.exit(1);
         }
-        console.log(`OK: ${exports.length} exports in sync`);
+        console.log(`OK: ${exports.length} exports in sync (cwrap + SolarSystemModule _Export members)`);
         return;
     }
 

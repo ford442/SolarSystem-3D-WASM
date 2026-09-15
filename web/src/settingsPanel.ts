@@ -1,4 +1,5 @@
 import { copyShareableLink, type DeepLinkViewState } from './deepLink';
+import { bindConjunctionChip } from './conjunction';
 import {
     isoDateFromJulianDate,
     isoDateUtcNow,
@@ -46,6 +47,9 @@ export interface SettingsPanelElements {
     settingsReset: HTMLButtonElement;
     copyViewLinkButton: HTMLButtonElement;
     settingsStatus: HTMLElement;
+    conjunctionChip: HTMLElement;
+    conjunctionText: HTMLElement;
+    conjunctionJump: HTMLButtonElement;
 }
 
 export interface SettingsPanelInitOptions {
@@ -121,6 +125,9 @@ export function initSettingsPanel(options: SettingsPanelInitOptions): void {
         settingsReset,
         copyViewLinkButton,
         settingsStatus,
+        conjunctionChip,
+        conjunctionText,
+        conjunctionJump,
     } = elements;
 
     function currentPanelSettings(): PersistedSettings {
@@ -253,9 +260,11 @@ export function initSettingsPanel(options: SettingsPanelInitOptions): void {
     const magneticFields = deepLink.magneticFields ?? saved.magneticFields ?? false;
     const musicVolumePercent = saved.musicVolume ?? Math.round(runtime.getMusicVolume() * 100);
     const musicMuted = saved.musicMuted ?? runtime.getMusicMuted();
-    const simulationDate = deepLink.simulationDate
-        ?? saved.simulationDate
-        ?? isoDateFromJulianDate(runtime.getSimulationEpoch());
+    const simulationDate = deepLink.julianDate !== undefined
+        ? isoDateFromJulianDate(deepLink.julianDate)
+        : deepLink.simulationDate
+            ?? saved.simulationDate
+            ?? isoDateFromJulianDate(runtime.getSimulationEpoch());
     const orbitScale = deepLink.orbitScale;
 
     qualitySelect.value = String(quality);
@@ -275,7 +284,9 @@ export function initSettingsPanel(options: SettingsPanelInitOptions): void {
     if (orbitScale === 0 || orbitScale === 1) {
         runtime.setOrbitScaleMode(orbitScale);
     }
-    {
+    if (deepLink.julianDate !== undefined && Number.isFinite(deepLink.julianDate)) {
+        runtime.setSimulationEpoch(deepLink.julianDate);
+    } else {
         const jd = julianDateFromIsoDate(simulationDate);
         if (jd !== undefined) {
             runtime.setSimulationEpoch(jd);
@@ -389,16 +400,14 @@ export function initSettingsPanel(options: SettingsPanelInitOptions): void {
         void copyShareableLink({
             getQualityPreset: () => runtime.getQualityPreset(),
             getTimeScale: () => runtime.getTimeScale(),
-            getPaused: () => (runtime.getPaused() ? 1 : 0),
+            getPaused: () => runtime.getPaused(),
             getSimulationEpoch: () => runtime.getSimulationEpoch(),
             getOrbitScaleMode: () => runtime.getOrbitScaleMode(),
             getShadowQuality: () => runtime.getShadowQuality(),
-            getOrbitLines: () => (runtime.getOrbitLines() ? 1 : 0),
-            getMagneticFields: () => (runtime.getMagneticFields() ? 1 : 0),
+            getOrbitLines: () => runtime.getOrbitLines(),
+            getMagneticFields: () => runtime.getMagneticFields(),
             getFocusedPlanetIndex: () => runtime.getFocusedPlanetIndex(),
-            getCameraPosition: () => runtime.getCameraPosition(),
-            getCameraYaw: () => runtime.getCameraYaw(),
-            getCameraPitch: () => runtime.getCameraPitch(),
+            getCameraPose: () => runtime.getCameraPose(),
             isoDateFromJulianDate,
         })
             .then(() => {
@@ -437,5 +446,23 @@ export function initSettingsPanel(options: SettingsPanelInitOptions): void {
         persistPanelSettings();
     });
 
-    subscribeSettingsChanges(syncFieldFromRuntime);
+    const conjunction = bindConjunctionChip({
+        chip: conjunctionChip,
+        text: conjunctionText,
+        jumpButton: conjunctionJump,
+        getNextConjunction: () => runtime.getNextConjunction(),
+        setSimulationEpoch: (jd) => runtime.setSimulationEpoch(jd),
+        onJumped: (next) => {
+            simulationDateInput.value = isoDateFromJulianDate(next.julianDate);
+            settingsStatus.textContent = `Date set to conjunction (${simulationDateInput.value})`;
+            persistPanelSettings();
+        },
+    });
+    subscribeSettingsChanges((field) => {
+        syncFieldFromRuntime(field);
+        if (field === 'simulationEpoch') {
+            conjunction.refresh();
+        }
+    });
+    window.setInterval(() => conjunction.refresh(), 2000);
 }

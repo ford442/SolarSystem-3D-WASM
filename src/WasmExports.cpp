@@ -35,9 +35,17 @@ void SetActiveApplication(Application* application) {
 #ifdef __EMSCRIPTEN__
 extern "C" {
     // Keep this small control surface as an explicit C ABI consumed through
-    // cwrap. If the web API grows to return planet lists or settings structs,
-    // migrate those structured values to embind instead of adding pointer-based
-    // C exports; these scalar settings remain simpler as cwrap calls.
+    // cwrap. Structured JS values (conjunction, camera pose) are assembled in
+    // web/src/wasmBridge.ts from these scalars — do not add GetFooX/Y/Z-style
+    // exports for new payloads.
+    //
+    // Embind (--bind) is rejected for this control plane: camera pose and
+    // conjunction are tiny tuples already covered by keepalives plus one
+    // façade adapter each. Enabling embind would add a second ABI, extra link
+    // size, and Closure/externs work without buying lists or settings structs.
+    // If the web API grows to return planet lists or settings snapshots,
+    // migrate those structured values to embind then; keep these scalars as
+    // cwrap. See docs/plans/PORTING_GUIDE.md § JS control surface.
     EMSCRIPTEN_KEEPALIVE void SetCameraPose(float x, float y, float z, float yaw, float pitch) {
         if (!activeApplication) return;
         Camera& cam = activeApplication->GetCamera();
@@ -147,8 +155,9 @@ extern "C" {
         idx = std::clamp(idx, 0, OrbitLayout::kBodyCount - 1);
         return OrbitLayout::GetSceneDistance(static_cast<OrbitLayout::Body>(idx));
     }
-    // Next inner-planet conjunction at the current epoch, as four scalars so the UI can
-    // format it however it likes. Body indices match FocusPlanet; -1 when none was found.
+    // Next inner-planet conjunction at the current epoch, as four scalars.
+    // JS assembles { valid, bodyA, bodyB, julianDate, separationDeg } in
+    // SolarSystemRuntime.getNextConjunction() — no extra cwrap and no Embind.
     EMSCRIPTEN_KEEPALIVE double GetNextConjunctionJulianDate() {
         if (!activeApplication) return 0.0;
         const auto& next = activeApplication->GetNextConjunction();

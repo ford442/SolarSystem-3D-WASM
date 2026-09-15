@@ -99,8 +99,15 @@ A full WebGPU port of the custom C++ renderer (Emdawnwebgpu / webgpu.h / WGSL) w
 Only after Phases 0–3 are stable:
 
 - [ ] Evaluate WASM ↔ JS interop: C++ core for orbit/simulation, Three.js for presentation.
-- [ ] Shared camera state via `Module.cwrap` or Embind.
+- [ ] Shared camera / epoch via the existing control plane (`SolarSystemRuntime.setCameraPose` /
+      `getCameraPose`, `setSimulationEpoch` / `getSimulationEpoch`). Structured values are JS
+      adapters over cwrap scalars; Embind is not in the link (see `WasmExports.cpp`).
+      **Do not** add a parallel `GetFooX/Y/Z` ABI for the companion.
 - [ ] Decide: separate deploy vs. tab toggle in single `index.html`.
+
+**API availability:** Phase 4 *can* share camera and epoch through this façade today.
+Whether to actually hybridize (separate tracks vs. one page) remains a **written
+decision in this section**, not a rewrite in the control-plane ticket.
 
 **Exit criteria:** Written decision in this doc (separate tracks vs. hybrid).
 

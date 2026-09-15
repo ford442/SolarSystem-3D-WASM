@@ -315,7 +315,7 @@ export interface SolarSystemCwrap {
     returnType: 'number',
     argTypes: [],
   ): (...args: number[]) => number;
-    // END GENERATED CWARP OVERLOADS
+  // END GENERATED CWARP OVERLOADS
 }
 
 export type SettingsChangeField =
@@ -358,48 +358,54 @@ export interface SolarSystemModule {
   HEAPF32: Float32Array;
   HEAP8: Int8Array;
   _main: (argc: number, argv: number) => number;
-  _SetCameraPose: SetCameraPose;
-  _SetQualityPreset: SetQualityPreset;
-  _GetQualityPreset: GetQualityPreset;
-  _SetTimeScale: SetTimeScale;
-  _GetTimeScale: GetTimeScale;
-  _SetPaused: SetPaused;
+  // BEGIN GENERATED MODULE EXPORTS
+  _SetCameraPose: (...args: number[]) => void;
+  _SetQualityPreset: (...args: number[]) => void;
+  _GetQualityPreset: () => number;
+  _SetTimeScale: (...args: number[]) => void;
+  _GetTimeScale: () => number;
+  _SetPaused: (...args: number[]) => void;
   _GetPaused: () => number;
-  _SetSimulationEpoch: SetSimulationEpoch;
-  _GetSimulationEpoch: GetSimulationEpoch;
-  _SetShadowQuality: SetShadowQuality;
-  _GetShadowQuality: GetShadowQuality;
-  _SetTouchMovement: SetTouchMovement;
-  _AddTouchLook: AddTouchLook;
-  _AddTouchZoom: AddTouchZoom;
+  _SetSimulationEpoch: (...args: number[]) => void;
+  _GetSimulationEpoch: () => number;
+  _SetShadowQuality: (...args: number[]) => void;
+  _GetShadowQuality: () => number;
+  _SetTouchMovement: (...args: number[]) => void;
+  _AddTouchLook: (...args: number[]) => void;
+  _AddTouchZoom: (...args: number[]) => void;
   _IsMobileWeb: () => number;
-  _SetMusicVolume: SetMusicVolume;
-  _GetMusicVolume: GetMusicVolume;
-  _SetMusicMuted: SetMusicMuted;
+  _SetMusicVolume: (...args: number[]) => void;
+  _GetMusicVolume: () => number;
+  _SetMusicMuted: (...args: number[]) => void;
   _GetMusicMuted: () => number;
-  _FocusPlanet: FocusPlanet;
-  _SetOrbitScaleMode: SetOrbitScaleMode;
-  _GetOrbitScaleMode: GetOrbitScaleMode;
-  _GetNearestPlanetIndex: GetNearestPlanetIndex;
-  _GetFocusedPlanetIndex: GetFocusedPlanetIndex;
-  _GetPlanetSceneDistance: GetPlanetSceneDistance;
-  _SetOrbitLines: SetOrbitLines;
+  _FocusPlanet: (...args: number[]) => void;
+  _SetOrbitScaleMode: (...args: number[]) => void;
+  _GetOrbitScaleMode: () => number;
+  _GetNearestPlanetIndex: () => number;
+  _GetFocusedPlanetIndex: () => number;
+  _GetPlanetSceneDistance: (...args: number[]) => number;
+  _GetNextConjunctionJulianDate: () => number;
+  _GetNextConjunctionBodyA: () => number;
+  _GetNextConjunctionBodyB: () => number;
+  _GetNextConjunctionSeparationDeg: () => number;
+  _SetOrbitLines: (...args: number[]) => void;
   _GetOrbitLines: () => number;
-  _SetMagneticFields: SetMagneticFields;
+  _SetMagneticFields: (...args: number[]) => void;
   _GetMagneticFields: () => number;
-  _SetMagneticFieldMode: SetMagneticFieldMode;
+  _SetMagneticFieldMode: (...args: number[]) => void;
   _GetMagneticFieldMode: () => number;
-  _SetXrSessionActive: SetXrSessionActive;
-  _SetXrEyeCount: SetXrEyeCount;
-  _SetXrEyeViewport: SetXrEyeViewport;
-  _GetXrMatrixScratch: GetXrMatrixScratch;
-  _CommitXrEyeMatrices: CommitXrEyeMatrices;
-  _RunXrFrame: RunXrFrame;
-  _GetCameraPositionX: GetCameraPositionComponent;
-  _GetCameraPositionY: GetCameraPositionComponent;
-  _GetCameraPositionZ: GetCameraPositionComponent;
-  _GetCameraYaw: GetCameraYaw;
-  _GetCameraPitch: GetCameraPitch;
+  _SetXrSessionActive: (...args: number[]) => void;
+  _SetXrEyeCount: (...args: number[]) => void;
+  _SetXrEyeViewport: (...args: number[]) => void;
+  _GetXrMatrixScratch: () => number;
+  _CommitXrEyeMatrices: (...args: number[]) => void;
+  _RunXrFrame: () => void;
+  _GetCameraPositionX: () => number;
+  _GetCameraPositionY: () => number;
+  _GetCameraPositionZ: () => number;
+  _GetCameraYaw: () => number;
+  _GetCameraPitch: () => number;
+  // END GENERATED MODULE EXPORTS
 }
 
 declare const SolarSystem: (
@@ -410,17 +416,27 @@ export default SolarSystem;
 
 declare global {
   interface Window {
-    /** Console helper documented in AGENTS.md. */
+    /** Console helpers documented in AGENTS.md. */
     setCameraPose?: SetCameraPose;
+    setQualityPreset?: SetQualityPreset;
+    getQualityPreset?: GetQualityPreset;
+    getNextConjunction?: () => {
+      valid: boolean;
+      bodyA: number;
+      bodyB: number;
+      julianDate: number;
+      separationDeg: number;
+    };
     /** Runtime asset base URL for WebResourceFetcher. */
     __solarSystemAssetBase?: string;
     /** Init config published before Module() — read by QualitySettings.cpp. */
     __solarSystemInit?: {
       qualityPreset: QualityPreset;
       isMobileWeb: boolean;
+      backingStoreScale: number;
     };
   }
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const Module: SolarSystemModuleConfig & Record<string, any>;
+  /** Incoming Module config (callbacks live on SolarSystemModuleConfig). */
+  const Module: SolarSystemModuleConfig;
 }
