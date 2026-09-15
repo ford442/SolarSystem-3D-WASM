@@ -168,6 +168,7 @@ export function exposeConsoleHelpers(runtime: SolarSystemRuntime): void {
     window.setCameraPose = runtime.setCameraPose.bind(runtime);
     window.setQualityPreset = runtime.setQualityPreset.bind(runtime);
     window.getQualityPreset = runtime.getQualityPreset.bind(runtime);
+    window.getNextConjunction = runtime.getNextConjunction.bind(runtime);
 }
 
 export function subscribeSettingsChanges(

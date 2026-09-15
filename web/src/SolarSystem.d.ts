@@ -420,6 +420,13 @@ declare global {
     setCameraPose?: SetCameraPose;
     setQualityPreset?: SetQualityPreset;
     getQualityPreset?: GetQualityPreset;
+    getNextConjunction?: () => {
+      valid: boolean;
+      bodyA: number;
+      bodyB: number;
+      julianDate: number;
+      separationDeg: number;
+    };
     /** Runtime asset base URL for WebResourceFetcher. */
     __solarSystemAssetBase?: string;
     /** Init config published before Module() — read by QualitySettings.cpp. */

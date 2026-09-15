@@ -210,7 +210,7 @@ export class PlanetExplorer {
         this.bindings = bindings;
         this.skipPlanetRestore = options?.skipPlanetRestore ?? false;
         this.initialOrbitScale = options?.initialOrbitScale;
-        const factsUrl = new URL('planet_facts.json', import.meta.env.BASE_URL).toString();
+        const factsUrl = new URL('planet_facts.json', new URL(import.meta.env.BASE_URL, window.location.href)).toString();
         const response = await fetch(factsUrl);
         if (!response.ok) {
             throw new Error(`Failed to load planet facts (${response.status})`);
