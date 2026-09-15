@@ -1,5 +1,6 @@
 #include "MissionPathRenderer.h"
 
+#include <algorithm>
 #include <cmath>
 #include <cstddef>
 
