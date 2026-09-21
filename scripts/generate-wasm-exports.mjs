@@ -135,7 +135,12 @@ function findUnwrappedExports(exports) {
         return exports.map(({ name }) => name);
     }
     return exports
-        .filter(({ name }) => !bridgeSource.includes(`exports.${toCamelCase(name)}`))
+        .filter(({ name }) => {
+            // Word-boundary match: a plain .includes() would count `exports.getCameraPosition`
+            // as "wrapped" merely because `exports.getCameraPositionX` appears in the file.
+            const re = new RegExp(`exports\\.${escapeRegExp(toCamelCase(name))}\\b`);
+            return !re.test(bridgeSource);
+        })
         .map(({ name }) => name);
 }
 
