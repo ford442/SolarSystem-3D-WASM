@@ -1,6 +1,7 @@
 // Shadow/color passes for planets, atmospheres, rings, clouds and text overlays, plus the
 // GPU-resource setup they need. Renderer:: methods; see Renderer.h for what it owns versus
 // what it reaches into Application for (camera, scene components, sun, display size, ...).
+#include "Solar_System/TexturePaths.h"
 #include "Application.h"
 #include "JsBridge.h"
 #include "QualitySettings.h"
@@ -46,7 +47,7 @@ void Renderer::Init() {
     mainCloudsShader = make_unique<Shader>("resource/shaders/planetLighting.vs", "resource/shaders/cloudsLighting.fs");
     mainRingShader = make_unique<Shader>("resource/shaders/planetaryRingLighting.vs", "resource/shaders/planetaryRingLighting.fs");
     lensFlareShader = make_unique<Shader>("resource/shaders/lensFlare.vs", "resource/shaders/lensFlare.fs");
-    lensFlare = make_unique<LensFlare>(*lensFlareShader, TextureImage2D("resource/textures_low/flares_bright_Low.dds"),
+    lensFlare = make_unique<LensFlare>(*lensFlareShader, TextureImage2D(TexturePaths::Resolve("resource/textures_low/flares_bright_Low.dds")),
             FlaresInfo {4,
             {
                 FlareSprite{false, 1.0, 7.0, 0},

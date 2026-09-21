@@ -2,6 +2,7 @@
 #include "ResourceManifest.h"
 #include "QualitySettings.h"
 #include "Auxiliary_Modules/WebResourceFetcher.h"
+#include "Solar_System/TexturePaths.h"
 #include <array>
 #include <chrono>
 #include <fstream>
@@ -63,8 +64,12 @@ void Application::LoadCoreResources() {
         {"resource/models/deimos.obj", "resource/models/deimos.obj"},
         {"resource/models/saturn_ring.obj", "resource/models/saturn_ring.obj"},
         {"resource/models/uranus_ring.obj", "resource/models/uranus_ring.obj"},
-        {"resource/textures_low/Star_Spectrum_Low.dds", "resource/textures_low/Star_Spectrum_Low.dds"},
-        {"resource/textures_low/flares_bright_Low.dds", "resource/textures_low/flares_bright_Low.dds"},
+        // Resolved through the active texture pack so the staged file matches what the
+        // Sun/lens-flare constructors later read (see TextureFormats::VariantPath).
+        {TexturePaths::Resolve("resource/textures_low/Star_Spectrum_Low.dds"),
+         TexturePaths::Resolve("resource/textures_low/Star_Spectrum_Low.dds")},
+        {TexturePaths::Resolve("resource/textures_low/flares_bright_Low.dds"),
+         TexturePaths::Resolve("resource/textures_low/flares_bright_Low.dds")},
     };
 
     const auto skyBoxFaces = GetSkyBoxFaces();

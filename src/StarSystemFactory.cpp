@@ -59,7 +59,7 @@ void Application::InitStarSystem() {
     _sphereModel = std::make_unique<MeshHolder>("resource/models/sphere.obj");
 
     _renderer.starGlowShader = make_unique<Shader>("resource/shaders/starGlow.vs", "resource/shaders/starGlow.fs");
-    StarInfo sunInfo(*_sphereModel, *_renderer.mainStarShader, *_renderer.starGlowShader, TextureImage2D("resource/textures_low/Star_Spectrum_Low.dds"),
+    StarInfo sunInfo(*_sphereModel, *_renderer.mainStarShader, *_renderer.starGlowShader, TextureImage2D(TexturePaths::Resolve("resource/textures_low/Star_Spectrum_Low.dds")),
                      _renderer.starTemperatureInKelvin, 696342.0, glm::vec3(0.99607843, 0.890196078, 0.725490196), L"Sun", L"Солнце");
     _sun = make_shared<Sun>(sunInfo);
     _sun->SetMagneticField(MagneticFieldCatalog::IntrinsicParamsForBody(OrbitLayout::Body::Sun));

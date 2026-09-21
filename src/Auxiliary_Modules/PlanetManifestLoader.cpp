@@ -1,5 +1,6 @@
 #include "PlanetManifestLoader.h"
 #include "../PlanetSystemManifest.h"
+#include "TextureFormatSupport.h"
 
 #include <cctype>
 #include <fstream>
@@ -7,6 +8,17 @@
 #include <utility>
 
 namespace PlanetManifestLoader {
+namespace {
+std::vector<std::string> ToVariantPaths(const std::vector<std::string>& ddsPaths) {
+    std::vector<std::string> resolved;
+    resolved.reserve(ddsPaths.size());
+    for (const std::string& path : ddsPaths) {
+        resolved.push_back(TextureFormats::VariantPath(path));
+    }
+    return resolved;
+}
+} // namespace
+
 namespace {
 
 struct ParsedSystem {
@@ -361,9 +373,13 @@ std::vector<PlanetSystemManifest> LoadManifests(
         manifest.name = system.name;
         manifest.proxyPosition = sunPosition + system.proxyOffset;
         manifest.activationRadius = system.activationRadius;
-        manifest.assetPaths = system.required;
-        manifest.optionalAssetPaths = system.optional;
-        manifest.optionalHighResAssetPaths = system.optionalHighRes;
+        // Stage whatever the active texture pack will actually read. The catalog spells
+        // every asset as .dds; with a KTX2 pack selected the consumer asks for the
+        // rewritten path, so the download has to be rewritten the same way or the
+        // constructor finds nothing resident. See TextureFormats::VariantPath.
+        manifest.assetPaths = ToVariantPaths(system.required);
+        manifest.optionalAssetPaths = ToVariantPaths(system.optional);
+        manifest.optionalHighResAssetPaths = ToVariantPaths(system.optionalHighRes);
         manifest.initFunc = std::move(initFunc);
         manifests.push_back(std::move(manifest));
     }

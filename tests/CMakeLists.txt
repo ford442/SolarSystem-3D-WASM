@@ -25,6 +25,9 @@ set(SOLARSYSTEM_TEST_SOURCES
     ${CMAKE_SOURCE_DIR}/src/Auxiliary_Modules/TextureLoadingQueue.cpp
     ${CMAKE_SOURCE_DIR}/src/Auxiliary_Modules/TextureLODController.cpp
     ${CMAKE_SOURCE_DIR}/src/Auxiliary_Modules/WebResourceFetcher.cpp
+    ${CMAKE_SOURCE_DIR}/src/Auxiliary_Modules/TextureFormatSupport.cpp
+    ${CMAKE_SOURCE_DIR}/src/Auxiliary_Modules/BlockCompression.cpp
+    ${CMAKE_SOURCE_DIR}/src/3rdparty/ktx2_reader.cpp
 )
 
 add_executable(SolarSystemTests
@@ -41,6 +44,7 @@ add_executable(SolarSystemTests
     test_eclipse_caster.cpp
     test_mission_catalog.cpp
     test_body_catalog.cpp
+    test_texture_formats.cpp
     stub_texture_image2d.cpp
     ${SOLARSYSTEM_TEST_SOURCES}
 )

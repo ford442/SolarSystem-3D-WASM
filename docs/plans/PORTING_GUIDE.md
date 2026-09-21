@@ -354,10 +354,65 @@ Two independent bugs, now fixed:
   fixed upstream by then, but the direct-query workaround will keep working regardless.
 
 Anisotropic filtering is now enabled on web when the extension exists (capped 4× mobile / 8×
-desktop, vs. native's unconditional 16×). DDS loading throws a specific "S3TC not supported"
-error (instead of a generic parse failure) when a compressed texture is loaded on a GPU/browser
-without `WEBGL_compressed_texture_s3tc` — it still falls back to the same checkerboard
-placeholder texture as any other load failure, just with a clearer console message.
+desktop, vs. native's unconditional 16×).
+
+`GetGlCapabilities()` also probes `EXT_texture_compression_bptc`,
+`WEBGL_compressed_texture_etc` and `WEBGL_compressed_texture_astc`, and logs a
+`preferredPack=` field. A missing `WEBGL_compressed_texture_s3tc` is no longer a load
+failure — see "Texture containers" below.
+
+## 3d. Texture containers: DDS, KTX2, and the software BC decoder
+
+Until this changed, the renderer shipped DXT/S3TC DDS only. A GPU without
+`WEBGL_compressed_texture_s3tc` — Safari, iOS, most Android GPUs — threw out of
+`TextureImage2D::LoadTextureFromFile` and rendered the 4×4 fallback checkerboard. There
+are now three layers:
+
+1. **Format probing.** `GlCapabilities` reports S3TC / BPTC / ETC2 / ASTC, and
+   `TextureFormats::PreferredPackName()` turns that into one pack name, in the order
+   **BC7 → BC3 → ASTC → ETC2 → RGBA8**. BC comes first so desktop keeps a BC format
+   instead of drifting onto a driver-emulated ASTC path; a GPU with no BC at all lands
+   on a real compressed format rather than the checkerboard.
+
+2. **KTX2 packs (the shipping path for non-BC GPUs).**
+   `src/3rdparty/ktx2_reader.cpp` parses the KTX2 *container* only — header, level index,
+   per-level spans — and `TextureFormatSupport.cpp` maps `vkFormat` onto a GL internal
+   format. **Nothing is transcoded at runtime.** Levels are handed straight to
+   `glCompressedTexImage2D`, so:
+
+   - **Wasm size delta from this feature: 0 KB of third-party code.** No
+     `basis_universal` transcoder, no `libktx`, no zstd decompressor is linked in. The
+     issue budgeted < 250 KB for a transcoder; encoding offline into the format the GPU
+     already reported spends none of it. The cost moves to the CDN (one pack per format)
+     instead of the download.
+   - Files **must not** be supercompressed (`supercompressionScheme != 0`) and **must
+     not** be Basis Universal (`vkFormat == 0`). Both are rejected by name at parse time
+     rather than silently misread. `scripts/convert_textures_ktx2.py` produces conforming
+     files.
+   - The reader is **2D-only**. Cube maps (the skybox) stay on DDS.
+
+   Packs are opt-in per deployment: `web/src/bootstrap.ts` publishes
+   `VITE_TEXTURE_PACKS` (e.g. `astc,etc2,bc3`) as `window.__solarSystemTexturePacks`, and
+   `SelectTexturePack()` in `PlatformWindow.cpp` adopts the preferred pack only if the
+   deployment published it. Path rewriting is then a pure string operation in
+   `TextureFormats::VariantPath()` —
+   `textures_low/X_Low.dds` → `textures_low/<pack>/X_Low.ktx2`.
+
+3. **Software BC decode (the compatibility path).** With no pack published — the default,
+   and every native build — a GPU without S3TC now CPU-decodes the DXT blocks to RGBA8
+   (`src/Auxiliary_Modules/BlockCompression.cpp`) and uploads that, instead of falling
+   back to the checkerboard. It costs 4 bytes per texel of GPU memory and a decode pass
+   per mip, so it is a stopgap that keeps the *existing* DDS content usable everywhere;
+   publishing an ASTC/ETC2 pack is what turns it back into a real compressed upload.
+
+The GL-free halves of all three layers are unit tested natively in
+`tests/test_texture_formats.cpp` (container parsing, format mapping, pack selection,
+block decode) — no GL context or browser required.
+
+**Native builds** keep the `.dds` path unchanged: `SelectTexturePack()` is a no-op off
+Emscripten, so Linux/Windows still boot from the existing DDS set. The KTX2 upload path
+itself is not `#ifdef`'d, so pointing a native build at a pack works if one is ever
+published for it.
 
 ## 4. Platform-Specific Code
 

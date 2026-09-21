@@ -242,7 +242,23 @@ After a planet is `READY`, it renders with **low-res** textures (`GetTexturePath
 
 Loads are deduplicated, cancellable on camera retreat, concurrency-capped by quality preset, and reported through `window.updateStreamingProgress(completed, total, active, tierCode)` (`tierCode`: 0 generic, 1 mid, 2 high).
 
-**Mipmap safety:** `nv_dds` + `TextureImage2D` always set `GL_TEXTURE_BASE_LEVEL=0` and `GL_TEXTURE_MAX_LEVEL` to the last uploaded mip level. Incomplete mip chains cause black textures on WebGL 2.
+**Mipmap safety:** every upload path — `nv_dds`, the KTX2 reader, and the software BC decoder — sets `GL_TEXTURE_BASE_LEVEL=0` and `GL_TEXTURE_MAX_LEVEL` to the last uploaded mip level. Incomplete mip chains cause black textures on WebGL 2.
+
+### 4.4 Texture formats and packs
+
+LOD paths are written as `.dds` everywhere and rewritten at load time by `TexturePaths::Resolve()` → `TextureFormats::VariantPath()`, so the tier table above is format-agnostic. Which format is used depends on what the GL context reports:
+
+| Context | Pack picked | What loads |
+|---------|-------------|------------|
+| Desktop with `EXT_texture_compression_bptc` | `bc7` | `textures_*/bc7/*.ktx2` if published, else `.dds` |
+| Desktop Chrome (S3TC) | `bc3` | `.dds` as before, or a `bc3` pack |
+| Safari / iOS, modern Android (ASTC) | `astc` | `astc` pack if published, else `.dds` **software-decoded to RGBA8** |
+| Older Android (ETC2 only) | `etc2` | `etc2` pack if published, else software decode |
+| CI / software GL (nothing compressed) | `rgba8` | software decode |
+
+A deployment opts in by building with `VITE_TEXTURE_PACKS=astc,etc2,bc3` after running `scripts/convert_textures_ktx2.py`; with none published every GPU stays on `.dds`. Quality presets are unaffected — pack selection and LOD tier are independent, so preset 0 still never upgrades past low. The skybox cube map is deliberately excluded (the KTX2 reader is 2D-only).
+
+See `docs/plans/PORTING_GUIDE.md` § 3d for why no Basis/`libktx` transcoder is linked into the Wasm module.
 
 ---
 

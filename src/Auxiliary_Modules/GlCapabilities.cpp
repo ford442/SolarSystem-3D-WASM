@@ -30,12 +30,20 @@ GlCapabilities ProbeGlCapabilities() {
 #ifdef __EMSCRIPTEN__
     caps.anisotropicFiltering = IsWebGlExtensionSupported("EXT_texture_filter_anisotropic");
     caps.s3tcCompressedTextures = IsWebGlExtensionSupported("WEBGL_compressed_texture_s3tc");
+    caps.bptcCompressedTextures = IsWebGlExtensionSupported("EXT_texture_compression_bptc");
+    caps.etc2CompressedTextures = IsWebGlExtensionSupported("WEBGL_compressed_texture_etc");
+    caps.astcCompressedTextures = IsWebGlExtensionSupported("WEBGL_compressed_texture_astc");
     caps.colorBufferFloat = IsWebGlExtensionSupported("EXT_color_buffer_float");
 #else
     // Desktop GL 4.6 core always has these via GLEW; anisotropy is applied unconditionally
     // in TextureImage2D.cpp for native builds, so this cap is web-only for now.
     caps.anisotropicFiltering = true;
     caps.s3tcCompressedTextures = true;
+    caps.bptcCompressedTextures = true;
+    // ETC2 and ASTC are nominally core in GL 4.3+ but are software-decoded by desktop
+    // drivers. Leave them off so the desktop path keeps picking a BC format.
+    caps.etc2CompressedTextures = false;
+    caps.astcCompressedTextures = false;
     caps.colorBufferFloat = true;
 #endif
 
@@ -57,6 +65,10 @@ const GlCapabilities& GetGlCapabilities() {
         std::cout << "[GlCapabilities] anisotropy=" << (c.anisotropicFiltering ? "yes" : "no")
                   << " (max " << c.maxAnisotropy << "x)"
                   << " | S3TC=" << (c.s3tcCompressedTextures ? "yes" : "no")
+                  << " | BPTC=" << (c.bptcCompressedTextures ? "yes" : "no")
+                  << " | ETC2=" << (c.etc2CompressedTextures ? "yes" : "no")
+                  << " | ASTC=" << (c.astcCompressedTextures ? "yes" : "no")
+                  << " | preferredPack=" << c.PreferredTexturePack()
                   << " | colorBufferFloat=" << (c.colorBufferFloat ? "yes" : "no")
                   << " | maxTextureSize=" << c.maxTextureSize << std::endl;
         return c;

@@ -287,6 +287,24 @@ value as `window.__solarSystemAssetBase`. `WebResourceFetcher` then resolves eve
 the deployed Vite base (normally `/solar-system/resource/...`). The value is public configuration,
 so it must never contain credentials or signed secrets.
 
+#### Texture packs (`VITE_TEXTURE_PACKS`)
+
+The textures ship as DXT/S3TC `.dds`, which Safari, iOS and most Android GPUs cannot accept.
+Those GPUs still render real surfaces — the loader CPU-decodes the DXT blocks to RGBA8 — but
+that costs GPU memory and decode time. To serve them a native compressed format instead, build
+per-format KTX2 packs and tell the bundle which ones you published:
+
+```bash
+python3 scripts/convert_textures_ktx2.py --formats astc,etc2,bc3
+# deploy the new resource/textures_*/<pack>/ subdirectories, then:
+VITE_TEXTURE_PACKS=astc,etc2,bc3 npm run build
+```
+
+The list is published as `window.__solarSystemTexturePacks`. At startup the WASM module probes
+the WebGL context, picks its preferred pack (BC7 → BC3 → ASTC → ETC2) and uses it only if that
+pack appears in the list; otherwise it stays on `.dds`. Leaving the variable unset is a supported
+configuration and changes nothing. See `docs/plans/PORTING_GUIDE.md` § 3d.
+
 ### Distribution options
 
 | Option | Assessment |
