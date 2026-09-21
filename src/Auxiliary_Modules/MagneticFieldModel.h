@@ -18,7 +18,7 @@ glm::vec3 SampleField(const glm::vec3& magneticPos, const MagneticFieldParams& p
 
 /**
  * Body-frame-from-magnetic-frame rotation about +X by dipoleTiltDeg.
- * Matches Application::RenderMagneticFields (glm::rotate(..., tilt, X)).
+ * Matches Renderer::RenderMagneticFields (glm::rotate(..., tilt, X)).
  * TiltMatrix(90°) maps +Y to +Z.
  */
 glm::mat3 TiltMatrix(float dipoleTiltDeg);

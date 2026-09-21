@@ -114,10 +114,10 @@ void Application::RenderPlanetProxyMarkers() const {
     glEnable(GL_BLEND);
     glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
 
-    _mainTextShader->Use();
-    _mainTextShader->SetMat4("projection", _cameraProjection);
-    _mainTextShader->SetMat4("view", _cameraView);
-    _mainTextShader->SetBool("is3D", true);
+    _renderer.mainTextShader->Use();
+    _renderer.mainTextShader->SetMat4("projection", _renderer.cameraProjection);
+    _renderer.mainTextShader->SetMat4("view", _renderer.cameraView);
+    _renderer.mainTextShader->SetBool("is3D", true);
 
     for (const auto& manifest : _planetSystemManifests) {
         if (manifest.state == PlanetSystemManifest::State::READY) continue;
@@ -132,8 +132,8 @@ void Application::RenderPlanetProxyMarkers() const {
         }
 
         std::deque<wchar_t> chars(label.begin(), label.end());
-        _mainTextShader->SetVec3("particleCenterWorldSpace", manifest.proxyPosition);
-        _textRenderer->Render(*_mainTextShader, chars, 0.0, 0.0, 0.075, glm::vec3(0.5f, 0.7f, 1.0f));
+        _renderer.mainTextShader->SetVec3("particleCenterWorldSpace", manifest.proxyPosition);
+        _renderer.textRenderer->Render(*_renderer.mainTextShader, chars, 0.0, 0.0, 0.075, glm::vec3(0.5f, 0.7f, 1.0f));
     }
 
     glDisable(GL_BLEND);

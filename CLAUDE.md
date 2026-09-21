@@ -57,17 +57,24 @@ The CMakeLists.txt has separate configurations for EMSCRIPTEN vs native builds, 
 
 **Core Modules**
 - `main.cpp` — Application entry point
-- `Application.h` — The single `Application` class. Its members are split across several
+- `Application.h` — The `Application` class: lifecycle, window/input/audio, scene construction
+  and the mission/magnetic-field-toggle public API. Its members are split across several
   translation units by responsibility; `Application.h` is the one place that declares them all:
   - `Application.cpp` — lifecycle (ctor/dtor, `InitScene`/`InitSceneObjects`) and the frame loop
   - `PlatformWindow.cpp` — GLFW/SDL/GL bring-up, window icon, resize, vsync, `Dispose`
   - `InputHandler.cpp` — polled input plus the mouse/scroll/key callbacks
   - `AudioPlayer.cpp` — background music (SDL_mixer on web, irrKlang on native)
-  - `SceneRenderer.cpp` — shadow/color passes for planets, atmospheres, rings, clouds, text overlays
-  - `SceneOverlayRenderer.cpp` — magnetic field ribbons, orbit paths, asteroid belt
   - `RenderSettings.cpp` — quality/shadow presets, orbit scale mode, texture LOD manager
   - `StarSystemFactory.cpp` / `PlanetSystemLoader.cpp` — scene construction and staged web loading
   - `XrSession.cpp` — WebXR eye state and the stereo render pass (web only)
+- `Renderer.h` — The `Renderer` class: shadow/color/overlay/HDR draw passes and the GPU
+  resources they own (shaders, shadow FBO, HDR, skybox, lens flare, text renderer, orbit/
+  mission/magnetic-field overlay meshes). `Application` holds one (`_renderer`) and reaches it
+  through public fields/methods; `Renderer` reaches back into scene state it doesn't own
+  (camera, planet list, sun, mission/asteroid data) via a `friend`-granted `Application&`
+  rather than duplicating storage — see the comment at the top of Renderer.h.
+  - `SceneRenderer.cpp` — shadow/color passes for planets, atmospheres, rings, clouds, text overlays
+  - `SceneOverlayRenderer.cpp` — magnetic field ribbons, orbit paths, mission paths, asteroid belt
 - `SystemModules.h` — Convenience headers bundling system includes
 
 **Auxiliary Modules** (`Auxiliary_Modules/`)

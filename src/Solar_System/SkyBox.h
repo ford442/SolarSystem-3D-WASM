@@ -1,7 +1,7 @@
 #ifndef SOLARSYSTEM_SKYBOX_H
 #define SOLARSYSTEM_SKYBOX_H
 #include "../Auxiliary_Modules/Shader.h"
-#include "../../src/3rdparty//nv_dds.h"
+#include "../3rdparty/nv_dds.h"
 #include <vector>
 
 using namespace nv_dds;

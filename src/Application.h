@@ -1,6 +1,7 @@
 #ifndef SOLARSYSTEM_APPLICATION_H
 #define SOLARSYSTEM_APPLICATION_H
 #include "ApplicationTypes.h"
+#include "Renderer.h"
 #include "SimState.h"
 #include "Auxiliary_Modules/AuxiliaryModules.h"
 #include "Auxiliary_Modules/SkyEvents.h"
@@ -28,6 +29,7 @@ using namespace irrklang;
 #endif
 
 class Application {
+    friend class Renderer;
 public:
     Application();
     ~Application();
@@ -102,18 +104,7 @@ private:
     double _deltaTime = 0.0;
     double _lastFrame = 0.0;
 
-    float _starExposure = 8.0f;
-    float _starGamma = 0.4545454f;
-    float _starTemperatureInKelvin = 5778.0f;
-
-    bool _isRenderHints = true;
-    bool _isRenderPlanetStarDistances = true;
-    bool _isRenderSatelliteDistances = true;
     bool _isVertSyncEnabled = true;
-    bool _orbitLinesEnabled = true;
-    bool _magneticFieldsEnabled = false;
-    bool _magneticFieldsBuilt = false;
-    int _magneticFieldsQuality = -1;
 
 #ifdef __EMSCRIPTEN__
     XrFrameState _xr;
@@ -131,7 +122,7 @@ private:
     FPS_Handler _fpsHandler;
     FT_Library _ft = nullptr;
     bool _isBackgroundMusicPlay = false, _isSearchNearestPlanet = false;
-    
+
 #ifdef SOLARSYSTEM_USE_SDL_MIXER
     Mix_Music* _currentMusic = nullptr;
     int _currentSongIndex = 0;
@@ -152,32 +143,16 @@ private:
     ISoundEngine* _soundEngine = nullptr;
     std::unique_ptr<std::thread> _backgroundMusicThread;
 #endif
-    
+
     std::string _currentMusicTrack;
-    glm::mat4 _cameraProjection = glm::mat4(), _cameraView = glm::mat4();
-    std::unique_ptr<TextRenderer> _textRenderer;
-    std::unique_ptr<ShadowMapFBO> _shadowMapFBO;
-    std::unique_ptr<HDR> _hdr;
-    bool _hdrEnabled = true;
-    std::unique_ptr<SkyBox> _skyBox;
-    std::unique_ptr<Shader> _shadowMapShader;
-    std::unique_ptr<Shader> _mainSkyBoxShader, _mainTextShader, _mainStarShader, _mainCoronaStarShader, _mainPlanetShader, _mainAtmosphereShader, _mainCloudsShader,
-        _mainRingShader;
-    std::unique_ptr<Shader> _hdrShader, _lensFlareShader, _starGlowShader;
-    std::unique_ptr<LensFlare> _lensFlare;
-    std::unique_ptr<OrbitPathRenderer> _orbitPathRenderer;
-    std::unique_ptr<XrPointerRenderer> _xrPointerRenderer;
     MissionCatalog::Catalog _missionCatalog;
-    std::vector<std::unique_ptr<MissionPathRenderer>> _missionPathMeshes;
     int _focusedMissionIndex = -1;
     bool _missionFollowActive = false;
-    std::unique_ptr<MagneticFieldLineRenderer> _magneticFieldRenderer;
-    std::unique_ptr<MagneticFieldBloom> _magneticFieldBloom;
     std::unique_ptr<AsteroidField> _asteroidField;
     std::shared_ptr<Star> _sun;
     std::vector<RenderableSceneComponent> _renderableSceneComponents;
     std::vector<std::string> _backgroundSongPaths;
-    
+
     // Next-conjunction hint cache — see GetNextConjunction().
     mutable SkyEvents::Conjunction _nextConjunction;
     mutable double _nextConjunctionComputedJd = 0.0;
@@ -188,16 +163,12 @@ private:
     mutable double _nextSkyEventComputedJd = 0.0;
     mutable bool _nextSkyEventCached = false;
 
-    // Pre-allocated containers for RenderHints to eliminate per-frame allocations
-    mutable std::deque<wchar_t> _distanceInfoCache;
-    mutable std::deque<std::wstring> _fpsHintCache;
-    mutable std::deque<std::wstring> _gpuHintCache;
-    mutable std::deque<std::wstring> _soundVolumeHintCache;
-    mutable std::deque<std::wstring> _tmpStringCache;
-
     // Staged-loading infrastructure for all planet systems (WASM only)
     std::vector<PlanetSystemManifest> _planetSystemManifests;
     std::unique_ptr<MeshHolder> _sphereModel;
+
+    // Shadow/color/overlay/HDR draw passes and the GPU resources they own — see Renderer.h.
+    Renderer _renderer;
 
     void InitSystems();
     void InitScene();
@@ -219,19 +190,12 @@ private:
     void ApplyRenderResources(uint16_t shadowResolution, bool enableHdr);
     void UpdateLOD();             // Central LOD manager: upgrade textures for nearest planets (WASM)
     void RenderPlanetProxyMarkers() const; // Show orbital markers for unloaded planets (WASM)
-    void RenderOrbitPaths() const;
     void LoadMissionCatalog();
     void LoadMissions();
-    void RebuildMissionPaths();
-    void RenderMissionPaths() const;
     void UpdateMissionFollow();
     void StopMissionFollow();
     bool SampleMissionScenePosition(int idx, glm::vec3& outScene) const;
     void UpdateMusicDucking();
-    void RenderXrPointers() const;
-    void EnsureMagneticFieldsBuilt();
-    void RenderMagneticFields();
-    void RenderAsteroidField();
     void RenderFrameContent(); // Sky → planets → effects (one eye / mono)
 #ifdef __EMSCRIPTEN__
     void RenderXrStereoFrame();
@@ -244,25 +208,6 @@ private:
     void StopPlayBackgroundMusic();
     void LoadWindowIcon() const;
     void DisplaySystemInformation() const;
-    void ProcessSceneComponentsRendering();
-    void ShadowMapPass(const RenderableSceneComponent& component);
-    void RenderPass(const RenderableSceneComponent& component);
-    void ProcessStarRendering();
-    void RenderStarCorona() const;
-    void RenderStar() const;
-    void RenderStarEffects() const;
-    void RenderAtmospheres(const std::vector<RenderableAtmosphere>& renderableAtmospheres, const glm::mat4& lightSpaceMatrix, const PlanetaryRing* ring) const;
-    void RenderClouds(Clouds* renderableClouds, const glm::mat4& lightSpaceMatrix) const;
-    void RenderPlanetaryRing(const Shader& shader, PlanetaryRing* planetaryRing, const glm::mat4& lightSpaceMatrix) const;
-    void RenderPlanetSatelliteStarDistances() const;
-    void RenderSpaceObjectDistance(const SpaceObject* spaceObject) const;
-    void RenderHints() const;
-    void RenderTextureLoadingProgress() const;
-    void ConfigureMainShaders();
-    void ConfigureMainPlanetShader(const RenderableSceneComponent& renderableComponent);
-    /** Upload (or clear) the one moon currently casting an umbra on this component's planet. */
-    void ConfigureEclipseUmbra(const RenderableSceneComponent& renderableComponent);
-    void UpdateOcclusionQuery();
     void ProcessInput(GLFWwindow* window);
     float CalculateSpaceObjectDistance(const SpaceObject* spaceObject) const;
     glm::vec3 CurrentFpsColor() const;
