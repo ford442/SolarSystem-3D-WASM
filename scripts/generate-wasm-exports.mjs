@@ -19,6 +19,7 @@ const wasmExportsCpp = join(root, 'src/WasmExports.cpp');
 const dtsPath = join(root, 'web/src/SolarSystem.d.ts');
 const bridgeExportsPath = join(root, 'web/src/wasmBridge.exports.ts');
 const exportedFunctionsPath = join(root, 'scripts/wasm-exports.json');
+const bridgePath = join(root, 'web/src/wasmBridge.ts');
 
 const CWRAP_BEGIN = '// BEGIN GENERATED CWARP OVERLOADS';
 const CWRAP_END = '// END GENERATED CWARP OVERLOADS';
@@ -120,6 +121,29 @@ function replaceMarkedSection(source, beginComment, endComment, inner) {
     return source.replace(re, `  ${beginComment}\n${inner}\n  ${endComment}`);
 }
 
+/**
+ * SolarSystem.d.ts / wasmBridge.exports.ts are regenerated wholesale, so they can never
+ * drift from WasmExports.cpp. wasmBridge.ts's hand-written SolarSystemRuntime façade is
+ * not regenerated — nothing stops a new export from landing in exports.ts without anyone
+ * wiring it into the façade real code ever calls. Fail --check if that happens.
+ */
+function findUnwrappedExports(exports) {
+    let bridgeSource;
+    try {
+        bridgeSource = readFileSync(bridgePath, 'utf8');
+    } catch {
+        return exports.map(({ name }) => name);
+    }
+    return exports
+        .filter(({ name }) => {
+            // Word-boundary match: a plain .includes() would count `exports.getCameraPosition`
+            // as "wrapped" merely because `exports.getCameraPositionX` appears in the file.
+            const re = new RegExp(`exports\\.${escapeRegExp(toCamelCase(name))}\\b`);
+            return !re.test(bridgeSource);
+        })
+        .map(({ name }) => name);
+}
+
 function main() {
     const source = readFileSync(wasmExportsCpp, 'utf8');
     const exports = parseExports(source);
@@ -180,7 +204,17 @@ export const EXPORT_COUNT = ${exports.length};
             console.error('Generated wasm export bindings are out of date. Run: npm run generate:wasm-exports');
             process.exit(1);
         }
-        console.log(`OK: ${exports.length} exports in sync (cwrap + SolarSystemModule _Export members)`);
+
+        const unwrapped = findUnwrappedExports(exports);
+        if (unwrapped.length > 0) {
+            console.error(
+                `SolarSystemRuntime (web/src/wasmBridge.ts) does not wrap ${unwrapped.length} generated export(s): ${unwrapped.join(', ')}\n` +
+                'Every EMSCRIPTEN_KEEPALIVE export needs a call site in createSolarSystemRuntime(), or it is dead from JS.',
+            );
+            process.exit(1);
+        }
+
+        console.log(`OK: ${exports.length} exports in sync (cwrap + SolarSystemModule _Export members) and wrapped in SolarSystemRuntime`);
         return;
     }
 

@@ -6,7 +6,7 @@
 /**
  * Which moon, if any, is currently dropping a shadow on its primary.
  *
- * Split out of Application::ConfigureEclipseUmbra so the geometry is testable without a GL
+ * Split out of Renderer::ConfigureEclipseUmbra so the geometry is testable without a GL
  * context: the rest of that function is uniform uploads. Everything here is in scene units
  * and scene space, the same space the lighting shader's vFragPos and lightPos live in.
  */

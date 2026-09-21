@@ -21,7 +21,7 @@
 
 using namespace std;
 
-Application::Application() : _fpsHandler(240) {
+Application::Application() : _fpsHandler(240), _renderer(*this) {
     gSimState = &_simState;
     SetActiveApplication(this);
     InitSystems();
@@ -119,13 +119,13 @@ void Application::RunOneFrame() {
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
     RenderFrameContent();
 
-    if (_isRenderPlanetStarDistances || _isRenderSatelliteDistances)
-        RenderPlanetSatelliteStarDistances();
-    if (_isRenderHints)
-        RenderHints();
+    if (_renderer.isRenderPlanetStarDistances || _renderer.isRenderSatelliteDistances)
+        _renderer.RenderPlanetSatelliteStarDistances();
+    if (_renderer.isRenderHints)
+        _renderer.RenderHints();
 
     TextureLoadingQueue::GetInstance().ProcessQueue();
-    RenderTextureLoadingProgress();
+    _renderer.RenderTextureLoadingProgress();
 
 #ifdef __EMSCRIPTEN__
     UpdateSearchNearestPlanet();
@@ -143,22 +143,22 @@ void Application::RunOneFrame() {
 }
 
 void Application::RenderFrameContent() {
-    ConfigureMainShaders();
-    _skyBox->Render(*_mainSkyBoxShader);
-    RenderOrbitPaths();
-    RenderMissionPaths();
-    RenderXrPointers();
-    RenderStarCorona();
-    ProcessSceneComponentsRendering();
-    RenderAsteroidField();
-    RenderMagneticFields();
+    _renderer.ConfigureMainShaders();
+    _renderer.skyBox->Render(*_renderer.mainSkyBoxShader);
+    _renderer.RenderOrbitPaths();
+    _renderer.RenderMissionPaths();
+    _renderer.RenderXrPointers();
+    _renderer.RenderStarCorona();
+    _renderer.ProcessSceneComponentsRendering();
+    _renderer.RenderAsteroidField();
+    _renderer.RenderMagneticFields();
 #ifdef __EMSCRIPTEN__
     if (!_xr.active) {
         RenderPlanetProxyMarkers();
-        RenderStarEffects();
+        _renderer.RenderStarEffects();
     }
 #else
-    RenderStarEffects();
+    _renderer.RenderStarEffects();
 #endif
 }
 
@@ -186,53 +186,8 @@ void Application::UpdateLoadingProgress() {
 
 void Application::InitSceneObjects() {
     _camera.SetAspect(static_cast<float>(_displayWidth) / static_cast<float>(_displayHeight));
-    const auto qualitySettings = GetQualitySettings(
-        gSimState->shadowQuality == 0 ? gSimState->qualityPreset : gSimState->shadowQuality - 1, gSimState->isMobileWeb);
-    _shadowMapFBO = make_unique<ShadowMapFBO>(qualitySettings.shadowResolution, qualitySettings.shadowResolution);
-    _hdrEnabled = qualitySettings.enableHdr;
-    _hdrShader = make_unique<Shader>("resource/shaders/passThrough.vs", "resource/shaders/hdr.fs");
-    _hdr = make_unique<HDR>(*_hdrShader, _displayWidth, _displayHeight, _hdrEnabled);
-    // HDR turns itself off when the GPU cannot give it a complete float FBO; follow it,
-    // otherwise the composite path would keep sampling an empty buffer.
-    _hdrEnabled = _hdr->IsEnabled();
-    LogQualityTier(qualitySettings, _hdrEnabled, gSimState->shadowQuality);
-
-    const vector<string> skyBoxFaces = GetSkyBoxFaces();
-
-    _skyBox = make_unique<SkyBox>(skyBoxFaces);
-    _mainTextShader = make_unique<Shader>("resource/shaders/text.vs", "resource/shaders/text.fs");
-    _textRenderer = make_unique<TextRenderer>(_ft, "resource/fonts/Arial.ttf");
-    FT_Done_FreeType(_ft);
-    _shadowMapShader = make_unique<Shader>("resource/shaders/shadowMap.vs", "resource/shaders/shadowMap.fs");
-    _mainSkyBoxShader = make_unique<Shader>("resource/shaders/skyBox.vs", "resource/shaders/skyBox.fs");
-    _mainStarShader = make_unique<Shader>("resource/shaders/star.vs", "resource/shaders/star.fs");
-    _mainCoronaStarShader = make_unique<Shader>("resource/shaders/starCorona.vs", "resource/shaders/starCorona.fs");
-    _mainPlanetShader = make_unique<Shader>("resource/shaders/planetLighting.vs", "resource/shaders/planetLighting.fs");
-    _mainAtmosphereShader = make_unique<Shader>("resource/shaders/atmosphere.vs", "resource/shaders/atmosphere.fs");
-    _mainCloudsShader = make_unique<Shader>("resource/shaders/planetLighting.vs", "resource/shaders/cloudsLighting.fs");
-    _mainRingShader = make_unique<Shader>("resource/shaders/planetaryRingLighting.vs", "resource/shaders/planetaryRingLighting.fs");
-    _lensFlareShader = make_unique<Shader>("resource/shaders/lensFlare.vs", "resource/shaders/lensFlare.fs");
-    _lensFlare = make_unique<LensFlare>(*_lensFlareShader, TextureImage2D("resource/textures_low/flares_bright_Low.dds"),
-            FlaresInfo {4,
-            {
-                FlareSprite{false, 1.0, 7.0, 0},
-                FlareSprite{false, 1.35, 0.3, 1},
-                FlareSprite{false, 1.5, 0.4, 4},
-                FlareSprite{false, 1.7, 0.6, 5},
-                FlareSprite{false, 1.9, 1.2, 6},
-                FlareSprite{false, 2.1, 0.4, 2},
-                FlareSprite{false, 2.25, 0.2, 3},
-                FlareSprite{false, 2.75, 2.0, 7}
-            }});
-    _orbitPathRenderer = make_unique<OrbitPathRenderer>();
-    _xrPointerRenderer = make_unique<XrPointerRenderer>();
+    _renderer.Init();
     LoadMissions();
-    _magneticFieldRenderer = make_unique<MagneticFieldLineRenderer>();
-    {
-        const auto fieldQuality = GetQualitySettings(gSimState->qualityPreset, gSimState->isMobileWeb);
-        _magneticFieldBloom = make_unique<MagneticFieldBloom>(_displayWidth, _displayHeight,
-                                                              fieldQuality.enableMagneticBloom);
-    }
     {
         const auto asteroidQuality = GetQualitySettings(gSimState->qualityPreset, gSimState->isMobileWeb);
         _asteroidField = make_unique<AsteroidField>(AsteroidField::kDefaultSeed,
@@ -411,10 +366,37 @@ void Application::UpdateMissionFollow() {
 
 void Application::SetXrControllerRay(int hand, float ox, float oy, float oz, float dx, float dy, float dz,
                                      int visible) {
-    if (!_xrPointerRenderer) {
+    if (!_renderer.xrPointerRenderer) {
         return;
     }
-    _xrPointerRenderer->SetRay(hand, glm::vec3(ox, oy, oz), glm::vec3(dx, dy, dz), visible != 0);
+    _renderer.xrPointerRenderer->SetRay(hand, glm::vec3(ox, oy, oz), glm::vec3(dx, dy, dz), visible != 0);
+}
+
+void Application::SetOrbitLinesEnabled(bool enabled) { _renderer.SetOrbitLinesEnabled(enabled); }
+bool Application::GetOrbitLinesEnabled() const { return _renderer.GetOrbitLinesEnabled(); }
+void Application::SetMagneticFieldsEnabled(bool enabled) { _renderer.SetMagneticFieldsEnabled(enabled); }
+bool Application::GetMagneticFieldsEnabled() const { return _renderer.GetMagneticFieldsEnabled(); }
+void Application::ForEachEnabledMagneticField(
+    const std::function<void(const SpaceObject& object, const MagneticFieldParams& params)>& fn) const {
+    _renderer.ForEachEnabledMagneticField(fn);
+}
+
+void Application::LoadMissionCatalog() {
+    std::string error;
+    if (!MissionCatalog::LoadFromFile("resource/missions/catalog.json", _missionCatalog, error)) {
+        std::cout << "[Missions] " << error << std::endl;
+        _missionCatalog = {};
+        return;
+    }
+    std::cout << "[Missions] Loaded " << _missionCatalog.missions.size()
+              << " trajectory path(s) from catalog.json" << std::endl;
+}
+
+void Application::LoadMissions() {
+    if (_missionCatalog.missions.empty()) {
+        LoadMissionCatalog();
+    }
+    _renderer.RebuildMissionPaths();
 }
 
 const SkyEvents::Conjunction& Application::GetNextConjunction() const {

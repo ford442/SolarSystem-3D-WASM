@@ -23,29 +23,29 @@ void Application::ApplyQualityPreset(int preset) {
     if (_asteroidField) {
         _asteroidField->SetInstanceCount(settings.asteroidInstanceCount);
     }
-    RebuildMissionPaths();
-    if (_magneticFieldsEnabled) {
-        _magneticFieldsBuilt = false;
-        EnsureMagneticFieldsBuilt();
+    _renderer.RebuildMissionPaths();
+    if (_renderer.magneticFieldsEnabled) {
+        _renderer.magneticFieldsBuilt = false;
+        _renderer.EnsureMagneticFieldsBuilt();
     }
-    LogQualityTier(settings, _hdrEnabled, gSimState->shadowQuality);
+    LogQualityTier(settings, _renderer.hdrEnabled, gSimState->shadowQuality);
 }
 
 void Application::ApplyRenderResources(uint16_t shadowResolution, bool enableHdr) {
-    _hdrEnabled = enableHdr;
+    _renderer.hdrEnabled = enableHdr;
 
-    if (_shadowMapFBO && gSimState->shadowQuality > 0) {
-        _shadowMapFBO->Resize(shadowResolution, shadowResolution);
+    if (_renderer.shadowMapFBO && gSimState->shadowQuality > 0) {
+        _renderer.shadowMapFBO->Resize(shadowResolution, shadowResolution);
     }
 
-    if (_hdr) {
-        _hdr->SetEnabled(enableHdr, _displayWidth, _displayHeight);
+    if (_renderer.hdr) {
+        _renderer.hdr->SetEnabled(enableHdr, _displayWidth, _displayHeight);
         // SetEnabled can refuse (no renderable float buffers / incomplete FBO).
-        _hdrEnabled = _hdr->IsEnabled();
+        _renderer.hdrEnabled = _renderer.hdr->IsEnabled();
     }
-    if (_magneticFieldBloom) {
+    if (_renderer.magneticFieldBloom) {
         const auto bloomSettings = GetQualitySettings(gSimState->qualityPreset, gSimState->isMobileWeb);
-        _magneticFieldBloom->SetEnabled(bloomSettings.enableMagneticBloom, _displayWidth, _displayHeight);
+        _renderer.magneticFieldBloom->SetEnabled(bloomSettings.enableMagneticBloom, _displayWidth, _displayHeight);
     }
 }
 
@@ -57,11 +57,11 @@ void Application::ApplyShadowQuality(int quality) {
     }
 
     const auto settings = GetQualitySettings(gSimState->shadowQuality - 1, gSimState->isMobileWeb);
-    if (_shadowMapFBO) {
-        _shadowMapFBO->Resize(settings.shadowResolution, settings.shadowResolution);
+    if (_renderer.shadowMapFBO) {
+        _renderer.shadowMapFBO->Resize(settings.shadowResolution, settings.shadowResolution);
     }
     ApplyRenderResources(settings.shadowResolution, settings.enableHdr);
-    LogQualityTier(settings, _hdrEnabled, gSimState->shadowQuality);
+    LogQualityTier(settings, _renderer.hdrEnabled, gSimState->shadowQuality);
 }
 
 void Application::ApplyOrbitScaleMode(int mode) {
@@ -71,7 +71,7 @@ void Application::ApplyOrbitScaleMode(int mode) {
     if (_asteroidField) {
         _asteroidField->Update(0.0f); // rebuild instance matrices for new AU→scene mapping
     }
-    RebuildMissionPaths();
+    _renderer.RebuildMissionPaths();
     std::cout << "[OrbitScale] " << (scaleMode == OrbitLayout::ScaleMode::Realistic ? "realistic" : "compressed")
               << " distances active" << std::endl;
 }

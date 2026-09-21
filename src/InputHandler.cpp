@@ -77,22 +77,22 @@ void Application::ProcessInput(GLFWwindow* window) {
         _camera.SetMovementSpeed(movementSpeed);
     }
     if (glfwGetKey(window, GLFW_KEY_3) == GLFW_PRESS) {
-        _starExposure = glm::clamp(_starExposure + 0.1f, 0.0f, 20.f);
+        _renderer.starExposure = glm::clamp(_renderer.starExposure + 0.1f, 0.0f, 20.f);
     }
     if (glfwGetKey(window, GLFW_KEY_4) == GLFW_PRESS) {
-        _starExposure = glm::clamp(_starExposure - 0.1f, 0.0f, 20.f);
+        _renderer.starExposure = glm::clamp(_renderer.starExposure - 0.1f, 0.0f, 20.f);
     }
     if (glfwGetKey(window, GLFW_KEY_5) == GLFW_PRESS) {
-        _starGamma = glm::clamp(_starGamma + 0.01f, 0.0f, 2.f);
+        _renderer.starGamma = glm::clamp(_renderer.starGamma + 0.01f, 0.0f, 2.f);
     }
     if (glfwGetKey(window, GLFW_KEY_6) == GLFW_PRESS) {
-        _starGamma = glm::clamp(_starGamma - 0.01f, 0.0f, 2.f);
+        _renderer.starGamma = glm::clamp(_renderer.starGamma - 0.01f, 0.0f, 2.f);
     }
     if (glfwGetKey(window, GLFW_KEY_7) == GLFW_PRESS) {
-        _starTemperatureInKelvin = glm::clamp(_starTemperatureInKelvin + 15.0f, 800.f, 30000.f);
+        _renderer.starTemperatureInKelvin = glm::clamp(_renderer.starTemperatureInKelvin + 15.0f, 800.f, 30000.f);
     }
     if (glfwGetKey(window, GLFW_KEY_8) == GLFW_PRESS) {
-        _starTemperatureInKelvin = glm::clamp(_starTemperatureInKelvin - 15.0f, 800.f, 30000.f);
+        _renderer.starTemperatureInKelvin = glm::clamp(_renderer.starTemperatureInKelvin - 15.0f, 800.f, 30000.f);
     }
     if (glfwGetKey(window, GLFW_KEY_LEFT) == GLFW_PRESS) {
         xPos -= 1;
@@ -184,13 +184,13 @@ void Application::KeyCallback(GLFWwindow* window, int key, int, int action, int)
     if (!app) return;
 
     if (key == GLFW_KEY_Z && action == GLFW_PRESS) {
-        app->_isRenderPlanetStarDistances = !app->_isRenderPlanetStarDistances;
+        app->_renderer.isRenderPlanetStarDistances = !app->_renderer.isRenderPlanetStarDistances;
     }
     if (key == GLFW_KEY_X && action == GLFW_PRESS) {
-        app->_isRenderSatelliteDistances = !app->_isRenderSatelliteDistances;
+        app->_renderer.isRenderSatelliteDistances = !app->_renderer.isRenderSatelliteDistances;
     }
     if (key == GLFW_KEY_TAB && action == GLFW_PRESS) {
-        app->_isRenderHints = !app->_isRenderHints;
+        app->_renderer.isRenderHints = !app->_renderer.isRenderHints;
     }
     if (key == GLFW_KEY_F1 && action == GLFW_PRESS) {
         app->_isVertSyncEnabled = !app->_isVertSyncEnabled;

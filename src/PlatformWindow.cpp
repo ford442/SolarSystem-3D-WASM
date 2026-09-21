@@ -288,11 +288,11 @@ void Application::HandleResize(int width, int height) {
     _displayWidth = static_cast<uint16_t>(width);
     _displayHeight = static_cast<uint16_t>(height);
     _camera.SetAspect(static_cast<float>(width) / static_cast<float>(height));
-    if (_hdr) {
-        _hdr->Resize(_displayWidth, _displayHeight);
+    if (_renderer.hdr) {
+        _renderer.hdr->Resize(_displayWidth, _displayHeight);
     }
-    if (_magneticFieldBloom) {
-        _magneticFieldBloom->Resize(_displayWidth, _displayHeight);
+    if (_renderer.magneticFieldBloom) {
+        _renderer.magneticFieldBloom->Resize(_displayWidth, _displayHeight);
     }
     glViewport(0, 0, width, height);
 }

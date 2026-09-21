@@ -26,37 +26,16 @@ if(EMSCRIPTEN)
     set(CMAKE_EXECUTABLE_SUFFIX ".js")
 endif()
 
-set(SOLARSYSTEM_SOURCES
+# .cpp only — headers are pulled in through #include, not by being listed here, and
+# listing them added nothing but a CMake edit for every new header. Grouped by
+# directory to keep this list scannable as the codebase grows.
+set(SOLARSYSTEM_SOURCES_CORE
     src/main.cpp
-    src/Auxiliary_Modules/WebResourceFetcher.cpp
-    src/Auxiliary_Modules/WebResourceFetcher.h
-    src/Auxiliary_Modules/Shader.cpp
-    src/Auxiliary_Modules/Shader.h
-    src/Auxiliary_Modules/Mesh.cpp
-    src/Auxiliary_Modules/Mesh.h
-    src/Auxiliary_Modules/MeshHolder.cpp
-    src/Auxiliary_Modules/MeshHolder.h
-    src/Auxiliary_Modules/Camera.cpp
-    src/Auxiliary_Modules/Camera.h
-    src/Auxiliary_Modules/FPS_Handler.cpp
-    src/Auxiliary_Modules/FPS_Handler.h
-    src/Solar_System/SpaceObject.cpp
-    src/Solar_System/SpaceObject.h
-    src/Solar_System/Planet.cpp
-    src/Solar_System/Planet.h
-    src/Solar_System/Transformable.cpp
-    src/Solar_System/Transformable.h
     src/Application.cpp
-    src/Application.h
-    src/ApplicationTypes.h
     src/JsBridge.cpp
-    src/JsBridge.h
     src/WasmExports.cpp
-    src/WasmExports.h
     src/QualitySettings.cpp
-    src/QualitySettings.h
     src/ResourceManifest.cpp
-    src/ResourceManifest.h
     src/PlanetSystemLoader.cpp
     src/SceneRenderer.cpp
     src/SceneOverlayRenderer.cpp
@@ -66,86 +45,70 @@ set(SOLARSYSTEM_SOURCES
     src/AudioPlayer.cpp
     src/RenderSettings.cpp
     src/XrSession.cpp
-    src/SimState.h
     src/SimState.cpp
+)
+
+set(SOLARSYSTEM_SOURCES_AUX
+    src/Auxiliary_Modules/WebResourceFetcher.cpp
+    src/Auxiliary_Modules/Shader.cpp
+    src/Auxiliary_Modules/Mesh.cpp
+    src/Auxiliary_Modules/MeshHolder.cpp
+    src/Auxiliary_Modules/Camera.cpp
+    src/Auxiliary_Modules/FPS_Handler.cpp
     src/Auxiliary_Modules/TextureImage2D.cpp
-    src/Auxiliary_Modules/TextureImage2D.h
     src/Auxiliary_Modules/TextureLoadingQueue.cpp
-    src/Auxiliary_Modules/TextureLoadingQueue.h
     src/Auxiliary_Modules/GlCapabilities.cpp
-    src/Auxiliary_Modules/GlCapabilities.h
-    src/Solar_System/Star.cpp
-    src/Solar_System/Star.h
-    src/Solar_System/Sun/Sun.cpp
-    src/Solar_System/Sun/Sun.h
-    src/Solar_System/Satellite.cpp
-    src/Solar_System/Satellite.h
-    src/3rdparty/nv_dds.cpp
-    src/3rdparty/nv_dds.h
     src/Auxiliary_Modules/ShadowMapFBO.cpp
-    src/Auxiliary_Modules/ShadowMapFBO.h
-    src/Solar_System/Atmosphere.cpp
-    src/Solar_System/Atmosphere.h
     src/Auxiliary_Modules/LensFlare.cpp
-    src/Auxiliary_Modules/LensFlare.h
     src/Auxiliary_Modules/OrbitPathRenderer.cpp
-    src/Auxiliary_Modules/OrbitPathRenderer.h
     src/Auxiliary_Modules/MissionCatalog.cpp
-    src/Auxiliary_Modules/MissionCatalog.h
     src/Auxiliary_Modules/MissionPathRenderer.cpp
-    src/Auxiliary_Modules/MissionPathRenderer.h
     src/Auxiliary_Modules/XrPointerRenderer.cpp
-    src/Auxiliary_Modules/XrPointerRenderer.h
     src/Auxiliary_Modules/MagneticFieldParams.cpp
-    src/Auxiliary_Modules/MagneticFieldParams.h
     src/Auxiliary_Modules/MagneticFieldModel.cpp
-    src/Auxiliary_Modules/MagneticFieldModel.h
     src/Auxiliary_Modules/MagneticFieldTracer.cpp
-    src/Auxiliary_Modules/MagneticFieldTracer.h
     src/Auxiliary_Modules/MagneticFieldLineMesh.cpp
-    src/Auxiliary_Modules/MagneticFieldLineMesh.h
     src/Auxiliary_Modules/MagneticFieldLineRenderer.cpp
-    src/Auxiliary_Modules/MagneticFieldLineRenderer.h
     src/Auxiliary_Modules/MagneticFieldBloom.cpp
-    src/Auxiliary_Modules/MagneticFieldBloom.h
     src/Auxiliary_Modules/Ephemeris.cpp
-    src/Auxiliary_Modules/Ephemeris.h
     src/Auxiliary_Modules/TextRenderer.cpp
-    src/Auxiliary_Modules/TextRenderer.h
-    src/Solar_System/PlanetaryRing.cpp
-    src/Solar_System/PlanetaryRing.h
-    src/Solar_System/SkyBox.cpp
-    src/Solar_System/SkyBox.h
-    src/Solar_System/Saturn_System/SaturnRing.cpp
-    src/Solar_System/Saturn_System/SaturnRing.h
-    src/Solar_System/Uranus_System/UranusRing.cpp
-    src/Solar_System/Uranus_System/UranusRing.h
-    src/Solar_System/SolarSystem.h
-    src/Solar_System/OuterShell.cpp
-    src/Solar_System/OuterShell.h
-    src/Solar_System/Clouds.cpp
-    src/Solar_System/Clouds.h
     src/Auxiliary_Modules/HDR.cpp
-    src/Auxiliary_Modules/HDR.h
-    src/Auxiliary_Modules/AuxiliaryModules.h
-    src/SystemModules.h
-    src/Solar_System/OrbitLayout.cpp
-    src/Solar_System/OrbitLayout.h
-    src/Solar_System/AsteroidOrbit.cpp
-    src/Solar_System/AsteroidOrbit.h
-    src/Solar_System/AsteroidField.cpp
-    src/Solar_System/AsteroidField.h
-    src/Solar_System/CatalogBody.cpp
-    src/Solar_System/CatalogBody.h
-    src/Solar_System/CatalogSatellite.cpp
-    src/Solar_System/CatalogSatellite.h
-    src/Solar_System/CatalogClouds.cpp
-    src/Solar_System/CatalogClouds.h
-    src/Solar_System/SystemVisuals.h
-    src/Solar_System/BodyCatalog.generated.h
     src/Auxiliary_Modules/SkyEvents.cpp
-    src/Auxiliary_Modules/SkyEvents.h
-    src/XrState.h
+    src/Auxiliary_Modules/TextureLODController.cpp
+    src/Auxiliary_Modules/PlanetManifestLoader.cpp
+)
+
+set(SOLARSYSTEM_SOURCES_SOLAR
+    src/Solar_System/SpaceObject.cpp
+    src/Solar_System/Planet.cpp
+    src/Solar_System/Transformable.cpp
+    src/Solar_System/Star.cpp
+    src/Solar_System/Sun/Sun.cpp
+    src/Solar_System/Satellite.cpp
+    src/Solar_System/Atmosphere.cpp
+    src/Solar_System/PlanetaryRing.cpp
+    src/Solar_System/SkyBox.cpp
+    src/Solar_System/Saturn_System/SaturnRing.cpp
+    src/Solar_System/Uranus_System/UranusRing.cpp
+    src/Solar_System/OuterShell.cpp
+    src/Solar_System/Clouds.cpp
+    src/Solar_System/OrbitLayout.cpp
+    src/Solar_System/AsteroidOrbit.cpp
+    src/Solar_System/AsteroidField.cpp
+    src/Solar_System/CatalogBody.cpp
+    src/Solar_System/CatalogSatellite.cpp
+    src/Solar_System/CatalogClouds.cpp
+)
+
+set(SOLARSYSTEM_SOURCES_3RDPARTY
+    src/3rdparty/nv_dds.cpp
+)
+
+set(SOLARSYSTEM_SOURCES
+    ${SOLARSYSTEM_SOURCES_CORE}
+    ${SOLARSYSTEM_SOURCES_AUX}
+    ${SOLARSYSTEM_SOURCES_SOLAR}
+    ${SOLARSYSTEM_SOURCES_3RDPARTY}
 )
 
 if(WIN32)
@@ -153,15 +116,6 @@ if(WIN32)
 endif()
 
 add_executable(${PROJECT_NAME} ${SOLARSYSTEM_SOURCES})
-
-target_sources(${PROJECT_NAME} PRIVATE
-    src/Auxiliary_Modules/TextureLODController.cpp
-    src/Auxiliary_Modules/TextureLODController.h
-    src/Auxiliary_Modules/PlanetManifestLoader.cpp
-    src/Auxiliary_Modules/PlanetManifestLoader.h
-    src/PlanetSystemManifest.h
-    src/Solar_System/TexturePaths.h
-)
 
 # Copying of all necessary dll files on which the executable depends (Windows only)
 if(WIN32)
