@@ -68,6 +68,18 @@ test('WASM module boots and staged loading reacts to camera pose', async ({ page
     })
     .toBe(true);
 
+  // No planet may end up on the 4x4 fallback checkerboard. On a context without
+  // WEBGL_compressed_texture_s3tc the DDS tier is software-decoded to RGBA8
+  // (BlockCompression.cpp) rather than skipped, so this holds on WebKit too once a
+  // webkit project is added to playwright.config.ts.
+  expect(consoleLogs.filter((line) => line.includes('Created 4x4 fallback texture'))).toEqual([]);
+  expect(
+    consoleLogs.filter((line) => /compressed textures are not supported/i.test(line)),
+  ).toEqual([]);
+  expect(
+    consoleLogs.some((line) => line.includes('[GlCapabilities]') && line.includes('preferredPack=')),
+  ).toBe(true);
+
   await page.locator('#canvas').hover();
   await page.evaluate(() => {
     window.setCameraPose?.(1200, 0, 350, 0, 0);

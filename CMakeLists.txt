@@ -56,6 +56,8 @@ set(SOLARSYSTEM_SOURCES_AUX
     src/Auxiliary_Modules/Camera.cpp
     src/Auxiliary_Modules/FPS_Handler.cpp
     src/Auxiliary_Modules/TextureImage2D.cpp
+    src/Auxiliary_Modules/TextureFormatSupport.cpp
+    src/Auxiliary_Modules/BlockCompression.cpp
     src/Auxiliary_Modules/TextureLoadingQueue.cpp
     src/Auxiliary_Modules/GlCapabilities.cpp
     src/Auxiliary_Modules/ShadowMapFBO.cpp
@@ -102,6 +104,7 @@ set(SOLARSYSTEM_SOURCES_SOLAR
 
 set(SOLARSYSTEM_SOURCES_3RDPARTY
     src/3rdparty/nv_dds.cpp
+    src/3rdparty/ktx2_reader.cpp
 )
 
 set(SOLARSYSTEM_SOURCES

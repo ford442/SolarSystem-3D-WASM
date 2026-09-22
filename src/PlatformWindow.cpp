@@ -6,6 +6,7 @@
 #include "SimState.h"
 #include "Auxiliary_Modules/Ephemeris.h"
 #include "Auxiliary_Modules/GlCapabilities.h"
+#include "Auxiliary_Modules/TextureFormatSupport.h"
 #include "Solar_System/OrbitLayout.h"
 #include <SDL_image.h>
 #include <algorithm>
@@ -14,10 +15,49 @@
 #include <iostream>
 
 #ifdef __EMSCRIPTEN__
+#include <emscripten.h>
 #include <emscripten/html5.h>
 #endif
 
 using namespace std;
+
+namespace {
+/**
+ * Pick the texture pack every later asset path resolves to, from the packs the
+ * deployment says it published in `window.__solarSystemTexturePacks`.
+ *
+ * A deployment that publishes no packs — the default, and every native build — stays on
+ * the legacy `.dds` layout, where a GPU without S3TC is covered by the software BC
+ * decoder in BlockCompression.cpp. Publishing an `astc`/`etc2` pack is what turns that
+ * CPU decode into a real compressed upload on Safari/iOS and Android.
+ */
+void SelectTexturePack() {
+#ifdef __EMSCRIPTEN__
+    const char* preferred = GetGlCapabilities().PreferredTexturePack();
+    // Bracket notation throughout: Release links with --closure 1, which renames dotted
+    // property reads on `window`.
+    const bool published = EM_ASM_INT({
+        try {
+            const packs = (typeof window !== 'undefined' && Array.isArray(window['__solarSystemTexturePacks']))
+                ? window['__solarSystemTexturePacks']
+                : [];
+            return packs.indexOf(UTF8ToString($0)) >= 0 ? 1 : 0;
+        } catch (e) {
+            return 0;
+        }
+    }, preferred) != 0;
+
+    if (published) {
+        TextureFormats::SetTexturePack(preferred);
+        std::cout << "[Texture] Using the '" << preferred << "' KTX2 pack" << std::endl;
+        return;
+    }
+    std::cout << "[Texture] No '" << preferred << "' KTX2 pack published; using .dds"
+              << (GetGlCapabilities().s3tcCompressedTextures ? "" : " with software BC decode")
+              << std::endl;
+#endif
+}
+} // namespace
 
 // Error Callback
 void glfwErrorCallback(int error, const char* description) {
@@ -136,6 +176,7 @@ void Application::InitSystems() {
     VertSync(_isVertSyncEnabled);
 
     GetGlCapabilities(); // Probed once here (context is current); logs its findings.
+    SelectTexturePack();  // Decide which texture pack every later asset path resolves to.
 
     glfwSetWindowUserPointer(_mainWindow, this);
     glfwSetFramebufferSizeCallback(_mainWindow, FramebufferSizeCallback);

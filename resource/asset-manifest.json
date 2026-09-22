@@ -3,6 +3,10 @@
   "assetVersion": "2026.07.0",
   "basePath": "resource/",
   "description": "Runtime assets deployed independently from the Vite and WASM bundle. Null SHA256 values are populated by the asset publishing pipeline when source files are available.",
+  "texturePacks": {
+    "description": "KTX2 packs published alongside the .dds tree, built by scripts/convert_textures_ktx2.py. Each pack is a subdirectory of the directories below (e.g. textures_low/astc/). List the published names in VITE_TEXTURE_PACKS so the runtime may select one; an empty list keeps every GPU on .dds.",
+    "published": []
+  },
   "directories": [
     "textures/",
     "textures_low/",

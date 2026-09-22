@@ -63,6 +63,16 @@ const deployedBaseUrl = new URL(import.meta.env.BASE_URL, window.location.href);
 const isMobileDevice = isMobileLikeDevice();
 const runtimeAssetBase = import.meta.env.VITE_ASSET_BASE?.trim() || deployedBaseUrl.toString();
 
+// Which KTX2 texture packs this deployment has published alongside the .dds assets,
+// e.g. VITE_TEXTURE_PACKS="bc3,astc,etc2". The WASM module probes the WebGL context,
+// picks its preferred pack (BC7 > BC3 > ASTC > ETC2) and uses it only if it appears
+// here; with none published it stays on .dds, and a GPU without S3TC falls back to the
+// software BC decoder. See scripts/convert_textures_ktx2.py and docs/ARCHITECTURE.md.
+const publishedTexturePacks: string[] = String(import.meta.env.VITE_TEXTURE_PACKS ?? '')
+    .split(',')
+    .map((pack: string) => pack.trim())
+    .filter((pack: string) => pack.length > 0);
+
 const progressCallbacks = createProgressCallbacks({
     loadingContainer,
     progressBar,
@@ -73,6 +83,7 @@ const progressCallbacks = createProgressCallbacks({
 });
 
 window.__solarSystemAssetBase = runtimeAssetBase;
+window.__solarSystemTexturePacks = publishedTexturePacks;
 
 // Resolve quality/mobile before WASM main() creates the GLFW/WebGL context.
 const initConfig = resolveInitConfig();

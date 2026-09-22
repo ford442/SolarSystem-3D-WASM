@@ -1,12 +1,28 @@
 #include "TextureImage2D.h"
 #include "WebResourceFetcher.h"
 #include "GlCapabilities.h"
+#include "BlockCompression.h"
+#include "TextureFormatSupport.h"
+#include "../3rdparty/ktx2_reader.h"
 #include "../SimState.h"
 #include <cstdint>
 #include <algorithm>
+#include <fstream>
 #include <stdexcept>
+#include <vector>
 
 namespace {
+    /** What a container upload left on the GPU, so the caller knows how to finish the texture. */
+    struct UploadResult {
+        bool hasMipmaps = false;         // a real chain is resident; a mip min-filter is safe
+        bool allowGenerateMipmap = false; // uncompressed, so glGenerateMipmap can fill the chain
+    };
+
+    bool HasSuffix(const std::string& value, const std::string& suffix) {
+        return value.size() > suffix.size() &&
+               value.compare(value.size() - suffix.size(), suffix.size(), suffix) == 0;
+    }
+
     bool IsGpuTextureValid(GLuint textureId, unsigned int width, unsigned int height) {
         if (textureId == 0) {
             return false;
@@ -24,14 +40,28 @@ namespace {
 #endif
     }
 
-#ifdef __EMSCRIPTEN__
-    void ValidateTextureDimensions(const std::string& path, unsigned int width, unsigned int height) {
-        GLint maxTextureSize = 0;
-        glGetIntegerv(GL_MAX_TEXTURE_SIZE, &maxTextureSize);
+    std::vector<std::uint8_t> ReadWholeFile(const std::string& path) {
+        std::ifstream stream(path, std::ios::binary | std::ios::ate);
+        if (!stream) {
+            throw std::runtime_error("cannot open " + path);
+        }
+        const std::streamoff size = stream.tellg();
+        if (size <= 0) {
+            throw std::runtime_error("empty file " + path);
+        }
+        stream.seekg(0, std::ios::beg);
+        std::vector<std::uint8_t> bytes(static_cast<std::size_t>(size));
+        if (!stream.read(reinterpret_cast<char*>(bytes.data()), size)) {
+            throw std::runtime_error("short read on " + path);
+        }
+        return bytes;
+    }
+
+    void ValidateAgainstMaxTextureSize(const std::string& path, unsigned int width, unsigned int height) {
+        const int maxTextureSize = GetGlCapabilities().maxTextureSize;
         if (maxTextureSize <= 0) {
             return;
         }
-
         if (width > static_cast<unsigned int>(maxTextureSize) ||
             height > static_cast<unsigned int>(maxTextureSize)) {
             throw std::runtime_error(
@@ -39,7 +69,148 @@ namespace {
                 " exceed GL_MAX_TEXTURE_SIZE (" + std::to_string(maxTextureSize) + ") for " + path);
         }
     }
-#endif
+
+    /**
+     * Upload a KTX2 file whose levels are already in a GPU block format (or plain RGBA8).
+     * Nothing is transcoded here: the pack was encoded offline into the format this GPU
+     * reported, so each level's bytes go straight to glCompressedTexImage2D. A pack whose
+     * format this context cannot accept is an error, not a silent downgrade — the caller
+     * falls back, and the console names the mismatch.
+     */
+    UploadResult UploadKtx2(const std::string& path, unsigned int& width, unsigned int& height) {
+        const std::vector<std::uint8_t> bytes = ReadWholeFile(path);
+        const ktx2::File file = ktx2::Parse(bytes.data(), bytes.size(), path);
+
+        const std::uint32_t internalFormat = TextureFormats::GlInternalFormatFromVkFormat(file.vkFormat);
+        if (internalFormat == 0) {
+            throw std::runtime_error("KTX2 " + path + ": vkFormat " + std::to_string(file.vkFormat) +
+                                     " has no GL mapping in this build");
+        }
+        if (!TextureFormats::IsFormatSupported(file.vkFormat, GetGlCapabilities().ToFormatCapabilities())) {
+            throw std::runtime_error("KTX2 " + path + ": vkFormat " + std::to_string(file.vkFormat) +
+                                     " is not supported by this GPU/browser (expected the '" +
+                                     GetGlCapabilities().PreferredTexturePack() + "' pack)");
+        }
+
+        width = file.pixelWidth;
+        height = std::max<std::uint32_t>(file.pixelHeight, 1);
+        ValidateAgainstMaxTextureSize(path, width, height);
+
+        const TextureFormats::BlockLayout layout = TextureFormats::LayoutFromVkFormat(file.vkFormat);
+        const TextureFormats::UncompressedUpload uncompressed =
+            TextureFormats::UncompressedUploadFromVkFormat(file.vkFormat);
+
+        while (glGetError() != GL_NO_ERROR) {}
+
+        int uploadedLevels = 0;
+        for (std::size_t level = 0; level < file.levels.size(); ++level) {
+            const ktx2::Level& entry = file.levels[level];
+            const std::size_t expected =
+                TextureFormats::ExpectedLevelBytes(file.vkFormat, entry.width, entry.height);
+            if (expected == 0 || entry.byteLength < expected) {
+                throw std::runtime_error("KTX2 " + path + ": level " + std::to_string(level) +
+                                         " is shorter than its declared " + std::to_string(entry.width) +
+                                         "x" + std::to_string(entry.height) + " payload");
+            }
+
+            const std::uint8_t* levelData = bytes.data() + entry.byteOffset;
+            if (layout.compressed) {
+                glCompressedTexImage2D(GL_TEXTURE_2D, static_cast<GLint>(level),
+                                       static_cast<GLenum>(internalFormat),
+                                       static_cast<GLsizei>(entry.width), static_cast<GLsizei>(entry.height),
+                                       0, static_cast<GLsizei>(expected), levelData);
+            } else {
+                glTexImage2D(GL_TEXTURE_2D, static_cast<GLint>(level),
+                             static_cast<GLint>(uncompressed.internalFormat),
+                             static_cast<GLsizei>(entry.width), static_cast<GLsizei>(entry.height), 0,
+                             static_cast<GLenum>(uncompressed.format),
+                             static_cast<GLenum>(uncompressed.type), levelData);
+            }
+
+            const GLenum error = glGetError();
+            if (error != GL_NO_ERROR) {
+                if (level == 0) {
+                    throw std::runtime_error("KTX2 " + path + ": GL rejected the base level (error 0x" +
+                                             std::to_string(static_cast<unsigned>(error)) + ")");
+                }
+                // A rejected mip is survivable: cap the chain at what actually landed.
+                break;
+            }
+            ++uploadedLevels;
+        }
+
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_BASE_LEVEL, 0);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAX_LEVEL, std::max(uploadedLevels - 1, 0));
+
+        UploadResult result;
+        result.hasMipmaps = uploadedLevels > 1;
+        result.allowGenerateMipmap = !layout.compressed && uploadedLevels == 1;
+        return result;
+    }
+
+    /**
+     * CPU-decode a DXT DDS to RGBA8 and upload that instead. This is the path a GPU with
+     * no WEBGL_compressed_texture_s3tc takes for the DDS content still in the tree; see
+     * BlockCompression.h for why it is a stopgap rather than the shipping answer.
+     */
+    UploadResult UploadDdsSoftwareDecoded(CDDSImage& image, const std::string& path) {
+        const std::uint32_t format = image.get_format();
+        if (!BlockCompression::IsDecodableS3tcFormat(format)) {
+            throw std::runtime_error(
+                "Compressed textures are not supported by this GPU/browser and format 0x" +
+                std::to_string(static_cast<unsigned>(format)) + " has no software decoder for " + path);
+        }
+
+        while (glGetError() != GL_NO_ERROR) {}
+
+        // Level 0 is the CDDSImage itself; get_mipmap(i) is level i + 1.
+        int uploadedLevels = 0;
+        const unsigned int levelCount = image.get_num_mipmaps() + 1;
+        for (unsigned int level = 0; level < levelCount; ++level) {
+            const std::uint8_t* blocks = nullptr;
+            unsigned int levelWidth = 0, levelHeight = 0, levelBytes = 0;
+            if (level == 0) {
+                blocks = static_cast<std::uint8_t*>(image);
+                levelWidth = image.get_width();
+                levelHeight = image.get_height();
+                levelBytes = image.get_size();
+            } else {
+                const CSurface& surface = image.get_mipmap(level - 1);
+                blocks = static_cast<std::uint8_t*>(surface);
+                levelWidth = surface.get_width();
+                levelHeight = surface.get_height();
+                levelBytes = surface.get_size();
+            }
+
+            const std::vector<std::uint8_t> rgba =
+                BlockCompression::DecodeS3tcToRgba8(format, blocks, levelBytes, levelWidth, levelHeight);
+            if (rgba.empty()) {
+                if (level == 0) {
+                    throw std::runtime_error("Software DXT decode failed for " + path);
+                }
+                break;
+            }
+
+            glTexImage2D(GL_TEXTURE_2D, static_cast<GLint>(level), GL_RGBA8,
+                         static_cast<GLsizei>(levelWidth), static_cast<GLsizei>(levelHeight), 0,
+                         GL_RGBA, GL_UNSIGNED_BYTE, rgba.data());
+            if (glGetError() != GL_NO_ERROR) {
+                if (level == 0) {
+                    throw std::runtime_error("GL rejected the software-decoded base level for " + path);
+                }
+                break;
+            }
+            ++uploadedLevels;
+        }
+
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_BASE_LEVEL, 0);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAX_LEVEL, std::max(uploadedLevels - 1, 0));
+
+        UploadResult result;
+        result.hasMipmaps = uploadedLevels > 1;
+        result.allowGenerateMipmap = uploadedLevels == 1;
+        return result;
+    }
 }
 
 TextureImage2D::TextureImage2D(const std::string& path, GLint wrapParam, GLint minFilter, GLint magFilter) {
@@ -55,36 +226,46 @@ void TextureImage2D::LoadTextureFromFile(const std::string& path, GLint wrapPara
     glGenTextures(1, &_textureID);
     glBindTexture(GL_TEXTURE_2D, _textureID);
 
-    bool isCompressed = false;
+    bool canGenerateMipmaps = false;
     bool hasEmbeddedMipmaps = false;
 
     try {
         // [PORTING NOTE]
         // Ensure files are preloaded (emcc --preload-file) or fetched asynchronously.
-        // For preloaded files, std::ifstream in CDDSImage will work transparently.
-        CDDSImage image;
-        image.load(path, false);
-        isCompressed = image.is_compressed();
-        _width = image.get_width();
-        _height = image.get_height();
+        // For preloaded files, std::ifstream works transparently over MEMFS.
+        if (HasSuffix(path, ".ktx2")) {
+            // Format-specific pack (BC/ASTC/ETC2), chosen at startup from the probed caps.
+            const UploadResult upload = UploadKtx2(path, _width, _height);
+            hasEmbeddedMipmaps = upload.hasMipmaps;
+            canGenerateMipmaps = upload.allowGenerateMipmap;
+        } else {
+            CDDSImage image;
+            image.load(path, false);
+            const bool isCompressed = image.is_compressed();
+            _width = image.get_width();
+            _height = image.get_height();
+            ValidateAgainstMaxTextureSize(path, _width, _height);
+
+            if (isCompressed && !GetGlCapabilities().s3tcCompressedTextures) {
+                // Safari/iOS and most Android GPUs land here. Decode on the CPU and upload
+                // RGBA8 rather than dropping the body to the fallback checkerboard.
+                const UploadResult upload = UploadDdsSoftwareDecoded(image, path);
+                hasEmbeddedMipmaps = upload.hasMipmaps;
+                canGenerateMipmaps = upload.allowGenerateMipmap;
+            } else {
+                image.upload_texture2D();
+                // hasEmbedded reflects what was *actually* uploaded (MAX_LEVEL>0).
+                // For compressed DXT with short chains or partial failures, upload_texture2D
+                // now sets MAX_LEVEL to the true last resident level.
+                hasEmbeddedMipmaps = (image.get_num_mipmaps() > 0);
+                canGenerateMipmaps = !isCompressed;
 #ifdef __EMSCRIPTEN__
-        ValidateTextureDimensions(path, _width, _height);
-        if (isCompressed && !GetGlCapabilities().s3tcCompressedTextures) {
-            throw std::runtime_error(
-                "DXT/S3TC compressed textures are not supported by this GPU/browser "
-                "(WEBGL_compressed_texture_s3tc missing) for " + path);
+                GLint actualMax = 0;
+                glGetTexParameteriv(GL_TEXTURE_2D, GL_TEXTURE_MAX_LEVEL, &actualMax);
+                hasEmbeddedMipmaps = (actualMax > 0);
+#endif
+            }
         }
-#endif
-        image.upload_texture2D();
-        // hasEmbedded reflects what was *actually* uploaded (MAX_LEVEL>0).
-        // For compressed DXT with short chains or partial failures, upload_texture2D
-        // now sets MAX_LEVEL to the true last resident level.
-        hasEmbeddedMipmaps = (image.get_num_mipmaps() > 0);
-#ifdef __EMSCRIPTEN__
-        GLint actualMax = 0;
-        glGetTexParameteriv(GL_TEXTURE_2D, GL_TEXTURE_MAX_LEVEL, &actualMax);
-        hasEmbeddedMipmaps = (actualMax > 0);
-#endif
     }
     catch (const std::runtime_error& error) {
 #ifdef __EMSCRIPTEN__
@@ -107,10 +288,10 @@ void TextureImage2D::LoadTextureFromFile(const std::string& path, GLint wrapPara
 #endif
     }
 
-    // S3TC compressed textures (DXT1/3/5) do not support glGenerateMipmap in WebGL 2.
-    // Mipmaps must be pre-embedded in the DDS file. Only attempt generation for
-    // uncompressed textures that have no embedded mipmaps.
-    if (!isCompressed) {
+    // Compressed textures (S3TC/ETC2/ASTC/BPTC) do not support glGenerateMipmap in
+    // WebGL 2 — their mip chain must come pre-embedded in the container. Only attempt
+    // generation for uncompressed uploads that arrived without one.
+    if (canGenerateMipmaps && !hasEmbeddedMipmaps) {
         // Clear GL error queue to prevent old errors from triggering false positives here
         while (glGetError() != GL_NO_ERROR);
 

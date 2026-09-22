@@ -499,6 +499,8 @@ declare global {
     startTour?: (id?: string) => void;
     /** Runtime asset base URL for WebResourceFetcher. */
     __solarSystemAssetBase?: string;
+    /** KTX2 texture packs published by this deployment — read by PlatformWindow.cpp. */
+    __solarSystemTexturePacks?: string[];
     /** Init config published before Module() — read by QualitySettings.cpp. */
     __solarSystemInit?: {
       qualityPreset: QualityPreset;

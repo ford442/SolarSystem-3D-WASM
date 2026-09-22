@@ -211,5 +211,6 @@ npm run dev
 - [docs/plans/PORTING_GUIDE.md](docs/plans/PORTING_GUIDE.md) — Emscripten porting notes (memory, async, library substitutions)
 - [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) — staged loading, LOD, asset URL resolution
 - Sound assets are managed via Git LFS and excluded from web preload to avoid CI/sandbox issues
+- Textures are format-aware at runtime: `GlCapabilities` probes S3TC/BPTC/ETC2/ASTC, `TextureFormats::PreferredPackName()` picks a pack, and `TexturePaths::Resolve()` rewrites `.dds` paths to `<pack>/*.ktx2` when a deployment publishes one via `VITE_TEXTURE_PACKS`. With no pack published, a GPU without S3TC CPU-decodes the DXT blocks (`BlockCompression.cpp`) instead of showing the fallback checkerboard. No Basis/libktx transcoder is linked in — see docs/plans/PORTING_GUIDE.md § 3d
 - Most DDS payloads are deploy artifacts; placeholders live in `resource/textures_low/`. Runtime fetches use `VITE_ASSET_BASE` or same-origin `resource/` (see README)
 - Web deployment should use a server that correctly sets MIME types for `.wasm` files (application/wasm)
