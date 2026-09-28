@@ -101,9 +101,9 @@ value. This replaced the previous split where C++ used `Rotate(81.2°, X)` for U
 vs catalog `−97.8°`, `+28.3°` vs `−28.3°` for Neptune, and no tilt at all for Pluto.
 
 The Sun, Saturn/Uranus *ring geometry*, and atmosphere scattering parameters remain
-hand-maintained (`Sun`, `SaturnRing`/`UranusRing`, `SystemVisuals.h`). Keplerian moon
-elements are stored on the catalog row for the eclipse follow-up; runtime moon motion
-is still circular `SatelliteOrbit::Offset` / `OffsetXY`.
+hand-maintained (`Sun`, `SaturnRing`/`UranusRing`, `SystemVisuals.h`). Moon motion is
+described under § Ephemeris accuracy: Keplerian where the row has measured elements, the
+circular `SatelliteOrbit::Offset` / `OffsetXY` otherwise — both as functions of the date.
 
 ---
 
@@ -449,6 +449,25 @@ byte-for-byte as authored.
 overload taking a `geometryPath` is compiled out under `__EMSCRIPTEN__`: passing one in a
 web build is a compile error, not a shader that silently fails to link.
 
+**Material binding.** `planetLighting` material state for every catalog body goes through
+`CatalogMaterial::BindMaterial` (`src/Solar_System/CatalogMaterial.h`). `CatalogBody` and
+`CatalogSatellite` build a `CatalogMaterial::Material` from their row's `render.shaderFlags`,
+`useSphereIntersect`, and `ambientFactor`. `BindMaterial` sets the full flag block on every
+draw, so no body inherits the previous draw's `hasClouds`/`hasNightTexture`. It also binds
+samplers to fixed units: diffuse 0, normal 1, specular 2, night 3, clouds 4. `SceneRenderer`
+owns 6 (`shadowMap`) and 7 (`ringDiffuse`). `generate-planet-metadata.mjs` rejects a row
+whose `shaderFlags` disagree with its `lod` ids, and a moon row that asks for night or cloud
+maps. **A new rocky body needs only a catalog row, not a `Render()`.**
+
+Special cases that stay outside the catalog material path:
+- `Sun`: star, corona, and glow programs.
+- `SaturnRing` / `UranusRing`: ring meshes on `planetaryRingLighting`.
+- `CatalogClouds`: cloud shells on `cloudsLighting.fs`, with their own `cloudsNormalMap`
+  binding.
+- `Atmosphere`: the O'Neil scattering program, with numbers in `SystemVisuals.h`.
+- Titan's atmosphere: hooked up by hand in `InitCatalogSystem`.
+- Asteroid field, comet tails, and the orbit/mission/magnetic-field overlays.
+
 **Uniform locations:** `Shader::Set*` resolves each uniform name with `glGetUniformLocation` on first use and caches the `GLint` (including `-1` for missing names) in a per-program map. Subsequent sets reuse the cache — do not call `glGetUniformLocation` at render call sites. The cache is cleared when the program is deleted (`Release` / destructor). If a re-link path is added later, clear the cache after a successful `glLinkProgram`.
 
 ### 9.2 Threading
@@ -514,6 +533,13 @@ confidently wrong orbital plane is worse than an obviously simplified one. `Sate
 EphemerisOffset` rescales the AU vector so the semi-major axis lands on the catalog
 `sceneOrbitRadius` — the orbit keeps its real shape and tilt, not its real size, the same art
 compression `OrbitLayout` applies to the planets.
+
+Both paths are **functions of `OrbitLayout::GetJulianDate()`**, never per-frame integrators.
+The circular path uses `SatelliteOrbit::MeanAnomalyAt` (`initialAnomalyRad` at J2000, one
+turn per `orbitalPeriodDays`), and moon spin and `CatalogClouds` spin use
+`SatelliteOrbit::SpinDegreesAt` on the same 120 s-per-year clock `OrbitLayout::Advance` runs.
+A `SetSimulationEpoch` jump therefore moves every moon to the pose that date implies, and
+scrubbing back returns it exactly. For placeholder rows the absolute phase is still art.
 
 Elements are J2000 mean elements with secular node and periapsis rates and **no periodic
 terms**. Frames: the Moon's and Triton's are genuinely ecliptic; the Galileans' and Titan's are

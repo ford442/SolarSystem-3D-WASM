@@ -1,6 +1,7 @@
 #ifndef SOLARSYSTEM_CATALOGBODY_H
 #define SOLARSYSTEM_CATALOGBODY_H
 #include "BodyCatalog.generated.h"
+#include "CatalogMaterial.h"
 #include "OrbitLayout.h"
 #include "Planet.h"
 #include "../Auxiliary_Modules/TextureLODController.h"
@@ -10,7 +11,7 @@
  *
  * Mercury–Pluto, Ceres, and Vesta all go through this class. Unique shader layouts
  * (Earth night+clouds, Uranus/Neptune cloud maps) are selected from BodyCatalog::Entry
- * flags and extra LOD ids, not from subclasses. Axial tilt is the catalog SSOT:
+ * flags and extra LOD ids, not from subclasses, and bound by CatalogMaterial::BindMaterial. Axial tilt is the catalog SSOT:
  * Rotate(axialTiltDegrees, Z) then optional artTiltXDegrees (Saturn).
  *
  * Atmospheres, ring geometry, and cloud *shells* are attached by the factory
@@ -32,9 +33,7 @@ public:
 private:
     const BodyCatalog::Entry& _entry;
     OrbitLayout::Body _body;
-    bool _hasSpecular;
-    bool _hasNight;
-    bool _hasClouds;
+    CatalogMaterial::Material _material;
 
     std::vector<TextureImage2D> _diffuses;
     TextureImage2D _normalMap, _specular;

@@ -100,6 +100,7 @@ set(SOLARSYSTEM_SOURCES_SOLAR
     src/Solar_System/CatalogBody.cpp
     src/Solar_System/CatalogSatellite.cpp
     src/Solar_System/CatalogClouds.cpp
+    src/Solar_System/CatalogMaterial.cpp
 )
 
 set(SOLARSYSTEM_SOURCES_3RDPARTY

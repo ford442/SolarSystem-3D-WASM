@@ -141,6 +141,32 @@ function validateCatalog(catalog) {
     }
   }
 
+  // render.shaderFlags is the single source CatalogMaterial reads; the lod ids decide which
+  // textures MakePlanetInfo loads. They must agree, or a flag samples an unbound unit.
+  const flagToLod = [
+    ['hasSpecularMap', 'specular'],
+    ['hasNightTexture', 'night'],
+    ['hasClouds', 'clouds'],
+  ];
+  for (const body of catalog.bodies) {
+    const r = body.render;
+    if (!r) continue;
+    const flags = r.shaderFlags || {};
+    const lod = r.lod || {};
+    for (const [flag, lodKey] of flagToLod) {
+      if (Boolean(flags[flag]) !== (lod[lodKey] != null)) {
+        throw new Error(
+          `Body ${body.id} render.shaderFlags.${flag}=${Boolean(flags[flag])} ` +
+            `disagrees with render.lod.${lodKey}=${JSON.stringify(lod[lodKey] ?? null)}`,
+        );
+      }
+    }
+    if (body.kind === 'satellite' && (flags.hasNightTexture || flags.hasClouds)) {
+      // SatelliteInfo carries only diffuse/normal/specular.
+      throw new Error(`Satellite ${body.id} cannot use night or cloud maps`);
+    }
+  }
+
   // Focusable primary bodies (star/planet/dwarf_planet) must form a contiguous 0..N-1 range.
   const focusIndices = catalog.bodies
     .filter(isFocusBody)

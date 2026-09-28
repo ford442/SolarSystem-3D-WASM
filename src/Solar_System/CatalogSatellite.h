@@ -1,6 +1,7 @@
 #ifndef SOLARSYSTEM_CATALOGSATELLITE_H
 #define SOLARSYSTEM_CATALOGSATELLITE_H
 #include "BodyCatalog.generated.h"
+#include "CatalogMaterial.h"
 #include "Satellite.h"
 
 /**
@@ -9,7 +10,8 @@
  * Scene motion prefers the active ephemeris backend's Keplerian solution for the row
  * (inclined, eccentric, epoch-driven — Moon, the Galileans, Titan, Triton today). Rows the
  * backend has no solution for fall back to the circular SatelliteOrbit offset (XZ or XY)
- * using catalog sceneOrbitRadius / orbitalPeriodDays.
+ * using catalog sceneOrbitRadius / orbitalPeriodDays. Either way the pose (and spin) is a
+ * function of OrbitLayout::GetJulianDate(), never of how many frames have run.
  */
 class CatalogSatellite : public Satellite {
 public:
@@ -26,9 +28,7 @@ public:
 
 private:
     const BodyCatalog::Entry& _entry;
-    bool _hasSpecular;
-    float _anomaly;
-    float _spinDegrees;
+    CatalogMaterial::Material _material;
     bool _ephemerisPlaced = false;
 
     std::vector<TextureImage2D> _diffuses;

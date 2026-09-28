@@ -1,6 +1,7 @@
 #include <gtest/gtest.h>
 
 #include "Solar_System/BodyCatalog.generated.h"
+#include "Solar_System/CatalogMaterial.h"
 #include "Solar_System/OrbitLayout.h"
 
 TEST(BodyCatalogTest, FocusIndicesUnchanged) {
@@ -67,4 +68,21 @@ TEST(BodyCatalogTest, EarthKeepsNightAndCloudMaps) {
     EXPECT_STREQ(earth->lod.clouds, "Earth_Clouds_Diffuse");
     EXPECT_TRUE(earth->hasCloudLayer);
     EXPECT_STREQ(earth->cloudLayer.diffuse, "Earth_Clouds_Diffuse");
+}
+
+TEST(BodyCatalogTest, MaterialFollowsShaderFlagsAndLodIds) {
+    // CatalogMaterial reads shaderFlags only; the generator guarantees they match the lod ids
+    // that decide which textures get loaded. Moons never carry night or cloud maps.
+    for (const BodyCatalog::Entry& entry : BodyCatalog::kEntries) {
+        const CatalogMaterial::Material material = CatalogMaterial::Material::FromEntry(entry);
+        EXPECT_EQ(material.hasSpecular, entry.lod.specular != nullptr) << entry.id;
+        EXPECT_EQ(material.hasNight, entry.lod.night != nullptr) << entry.id;
+        EXPECT_EQ(material.hasClouds, entry.lod.clouds != nullptr) << entry.id;
+        EXPECT_EQ(material.useSphereIntersect, entry.useSphereIntersect) << entry.id;
+        EXPECT_FLOAT_EQ(material.ambientFactor, entry.ambientFactor) << entry.id;
+        if (entry.kind == BodyCatalog::Kind::Satellite) {
+            EXPECT_FALSE(material.hasNight) << entry.id;
+            EXPECT_FALSE(material.hasClouds) << entry.id;
+        }
+    }
 }

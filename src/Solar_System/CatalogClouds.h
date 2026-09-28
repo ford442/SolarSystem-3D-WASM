@@ -17,7 +17,6 @@ public:
 
 private:
     const BodyCatalog::Entry& _parentEntry;
-    float _spinDegrees = 0.0f;
 };
 
 #endif //SOLARSYSTEM_CATALOGCLOUDS_H

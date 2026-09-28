@@ -1,6 +1,6 @@
 #include "CatalogClouds.h"
 #include "TexturePaths.h"
-#include "../SimState.h"
+#include "SatelliteOrbit.h"
 
 CatalogClouds::CatalogClouds(const CloudsInfo& cloudsInfo, std::shared_ptr<SpaceObject> parent,
                              const BodyCatalog::Entry& parentEntry)
@@ -12,9 +12,10 @@ CatalogClouds::CatalogClouds(const CloudsInfo& cloudsInfo, std::shared_ptr<Space
 }
 
 void CatalogClouds::AdjustToParent(float /*timeScale*/) {
-    if (gSimState->simDeltaSeconds > 0.0f) {
-        _spinDegrees += _parentEntry.cloudLayer.spinDegPerSimSecond * gSimState->simDeltaSeconds;
-    }
+    // A function of the date, like the parent's spin, so a date jump doesn't leave the
+    // cloud deck where the previous date had it.
+    const float spinDegrees = SatelliteOrbit::SpinDegreesAt(_parentEntry.cloudLayer.spinDegPerSimSecond,
+                                                            OrbitLayout::GetJulianDate());
 
     LoadIdentityModelMatrix();
     Translate(_parent->GetPosition());
@@ -23,7 +24,7 @@ void CatalogClouds::AdjustToParent(float /*timeScale*/) {
     if (_parentEntry.artTiltXDegrees != 0.0f) {
         Rotate(_parentEntry.artTiltXDegrees, glm::vec3(1.0f, 0.0f, 0.0f));
     }
-    Rotate(_spinDegrees, glm::vec3(0.0f, 1.0f, 0.0f));
+    Rotate(spinDegrees, glm::vec3(0.0f, 1.0f, 0.0f));
     UpdateModelMatrix();
 }
 

@@ -89,16 +89,12 @@ The CMakeLists.txt has separate configurations for EMSCRIPTEN vs native builds, 
   - `Transformable.h/cpp` — Rotation/translation transformations
   - `Planet.h/cpp`, `Satellite.h/cpp`, `Star.h/cpp` — Specializations
   - `CatalogBody` / `CatalogSatellite` / `CatalogClouds` — catalog-driven construction (Mercury–Pluto, moons, cloud shells)
+  - `CatalogMaterial.h/cpp` — the one `planetLighting` material binder (flags from `render.shaderFlags`, fixed texture units)
   
 - Specific celestial bodies that still have dedicated classes:
   - `Sun/Sun.h/cpp` — Star with corona and lens flare
   - `Saturn_System/SaturnRing`, `Uranus_System/UranusRing` — ring meshes
   - Atmosphere/ring *numbers* live in `SystemVisuals.h`; everything else is a catalog row
-  
-- Atmosphere/rings:
-  - `Atmosphere.h/cpp` — Atmospheric scattering shader
-  - `PlanetaryRing.h/cpp`, `SaturnRing.h/cpp`, `UranusRing.h/cpp` — Ring rendering
-  - `Clouds.h/cpp`, `OuterShell.h/cpp` — Cloud layer and outer atmospheric shells
   
 - Atmosphere/rings:
   - `Atmosphere.h/cpp` — Atmospheric scattering shader
@@ -142,7 +138,8 @@ The CMakeLists.txt has separate configurations for EMSCRIPTEN vs native builds, 
 
 ## Key Architectural Decisions
 
-- **Modular celestial bodies**: Each planet/satellite is its own class inheriting from base classes (Planet, Satellite, Star), making it easy to add new bodies or customize appearance.
+- **Catalog-driven celestial bodies**: planets and moons are `CatalogBody`/`CatalogSatellite` rows from `planets.catalog.json`, and all of them bind their material through `CatalogMaterial::BindMaterial`. The only dedicated classes left are for the Sun, the ring meshes, cloud shells, and atmospheres (list in ARCHITECTURE §9.1).
+- **Poses are functions of the date**: planets (`OrbitLayout`), moons (`SatelliteOrbit::EphemerisOffset` / `MeanAnomalyAt`), and spins (`SpinDegreesAt`) derive from `OrbitLayout::GetJulianDate()`. Do not add per-frame accumulators — they break date-scrubber jumps.
 - **Lazy texture loading**: Large DDS textures are not preloaded; `WebResourceFetcher` fetches them on-demand to avoid blocking initialization.
 - **No blocking fetches**: every download goes through callback-based `WebResourceFetcher::DownloadFile` (`emscripten_async_wget2`), and C++ only ever reads files that are already resident in MEMFS. That keeps the build free of `ASYNCIFY`/`JSPI` and lets it use native `-fwasm-exceptions`. Anything that needs a new asset must stage it through `DownloadFile` (core resources, a planet manifest, or `TextureLoadingQueue`) before the code that reads it runs — see `docs/plans/PORTING_GUIDE.md` §3b.
 - **Separate build paths**: CMakeLists.txt uses `if(EMSCRIPTEN)` to toggle library linking and compiler flags, avoiding duplication of core logic.
@@ -169,7 +166,8 @@ Ceres, Vesta, Mercury–Pluto, the Moon, and the Galileans are the worked exampl
 ### Modifying Shaders
 - Shaders are in `resource/shaders/`
 - Changes are reflected immediately in web (dev mode with Vite)
-- For native builds, recompile after modifying shaders (they are embedded in the executable)
+- Every shader is authored once as `#version 300 es`; native `Shader.cpp` rewrites the directive to `#version 460 core` at load (ARCHITECTURE §9.1)
+- Native reads `resource/shaders/` from disk at runtime — restart the app, no recompile needed
 
 ### Adjusting Graphics Settings (Shadows, Scattering, etc.)
 - Most parameters are exposed in the UI (accessed via GUI)

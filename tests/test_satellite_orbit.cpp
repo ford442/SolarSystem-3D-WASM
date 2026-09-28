@@ -85,3 +85,43 @@ TEST(SatelliteOrbitTest, OffsetIsAFunctionOfEpochNotOfCallCount) {
     EXPECT_FLOAT_EQ(first.y, second.y);
     EXPECT_FLOAT_EQ(first.z, second.z);
 }
+
+TEST(SatelliteOrbitTest, CircularAnomalyAndSpinAreFunctionsOfEpoch) {
+    // Mimas has no Keplerian solution, so it runs on MeanAnomalyAt/SpinDegreesAt. A date
+    // jump and a round trip through another date must land on the same pose.
+    const BodyCatalog::Entry& mimas = Row(kMimasIndex);
+    const double jd = Ephemeris::kJ2000 + 6440.5; // 2017-08-21
+    const float anomaly = SatelliteOrbit::MeanAnomalyAt(mimas, jd);
+    const float spin = SatelliteOrbit::SpinDegreesAt(mimas.spinDegPerSimSecond, jd);
+
+    (void)SatelliteOrbit::MeanAnomalyAt(mimas, Ephemeris::kJ2000 - 3653.0);
+    EXPECT_FLOAT_EQ(SatelliteOrbit::MeanAnomalyAt(mimas, jd), anomaly);
+    EXPECT_FLOAT_EQ(SatelliteOrbit::SpinDegreesAt(mimas.spinDegPerSimSecond, jd), spin);
+
+    // J2000 is the catalog's starting pose; one full period later is the same place.
+    EXPECT_NEAR(SatelliteOrbit::MeanAnomalyAt(mimas, Ephemeris::kJ2000),
+                std::fmod(mimas.initialAnomalyRad + SatelliteOrbit::kTwoPi, SatelliteOrbit::kTwoPi), 1e-5f);
+    EXPECT_NEAR(SatelliteOrbit::MeanAnomalyAt(mimas, jd + mimas.orbitalPeriodDays), anomaly, 1e-3f);
+    EXPECT_GE(anomaly, 0.0f);
+    EXPECT_LT(anomaly, SatelliteOrbit::kTwoPi);
+    EXPECT_GE(spin, 0.0f);
+    EXPECT_LT(spin, 360.0f);
+}
+
+TEST(SatelliteOrbitTest, CircularAnomalyMatchesTheOldPerFrameRate) {
+    // The retired AdvanceAnomaly integrated 2*pi/period per (120 s * P/365.25) of sim time;
+    // the closed form must move at that same rate so moons keep their on-screen speed.
+    const BodyCatalog::Entry& mimas = Row(kMimasIndex);
+    const double quarterPeriodDays = mimas.orbitalPeriodDays / 4.0;
+    const float a0 = SatelliteOrbit::MeanAnomalyAt(mimas, Ephemeris::kJ2000);
+    const float a1 = SatelliteOrbit::MeanAnomalyAt(mimas, Ephemeris::kJ2000 + quarterPeriodDays);
+    float delta = a1 - a0;
+    if (delta < 0.0f) {
+        delta += SatelliteOrbit::kTwoPi;
+    }
+    EXPECT_NEAR(delta, SatelliteOrbit::kTwoPi / 4.0f, 1e-4f);
+
+    // Spin: one Earth year of sim time is kEarthOrbitSecondsAt1x sim-seconds.
+    const float spinYear = SatelliteOrbit::SpinDegreesAt(1.0f, Ephemeris::kJ2000 + 365.25);
+    EXPECT_NEAR(spinYear, std::fmod(OrbitLayout::kEarthOrbitSecondsAt1x, 360.0f), 1e-3f);
+}

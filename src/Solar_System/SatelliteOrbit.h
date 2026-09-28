@@ -2,7 +2,6 @@
 #define SOLARSYSTEM_SATELLITEORBIT_H
 
 #include "../Auxiliary_Modules/Ephemeris.h"
-#include "../SimState.h"
 #include "BodyCatalog.generated.h"
 #include "OrbitLayout.h"
 #include <cmath>
@@ -13,18 +12,31 @@ namespace SatelliteOrbit {
 constexpr float kEarthYearDays = 365.25f;
 constexpr float kTwoPi = 6.28318530717958647692f;
 
-/** Advance a mean anomaly using this frame's scaled sim delta. */
-inline void AdvanceAnomaly(float& anomalyRad, float orbitalPeriodDays) {
-    if (gSimState->simDeltaSeconds <= 0.0f || orbitalPeriodDays <= 0.0f) {
-        return;
+/** Sim-seconds (OrbitLayout's 120 s = one Earth year clock) elapsed from J2000 to julianDate. */
+inline double SimSecondsSinceJ2000(double julianDate) {
+    return (julianDate - Ephemeris::kJ2000) *
+           (static_cast<double>(OrbitLayout::kEarthOrbitSecondsAt1x) / kEarthYearDays);
+}
+
+/**
+ * Circular-orbit mean anomaly at julianDate: initialAnomalyRad at J2000, one turn per
+ * orbitalPeriodDays. A pure function of the date — like OrbitLayout's planets — so a
+ * date-scrubber jump lands every moon where that date puts it, and scrubbing back returns
+ * it exactly. Absolute phase is still art for rows whose M0Deg is a placeholder.
+ */
+inline float MeanAnomalyAt(const BodyCatalog::Entry& entry, double julianDate) {
+    if (entry.orbitalPeriodDays <= 0.0f) {
+        return entry.initialAnomalyRad;
     }
-    const float periodSeconds =
-        OrbitLayout::kEarthOrbitSecondsAt1x * (orbitalPeriodDays / kEarthYearDays);
-    anomalyRad += gSimState->simDeltaSeconds * (kTwoPi / periodSeconds);
-    anomalyRad = std::fmod(anomalyRad, kTwoPi);
-    if (anomalyRad < 0.0f) {
-        anomalyRad += kTwoPi;
+    // Wrap the turn count in double before narrowing: decades of Mimas are ~10^4 turns.
+    const double turns = (julianDate - Ephemeris::kJ2000) / entry.orbitalPeriodDays;
+    const double fraction = turns - std::floor(turns);
+    double anomaly = entry.initialAnomalyRad + 2.0 * 3.14159265358979323846 * fraction;
+    anomaly = std::fmod(anomaly, 2.0 * 3.14159265358979323846);
+    if (anomaly < 0.0) {
+        anomaly += 2.0 * 3.14159265358979323846;
     }
+    return static_cast<float>(anomaly);
 }
 
 /** Parent-relative offset on a circular equatorial (XZ) orbit. */
@@ -68,12 +80,13 @@ inline bool EphemerisOffset(const BodyCatalog::Entry& entry, double julianDate,
     return true;
 }
 
-/** Advance axial spin in degrees (linear in sim time). */
-inline void AdvanceSpin(float& spinDegrees, float degreesPerSimSecond) {
-    if (gSimState->simDeltaSeconds <= 0.0f) {
-        return;
+/** Axial spin in degrees at julianDate (0 at J2000), wrapped to [0, 360). */
+inline float SpinDegreesAt(float degreesPerSimSecond, double julianDate) {
+    double spin = std::fmod(static_cast<double>(degreesPerSimSecond) * SimSecondsSinceJ2000(julianDate), 360.0);
+    if (spin < 0.0) {
+        spin += 360.0;
     }
-    spinDegrees += degreesPerSimSecond * gSimState->simDeltaSeconds;
+    return static_cast<float>(spin);
 }
 
 } // namespace SatelliteOrbit
