@@ -1,7 +1,4 @@
 #version 300 es
-precision highp float;
-precision highp int;
-
 uniform sampler2D ringTexture;
 uniform sampler2D shadowMap;
 
@@ -31,6 +28,8 @@ vec3 sphereIntersectNormal;
 float sphereIntersectDistance;
 
 out vec4 fragColor;
+
+#include "common/shadow_pcf.glsl"
 
 float vecSum(vec3 v) {
     return v.x + v.y + v.z;
@@ -71,44 +70,6 @@ float sphereIntersectAmount(vec3 raydir, vec3 rayorig, vec3 pos, float rad) {
     return distanceToSphere - rad;
 }
 
-// https://www.youtube.com/watch?v=yn5UJzMqxj0
-float SampleShadowMap(vec2 coords, float compare) {
-    return step(compare, texture(shadowMap, coords).r);
-}
-
-float SampleShadowMapLinear(vec2 coords, float compare, vec2 texelSize) {
-    vec2 pixelPos = coords / texelSize + vec2(0.5);
-    vec2 fracPart = fract(pixelPos);
-    vec2 startTexel = (pixelPos - fracPart) * texelSize;
-
-    float blTexel = SampleShadowMap(startTexel, compare);
-    float brTexel = SampleShadowMap(startTexel + vec2(texelSize.x, 0.0), compare);
-    float tlTexel = SampleShadowMap(startTexel + vec2(0.0, texelSize.y), compare);
-    float trTexel = SampleShadowMap(startTexel + texelSize, compare);
-
-    float mixA = mix(blTexel, tlTexel, fracPart.y);
-    float mixB = mix(brTexel, trTexel, fracPart.y);
-
-    return mix(mixA, mixB, fracPart.x);
-}
-
-void ApplyPCF(out float shadow, vec3 projCoords, float currentDepth) {
-    const float NUM_SAMPLES = 3.0; // Change this (lower to increase fps or higher to increase softening)
-    const float SAMPLES_START = (NUM_SAMPLES - 1.0) / 2.0;
-    const float NUM_SAMPLES_SQUARED = NUM_SAMPLES * NUM_SAMPLES;
-
-    shadow = 0.0;
-    vec2 texelSize = 1.0 / vec2(textureSize(shadowMap, 0));
-
-    for(float y = -SAMPLES_START; y <= SAMPLES_START; y += 1.0) {
-        for(float x = -SAMPLES_START; x <= SAMPLES_START; x += 1.0) {
-            shadow += SampleShadowMapLinear(projCoords.xy + vec2(x, y) * texelSize, currentDepth - bias, texelSize);
-        }
-    }
-
-    shadow /= NUM_SAMPLES_SQUARED;
-}
-
 float CalculateShadow(vec4 fragPosLightSpace) {
     // Perform perspective divide
     vec3 projCoords = fragPosLightSpace.xyz / fragPosLightSpace.w;
@@ -123,11 +84,7 @@ float CalculateShadow(vec4 fragPosLightSpace) {
     float currentDepth = projCoords.z;
     vec3 lightDir = normalize(lightPos - fWorldPosition);
 
-    // Check whether current frag pos is in shadow
-    float shadow;
-
-    ApplyPCF(shadow, projCoords, currentDepth);
-    return shadow;
+    return ApplyPCF(shadowMap, projCoords, currentDepth - bias);
 }
 
 void main() {

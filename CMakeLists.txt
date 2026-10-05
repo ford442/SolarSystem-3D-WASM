@@ -51,6 +51,7 @@ set(SOLARSYSTEM_SOURCES_CORE
 set(SOLARSYSTEM_SOURCES_AUX
     src/Auxiliary_Modules/WebResourceFetcher.cpp
     src/Auxiliary_Modules/Shader.cpp
+    src/Auxiliary_Modules/ShaderSource.cpp
     src/Auxiliary_Modules/Mesh.cpp
     src/Auxiliary_Modules/MeshHolder.cpp
     src/Auxiliary_Modules/Camera.cpp

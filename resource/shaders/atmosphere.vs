@@ -22,6 +22,8 @@ uniform mat4 lightSpaceMatrix;
 
 uniform float zCoef; // for log z-buffer (2.0 / log2(farPlane + 1.0)) [логарифмический z-буфер]
 
+#include "common/log_depth.glsl"
+
 void main() {
     fWorldPosition = vec3(model * vec4(aPos, 1.0));
     fPosition = aPos;
@@ -30,7 +32,5 @@ void main() {
 
     gl_Position = projection * view * vec4(fWorldPosition, 1);
 
-    /// Log z-buffer [логарифмический z-буфер]
-    gl_Position.z = log2(max(1e-6, gl_Position.w + 1.0)) * zCoef - 1.0;
-    gl_Position.z *= gl_Position.w;
+    gl_Position = ApplyLogDepth(gl_Position, zCoef);
 }

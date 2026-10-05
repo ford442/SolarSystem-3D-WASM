@@ -17,12 +17,12 @@ uniform float zCoef; // for log z-buffer (2.0 / log2(farPlane + 1.0)) [лога�
 // Output
 out vec3 fPosition;
 
+#include "common/log_depth.glsl"
+
 void main() {
     fPosition = (cameraRight * aPos.x + cameraUp * aPos.y);
     vec3 vpw = fPosition * maxSize;
     gl_Position = projection * view * model * vec4(vpw, 1.0);
 
-    /// Log z-buffer [логарифмический z-буфер]
-    gl_Position.z = log2(max(1e-6, gl_Position.w + 1.0)) * zCoef - 1.0;
-    gl_Position.z *= gl_Position.w;
+    gl_Position = ApplyLogDepth(gl_Position, zCoef);
 }

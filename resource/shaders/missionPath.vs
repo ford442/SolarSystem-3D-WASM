@@ -1,5 +1,4 @@
 #version 300 es
-precision highp float;
 
 layout (location = 0) in vec3 aPosition;
 layout (location = 1) in vec3 aTangent;
@@ -14,6 +13,8 @@ uniform float zCoef;
 
 out float vArcLength;
 out float vEdgeFade;
+
+#include "common/log_depth.glsl"
 
 void main() {
     vec3 worldPos = aPosition;
@@ -45,6 +46,5 @@ void main() {
     vEdgeFade = 1.0 - abs(aLineUV);
 
     gl_Position = projection * view * vec4(worldPos, 1.0);
-    gl_Position.z = log2(max(1e-6, gl_Position.w + 1.0)) * zCoef - 1.0;
-    gl_Position.z *= gl_Position.w;
+    gl_Position = ApplyLogDepth(gl_Position, zCoef);
 }

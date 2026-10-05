@@ -28,6 +28,7 @@ set(SOLARSYSTEM_TEST_SOURCES
     ${CMAKE_SOURCE_DIR}/src/Auxiliary_Modules/TextureFormatSupport.cpp
     ${CMAKE_SOURCE_DIR}/src/Auxiliary_Modules/BlockCompression.cpp
     ${CMAKE_SOURCE_DIR}/src/3rdparty/ktx2_reader.cpp
+    ${CMAKE_SOURCE_DIR}/src/Auxiliary_Modules/ShaderSource.cpp
 )
 
 add_executable(SolarSystemTests
@@ -45,11 +46,13 @@ add_executable(SolarSystemTests
     test_mission_catalog.cpp
     test_body_catalog.cpp
     test_texture_formats.cpp
+    test_shader_source.cpp
     stub_texture_image2d.cpp
     ${SOLARSYSTEM_TEST_SOURCES}
 )
 
-target_compile_definitions(SolarSystemTests PRIVATE SOLARSYSTEM_BUILD_TESTS)
+target_compile_definitions(SolarSystemTests PRIVATE SOLARSYSTEM_BUILD_TESTS
+    SOLARSYSTEM_SOURCE_DIR="${CMAKE_SOURCE_DIR}")
 target_include_directories(SolarSystemTests PRIVATE
     ${CMAKE_SOURCE_DIR}/src
 )

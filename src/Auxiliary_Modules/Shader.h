@@ -17,6 +17,7 @@
         glBindTexture(GL_TEXTURE_2D, (texture)); \
     } while (0)
 #endif
+#include "ShaderSource.h"
 #include <glm/glm.hpp>
 #include <string>
 #include <fstream>
@@ -68,6 +69,14 @@ public:
     void SetMat4Double(const std::string& name, const glm::dmat4& mat) const;
     size_t GetProgramId() const;
 
+#ifndef __EMSCRIPTEN__
+    // SOLARSYSTEM_SHADER_SELFTEST=1: compile every .vs/.fs under `directory` as its own
+    // stage (assembled exactly as Build does) and report. Returns the failure count. This is
+    // what CI runs under Mesa, so a shader that the running app would only reach after the
+    // skybox loads (or never, on a given preset) still gets compiled.
+    static int SelfTestDirectory(const std::string& directory);
+#endif
+
 private:
     enum class ShaderType {
         VertexShader,
@@ -84,7 +93,8 @@ private:
     void Release();
     void Build(const std::string& vertexPath, const std::string& fragmentPath, const std::string& geometryPath);
 
-    static void CheckCompileErrors(size_t shader, ShaderType type, const std::string& path = "");
+    static void CheckCompileErrors(size_t shader, ShaderType type, const std::string& path = "",
+                                   const ShaderSource::Result* source = nullptr);
     static std::string ShaderTypeToString(ShaderType type);
 };
 
