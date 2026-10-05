@@ -18,6 +18,7 @@ class Atmosphere : public OuterShell {
 public:
     explicit Atmosphere(const AtmosphereInfo& atmosphereInfo, std::shared_ptr<SpaceObject> parent);
     void AdjustToParent(float timeScale = 0.0f) override;
+    glm::vec3 GetAtmosphereColor() const;
     glm::vec3 GetMieTint() const;
     float GetInnerRadius() const;
     float GetOuterRadius() const;

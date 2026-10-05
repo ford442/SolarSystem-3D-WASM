@@ -6,6 +6,11 @@ SpaceObject::SpaceObject(MeshHolder model, const Shader& shader, std::wstring en
 }
 
 void SpaceObject::Render() const {
+    // `model` is uploaded here, at draw time, rather than when AdjustToParent builds the
+    // matrix: placement runs for every component before any pass binds a program, and
+    // glUniform* writes to whichever program is current, not to _shader's. The caller has
+    // already Use()d _shader (every pass does before Render()).
+    _shader->SetMat4("model", GetModelMatrix());
     _objectModel.Draw(*_shader);
 }
 

@@ -32,9 +32,6 @@ void Renderer::Init() {
     hdrEnabled = hdr->IsEnabled();
     LogQualityTier(qualitySettings, hdrEnabled, gSimState->shadowQuality);
 
-    const vector<string> skyBoxFaces = GetSkyBoxFaces();
-
-    skyBox = make_unique<SkyBox>(skyBoxFaces);
     mainTextShader = make_unique<Shader>("resource/shaders/text.vs", "resource/shaders/text.fs");
     textRenderer = make_unique<TextRenderer>(app._ft, "resource/fonts/Arial.ttf");
     FT_Done_FreeType(app._ft);
@@ -47,6 +44,11 @@ void Renderer::Init() {
     mainCloudsShader = make_unique<Shader>("resource/shaders/planetLighting.vs", "resource/shaders/cloudsLighting.fs");
     mainRingShader = make_unique<Shader>("resource/shaders/planetaryRingLighting.vs", "resource/shaders/planetaryRingLighting.fs");
     lensFlareShader = make_unique<Shader>("resource/shaders/lensFlare.vs", "resource/shaders/lensFlare.fs");
+
+    // After every program is built: a missing skybox face aborts start-up (native has no
+    // checkerboard fallback), and the native CI smoke run should still have compiled the
+    // shaders by then.
+    skyBox = make_unique<SkyBox>(GetSkyBoxFaces());
     lensFlare = make_unique<LensFlare>(*lensFlareShader, TextureImage2D(TexturePaths::Resolve("resource/textures_low/flares_bright_Low.dds")),
             FlaresInfo {4,
             {
@@ -186,6 +188,11 @@ void Renderer::RenderAtmospheres(const std::vector<RenderableAtmosphere>& render
         for (const auto& renderableAtmosphere : renderableAtmospheres) {
             mainAtmosphereShader->SetVec3("camPosition", _app._camera.GetPosition() - renderableAtmosphere.atmosphere->GetPosition());
             mainAtmosphereShader->SetVec3("lightPos", _app._sun->GetPosition() - renderableAtmosphere.atmosphere->GetPosition());
+            // Per-shell constants are set here, after Use(): Saturn and Titan share a component,
+            // so setting them at placement time let the last shell's values win for both.
+            mainAtmosphereShader->SetVec3("C_R", renderableAtmosphere.atmosphere->GetAtmosphereColor());
+            mainAtmosphereShader->SetFloat("innerRadius", renderableAtmosphere.atmosphere->GetInnerRadius());
+            mainAtmosphereShader->SetFloat("outerRadius", renderableAtmosphere.atmosphere->GetOuterRadius());
             mainAtmosphereShader->SetVec3("mieTint", renderableAtmosphere.atmosphere->GetMieTint());
             mainAtmosphereShader->SetFloat("SCALE_H_FACTOR", renderableAtmosphere.hScaleFactor);
             mainAtmosphereShader->SetFloat("SCALE_L_FACTOR", 1.0f);

@@ -24,8 +24,8 @@ void Transformable::LoadIdentityModelMatrix() {
     _matrixModel = glm::mat4(1.0f);
 }
 
-void Transformable::UpdateModelMatrix() {
-    _shader->SetMat4("model", _matrixModel);
+const glm::mat4& Transformable::GetModelMatrix() const {
+    return _matrixModel;
 }
 
 void Transformable::SetShader(const Shader& shader) {

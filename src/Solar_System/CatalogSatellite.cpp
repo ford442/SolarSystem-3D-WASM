@@ -38,7 +38,6 @@ void CatalogSatellite::AdjustToParent(float /*timeScale*/) {
         Rotate(_entry.yawOffsetDegrees, glm::vec3(0.0f, 1.0f, 0.0f));
     }
     Rotate(SatelliteOrbit::SpinDegreesAt(_entry.spinDegPerSimSecond, julianDate), glm::vec3(0.0f, 1.0f, 0.0f));
-    UpdateModelMatrix();
 }
 
 float CatalogSatellite::OrbitSceneUnitsPerKm() const {

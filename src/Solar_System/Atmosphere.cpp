@@ -8,14 +8,13 @@ Atmosphere::Atmosphere(const AtmosphereInfo& atmosphereInfo, std::shared_ptr<Spa
 }
 
 void Atmosphere::AdjustToParent(float /*timeScale*/) {
-    GetShader().SetVec3("C_R", _atmosphereColor);
-    GetShader().SetFloat("innerRadius", _innerRadius);
-    GetShader().SetFloat("outerRadius", _outerRadius);
-
     LoadIdentityModelMatrix();
     Translate(_parent->GetPosition());
     Scale(glm::vec3(_scaleFactor));
-    UpdateModelMatrix();
+}
+
+glm::vec3 Atmosphere::GetAtmosphereColor() const {
+    return _atmosphereColor;
 }
 
 glm::vec3 Atmosphere::GetMieTint() const {

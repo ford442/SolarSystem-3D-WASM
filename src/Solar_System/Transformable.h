@@ -11,9 +11,9 @@ public:
     void Scale(const glm::vec3& scale);
     void Rotate(float angle, const glm::vec3& axisRotation);
     void LoadIdentityModelMatrix();
-    void UpdateModelMatrix();
     void SetShader(const Shader& shader);
     const Shader& GetShader() const;
+    const glm::mat4& GetModelMatrix() const;
     glm::mat4 GetRotationMatrix() const;
     glm::vec3 GetPosition() const;
     float GetLastRotationAngle() const;
