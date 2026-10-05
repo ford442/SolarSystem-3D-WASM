@@ -447,9 +447,9 @@ void Renderer::RenderStarCoronaVolume() const {
     // In solar radii. The K-corona is visible to a few radii; 6 keeps the slices' discs
     // small enough that the stack stays cheap from planetary distances.
     constexpr float kCoronaExtent = 6.0f;
-    // Brightness at ~1.1 solar radii comes out near 1 with this; tuned by eye against the
-    // HDR glow and lens flare, which sit on top.
-    constexpr float kCoronaIntensity = 0.55f;
+    // Tuned by eye so the streamers read against black without the inner corona clipping;
+    // the HDR glow and lens flare sit on top of it.
+    constexpr float kCoronaIntensity = 0.8f;
 
     const glm::vec3 sunCenter = _app._sun->GetPosition();
     const float sunRadius = _app._sun->GetSceneRadius();

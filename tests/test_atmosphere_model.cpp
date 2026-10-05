@@ -133,9 +133,11 @@ TEST(AtmosphereModel, NightSideReceivesNoSingleScatteringLight) {
 }
 
 TEST(AtmosphereModel, ThicknessScalePreservesVerticalOpticalDepth) {
+    BodyCatalog::AtmospherePhysical unscaled = Earth();
+    unscaled.thicknessScale = 1.0f;
     BodyCatalog::AtmospherePhysical stretched = Earth();
     stretched.thicknessScale = 3.0f;
-    const Params base = FromCatalog(Earth());
+    const Params base = FromCatalog(unscaled);
     const Params wide = FromCatalog(stretched);
     EXPECT_NEAR(wide.topRadius - wide.bottomRadius, 3.0 * (base.topRadius - base.bottomRadius), 1e-9);
     const glm::dvec3 a = IntegrateTransmittance(base, base.bottomRadius, 1.0, 4000);

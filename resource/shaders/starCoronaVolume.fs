@@ -30,19 +30,25 @@ void main() {
     float pointDistance = length(toPoint);
     vec3 rayDir = toPoint / pointDistance;
     vec2 photosphere = raySphere(cameraLocal, rayDir, 1.0);
-    if (photosphere.x <= photosphere.y && photosphere.x > 0.0 && photosphere.x < pointDistance)
+    bool hitsDisc = photosphere.x <= photosphere.y && photosphere.x > 0.0;
+    if (hitsDisc && photosphere.x < pointDistance)
         discard;
+    // In front of the disc the corona is ~1e-6 of the photosphere and invisible; letting it
+    // add here would only wash out the limb darkening.
+    float overDisc = hitsDisc ? 0.1 : 1.0;
 
-    // Baumbach (1937) electron density, relative units: the K-corona's steep fall-off.
-    float density = 0.036 * pow(r, -1.5) + 1.55 * pow(r, -6.0) + 2.99 * pow(r, -16.0);
+    // Baumbach (1937) K-corona electron density, with the r^-1.5 term (the outer corona,
+    // where streamers live) raised 4x over the published fit: physically it is ~1e-4 of the
+    // limb brightness, which an 8-bit display cannot show next to the photosphere.
+    float density = 0.15 * pow(r, -1.5) + 1.55 * pow(r, -6.0) + 2.99 * pow(r, -16.0);
 
-    // Streamers: radial structure from noise on the direction (stretched along r so it
-    // reads as rays), slowly evolving, strongest toward the solar equator (world XZ).
+    // Streamers: noise on the direction only (plus a slow drift along r), so features stay
+    // radial and read as rays; strongest toward the solar equator (world XZ plane).
     vec3 direction = fLocal / r;
-    float rays = noise(vec4(direction * 3.0, r * 0.15 + time), 3, 1.0, 0.55);
-    float streamer = 0.35 + 1.6 * pow(clamp(0.5 + 0.5 * rays, 0.0, 1.0), 3.0);
-    float equator = 1.0 - 0.55 * direction.y * direction.y;
-    float structure = mix(1.0, streamer * equator, smoothstep(1.02, 1.5, r));
+    float rays = noise(vec4(direction * 5.0, r * 0.08 + time), 3, 1.0, 0.5);
+    float streamer = 0.25 + 2.2 * pow(clamp(0.5 + 0.5 * rays, 0.0, 1.0), 4.0);
+    float equator = 1.0 - 0.6 * direction.y * direction.y;
+    float structure = mix(1.0, streamer * equator, smoothstep(1.02, 1.4, r));
 
     float edgeFade = (1.0 - smoothstep(0.6 * coronaExtent, coronaExtent, r)) * smoothstep(1.0, 1.01, r);
 
@@ -50,6 +56,6 @@ void main() {
     // camera->Sun axis, so off-axis rays cross them obliquely).
     float pathLength = sliceSpacing / max(abs(dot(rayDir, sliceForward)), 0.25);
 
-    float emission = density * structure * edgeFade * pathLength * coronaIntensity;
+    float emission = density * structure * edgeFade * pathLength * coronaIntensity * overDisc;
     fragColor = vec4(coronaColor * emission, 1.0);
 }

@@ -158,10 +158,10 @@ void main() {
         throughput *= stepTransmittance;
     }
 
-    // The default framebuffer is LDR and gamma-encoded: expose, compress, encode. The
-    // planet behind is already encoded, so its attenuation is encoded the same way.
-    vec3 color = 1.0 - exp(-luminance * uExposure);
-    color = pow(color, vec3(1.0 / 2.2)) * uSurfaceDim;
+    // The default framebuffer is LDR, and the planet shaders write texture colour times
+    // lighting with no gamma step, so stay in that same space: expose and compress only.
+    // (Gamma-encoding here would lift the faint over-the-disc haze to a grey veil.)
+    vec3 color = (1.0 - exp(-luminance * uExposure)) * uSurfaceDim;
     float transmittance = dot(throughput, vec3(0.2126, 0.7152, 0.0722));
-    fragColor = vec4(color, pow(clamp(transmittance, 0.0, 1.0), 1.0 / 2.2));
+    fragColor = vec4(color, clamp(transmittance, 0.0, 1.0));
 }
