@@ -19,6 +19,13 @@ struct QualityTierSettings {
     int magneticBloomPasses;
     int asteroidInstanceCount;
     TextureLodTier maxTextureLodTier;
+    // LUT-based atmosphere (atmospherePbr.fs) on bodies whose catalog row has a `physical`
+    // block; atmosphereSteps is the view-ray sample count. Off = the O'Neil shell.
+    bool enablePbrAtmosphere;
+    int atmosphereSteps;
+    // Instanced view-aligned corona slices (starCoronaVolume.*). Off = the flat billboard.
+    bool enableVolumetricCorona;
+    int coronaSlices;
     const char* name;
 };
 

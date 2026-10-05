@@ -53,6 +53,11 @@ HDR glow / lens flare are still skipped in VR (`RenderFrameContent`): their full
 composite quad is sized to the 2-D display, not a per-eye viewport. Re-enabling them needs
 per-eye HDR targets, which is out of scope here.
 
+The LUT atmosphere (`atmospherePbr.fs`) and the sliced corona (`starCoronaVolume.*`) *do*
+run in VR: neither binds a framebuffer, both draw into whatever the eye pass has bound, and
+both take the camera position from the eye's view matrix (`Renderer::CameraWorldPosition`),
+not the head. A future offscreen pass for either must return to `DefaultFramebuffer()`.
+
 ## Context creation
 
 `Module.contextAttributes.xrCompatible = true` is set from `web/src/main.ts` before GLFW creates the WebGL 2 context. MSAA is still fixed at context creation — prefer `?quality=medium` (0× MSAA) when targeting VR headsets; see [TESTING_GUIDE.md](TESTING_GUIDE.md) quality table.

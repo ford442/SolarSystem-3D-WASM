@@ -60,11 +60,14 @@ The project is an animated 3D scene with a model of the Solar System.
 - 🖼️ Photoshop-processed skybox with high resolution textures (6K)
 - 💡 High-quality shaders
 - 💡 Blinn–Fong reflection model with normal maps to visualise surface irregularities
-- 💡 Accurate atmospheric scattering of planets and satellites
+- 💡 Physically based atmospheres for Earth, Venus, Mars and Titan: transmittance and
+  multiple-scattering lookup tables baked offline from catalog parameters (Medium/Full), with a
+  cheap single-scattering shell on Low and for the gas giants
 - 💡 Mie scattering and accurate shadows for planetary rings
 - 💡 High-quality soft shadows using PCF and ray tracing
 - 💡 Omnidirectional shadow maps simulation when using a single unidirectional shadow map
 - 💡 Shadows from the clouds
+- 💡 Limb-darkened photosphere and a volumetric (instanced-slice) solar corona
 - 💡 Lens flare
 - 🎵 Background music
 - ⚙️ FreeType status hints plus a browser settings panel for quality, time control, pause,

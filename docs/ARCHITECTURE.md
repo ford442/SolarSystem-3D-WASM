@@ -100,8 +100,12 @@ overlay so the rings keep their established presentation; it is *not* a second I
 value. This replaced the previous split where C++ used `Rotate(81.2°, X)` for Uranus
 vs catalog `−97.8°`, `+28.3°` vs `−28.3°` for Neptune, and no tilt at all for Pluto.
 
-The Sun, Saturn/Uranus *ring geometry*, and atmosphere scattering parameters remain
-hand-maintained (`Sun`, `SaturnRing`/`UranusRing`, `SystemVisuals.h`). Moon motion is
+Atmospheres are catalog data too: `render.atmosphere` carries the O'Neil shell numbers
+(`oneil`) and, for Earth/Venus/Mars/Titan, the physical coefficients (`physical`) that
+`tools/atmosphere_lut_baker` turns into `resource/atmosphere/*.ktx2` (§9.2). The flow is
+catalog → `generate-planet-metadata.mjs` → `BodyCatalog::kAtmospheres` → baker → LUTs
+preloaded into `.data`. The Sun and Saturn/Uranus *ring geometry* remain hand-maintained
+(`Sun`, `SaturnRing`/`UranusRing`, `SystemVisuals.h`). Moon motion is
 described under § Ephemeris accuracy: Keplerian where the row has measured elements, the
 circular `SatelliteOrbit::Offset` / `OffsetXY` otherwise — both as functions of the date.
 
@@ -362,6 +366,7 @@ The value is the directory **containing** `resource/`, with a trailing slash. It
 | Asset class | WASM `.data` preload | Runtime fetch |
 |-------------|---------------------|---------------|
 | Shaders, fonts, icons | Yes | — |
+| Atmosphere LUTs (`resource/atmosphere/`, ~560 KB RGBA16F KTX2) | Yes | — |
 | Low-res placeholders | Partial (via build copy to `web/public/`) | Core + staged + LOD |
 | High-res textures | No | LOD queue + skybox core load |
 | Sounds | No (may be absent in checkout) | Optional parallel download |
@@ -379,6 +384,7 @@ See [README.md § Runtime asset hosting](../README.md#runtime-asset-hosting) for
 | `Application` | Scene graph, render passes, loading orchestration, quality presets |
 | `SystemModules.h` | Platform-conditional OpenGL/audio includes; `glBindTextureUnit` polyfill on WASM |
 | `Shader` | GLSL compile/link; lazy uniform-location cache; `Set*Double` casts to float on WASM |
+| `ShaderSource` | GL-free source assembly: `#version` rewrite, `common/preamble.glsl`, `#include`, `#line` bookkeeping (§9.1) |
 
 ### 7.2 Auxiliary
 
@@ -387,6 +393,7 @@ See [README.md § Runtime asset hosting](../README.md#runtime-asset-hosting) for
 | `Camera`, `FPS_Handler` | First-person navigation |
 | `ShadowMapFBO` | PCF / ray-traced shadows |
 | `HDR`, `LensFlare` | Post-processing (star glow only) |
+| `FloatLutTexture` | Loads a baked RGBA16F LUT (atmosphere); quiet `nullopt` instead of a checkerboard |
 | `MagneticFieldBloom` | Half-res field-line bloom (not the star HDR FBO) |
 | `TextureImage2D` | DDS load, reload, mip level management |
 | `WebResourceFetcher` | `DownloadFile` (async, callback-based) + `RequireResident` (residency probe) — WASM only |
@@ -402,7 +409,7 @@ See [README.md § Runtime asset hosting](../README.md#runtime-asset-hosting) for
 
 Inheritance: `SpaceObject` → `Transformable` → `Planet` / `Satellite` / `Star`.
 
-Each planet system lives in `src/Solar_System/<Name>_System/`. `SolarSystem.h` aggregates includes. Atmospheres, clouds, and rings are separate render components.
+Each planet system lives in `src/Solar_System/<Name>_System/`. `SolarSystem.h` aggregates includes. Atmospheres, clouds, and rings are separate render components. `Atmosphere` is configured from its catalog row and owns its LUTs; `AtmosphereModel` is the GL-free physics behind them, shared with the baker and the tests (§9.2).
 
 **Magnetic field params:** `MagneticFieldParams` on `SpaceObject` (set in `StarSystemFactory.cpp` via `MagneticFieldCatalog::IntrinsicParamsForBody`). Values are visual/educational — not SI magnetosphere physics. `ParamsForBody(body, quality)` adds seed/sample scaling and quality enable gates for the ribbon renderer. `Application::ForEachEnabledMagneticField` walks the Sun, loaded planets, and satellites whose `enabled` flag is set. Satellites default to disabled. Magnetic mode (`SetMagneticFields` / alias `SetMagneticFieldMode`, settings **M**) dims planet/cloud/atmosphere/ring shaders via `uSurfaceDim` and fades orbit paths; the Sun is left at full brightness.
 
@@ -431,19 +438,44 @@ Rebuild WASM after C++ changes: `./build-web.sh` then refresh the browser.
 |--------|--------|-----|
 | Version in `resource/shaders/` | `#version 300 es` (single source) | `#version 300 es` |
 | Version actually compiled | `#version 460 core` (rewritten at load) | `#version 300 es` |
-| Precision | Qualifiers accepted and ignored | `precision highp float;` in fragments |
+| Precision | Qualifiers accepted and ignored | `common/preamble.glsl` sets `highp` defaults in fragments |
+| `#include "common/x.glsl"` | Expanded by `ShaderSource` | Expanded by `ShaderSource` |
 | Geometry/compute shaders | Geometry allowed | **Not supported** — no 3-arg `Shader` ctor exists |
 | Double uniforms | `glUniform1d` | Cast to float via `Shader` class |
 
 **One source, two dialects.** Every file in `resource/shaders/` is written once in GLSL
 ES 3.00, because that is the only dialect WebGL 2 accepts. The native build runs an
 OpenGL 4.6 **core** context, which accepts `#version 300 es` only through
-`ARB_ES3_compatibility` — widely implemented, but not guaranteed. So `ReadShaderFile` in
-`src/Auxiliary_Modules/Shader.cpp` rewrites the leading `#version 300 es` directive to
-`#version 460 core` on native builds only (GLSL ES 3.00 is a subset of desktop GLSL 4.60,
-precision qualifiers included). The replacement stays on the directive's own line, so
-compiler error line numbers still match the file on disk. Web builds compile the file
-byte-for-byte as authored.
+`ARB_ES3_compatibility` — widely implemented, but not guaranteed. So `ShaderSource`
+(`src/Auxiliary_Modules/ShaderSource.cpp`, called by `Shader.cpp`) rewrites the leading
+`#version 300 es` directive to `#version 460 core` on native builds only (GLSL ES 3.00 is a
+subset of desktop GLSL 4.60, precision qualifiers included).
+
+**Preamble and includes.** Every stage is assembled the same way on both targets:
+
+```
+#version …                         line 1 of the file (rewritten natively)
+#define SS_STAGE_VERTEX|FRAGMENT 1, SS_GLSL_ES|SS_GLSL_DESKTOP 1
+#line 1 1   common/preamble.glsl   precision defaults only; no helper macros
+#line 2 0   the file itself        on-disk line numbers
+            #include "common/x.glsl" → #line 1 <id> … #line <next> <parent>
+```
+
+Includes resolve against `resource/shaders/` (preloaded on web), each file is expanded at
+most once per stage (no include guards), and cycles, missing files, absolute paths and a
+`#version` inside an include are errors. Compiler errors read `<source string>:<line>`; a
+failed compile prints the id → file legend and the assembled listing. Shared helpers live
+in `resource/shaders/common/`: `raytrace` (sphere/plane/disk), `ring` (ring crossing and
+opacity), `shadow_pcf` (`PCF_NUM_SAMPLES` overridable), `eclipse`, `phase`, `tonemap`,
+`log_depth`, `noise_simplex3d`/`noise_simplex4d`, and `atmosphere_lut`. They take samplers
+and values as parameters and declare no uniforms; each shader keeps its own
+`CalculateShadow` wrapper. `tests/test_shader_source.cpp` preprocesses every real shader
+and fails on a function defined twice.
+
+**Self-test.** `SOLARSYSTEM_SHADER_SELFTEST=1 ./build/SolarSystem` compiles every `.vs`/`.fs`
+in both dialects (Mesa's core context also accepts `300 es`), prints
+`[ShaderSelfTest] N/N … OK` and exits; the native CI job runs it under Xvfb with
+`MESA_GLSL_VERSION_OVERRIDE=460`.
 
 **No geometry stage on web.** WebGL 2 has no geometry shader, so the `Shader` constructor
 overload taking a `geometryPath` is compiled out under `__EMSCRIPTEN__`: passing one in a
@@ -455,7 +487,8 @@ web build is a compile error, not a shader that silently fails to link.
 `useSphereIntersect`, and `ambientFactor`. `BindMaterial` sets the full flag block on every
 draw, so no body inherits the previous draw's `hasClouds`/`hasNightTexture`. It also binds
 samplers to fixed units: diffuse 0, normal 1, specular 2, night 3, clouds 4. `SceneRenderer`
-owns 6 (`shadowMap`) and 7 (`ringDiffuse`). `generate-planet-metadata.mjs` rejects a row
+owns 6 (`shadowMap`) and 7 (`ringDiffuse`); the atmosphere passes use 9 (`ringDiffuse`),
+11 (`shadowMap`, O'Neil) and 12/13 (transmittance / multi-scattering LUTs). `generate-planet-metadata.mjs` rejects a row
 whose `shaderFlags` disagree with its `lod` ids, and a moon row that asks for night or cloud
 maps. **A new rocky body needs only a catalog row, not a `Render()`.**
 
@@ -464,20 +497,73 @@ Special cases that stay outside the catalog material path:
 - `SaturnRing` / `UranusRing`: ring meshes on `planetaryRingLighting`.
 - `CatalogClouds`: cloud shells on `cloudsLighting.fs`, with their own `cloudsNormalMap`
   binding.
-- `Atmosphere`: the O'Neil scattering program, with numbers in `SystemVisuals.h`.
-- Titan's atmosphere: hooked up by hand in `InitCatalogSystem`.
+- `Atmosphere`: the O'Neil and LUT programs, configured from `render.atmosphere` (§9.2).
 - Asteroid field, comet tails, and the orbit/mission/magnetic-field overlays.
 
 **Uniform locations:** `Shader::Set*` resolves each uniform name with `glGetUniformLocation` on first use and caches the `GLint` (including `-1` for missing names) in a per-program map. Subsequent sets reuse the cache — do not call `glGetUniformLocation` at render call sites. The cache is cleared when the program is deleted (`Release` / destructor). If a re-link path is added later, clear the cache after a successful `glLinkProgram`.
 
-### 9.2 Threading
+### 9.2 Atmospheres and the Sun
+
+**Two atmosphere paths, one catalog row.** `render.atmosphere.oneil` drives the O'Neil
+single-scattering shell (`atmosphere.fs`), which every preset can afford and which is the
+only path for the gas giants and Pluto. Bodies whose row also has `physical`
+(Earth, Venus, Mars, Titan) switch to `atmospherePbr.fs` on Medium/Full:
+
+| Step | Where | What |
+|------|-------|------|
+| Bake (offline) | `tools/atmosphere_lut_baker` + `AtmosphereModel` | Transmittance LUT 256×64 (Bruneton 2017 mapping) and multi-scattering LUT 32×32 (Hillaire 2020), double precision → RGBA16F KTX2 with a parameter hash in the key/value data |
+| Ship | `resource/atmosphere/<id>_{transmittance,multiscatter}.ktx2` | Preloaded into `.data` (~140 KB per body) |
+| Load | `LoadAtmosphereLuts` (`StarSystemFactory.cpp`) → `FloatLutTexture` | Always loaded, so preset changes need no reload; any failure leaves the body on O'Neil |
+| Draw | `Renderer::RenderPbrAtmosphere` | One view ray per shell fragment, `uSteps` samples (8 Medium / 16 Full / 12 mobile Full) warped toward the limb; sun transmittance and Ψ_ms from the LUTs |
+
+The shader's output is premultiplied — rgb in-scattered light, alpha the luminance of the
+view transmittance — and blended with `GL_ONE, GL_SRC_ALPHA`, so the planet seen through
+the limb is attenuated, not just tinted. The cloud shell is drawn *before* a LUT
+atmosphere for the same reason. The planet's own shadow is exact per sample (a sun ray
+that hits the ground gets no direct light); ring shadows and a moon's umbra
+(`common/eclipse.glsl`) are applied analytically; the shared shadow map is not used on
+this path because it also contains the planet itself.
+
+`thicknessScale` stretches a shell while keeping vertical optical depth, for bodies whose
+real atmosphere would be a sub-pixel line; `exposure` is a display setting applied in the
+shader and is not part of the bake. **No float render target is involved** —
+`EXT_color_buffer_float` only gates HDR/bloom, and sampling RGBA16F with linear filtering
+is core WebGL 2 — so Low/mobile fall back by preset, not by capability.
+
+**After editing `physical`:** `node scripts/generate-planet-metadata.mjs`, then build the
+`atmosphere_lut_baker` target (`-DSOLARSYSTEM_BUILD_TOOLS=ON` or `…_TESTS=ON`) and run
+`atmosphere_lut_baker --out resource/atmosphere` from the repo root. The
+`AtmosphereLutsFresh` ctest re-bakes and fails on a stale hash or values that drift beyond
+half-float rounding. Changing a mapping or table size means bumping `kLutMappingVersion`
+and `ATMO_LUT_MAPPING_VERSION` together (pinned by `test_atmosphere_model.cpp`).
+
+**Sun.** `star.fs` applies power-law limb darkening per channel (μ^α, α ≈ 0.40/0.50/0.65
+for R/G/B) to the granulation/sunspot surface. On Medium/Full the corona is
+`starCoronaVolume.*`: `coronaSlices` instances (16/32) of the glow quad, each a slice
+perpendicular to the camera→Sun axis through a 6 R☉ sphere, evaluating a Baumbach K-corona
+density with 4D-noise streamers and discarding points behind the photosphere. It is drawn
+after the planets so they occlude it. Low keeps the flat `starCorona` billboard. The 2D
+`starGlow` + HDR composite and `LensFlare` are unchanged and stay skipped in XR.
+
+| Preset | Atmosphere | Corona |
+|--------|-----------|--------|
+| Low (desktop + mobile) | O'Neil | billboard |
+| Medium | LUT, 8 steps | 16 slices (mobile: billboard) |
+| Full | LUT, 16 steps (mobile 12) | 32 slices (mobile 16) |
+
+**XR.** None of these passes binds a framebuffer; camera positions come from the current
+eye's view matrix (`Renderer::CameraWorldPosition`). Any future offscreen pass must return
+to `Application::DefaultFramebuffer()`, never FBO 0 — under WebXR the frame composites into
+the `XRWebGLLayer`'s framebuffer.
+
+### 9.3 Threading
 
 | Task | Native | Web |
 |------|--------|-----|
 | Background music | `std::thread` | `UpdateBackgroundMusic()` per frame |
 | Nearest-planet search | `std::thread` | `UpdateSearchNearestPlanet()` every 60 frames |
 
-### 9.3 Texture path helper
+### 9.4 Texture path helper
 
 ```cpp
 std::string GetTexturePath(const std::string& lowRes, const std::string& highRes) {
@@ -506,10 +592,13 @@ to `kKeplerianSatellites` in `Ephemeris.cpp`, which is the gate that keeps rows 
 placeholder angles on the old circular `SatelliteOrbit::Offset` path. See § Ephemeris accuracy. Keep focus indices **0–11 frozen** (Sun=0 … Vesta=11); new focus bodies continue at 12+
 only after moons (moons already occupy 12+ as non-focus catalog rows).
 
-The steps below are for bodies with their own atmosphere scattering numbers, rings, or shaders
-that do not fit `CatalogBody` flags (today: the Sun; Saturn/Uranus ring *meshes*).
+**Atmosphere:** add a `render.atmosphere` block to the row (planet *or* moon). `oneil` alone
+gives the cheap shell; add `physical` and rebake (§9.2) for the LUT path. No C++ change.
 
-1. Add atmosphere / ring numbers to `src/Solar_System/SystemVisuals.h` if needed.
+The steps below are for bodies with rings or shaders that do not fit `CatalogBody` flags
+(today: the Sun; Saturn/Uranus ring *meshes*).
+
+1. Add ring numbers to `src/Solar_System/SystemVisuals.h` if needed.
 2. **Desktop:** `InitStarSystem()` already loops catalog initTags.
 3. **WASM:** staged loading reads `planet_manifest.json` (generated); `MakePlanetInitFunc` maps
    any allowlisted initTag to `InitCatalogSystem`.

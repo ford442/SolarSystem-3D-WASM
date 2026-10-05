@@ -116,6 +116,12 @@ void Star::CalculateGlowSize(float distance) {
     _currentGlowSize = 0.016 * std::pow(L, 0.25) / std::pow(d, 0.5) * 0.001667; // Size
 }
 
+void Star::DrawCoronaSlices(int count) const {
+    glBindVertexArray(_glowVao);
+    glDrawElementsInstanced(GL_TRIANGLES, 6, GL_UNSIGNED_SHORT, nullptr, count);
+    glBindVertexArray(0);
+}
+
 void Star::InitBuffers() {
     constexpr glm::vec2 cPositions[4] = {
             glm::vec2(-1.0f, 1.0f),

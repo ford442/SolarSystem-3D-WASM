@@ -106,6 +106,27 @@ test('WASM module boots and staged loading reacts to camera pose', async ({ page
   await expect(page.locator('#tour-stop')).not.toHaveAttribute('hidden');
   await page.locator('#tour-stop').evaluate((el: HTMLButtonElement) => el.click());
 
+  // Every preset must switch cleanly: Low falls back to the O'Neil atmosphere and the flat
+  // corona, Medium/Full draw the LUT atmosphere and the sliced corona (ARCHITECTURE §9.2).
+  // A shader or LUT problem would surface as a console error or a missing tier line.
+  for (const [preset, atmosphere, corona] of [
+    [0, "atmosphere=O'Neil", 'corona=billboard'],
+    [1, 'atmosphere=LUT 8 steps', 'corona=16 slices'],
+    [2, 'atmosphere=LUT 16 steps', 'corona=32 slices'],
+  ] as const) {
+    await page.evaluate((value) => window.setQualityPreset?.(value), preset);
+    await expect
+      .poll(
+        () =>
+          consoleLogs.some(
+            (line) => line.includes('[Quality] Active tier') && line.includes(atmosphere) && line.includes(corona),
+          ),
+        { timeout: 10_000 },
+      )
+      .toBe(true);
+  }
+  expect(consoleLogs.filter((line) => line.includes('[FloatLut]'))).toEqual([]);
+
   const fatalConsoleErrors = consoleErrors.filter(
     (line) => !allowedConsoleErrorPatterns.some((pattern) => pattern.test(line)),
   );

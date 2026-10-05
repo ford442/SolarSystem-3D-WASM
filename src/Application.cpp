@@ -150,6 +150,7 @@ void Application::RenderFrameContent() {
     _renderer.RenderXrPointers();
     _renderer.RenderStarCorona();
     _renderer.ProcessSceneComponentsRendering();
+    _renderer.RenderStarCoronaVolume();
     _renderer.RenderAsteroidField();
     _renderer.RenderMagneticFields();
 #ifdef __EMSCRIPTEN__

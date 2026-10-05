@@ -47,6 +47,10 @@ public:
     GLuint GetStarSpectrumTexture() const;
     glm::vec3 GetShiftColor() const;
     glm::vec3 GetGlowTintMult() const;
+    /** Drawn radius in scene units (sphere.obj's radius 2 times the Sun's 0.5 scale). */
+    virtual float GetSceneRadius() const { return 1.0f; }
+    /** `count` instances of the unit glow quad: the slices of the volumetric corona. */
+    void DrawCoronaSlices(int count) const;
     GLuint& GetStarOcclusionValue(size_t index);
     std::array<GLuint, 2>& GetStarOcclusion();
 
@@ -60,7 +64,6 @@ private:
     TextureImage2D _starSpectrumTexture;
     std::array<GLuint, 2> _starOcclusion;
     GLuint _glowVao = 0, _glowVbo = 0, _glowEbo = 0;
-    GLuint _coronaVao = 0, _coronaVbo = 0, _coronaEbo = 0;
     const Shader* _glowShader;
 
     void InitBuffers();
