@@ -79,6 +79,7 @@ set(SOLARSYSTEM_SOURCES_AUX
     src/Auxiliary_Modules/SkyEvents.cpp
     src/Auxiliary_Modules/TextureLODController.cpp
     src/Auxiliary_Modules/PlanetManifestLoader.cpp
+    src/Auxiliary_Modules/FloatLutTexture.cpp
 )
 
 set(SOLARSYSTEM_SOURCES_SOLAR
@@ -89,6 +90,7 @@ set(SOLARSYSTEM_SOURCES_SOLAR
     src/Solar_System/Sun/Sun.cpp
     src/Solar_System/Satellite.cpp
     src/Solar_System/Atmosphere.cpp
+    src/Solar_System/AtmosphereModel.cpp
     src/Solar_System/PlanetaryRing.cpp
     src/Solar_System/SkyBox.cpp
     src/Solar_System/Saturn_System/SaturnRing.cpp
@@ -177,6 +179,8 @@ if(EMSCRIPTEN)
         "SHELL:--preload-file ${CMAKE_SOURCE_DIR}/resource/fonts@/resource/fonts"
         "SHELL:--preload-file ${CMAKE_SOURCE_DIR}/resource/icons@/resource/icons"
         "SHELL:--preload-file ${CMAKE_SOURCE_DIR}/resource/textures_low@/resource/textures_low"
+        # Baked atmosphere LUTs (~560 KB): tools/atmosphere_lut_baker, ARCHITECTURE §9.2.
+        "SHELL:--preload-file ${CMAKE_SOURCE_DIR}/resource/atmosphere@/resource/atmosphere"
         "SHELL:-sMODULARIZE=1"
         "SHELL:-sEXPORT_ES6=1"
         # 'GL' is needed so web/src/wasmBridge.ts can register the XRWebGLLayer's opaque
@@ -269,7 +273,14 @@ if(NOT EMSCRIPTEN AND NOT MSVC)
 endif()
 
 option(SOLARSYSTEM_BUILD_TESTS "Build native unit tests" OFF)
+option(SOLARSYSTEM_BUILD_TOOLS "Build offline asset tools (atmosphere LUT baker)" OFF)
+if(NOT EMSCRIPTEN AND (SOLARSYSTEM_BUILD_TOOLS OR SOLARSYSTEM_BUILD_TESTS))
+    add_subdirectory(tools/atmosphere_lut_baker)
+endif()
 if(SOLARSYSTEM_BUILD_TESTS AND NOT EMSCRIPTEN)
     enable_testing()
     add_subdirectory(tests)
+    # The committed resource/atmosphere/*.ktx2 must match the catalog (see the baker).
+    add_test(NAME AtmosphereLutsFresh
+             COMMAND atmosphere_lut_baker --check --out ${CMAKE_SOURCE_DIR}/resource/atmosphere)
 endif()

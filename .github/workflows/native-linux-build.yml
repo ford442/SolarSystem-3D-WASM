@@ -39,14 +39,28 @@ jobs:
         run: |
           rm -rf build-test
           cmake -G Ninja -DCMAKE_BUILD_TYPE=Release -DSOLARSYSTEM_BUILD_TESTS=ON -B build-test
-          cmake --build build-test --target SolarSystemTests
+          cmake --build build-test --target SolarSystemTests atmosphere_lut_baker
           ctest --test-dir build-test --output-on-failure
+
+      - name: Compile every shader under Mesa (460 core and 300 es)
+        working-directory: ${{ github.workspace }}
+        env:
+          LIBGL_ALWAYS_SOFTWARE: "1"
+          MESA_GL_VERSION_OVERRIDE: "4.6"
+          # Without this llvmpipe reports GL 4.6 but rejects `#version 460`.
+          MESA_GLSL_VERSION_OVERRIDE: "460"
+          SDL_AUDIODRIVER: dummy
+          SOLARSYSTEM_SHADER_SELFTEST: "1"
+        run: |
+          timeout 120s xvfb-run -a ./build/SolarSystem 2>&1 | tee /tmp/solar-shaders.log
+          grep -q "\[ShaderSelfTest\] .* OK" /tmp/solar-shaders.log
 
       - name: Smoke test binary under Xvfb
         working-directory: ${{ github.workspace }}
         env:
           LIBGL_ALWAYS_SOFTWARE: "1"
           MESA_GL_VERSION_OVERRIDE: "4.6"
+          MESA_GLSL_VERSION_OVERRIDE: "460"
           SDL_AUDIODRIVER: dummy
         run: |
           set +e
@@ -58,5 +72,9 @@ jobs:
           # 124 = still running at timeout. Any other exit is fine if GL came up.
           if ! grep -q "OpenGL version:" /tmp/solar-native.log; then
             echo "OpenGL did not initialize (exit ${code})"
+            exit 1
+          fi
+          if grep -q "ERROR::SHADER" /tmp/solar-native.log; then
+            echo "A shader failed to compile or link"
             exit 1
           fi
