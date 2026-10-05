@@ -68,6 +68,72 @@ function isFocusBody(body) {
   return FOCUS_KINDS.has(body.kind);
 }
 
+function isRgb(value) {
+  return Array.isArray(value) && value.length === 3 && value.every((v) => Number.isFinite(v) && v >= 0);
+}
+
+function isFinitePositive(value) {
+  return Number.isFinite(value) && value > 0;
+}
+
+/**
+ * render.atmosphere = { oneil: {...}, physical?: {...} }. `oneil` drives the cheap shell
+ * every preset can draw; `physical` is baked into transmittance/multi-scattering LUTs by
+ * tools/atmosphere_lut_baker and drawn on the Medium/Full presets. See ARCHITECTURE §9.2.
+ */
+function validateAtmosphere(body) {
+  const where = `Body ${body.id} render.atmosphere`;
+  const a = body.render.atmosphere;
+  const o = a.oneil;
+  if (!o) {
+    throw new Error(`${where} requires an oneil block (the Low-preset shell)`);
+  }
+  for (const key of ['shellScale', 'outerRadius', 'hScaleFactor']) {
+    if (!isFinitePositive(o[key])) throw new Error(`${where}.oneil.${key} must be a positive number`);
+  }
+  for (const key of ['color', 'mieTint']) {
+    if (!isRgb(o[key])) throw new Error(`${where}.oneil.${key} must be [r, g, b]`);
+  }
+  for (const key of ['innerRadiusMinusEpsilon', 'toneMapping']) {
+    if (typeof o[key] !== 'boolean') throw new Error(`${where}.oneil.${key} must be a boolean`);
+  }
+
+  const p = a.physical;
+  if (!p) return;
+  for (const key of ['groundRadiusKm', 'topRadiusKm', 'thicknessScale', 'exposure']) {
+    if (!isFinitePositive(p[key])) throw new Error(`${where}.physical.${key} must be a positive number`);
+  }
+  if (!(p.topRadiusKm > p.groundRadiusKm)) {
+    throw new Error(`${where}.physical.topRadiusKm must exceed groundRadiusKm`);
+  }
+  const radiusKm = (body.facts?.diameterKm ?? 0) / 2;
+  if (radiusKm > 0 && Math.abs(p.groundRadiusKm - radiusKm) > 0.05 * radiusKm) {
+    throw new Error(
+      `${where}.physical.groundRadiusKm=${p.groundRadiusKm} is not within 5% of the body radius ${radiusKm}`,
+    );
+  }
+  if (!isRgb(p.rayleigh?.scatteringPerKm) || !isFinitePositive(p.rayleigh?.scaleHeightKm)) {
+    throw new Error(`${where}.physical.rayleigh needs scatteringPerKm [r, g, b] and scaleHeightKm > 0`);
+  }
+  const m = p.mie;
+  if (!isRgb(m?.scatteringPerKm) || !isRgb(m?.extinctionPerKm) || !isFinitePositive(m?.scaleHeightKm)) {
+    throw new Error(`${where}.physical.mie needs scatteringPerKm, extinctionPerKm and scaleHeightKm`);
+  }
+  if (m.scatteringPerKm.some((s, i) => s > m.extinctionPerKm[i])) {
+    throw new Error(`${where}.physical.mie scattering cannot exceed extinction (albedo > 1)`);
+  }
+  if (!Number.isFinite(m.phaseG) || Math.abs(m.phaseG) >= 1) {
+    throw new Error(`${where}.physical.mie.phaseG must be in (-1, 1)`);
+  }
+  const ab = p.absorption;
+  if (!isRgb(ab?.extinctionPerKm) || !Number.isFinite(ab?.layerCenterKm) || !isFinitePositive(ab?.layerHalfWidthKm)) {
+    throw new Error(`${where}.physical.absorption needs extinctionPerKm, layerCenterKm and layerHalfWidthKm > 0`);
+  }
+  if (!isRgb(p.groundAlbedo) || p.groundAlbedo.some((v) => v > 1)) {
+    throw new Error(`${where}.physical.groundAlbedo must be [r, g, b] in [0, 1]`);
+  }
+}
+
 function validateCatalog(catalog) {
   if (catalog.schemaVersion !== 1) {
     throw new Error(`Unsupported schemaVersion: ${catalog.schemaVersion}`);
@@ -164,6 +230,12 @@ function validateCatalog(catalog) {
     if (body.kind === 'satellite' && (flags.hasNightTexture || flags.hasClouds)) {
       // SatelliteInfo carries only diffuse/normal/specular.
       throw new Error(`Satellite ${body.id} cannot use night or cloud maps`);
+    }
+  }
+
+  for (const body of catalog.bodies) {
+    if (body.render?.atmosphere) {
+      validateAtmosphere(body);
     }
   }
 
@@ -442,11 +514,30 @@ function buildBodyCatalogHeader(catalog) {
       `{${cppNullableString(cloud.diffuse)}, ${cppNullableString(cloud.normal)}, ` +
       `${cppFloat(cloud.scaleFactor)}, ${cppFloat(cloud.spinDegPerSimSecond)}, ` +
       `${cppFloat(cloud.ambientFactor)}}, ` +
-      `${!!body.system?.hasAtmosphere}, ${!!body.system?.hasCloudLayer}, ` +
-      `${!!body.system?.hasRings}, ${!!body.system?.atmosphereToneMapping}, ` +
+      `${!!body.system?.hasCloudLayer}, ${!!body.system?.hasRings}, ` +
       `${!!body.system?.lightFarUsesPlanetDistance}}, // ${body.id}`
     );
   });
+
+  const rgb = (v) => `{${cppFloat(v[0])}, ${cppFloat(v[1])}, ${cppFloat(v[2])}}`;
+  const atmospheres = bodies
+    .filter((body) => body.render.atmosphere)
+    .map((body) => {
+      const o = body.render.atmosphere.oneil;
+      const p = body.render.atmosphere.physical;
+      const oneil =
+        `{${cppFloat(o.shellScale)}, ${rgb(o.color)}, ${!!o.innerRadiusMinusEpsilon}, ` +
+        `${cppFloat(o.outerRadius)}, ${rgb(o.mieTint)}, ${cppFloat(o.hScaleFactor)}, ${!!o.toneMapping}}`;
+      const physicalRow = p
+        ? `{true, ${cppFloat(p.groundRadiusKm)}, ${cppFloat(p.topRadiusKm)}, ${cppFloat(p.thicknessScale)}, ` +
+          `${rgb(p.rayleigh.scatteringPerKm)}, ${cppFloat(p.rayleigh.scaleHeightKm)}, ` +
+          `${rgb(p.mie.scatteringPerKm)}, ${rgb(p.mie.extinctionPerKm)}, ` +
+          `${cppFloat(p.mie.scaleHeightKm)}, ${cppFloat(p.mie.phaseG)}, ` +
+          `${rgb(p.absorption.extinctionPerKm)}, ${cppFloat(p.absorption.layerCenterKm)}, ` +
+          `${cppFloat(p.absorption.layerHalfWidthKm)}, ${rgb(p.groundAlbedo)}, ${cppFloat(p.exposure)}}`
+        : '{}';
+      return `    {${cppString(body.id)}, ${oneil}, ${physicalRow}},`;
+    });
 
   return [
     '#pragma once',
@@ -454,7 +545,7 @@ function buildBodyCatalogHeader(catalog) {
     '// Do not edit directly — run: node scripts/generate-planet-metadata.mjs',
     '//',
     '// CatalogBody / CatalogSatellite / CatalogClouds consume these rows. Mercury–Pluto and',
-    '// catalog moons are constructed from this table (plus SystemVisuals for atmospheres/rings).',
+    '// catalog moons are constructed from this table (plus SystemVisuals for ring meshes).',
     '// Axial tilt SSOT is orbit.axialTiltDegrees, applied as Rotate(Z) then optional artTiltX.',
     '// See docs/ARCHITECTURE.md §2.1.',
     '',
@@ -525,10 +616,8 @@ function buildBodyCatalogHeader(catalog) {
     '    float spinDegPerSimSecond;',
     '    Keplerian keplerian;',
     '    CloudLayer cloudLayer;',
-    '    bool hasAtmosphere;',
     '    bool hasCloudLayer;',
     '    bool hasRings;',
-    '    bool atmosphereToneMapping;',
     '    bool lightFarUsesPlanetDistance;',
     '};',
     '',
@@ -552,6 +641,62 @@ function buildBodyCatalogHeader(catalog) {
     '    for (const Entry& entry : kEntries) {',
     '        if (StrEq(entry.id, id)) {',
     '            return &entry;',
+    '        }',
+    '    }',
+    '    return nullptr;',
+    '}',
+    '',
+    '// ---------------------------------------------------------------------------------',
+    '// Atmospheres (render.atmosphere). `oneil` is the cheap shell every preset can draw;',
+    '// `physical` (enabled == true) is baked into LUTs under resource/atmosphere/ by',
+    '// tools/atmosphere_lut_baker and drawn by atmospherePbr.fs. See ARCHITECTURE §9.2.',
+    '',
+    'struct Rgb {',
+    '    float r, g, b;',
+    '};',
+    '',
+    'struct AtmosphereOneil {',
+    '    float shellScale;             // shell mesh scale (sphere.obj has radius 2)',
+    '    Rgb color;                    // C_R, the dominant scattered colour',
+    '    bool innerRadiusMinusEpsilon; // pull the inner radius just under the surface',
+    '    float outerRadius;            // scene units',
+    '    Rgb mieTint;                  // back-lit tint',
+    '    float hScaleFactor;           // SCALE_H_FACTOR',
+    '    bool toneMapping;             // ACES on the result (gas giants)',
+    '};',
+    '',
+    'struct AtmospherePhysical {',
+    '    bool enabled;',
+    '    float groundRadiusKm;',
+    '    float topRadiusKm;',
+    '    float thicknessScale; // widens the shell, keeping vertical optical depth',
+    '    Rgb rayleighScattering; // per km at the ground',
+    '    float rayleighScaleHeightKm;',
+    '    Rgb mieScattering;',
+    '    Rgb mieExtinction;',
+    '    float mieScaleHeightKm;',
+    '    float miePhaseG;',
+    '    Rgb absorptionExtinction; // tent-shaped layer (ozone, CH4, Venus UV absorber)',
+    '    float absorptionCenterKm;',
+    '    float absorptionHalfWidthKm;',
+    '    Rgb groundAlbedo;',
+    '    float exposure;',
+    '};',
+    '',
+    'struct AtmosphereRow {',
+    '    const char* bodyId;',
+    '    AtmosphereOneil oneil;',
+    '    AtmospherePhysical physical;',
+    '};',
+    '',
+    'inline constexpr AtmosphereRow kAtmospheres[] = {',
+    ...atmospheres,
+    '};',
+    '',
+    'inline constexpr const AtmosphereRow* FindAtmosphere(const char* bodyId) {',
+    '    for (const AtmosphereRow& row : kAtmospheres) {',
+    '        if (StrEq(row.bodyId, bodyId)) {',
+    '            return &row;',
     '        }',
     '    }',
     '    return nullptr;',

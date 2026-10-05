@@ -7,9 +7,8 @@
 #include <vector>
 
 struct RenderableAtmosphere {
-    std::unique_ptr<Atmosphere> atmosphere;
-    float hScaleFactor, parentEarthSizeCoefficient;
-    bool isUseToneMapping = false;
+    std::unique_ptr<Atmosphere> atmosphere; // tuning numbers live on atmosphere->GetRow()
+    float parentEarthSizeCoefficient;
 };
 
 struct RenderableSceneComponent {

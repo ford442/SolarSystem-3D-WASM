@@ -194,10 +194,10 @@ void Renderer::RenderAtmospheres(const std::vector<RenderableAtmosphere>& render
             mainAtmosphereShader->SetFloat("innerRadius", renderableAtmosphere.atmosphere->GetInnerRadius());
             mainAtmosphereShader->SetFloat("outerRadius", renderableAtmosphere.atmosphere->GetOuterRadius());
             mainAtmosphereShader->SetVec3("mieTint", renderableAtmosphere.atmosphere->GetMieTint());
-            mainAtmosphereShader->SetFloat("SCALE_H_FACTOR", renderableAtmosphere.hScaleFactor);
+            mainAtmosphereShader->SetFloat("SCALE_H_FACTOR", renderableAtmosphere.atmosphere->GetRow().oneil.hScaleFactor);
             mainAtmosphereShader->SetFloat("SCALE_L_FACTOR", 1.0f);
             mainAtmosphereShader->SetFloat("earthSizeCoefficient", renderableAtmosphere.parentEarthSizeCoefficient);
-            mainAtmosphereShader->SetBool("isUseToneMapping", renderableAtmosphere.isUseToneMapping);
+            mainAtmosphereShader->SetBool("isUseToneMapping", renderableAtmosphere.atmosphere->GetRow().oneil.toneMapping);
             mainAtmosphereShader->SetBool("isNearbyPlanetaryRing", ring != nullptr);
 
             if (ring) {

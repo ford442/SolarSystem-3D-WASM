@@ -110,6 +110,57 @@
                   "spinDegPerSimSecond": { "type": "number" },
                   "ambientFactor": { "type": "number" }
                 }
+              },
+              "atmosphere": {
+                "type": "object",
+                "description": "Atmosphere shell (BodyCatalog::kAtmospheres). `oneil` is the cheap single-scattering shell every quality preset can draw; optional `physical` is baked into transmittance/multi-scattering LUTs by tools/atmosphere_lut_baker (resource/atmosphere/<id>_*.ktx2) and drawn on Medium/Full. Rebake after editing `physical`. See docs/ARCHITECTURE.md §9.2.",
+                "required": ["oneil"],
+                "properties": {
+                  "oneil": {
+                    "type": "object",
+                    "required": ["shellScale", "color", "innerRadiusMinusEpsilon", "outerRadius", "mieTint", "hScaleFactor", "toneMapping"],
+                    "properties": {
+                      "shellScale": { "type": "number", "description": "Shell mesh scale (sphere.obj radius 2)." },
+                      "color": { "type": "array", "items": { "type": "number", "minimum": 0 }, "minItems": 3, "maxItems": 3 },
+                      "innerRadiusMinusEpsilon": { "type": "boolean" },
+                      "outerRadius": { "type": "number", "description": "Scene units." },
+                      "mieTint": { "type": "array", "items": { "type": "number", "minimum": 0 }, "minItems": 3, "maxItems": 3 },
+                      "hScaleFactor": { "type": "number" },
+                      "toneMapping": { "type": "boolean", "description": "ACES on the shell (gas giants)." }
+                    }
+                  },
+                  "physical": {
+                    "type": "object",
+                    "description": "Per-km coefficients at the ground; colour triples are ~680/550/440 nm.",
+                    "required": ["groundRadiusKm", "topRadiusKm", "thicknessScale", "rayleigh", "mie", "absorption", "groundAlbedo", "exposure"],
+                    "properties": {
+                      "groundRadiusKm": { "type": "number" },
+                      "topRadiusKm": { "type": "number" },
+                      "thicknessScale": { "type": "number", "description": "Art knob: widens the shell while preserving vertical optical depth." },
+                      "rayleigh": { "type": "object", "properties": { "scatteringPerKm": { "type": "array", "items": { "type": "number", "minimum": 0 }, "minItems": 3, "maxItems": 3 }, "scaleHeightKm": { "type": "number" } } },
+                      "mie": {
+                        "type": "object",
+                        "properties": {
+                          "scatteringPerKm": { "type": "array", "items": { "type": "number", "minimum": 0 }, "minItems": 3, "maxItems": 3 },
+                          "extinctionPerKm": { "type": "array", "items": { "type": "number", "minimum": 0 }, "minItems": 3, "maxItems": 3 },
+                          "scaleHeightKm": { "type": "number" },
+                          "phaseG": { "type": "number", "exclusiveMinimum": -1, "exclusiveMaximum": 1 }
+                        }
+                      },
+                      "absorption": {
+                        "type": "object",
+                        "description": "Tent-shaped absorbing layer (ozone, methane, Venus's UV absorber).",
+                        "properties": {
+                          "extinctionPerKm": { "type": "array", "items": { "type": "number", "minimum": 0 }, "minItems": 3, "maxItems": 3 },
+                          "layerCenterKm": { "type": "number" },
+                          "layerHalfWidthKm": { "type": "number" }
+                        }
+                      },
+                      "groundAlbedo": { "type": "array", "items": { "type": "number", "minimum": 0 }, "minItems": 3, "maxItems": 3 },
+                      "exposure": { "type": "number" }
+                    }
+                  }
+                }
               }
             }
           }

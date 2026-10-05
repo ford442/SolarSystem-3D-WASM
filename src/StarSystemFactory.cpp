@@ -39,17 +39,12 @@ SatelliteInfo MakeSatelliteInfo(const MeshHolder& model, const BodyCatalog::Entr
 }
 
 RenderableAtmosphere MakeAtmosphere(const MeshHolder& sphereModel, Shader& atmosphereShader,
-                                    const SystemVisuals::AtmosphereSpec& spec,
+                                    const BodyCatalog::AtmosphereRow& row,
                                     const std::shared_ptr<SpaceObject>& parent,
-                                    float parentRadius, float parentEarthSize, bool toneMapping) {
-    const float inner = spec.innerRadiusMinusEpsilon ? parentRadius - 0.00007f : parentRadius;
-    AtmosphereInfo info(sphereModel, atmosphereShader, spec.scaleFactor, spec.color, inner,
-                        spec.outerRadius, spec.mieTint);
+                                    float parentRadius, float parentEarthSize) {
     RenderableAtmosphere renderable;
-    renderable.atmosphere = std::make_unique<Atmosphere>(info, parent);
-    renderable.hScaleFactor = spec.hScaleFactor;
+    renderable.atmosphere = std::make_unique<Atmosphere>(sphereModel, atmosphereShader, row, parent, parentRadius);
     renderable.parentEarthSizeCoefficient = parentEarthSize;
-    renderable.isUseToneMapping = toneMapping;
     return renderable;
 }
 
@@ -105,7 +100,9 @@ void Application::InitCatalogSystem(const MeshHolder& sphereModel, const std::st
         MagneticFieldCatalog::IntrinsicParamsForBody(static_cast<OrbitLayout::Body>(primary->index)));
 
     vector<shared_ptr<Satellite>> satellites;
-    shared_ptr<Satellite> titan;
+    // Moons whose catalog row carries render.atmosphere (Titan). Their shells render with
+    // this component, after the primary's.
+    vector<pair<shared_ptr<Satellite>, const BodyCatalog::AtmosphereRow*>> satelliteAtmospheres;
     for (const BodyCatalog::Entry& entry : BodyCatalog::kEntries) {
         if (entry.kind != BodyCatalog::Kind::Satellite || !entry.parentId ||
             !BodyCatalog::StrEq(entry.parentId, primary->id)) {
@@ -115,35 +112,28 @@ void Application::InitCatalogSystem(const MeshHolder& sphereModel, const std::st
             MeshHolder mesh(entry.meshPath);
             SatelliteInfo satInfo = MakeSatelliteInfo(mesh, entry, *_renderer.mainPlanetShader);
             auto sat = make_shared<CatalogSatellite>(satInfo, planet, entry);
-            if (BodyCatalog::StrEq(entry.id, "titan")) {
-                titan = sat;
+            if (const auto* row = BodyCatalog::FindAtmosphere(entry.id)) {
+                satelliteAtmospheres.emplace_back(sat, row);
             }
             satellites.push_back(std::move(sat));
         } else {
             SatelliteInfo satInfo = MakeSatelliteInfo(sphereModel, entry, *_renderer.mainPlanetShader);
             auto sat = make_shared<CatalogSatellite>(satInfo, planet, entry);
-            if (BodyCatalog::StrEq(entry.id, "titan")) {
-                titan = sat;
+            if (const auto* row = BodyCatalog::FindAtmosphere(entry.id)) {
+                satelliteAtmospheres.emplace_back(sat, row);
             }
             satellites.push_back(std::move(sat));
         }
     }
 
     RenderableSceneComponent component;
-    if (primary->hasAtmosphere) {
-        if (const auto* spec = SystemVisuals::FindAtmosphere(primary->id)) {
-            component.atmospheres.push_back(
-                MakeAtmosphere(sphereModel, *_renderer.mainAtmosphereShader, *spec, planet,
-                               planet->GetRadius(), planet->GetEarthSizeCoefficient(),
-                               primary->atmosphereToneMapping));
-        }
+    if (const auto* row = BodyCatalog::FindAtmosphere(primary->id)) {
+        component.atmospheres.push_back(MakeAtmosphere(sphereModel, *_renderer.mainAtmosphereShader, *row, planet,
+                                                       planet->GetRadius(), planet->GetEarthSizeCoefficient()));
     }
-    if (titan) {
-        if (const auto* spec = SystemVisuals::FindAtmosphere("titan")) {
-            component.atmospheres.push_back(
-                MakeAtmosphere(sphereModel, *_renderer.mainAtmosphereShader, *spec, titan,
-                               titan->GetRadius(), titan->GetEarthSizeCoefficient(), false));
-        }
+    for (const auto& [satellite, row] : satelliteAtmospheres) {
+        component.atmospheres.push_back(MakeAtmosphere(sphereModel, *_renderer.mainAtmosphereShader, *row, satellite,
+                                                       satellite->GetRadius(), satellite->GetEarthSizeCoefficient()));
     }
 
     if (primary->hasCloudLayer && primary->cloudLayer.diffuse) {
