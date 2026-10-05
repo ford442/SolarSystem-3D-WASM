@@ -16,6 +16,7 @@ uniform vec3 cameraLocal;    // camera relative to the Sun's centre, solar radii
 uniform vec3 sliceForward;
 uniform float sliceSpacing;  // distance between slices, solar radii
 uniform float coronaExtent;
+uniform float nearMargin;    // nearest slice depth past the camera, solar radii
 uniform vec3 coronaColor;
 uniform float coronaIntensity;
 uniform float time;
@@ -52,10 +53,13 @@ void main() {
 
     float edgeFade = (1.0 - smoothstep(0.6 * coronaExtent, coronaExtent, r)) * smoothstep(1.0, 1.01, r);
 
-    // Path length of the view ray through this slab (slices are perpendicular to the
-    // camera->Sun axis, so off-axis rays cross them obliquely).
+    // Path length of the view ray through this slab. Off-axis rays cross the slices
+    // obliquely; the floor only guards the outside view's widest angles.
     float pathLength = sliceSpacing / max(abs(dot(rayDir, sliceForward)), 0.25);
+    // Inside the corona the nearest slices sweep past the camera; fade them in rather
+    // than let them pop.
+    float nearFade = smoothstep(nearMargin, 2.0 * nearMargin, pointDistance);
 
-    float emission = density * structure * edgeFade * pathLength * coronaIntensity * overDisc;
+    float emission = density * structure * edgeFade * pathLength * nearFade * coronaIntensity * overDisc;
     fragColor = vec4(coronaColor * emission, 1.0);
 }

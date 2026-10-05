@@ -62,7 +62,8 @@ The project is an animated 3D scene with a model of the Solar System.
 - 💡 Blinn–Fong reflection model with normal maps to visualise surface irregularities
 - 💡 Physically based atmospheres for Earth, Venus, Mars and Titan: transmittance and
   multiple-scattering lookup tables baked offline from catalog parameters (Medium/Full), with a
-  cheap single-scattering shell on Low and for the gas giants
+  cheap single-scattering shell on Low and for the gas giants. No float render target is
+  needed, so GPUs without `EXT_color_buffer_float` still get the LUT path
 - 💡 Mie scattering and accurate shadows for planetary rings
 - 💡 High-quality soft shadows using PCF and ray tracing
 - 💡 Omnidirectional shadow maps simulation when using a single unidirectional shadow map

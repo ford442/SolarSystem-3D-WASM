@@ -522,7 +522,10 @@ the limb is attenuated, not just tinted. The cloud shell is drawn *before* a LUT
 atmosphere for the same reason. The planet's own shadow is exact per sample (a sun ray
 that hits the ground gets no direct light); ring shadows and a moon's umbra
 (`common/eclipse.glsl`) are applied analytically; the shared shadow map is not used on
-this path because it also contains the planet itself.
+this path because it also contains the planet itself. There is no separate
+aerial-perspective pass: surfaces are spheres without displacement, so the shell's view ray,
+clipped at the ground sphere, already carries the in-scatter and attenuation for the
+terrain behind it — from orbit and from inside the shell alike.
 
 `thicknessScale` stretches a shell while keeping vertical optical depth, for bodies whose
 real atmosphere would be a sub-pixel line; `exposure` is a display setting applied in the
@@ -541,8 +544,12 @@ and `ATMO_LUT_MAPPING_VERSION` together (pinned by `test_atmosphere_model.cpp`).
 for R/G/B) to the granulation/sunspot surface. On Medium/Full the corona is
 `starCoronaVolume.*`: `coronaSlices` instances (16/32) of the glow quad, each a slice
 perpendicular to the camera→Sun axis through a 6 R☉ sphere, evaluating a Baumbach K-corona
-density with 4D-noise streamers and discarding points behind the photosphere. It is drawn
-after the planets so they occlude it. Low keeps the flat `starCorona` billboard. The 2D
+density with 4D-noise streamers and discarding points behind the photosphere. Inside the
+corona (within ~1.2 × 6 R☉, with hysteresis) the slices turn to face the view direction
+instead, so rays at the screen edge do not graze them; in both cases they span only the
+part of the sphere in front of the camera, starting just past the near plane and fading in
+there. Inside the photosphere the corona is skipped. It is drawn after the planets so they
+occlude it. Low keeps the flat `starCorona` billboard. The 2D
 `starGlow` + HDR composite and `LensFlare` are unchanged and stay skipped in XR.
 
 | Preset | Atmosphere | Corona |

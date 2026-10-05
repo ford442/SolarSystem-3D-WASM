@@ -23,7 +23,8 @@ struct QualityTierSettings {
     // block; atmosphereSteps is the view-ray sample count. Off = the O'Neil shell.
     bool enablePbrAtmosphere;
     int atmosphereSteps;
-    // Instanced view-aligned corona slices (starCoronaVolume.*). Off = the flat billboard.
+    // Instanced corona slices (starCoronaVolume.*), perpendicular to the camera->Sun axis
+    // (view-aligned inside the corona). Off = the flat billboard.
     bool enableVolumetricCorona;
     int coronaSlices;
     const char* name;

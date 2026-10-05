@@ -95,6 +95,9 @@ public:
     // From the quality tier (ApplyEffectQuality); 0 = effect off.
     int pbrAtmosphereSteps = 0;
     int coronaSlices = 0;
+    // Corona slices follow the view direction (not the camera->Sun axis) while the camera
+    // is inside the corona; kept across frames for hysteresis.
+    mutable bool coronaSlicesViewAligned = false;
 
     float starExposure = 8.0f;
     float starGamma = 0.4545454f;

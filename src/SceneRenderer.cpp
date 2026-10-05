@@ -225,7 +225,7 @@ void Renderer::RenderAtmospheres(const RenderableSceneComponent& component) cons
 
     for (const auto& renderableAtmosphere : component.atmospheres) {
         // Inside the shell, draw its far side (the near side is behind the camera).
-        const bool inside = _app.CalculateSpaceObjectDistance(renderableAtmosphere.atmosphere.get()) <=
+        const bool inside = glm::distance(CameraWorldPosition(), renderableAtmosphere.atmosphere->GetPosition()) <=
                             renderableAtmosphere.atmosphere->GetAtmosphereOuterBoundary();
         if (inside) {
             glFrontFace(GL_CW);
@@ -255,7 +255,7 @@ void Renderer::RenderOneilAtmosphere(const RenderableAtmosphere& renderableAtmos
     mainAtmosphereShader->SetVec3("C_R", atmosphere.GetAtmosphereColor());
     mainAtmosphereShader->SetFloat("innerRadius", atmosphere.GetInnerRadius());
     mainAtmosphereShader->SetFloat("outerRadius", atmosphere.GetOuterRadius());
-    mainAtmosphereShader->SetVec3("camPosition", _app._camera.GetPosition() - atmosphere.GetPosition());
+    mainAtmosphereShader->SetVec3("camPosition", CameraWorldPosition() - atmosphere.GetPosition());
     mainAtmosphereShader->SetVec3("lightPos", _app._sun->GetPosition() - atmosphere.GetPosition());
     mainAtmosphereShader->SetVec3("mieTint", atmosphere.GetMieTint());
     mainAtmosphereShader->SetFloat("SCALE_H_FACTOR", atmosphere.GetRow().oneil.hScaleFactor);
@@ -456,14 +456,29 @@ void Renderer::RenderStarCoronaVolume() const {
     const glm::mat4 inverseView = glm::inverse(cameraView);
     const glm::vec3 camera(inverseView[3]);
     const glm::vec3 cameraUp(inverseView[1]);
-
-    // Slice basis: perpendicular to the camera->Sun axis, rolled with the camera.
-    const glm::vec3 toSun = sunCenter - camera;
-    const float distance = glm::length(toSun);
-    if (distance < 1e-4f) {
-        return;
+    const glm::vec3 cameraLocal = (camera - sunCenter) / sunRadius;
+    const float distance = glm::length(cameraLocal);
+    if (distance <= 1.0f) {
+        return; // Inside the photosphere.
     }
-    const glm::vec3 forward = toSun / distance;
+
+    // Outside, slices are perpendicular to the camera->Sun axis, so the whole corona is
+    // crossed squarely. Inside, rays to the edge of the screen would graze those slices, so
+    // they follow the view direction instead (every on-screen ray within FOV/2 of normal).
+    // The thresholds differ so the switch does not flicker at the boundary.
+    coronaSlicesViewAligned = distance < (coronaSlicesViewAligned ? 1.25f : 1.15f) * kCoronaExtent;
+    const glm::vec3 forward = coronaSlicesViewAligned ? -glm::normalize(glm::vec3(inverseView[2]))
+                                                      : -cameraLocal / distance;
+
+    // Slice depths along `forward` from the Sun's centre: only the part of the sphere in front
+    // of the camera, starting a little past the near plane so no slab is clipped by it.
+    const float nearMargin = std::max(2.0f * _app._camera.GetNear() / sunRadius, 0.05f);
+    const float depthMax = kCoronaExtent;
+    const float depthMin = std::max(-kCoronaExtent, glm::dot(cameraLocal, forward) + nearMargin);
+    if (depthMin >= depthMax) {
+        return; // The corona is entirely behind the camera.
+    }
+
     glm::vec3 right = glm::cross(forward, cameraUp);
     if (glm::dot(right, right) < 1e-8f) {
         right = glm::cross(forward, glm::vec3(1.0f, 0.0f, 0.0f));
@@ -488,8 +503,11 @@ void Renderer::RenderStarCoronaVolume() const {
     shader.SetVec3("sliceUp", up);
     shader.SetFloat("coronaExtent", kCoronaExtent);
     shader.SetInt("sliceCount", coronaSlices);
-    shader.SetVec3("cameraLocal", (camera - sunCenter) / sunRadius);
-    shader.SetFloat("sliceSpacing", 2.0f * kCoronaExtent / static_cast<float>(coronaSlices));
+    shader.SetFloat("sliceDepthMin", depthMin);
+    shader.SetFloat("sliceDepthMax", depthMax);
+    shader.SetFloat("nearMargin", nearMargin);
+    shader.SetVec3("cameraLocal", cameraLocal);
+    shader.SetFloat("sliceSpacing", (depthMax - depthMin) / static_cast<float>(coronaSlices));
     shader.SetVec3("coronaColor", _app._sun->GetShiftColor());
     shader.SetFloat("coronaIntensity", kCoronaIntensity);
     shader.SetFloat("time", static_cast<float>(glfwGetTime() * 0.004));
@@ -860,8 +878,10 @@ void Renderer::ConfigureMainShaders() {
     mainCoronaStarShader->SetMat4("projection", cameraProjection);
     mainCoronaStarShader->SetMat4("view", cameraView);
     mainCoronaStarShader->SetVec3("center", _app._sun->GetPosition());
-    mainCoronaStarShader->SetVec3("cameraRight", _app._camera.GetRightVector());
-    mainCoronaStarShader->SetVec3("cameraUp", _app._camera.GetUpVector());
+    // The eye's axes, not the head's (the billboard faces each XR eye).
+    const glm::mat4 inverseView = glm::inverse(cameraView);
+    mainCoronaStarShader->SetVec3("cameraRight", glm::normalize(glm::vec3(inverseView[0])));
+    mainCoronaStarShader->SetVec3("cameraUp", glm::normalize(glm::vec3(inverseView[1])));
     mainCoronaStarShader->SetVec3("starShiftColor", _app._sun->GetShiftColor());
     mainCoronaStarShader->SetFloat("zCoef", zCoef);
     mainCoronaStarShader->SetFloat("maxSize", 7.1);

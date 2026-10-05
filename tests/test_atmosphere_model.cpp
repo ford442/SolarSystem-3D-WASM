@@ -260,6 +260,23 @@ TEST(AtmosphereModel, CommittedLutsMatchTheCatalog) {
         }
     }
 }
+
+// Every committed LUT is preloaded into SolarSystem.data, so the set has a byte budget.
+TEST(AtmosphereModel, CommittedLutsFitSizeBudget) {
+    constexpr std::streamoff kBudgetBytes = 1'000'000;
+    std::streamoff total = 0;
+    for (const BodyCatalog::AtmosphereRow& row : BodyCatalog::kAtmospheres) {
+        if (!row.physical.enabled) {
+            continue;
+        }
+        for (const std::string& path : {TransmittanceLutPath(row.bodyId), MultiScatteringLutPath(row.bodyId)}) {
+            std::ifstream file(std::string(SOLARSYSTEM_SOURCE_DIR) + "/" + path, std::ios::binary | std::ios::ate);
+            ASSERT_TRUE(file.good()) << path << " is missing; run atmosphere_lut_baker";
+            total += file.tellg();
+        }
+    }
+    EXPECT_LT(total, kBudgetBytes) << "baked atmosphere LUTs exceed the 1 MB .data budget";
+}
 #endif
 
 } // namespace
