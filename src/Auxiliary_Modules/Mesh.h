@@ -24,7 +24,7 @@ struct Texture {
 
 class Mesh {
 public:
-    explicit Mesh(std::vector<Vertex> vertices, std::vector<size_t> indices, std::vector<Texture> textures);
+    explicit Mesh(std::vector<Vertex> vertices, std::vector<GLuint> indices, std::vector<Texture> textures);
     ~Mesh();
     
     // Deep copy (creates new GL buffers)
@@ -39,7 +39,7 @@ public:
 
 private:
     std::vector<Vertex> _vertices; // Вершины
-    std::vector<size_t> _indices; // Индексы
+    std::vector<GLuint> _indices; // Индексы
     std::vector<Texture> _textures; // Текстуры
     GLuint _vbo; // Объект вершинного буфера (VBO)
     GLuint _vao; // Объект вершинного массива (VAO)

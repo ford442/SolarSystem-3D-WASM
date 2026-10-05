@@ -1,6 +1,6 @@
 #include "Mesh.h"
 
-Mesh::Mesh(std::vector<Vertex> vertices, std::vector<size_t> indices, std::vector<Texture> textures)
+Mesh::Mesh(std::vector<Vertex> vertices, std::vector<GLuint> indices, std::vector<Texture> textures)
     : _vertices(std::move(vertices)), _indices(std::move(indices)), _textures(std::move(textures)), _vbo(0), _vao(0), _ebo(0)
 {
     SetupMesh();
@@ -115,7 +115,7 @@ void Mesh::Draw(const Shader& shader) const {
 
     // Непосредственная отрисовка меша
     glBindVertexArray(_vao); // Связывание с вершинным массивом
-    glDrawElements(GL_TRIANGLES, _indices.size(), GL_UNSIGNED_INT, nullptr); // Отрисовка меша при помощи треугольников
+    glDrawElements(GL_TRIANGLES, static_cast<GLsizei>(_indices.size()), GL_UNSIGNED_INT, nullptr); // Отрисовка меша при помощи треугольников
     glBindVertexArray(0); // Отвязывание вершинного массива
 
     // Возврат к значению по умолчанию
@@ -135,7 +135,9 @@ void Mesh::SetupMesh() {
     glBufferData(GL_ARRAY_BUFFER, _vertices.size() * sizeof(Vertex), _vertices.data(), GL_STATIC_DRAW);
 
     glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, _ebo); // Связывание с элементным буфером (копируем индексы)
-    glBufferData(GL_ELEMENT_ARRAY_BUFFER, _indices.size() * sizeof(size_t), _indices.data(), GL_STATIC_DRAW);
+    // GLuint, not size_t: Draw() reads GL_UNSIGNED_INT, and size_t is 8 bytes on 64-bit native
+    // builds (every other index would read as 0) while it happens to be 4 on wasm32.
+    glBufferData(GL_ELEMENT_ARRAY_BUFFER, _indices.size() * sizeof(GLuint), _indices.data(), GL_STATIC_DRAW);
 
     // Установка указателей вершинных атрибутов (указание параметров доступа вершинных атрибутов к VBO)
     // Позиции вершин
