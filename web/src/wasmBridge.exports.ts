@@ -37,6 +37,13 @@ export interface CachedCwrapExports {
     getNextConjunctionBodyB: () => number;
     getNextConjunctionSeparationDeg: () => number;
     getNextSkyEventJson: () => string;
+    setObserveMode: (...args: number[]) => void;
+    getObserveMode: () => number;
+    setObserverSite: (...args: number[]) => void;
+    setObserveView: (...args: number[]) => void;
+    setObserveFov: (...args: number[]) => void;
+    setObserveTimeRate: (...args: number[]) => void;
+    getObserveStateJson: () => string;
     setOrbitLines: (...args: number[]) => void;
     getOrbitLines: () => number;
     setMagneticFields: (...args: number[]) => void;
@@ -95,6 +102,13 @@ export function createCachedCwrapExports(cwrap: SolarSystemCwrap): CachedCwrapEx
     getNextConjunctionBodyB: cwrap('GetNextConjunctionBodyB', 'number', []) as () => number,
     getNextConjunctionSeparationDeg: cwrap('GetNextConjunctionSeparationDeg', 'number', []) as () => number,
     getNextSkyEventJson: cwrap('GetNextSkyEventJson', 'string', []) as () => string,
+    setObserveMode: cwrap('SetObserveMode', null, ['number']) as (...args: number[]) => void,
+    getObserveMode: cwrap('GetObserveMode', 'number', []) as () => number,
+    setObserverSite: cwrap('SetObserverSite', null, ['number', 'number', 'number']) as (...args: number[]) => void,
+    setObserveView: cwrap('SetObserveView', null, ['number', 'number']) as (...args: number[]) => void,
+    setObserveFov: cwrap('SetObserveFov', null, ['number']) as (...args: number[]) => void,
+    setObserveTimeRate: cwrap('SetObserveTimeRate', null, ['number']) as (...args: number[]) => void,
+    getObserveStateJson: cwrap('GetObserveStateJson', 'string', []) as () => string,
     setOrbitLines: cwrap('SetOrbitLines', null, ['number']) as (...args: number[]) => void,
     getOrbitLines: cwrap('GetOrbitLines', 'number', []) as () => number,
     setMagneticFields: cwrap('SetMagneticFields', null, ['number']) as (...args: number[]) => void,
@@ -117,4 +131,4 @@ export function createCachedCwrapExports(cwrap: SolarSystemCwrap): CachedCwrapEx
     };
 }
 
-export const EXPORT_COUNT = 54;
+export const EXPORT_COUNT = 61;

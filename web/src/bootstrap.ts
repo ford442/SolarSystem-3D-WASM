@@ -2,6 +2,7 @@ import './style.css';
 import Module, { type SolarSystemModuleConfig } from './SolarSystem.js';
 import { parseDeepLinkFromUrl } from './deepLink';
 import { initEducationalLayer } from './educationalLayer';
+import { initObservePanel, type ObservePanelController } from './observe';
 import { publishInitConfig, resolveInitConfig } from './initialSettings';
 import { PlanetExplorer } from './planetExplorer';
 import { createProgressCallbacks } from './progressOverlay';
@@ -46,6 +47,25 @@ const skyEventChip = document.getElementById('next-sky-event') as HTMLElement;
 const skyEventText = document.getElementById('next-sky-event-text') as HTMLElement;
 const skyEventJump = document.getElementById('next-sky-event-jump') as HTMLButtonElement;
 const skyEventLandmark = document.getElementById('next-sky-event-landmark') as HTMLButtonElement;
+const observeElements = {
+    exploreButton: document.getElementById('mode-explore') as HTMLButtonElement,
+    observeButton: document.getElementById('mode-observe') as HTMLButtonElement,
+    controls: document.getElementById('observe-controls') as HTMLElement,
+    siteSelect: document.getElementById('observe-site') as HTMLSelectElement,
+    latInput: document.getElementById('observe-lat') as HTMLInputElement,
+    lonInput: document.getElementById('observe-lon') as HTMLInputElement,
+    locateButton: document.getElementById('observe-locate') as HTMLButtonElement,
+    timeInput: document.getElementById('observe-time') as HTMLInputElement,
+    rateSelect: document.getElementById('observe-rate') as HTMLSelectElement,
+    stepButtons: Array.from(document.querySelectorAll<HTMLButtonElement>('[data-step-days]')),
+    nowButton: document.getElementById('observe-now') as HTMLButtonElement,
+    lookSunButton: document.getElementById('observe-look-sun') as HTMLButtonElement,
+    lookMoonButton: document.getElementById('observe-look-moon') as HTMLButtonElement,
+    eclipseButton: document.getElementById('observe-eclipse') as HTMLButtonElement,
+    readout: document.getElementById('observe-readout') as HTMLElement,
+    dateInput: simulationDateInput,
+    status: settingsStatus,
+};
 const enterVrButton = document.getElementById('enter-vr') as HTMLButtonElement;
 const exitVrButton = document.getElementById('exit-vr') as HTMLButtonElement;
 const explorerPanel = document.getElementById('explorer-panel') as HTMLElement;
@@ -193,6 +213,14 @@ void Module(moduleConfig).then((instance) => {
             runXrFrame: runtime.runXrFrame.bind(runtime),
             getHeapF32: () => runtime.heapF32,
             setXrControllerRay: runtime.setXrControllerRay.bind(runtime),
+            observe: {
+                isActive: () => runtime.getObserveMode(),
+                scrubTime: (seconds) => runtime.setSimulationEpoch(runtime.getSimulationEpoch() + seconds / 86400),
+                turn: (degrees) => {
+                    const state = runtime.getObserveState();
+                    runtime.setObserveView(state.azDeg + degrees, state.elDeg);
+                },
+            },
         },
     }).then((controller) => {
         if (controller) {
@@ -205,7 +233,10 @@ void Module(moduleConfig).then((instance) => {
         enterVrButton.hidden = true;
     });
 
+    let observeController: ObservePanelController | null = null;
+
     initSettingsPanel({
+        getObserveTimeOfDayDays: () => observeController?.timeOfDayDays() ?? 0,
         elements: {
             settingsPanel,
             settingsToggle,
@@ -235,6 +266,17 @@ void Module(moduleConfig).then((instance) => {
         runtime,
         deepLink,
         isMobileDevice,
+    });
+
+    observeController = initObservePanel({
+        elements: observeElements,
+        runtime,
+        startInObserve: deepLink.mode === 'observe',
+        deepLink: { ...deepLink.observer, paused: deepLink.paused },
+        epochFromLink: deepLink.julianDate !== undefined || deepLink.simulationDate !== undefined,
+        onModeChanged: (active) => {
+            explorerPanel.classList.toggle('is-observing', active);
+        },
     });
 
     initEducationalLayer({

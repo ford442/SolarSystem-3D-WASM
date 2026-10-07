@@ -50,6 +50,7 @@ extern "C" {
     // cwrap. See docs/plans/PORTING_GUIDE.md § JS control surface.
     EMSCRIPTEN_KEEPALIVE void SetCameraPose(float x, float y, float z, float yaw, float pitch) {
         if (!activeApplication) return;
+        if (activeApplication->IsObserveActive()) return; // Observe keeps the viewer on the ground
         Camera& cam = activeApplication->GetCamera();
         cam.SetPosition(glm::vec3(x, y, z));
         cam.SetYawPitch(yaw, pitch);
@@ -232,6 +233,42 @@ extern "C" {
                       SkyEvents::BodyName(event.bodyA), SkyEvents::BodyName(event.bodyB),
                       event.julianDate, event.missDeg, event.limitDeg);
         json = buffer;
+        return json.c_str();
+    }
+    // Observe mode (camera on Earth at a lat/lon, sky from Observer::ComputeSky). The state is
+    // one JSON string for the same reason as GetNextSkyEventJson; the setters stay scalar.
+    // Mode and site changes notify "observeMode" / "observeSite" / "observeTimeRate".
+    EMSCRIPTEN_KEEPALIVE void SetObserveMode(int enabled) {
+        if (activeApplication) {
+            activeApplication->SetObserveMode(enabled != 0);
+        }
+    }
+    EMSCRIPTEN_KEEPALIVE int GetObserveMode() {
+        return activeApplication && activeApplication->IsObserveActive() ? 1 : 0;
+    }
+    EMSCRIPTEN_KEEPALIVE void SetObserverSite(double latDeg, double lonDeg, double altM) {
+        if (activeApplication) {
+            activeApplication->SetObserverSite(latDeg, lonDeg, altM);
+        }
+    }
+    EMSCRIPTEN_KEEPALIVE void SetObserveView(float azimuthDeg, float elevationDeg) {
+        if (activeApplication) {
+            activeApplication->SetObserveView(azimuthDeg, elevationDeg);
+        }
+    }
+    EMSCRIPTEN_KEEPALIVE void SetObserveFov(float fovDeg) {
+        if (activeApplication) {
+            activeApplication->SetObserveFov(fovDeg);
+        }
+    }
+    EMSCRIPTEN_KEEPALIVE void SetObserveTimeRate(double rate) {
+        if (activeApplication) {
+            activeApplication->SetObserveTimeRate(rate);
+        }
+    }
+    EMSCRIPTEN_KEEPALIVE const char* GetObserveStateJson() {
+        static std::string json;
+        json = activeApplication ? activeApplication->GetObserveStateJson() : R"({"active":false})";
         return json.c_str();
     }
     EMSCRIPTEN_KEEPALIVE void SetOrbitLines(int enabled) {

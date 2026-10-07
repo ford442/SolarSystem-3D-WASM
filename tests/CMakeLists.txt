@@ -15,6 +15,9 @@ set(SOLARSYSTEM_TEST_SOURCES
     ${CMAKE_SOURCE_DIR}/src/Solar_System/AsteroidOrbit.cpp
     ${CMAKE_SOURCE_DIR}/src/Auxiliary_Modules/Ephemeris.cpp
     ${CMAKE_SOURCE_DIR}/src/Auxiliary_Modules/SkyEvents.cpp
+    ${CMAKE_SOURCE_DIR}/src/Auxiliary_Modules/Observer.cpp
+    ${CMAKE_SOURCE_DIR}/src/Auxiliary_Modules/LunarTheory.cpp
+    ${CMAKE_SOURCE_DIR}/src/Auxiliary_Modules/StarCatalog.cpp
     ${CMAKE_SOURCE_DIR}/src/Auxiliary_Modules/MagneticFieldParams.cpp
     ${CMAKE_SOURCE_DIR}/src/Auxiliary_Modules/MagneticFieldModel.cpp
     ${CMAKE_SOURCE_DIR}/src/Auxiliary_Modules/MagneticFieldTracer.cpp
@@ -43,6 +46,10 @@ add_executable(SolarSystemTests
     test_asteroid_field.cpp
     test_magnetic_field.cpp
     test_sky_events.cpp
+    test_observer.cpp
+    test_lunar_theory.cpp
+    test_seated_view.cpp
+    test_star_catalog.cpp
     test_satellite_orbit.cpp
     test_eclipse_caster.cpp
     test_mission_catalog.cpp

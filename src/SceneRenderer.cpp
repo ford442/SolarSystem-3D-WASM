@@ -77,6 +77,12 @@ void Renderer::Init() {
                 FlareSprite{false, 2.25, 0.2, 3},
                 FlareSprite{false, 2.75, 2.0, 7}
             }});
+    try {
+        observeSky = make_unique<ObserveSky>();
+    } catch (const std::exception&) {
+        std::cerr << "[Observe] sky shaders unavailable; Observe mode will draw an empty sky" << std::endl;
+        observeSky.reset();
+    }
     orbitPathRenderer = make_unique<OrbitPathRenderer>();
     xrPointerRenderer = make_unique<XrPointerRenderer>();
     magneticFieldRenderer = make_unique<MagneticFieldLineRenderer>();
@@ -91,6 +97,10 @@ void Renderer::Init() {
 void Renderer::ApplyEffectQuality(const QualityTierSettings& settings) {
     pbrAtmosphereSteps = settings.enablePbrAtmosphere ? settings.atmosphereSteps : 0;
     coronaSlices = settings.enableVolumetricCorona ? settings.coronaSlices : 0;
+    observeStarCount = settings.observeStarCount;
+    if (observeSky) {
+        observeSky->SetStarLimit(observeStarCount);
+    }
 }
 
 glm::vec3 Renderer::CameraWorldPosition() const {

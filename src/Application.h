@@ -1,9 +1,11 @@
 #ifndef SOLARSYSTEM_APPLICATION_H
 #define SOLARSYSTEM_APPLICATION_H
 #include "ApplicationTypes.h"
+#include "ObserveState.h"
 #include "Renderer.h"
 #include "SimState.h"
 #include "Auxiliary_Modules/AuxiliaryModules.h"
+#include "Auxiliary_Modules/Observer.h"
 #include "Auxiliary_Modules/SkyEvents.h"
 #include "PlanetSystemManifest.h"
 #include "Solar_System/AsteroidField.h"
@@ -79,6 +81,21 @@ public:
      */
     const SkyEvents::SkyEvent& GetNextSkyEvent() const;
     int GetNearestPlanetIndexForJs() const;
+
+    // Observe mode — camera on Earth at a lat/lon, sky from Observer::ComputeSky (ObserveMode.cpp).
+    void SetObserveMode(bool active);
+    bool IsObserveActive() const { return _observe.active; }
+    const ObserveState& GetObserveState() const { return _observe; }
+    void SetObserverSite(double latDeg, double lonDeg, double altM);
+    /** Azimuth from north through east, elevation above the horizon, both in degrees. */
+    void SetObserveView(float azimuthDeg, float elevationDeg);
+    void SetObserveFov(float fovDeg);
+    void SetObserveTimeRate(double rate);
+    /** Sky for the current epoch and site; recomputed only when either changes. */
+    const Observer::Sky& CurrentObserveSky() const;
+    std::string GetObserveStateJson() const;
+    /** GL name of the Moon's diffuse texture once its system is loaded, else 0 (Observe draws it on the Moon disc). */
+    unsigned int ObserveMoonTexture() const;
     void SetMusicVolume(float volume);
     float GetMusicVolume() const;
     void SetMusicMuted(bool muted);
@@ -153,6 +170,13 @@ private:
     std::vector<RenderableSceneComponent> _renderableSceneComponents;
     std::vector<std::string> _backgroundSongPaths;
 
+    // Observe mode state and its sky cache — see CurrentObserveSky().
+    ObserveState _observe;
+    mutable Observer::Sky _observeSky;
+    mutable double _observeSkyJd = 0.0;
+    mutable Observer::Site _observeSkySite;
+    mutable bool _observeSkyValid = false;
+
     // Next-conjunction hint cache — see GetNextConjunction().
     mutable SkyEvents::Conjunction _nextConjunction;
     mutable double _nextConjunctionComputedJd = 0.0;
@@ -193,6 +217,9 @@ private:
     void LoadMissionCatalog();
     void LoadMissions();
     void UpdateMissionFollow();
+    const char* ObserveEventVisibility() const; // "above" / "below" / "unknown" / "none" for the next sky event
+    void UpdateObserveFrame();          // Observe: park the camera above Earth so loading/LOD follow it
+    void ApplyObserveEnvOverride();     // SOLARSYSTEM_OBSERVE=lat,lon[,jd[,az,el,fov]] for headless captures
     void StopMissionFollow();
     bool SampleMissionScenePosition(int idx, glm::vec3& outScene) const;
     void UpdateMusicDucking();

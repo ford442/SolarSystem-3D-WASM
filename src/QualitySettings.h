@@ -27,6 +27,9 @@ struct QualityTierSettings {
     // (view-aligned inside the corona). Off = the flat billboard.
     bool enableVolumetricCorona;
     int coronaSlices;
+    // How many of the brightest catalog stars Observe mode draws (the list is sorted by
+    // magnitude, so this is a prefix). Planets, Sun and Moon are always drawn.
+    int observeStarCount;
     const char* name;
 };
 

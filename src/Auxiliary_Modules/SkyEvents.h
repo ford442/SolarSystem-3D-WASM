@@ -59,6 +59,13 @@ struct SkyEvent {
     double limitDeg = 0.0;
 };
 
+/**
+ * Geocentric position in km on the J2000 ecliptic axes (x toward the equinox, z toward the
+ * north ecliptic pole). Bodies are Ephemeris indices 0 (Sun) – 9 (Pluto) excluding Earth, or
+ * kMoon. Returns false (and zeros) for anything else.
+ */
+bool GeocentricEclipticKm(int bodyIndex, double julianDate, double outXyzKm[3]);
+
 /** Geocentric ecliptic longitude and latitude of a body in degrees, as seen from Earth. */
 void GeocentricLonLatDeg(int bodyIndex, double julianDate, double& lonDeg, double& latDeg);
 

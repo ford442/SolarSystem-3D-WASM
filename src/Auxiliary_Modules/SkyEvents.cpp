@@ -109,6 +109,19 @@ Vec3 geocentricKm(int bodyIndex, double jd) {
     if (bodyIndex == kMoon) {
         return satelliteParentRelativeKm(kMoon, jd);
     }
+    if (bodyIndex == kSun) {
+        // The Sun is seen where it was 8.3 minutes ago, and Earth's orbital motion adds the
+        // aberration of light: together its apparent longitude is the geometric one minus
+        // 20.4898"/R (Meeus ch. 25), about 37 s of the Moon's motion. A solar eclipse is
+        // timed against that apparent Sun, not the geometric one. The Moon needs no such
+        // correction (its light time is 1.3 s). Rotating about the ecliptic pole shifts only
+        // the longitude.
+        const Vec3 geometric = scale(geocentric(kSun, jd), kKmPerAu);
+        const double distanceAu = length(geometric) / kKmPerAu;
+        const double shift = -20.4898 * (kDegToRad / 3600.0) / distanceAu;
+        const double c = std::cos(shift), s = std::sin(shift);
+        return {geometric.x * c - geometric.y * s, geometric.x * s + geometric.y * c, geometric.z};
+    }
     const Vec3 v = geocentric(bodyIndex, jd);
     return scale(v, kKmPerAu);
 }
@@ -203,6 +216,25 @@ double refineCrossing(int bodyA, int bodyB, double jdLo, double jdHi) {
 }
 
 } // namespace
+
+bool GeocentricEclipticKm(int bodyIndex, double julianDate, double outXyzKm[3]) {
+    outXyzKm[0] = outXyzKm[1] = outXyzKm[2] = 0.0;
+    if (bodyIndex == kMoon) {
+        const Vec3 moon = geocentricKm(kMoon, julianDate);
+        outXyzKm[0] = moon.x;
+        outXyzKm[1] = moon.y;
+        outXyzKm[2] = moon.z;
+        return length(moon) > 0.0;
+    }
+    if (bodyIndex < kSun || bodyIndex == kEarth || bodyIndex > 9) {
+        return false;
+    }
+    const Vec3 v = geocentricKm(bodyIndex, julianDate);
+    outXyzKm[0] = v.x;
+    outXyzKm[1] = v.y;
+    outXyzKm[2] = v.z;
+    return true;
+}
 
 void GeocentricLonLatDeg(int bodyIndex, double julianDate, double& lonDeg, double& latDeg) {
     const Vec3 v = geocentric(bodyIndex, julianDate);

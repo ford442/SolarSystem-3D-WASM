@@ -165,13 +165,15 @@ export function bindSkyEventChip(options: {
     getNextSkyEvent: () => NextSkyEvent;
     setSimulationEpoch: (julianDate: number) => void;
     onJumped?: (julianDate: number) => void;
+    /** Extra text appended to the chip line, e.g. whether the event is above the Observe-mode horizon. */
+    getTextSuffix?: () => string;
 }): { refresh: () => void } {
     const landmark = options.landmark ?? SKY_EVENT_LANDMARKS[0];
 
     const refresh = (): void => {
         const next = options.getNextSkyEvent();
         options.chip.hidden = !next.valid;
-        options.text.textContent = next.valid ? formatSkyEvent(next) : '';
+        options.text.textContent = next.valid ? formatSkyEvent(next) + (options.getTextSuffix?.() ?? '') : '';
         options.jumpButton.disabled = !next.valid;
     };
 

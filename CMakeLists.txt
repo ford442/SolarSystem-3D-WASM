@@ -42,6 +42,8 @@ set(SOLARSYSTEM_SOURCES_CORE
     src/StarSystemFactory.cpp
     src/PlatformWindow.cpp
     src/InputHandler.cpp
+    src/ObserveMode.cpp
+    src/ObserveRenderer.cpp
     src/AudioPlayer.cpp
     src/RenderSettings.cpp
     src/XrSession.cpp
@@ -77,6 +79,9 @@ set(SOLARSYSTEM_SOURCES_AUX
     src/Auxiliary_Modules/TextRenderer.cpp
     src/Auxiliary_Modules/HDR.cpp
     src/Auxiliary_Modules/SkyEvents.cpp
+    src/Auxiliary_Modules/Observer.cpp
+    src/Auxiliary_Modules/LunarTheory.cpp
+    src/Auxiliary_Modules/StarCatalog.cpp
     src/Auxiliary_Modules/TextureLODController.cpp
     src/Auxiliary_Modules/PlanetManifestLoader.cpp
     src/Auxiliary_Modules/FloatLutTexture.cpp
@@ -100,6 +105,7 @@ set(SOLARSYSTEM_SOURCES_SOLAR
     src/Solar_System/OrbitLayout.cpp
     src/Solar_System/AsteroidOrbit.cpp
     src/Solar_System/AsteroidField.cpp
+    src/Solar_System/ObserveSky.cpp
     src/Solar_System/CatalogBody.cpp
     src/Solar_System/CatalogSatellite.cpp
     src/Solar_System/CatalogClouds.cpp
@@ -176,6 +182,7 @@ if(EMSCRIPTEN)
         "SHELL:--preload-file ${CMAKE_SOURCE_DIR}/resource/shaders@/resource/shaders"
         "SHELL:--preload-file ${CMAKE_SOURCE_DIR}/resource/planet_manifest.json@/resource/planet_manifest.json"
         "SHELL:--preload-file ${CMAKE_SOURCE_DIR}/resource/missions@/resource/missions"
+        "SHELL:--preload-file ${CMAKE_SOURCE_DIR}/resource/sky@/resource/sky"
         "SHELL:--preload-file ${CMAKE_SOURCE_DIR}/resource/fonts@/resource/fonts"
         "SHELL:--preload-file ${CMAKE_SOURCE_DIR}/resource/icons@/resource/icons"
         "SHELL:--preload-file ${CMAKE_SOURCE_DIR}/resource/textures_low@/resource/textures_low"

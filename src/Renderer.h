@@ -2,6 +2,7 @@
 #define SOLARSYSTEM_RENDERER_H
 #include "ApplicationTypes.h"
 #include "SystemModules.h"
+#include "Solar_System/ObserveSky.h"
 #include <deque>
 #include <functional>
 #include <string>
@@ -47,6 +48,10 @@ public:
     void RenderAsteroidField();
     void RenderMissionPaths() const;
     void RenderXrPointers() const;
+    /** Observe mode: the ground-level sky pass (replaces every scene pass). */
+    void RenderObserveSky();
+    /** Observe mode: compass, body labels and the readout line, drawn over the sky. */
+    void RenderObserveHud();
     void EnsureMagneticFieldsBuilt();
     void RebuildMissionPaths();
 
@@ -77,6 +82,8 @@ public:
     std::unique_ptr<Shader> pbrAtmosphereShader;
     std::unique_ptr<Shader> coronaVolumeShader;
     std::unique_ptr<LensFlare> lensFlare;
+    // Null if its shaders failed to compile; Observe then draws an empty sky.
+    std::unique_ptr<ObserveSky> observeSky;
     std::unique_ptr<OrbitPathRenderer> orbitPathRenderer;
     std::unique_ptr<XrPointerRenderer> xrPointerRenderer;
     std::unique_ptr<MagneticFieldLineRenderer> magneticFieldRenderer;
@@ -95,6 +102,7 @@ public:
     // From the quality tier (ApplyEffectQuality); 0 = effect off.
     int pbrAtmosphereSteps = 0;
     int coronaSlices = 0;
+    int observeStarCount = 0; // brightest catalog stars Observe draws; see QualityTierSettings
     // Corona slices follow the view direction (not the camera->Sun axis) while the camera
     // is inside the corona; kept across frames for hysteresis.
     mutable bool coronaSlicesViewAligned = false;
@@ -112,6 +120,8 @@ private:
     void ShadowMapPass(const RenderableSceneComponent& component);
     void RenderPass(const RenderableSceneComponent& component);
     void RenderAtmospheres(const RenderableSceneComponent& component) const;
+    /** Compass points and body/star names projected onto `_observeFrame`; `textScale` grows them for a headset. */
+    void RenderObserveLabels(float width, float height, float textScale);
     void RenderOneilAtmosphere(const RenderableAtmosphere& renderableAtmosphere,
                                const RenderableSceneComponent& component) const;
     void RenderPbrAtmosphere(const RenderableAtmosphere& renderableAtmosphere,
@@ -133,6 +143,9 @@ private:
         float starRadius = 0.0f;
     };
     EclipseUmbra ComputeEclipseUmbra(const RenderableSceneComponent& renderableComponent) const;
+
+    // View state of the last RenderObserveSky(), reused to project HUD labels onto the same frame.
+    ObserveSky::Frame _observeFrame;
 
     // Pre-allocated containers for RenderHints to eliminate per-frame allocations
     mutable std::deque<wchar_t> distanceInfoCache;

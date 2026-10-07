@@ -402,7 +402,9 @@ See [README.md § Runtime asset hosting](../README.md#runtime-asset-hosting) for
 | `MissionCatalog` / `MissionPathRenderer` | Sampled probe ribbons (Voyager); quality downsample; AU→scene via `HelioAuToScene` |
 | `XrPointerRenderer` | WebXR controller rays (skipped on Low) |
 | `Ephemeris` | `IEphemeris` backend: Standish planets, Keplerian Pluto/belt bodies, Keplerian moons, GMST |
-| `SkyEvents` | Conjunction, eclipse, transit, and shadow-transit searches over the active backend |
+| `SkyEvents` | Conjunction, eclipse, transit, and shadow-transit searches over the active backend; `GeocentricEclipticKm` exposes the geocentric vectors it searches with |
+| `StarCatalog` | GL-free parser for `resource/sky/bright_stars.json` (columnar, J2000, sorted brightest first) and the B−V → colour fit; see §7.4 |
+| `Observer` | GL-free ground-observer maths: sidereal time, precession, ecliptic→equatorial→horizon frames (X=East, Y=Up, Z=−North), Moon parallax, `ComputeSky` for the Sun, Moon and naked-eye planets, `DiscOverlapFraction` (§7.4) |
 | `MagneticFieldTracer` / `MagneticFieldLineRenderer` / `MagneticFieldBloom` | Optional dipole+toroidal ribbons (static VBO, GPU flow, half-res bloom on Medium+) |
 
 ### 7.3 Scene objects
@@ -412,6 +414,25 @@ Inheritance: `SpaceObject` → `Transformable` → `Planet` / `Satellite` / `Sta
 Each planet system lives in `src/Solar_System/<Name>_System/`. `SolarSystem.h` aggregates includes. Atmospheres, clouds, and rings are separate render components. `Atmosphere` is configured from its catalog row and owns its LUTs; `AtmosphereModel` is the GL-free physics behind them, shared with the baker and the tests (§9.2).
 
 **Magnetic field params:** `MagneticFieldParams` on `SpaceObject` (set in `StarSystemFactory.cpp` via `MagneticFieldCatalog::IntrinsicParamsForBody`). Values are visual/educational — not SI magnetosphere physics. `ParamsForBody(body, quality)` adds seed/sample scaling and quality enable gates for the ribbon renderer. `Application::ForEachEnabledMagneticField` walks the Sun, loaded planets, and satellites whose `enabled` flag is set. Satellites default to disabled. Magnetic mode (`SetMagneticFields` / alias `SetMagneticFieldMode`, settings **M**) dims planet/cloud/atmosphere/ring shaders via `uSurfaceDim` and fades orbit paths; the Sun is left at full brightness.
+
+### 7.4 Observe mode
+
+Observe puts the camera on Earth at a lat/lon and a UTC instant (`?mode=observe&lat=&lon=&jd=`, the **Observe** toggle, or `O` natively). It is a separate pass, not the scene drawn from a different camera, because scene scale cannot give true angular sizes: the Sun mesh is ~9× too small and the Moon ~5× too big, and the skybox cubemap's frame against J2000 is undocumented. `OrbitLayout::ScaleMode` is left alone.
+
+| Piece | Role |
+|-------|------|
+| `Auxiliary_Modules/Observer.*` | Pure maths. Never reads the Earth model's matrix (its pole and prime meridian are art); goes ecliptic J2000 → equatorial J2000 → equatorial of date (precession) → horizon (local sidereal time, geodetic latitude). Moon parallax uses the WGS84 observer vector; Sun and planets are geocentric. |
+| Moon orientation | `Observer::MoonBodyAxesEquatorialJ2000` is the IAU 2009 WGCCRE lunar orientation (pole α0/δ0 and prime-meridian angle W with the E1–E13 terms), as right-handed body axes (X lon 0, Y lon +90 east, Z north). `ComputeSky` carries them into the horizon frame as `moonBodyToHorizon` and reports the sub-Earth point (libration). The fragment shader turns each disc point's topocentric surface normal into selenographic lon/lat with the transpose, so parallax and libration are already in it. Tests pin the frame by behaviour: right-handedness, a pole near (270°, 66.5°), longitude libration following the orbit's equation of centre (corr > 0.9, within ~10°), and latitude libration opposite the Moon's ecliptic latitude. The map is sampled as equirectangular, centre lon 0, north at the top (`MOON_MAP_CENTRE_LON` in `observeSprite.fs` if a deployed texture differs); DDS textures are loaded unflipped here, so t = 0.5 − lat/π. The texture comes from the loaded Moon `CatalogSatellite` (`GetDiffuseTexture()`, which changes on LOD reloads), falling back to the plain lit disc until its system has loaded; Observe keeps Earth's component re-placed each frame so the LOD manager sees the Moon as near. |
+| `ObserveState.h`, `ObserveMode.cpp` | State on `Application` (not `SimState`, which the tests link): site, time rate, saved Explore camera. `SetObserveMode` locks camera movement (`Camera::SetMovementLocked`, which also covers touch and the XR stick), widens the zoom range to 2–90°, and restores the Explore pose on exit. Focus keys, `FocusPlanetByIndex`/`FocusMissionByIndex` and `SetCameraPose` are ignored while active. `GetObserveStateJson` is the JS-facing snapshot. |
+| `Solar_System/ObserveSky.*`, `shaders/observe*.{vs,fs}` | The sky pass: an analytic sky/ground gradient from the Sun's altitude, additive point sprites for planets, an additive Sun disc with limb darkening and halo, and an alpha-blended lit Moon disc. Stars are one static instance buffer of J2000 unit vectors, rotated into the horizon frame by a single matrix uniform (`Observer::HorizonFromEquatorialJ2000`); their size and brightness come from `LimitingMagnitude(sunAlt)` in the vertex shader, so they fade in through twilight. Stars and planets are fixed-size screen-space points (round out to the edge of a wide FOV); the Sun and Moon are true angular discs on the tangent plane. Camera at the origin, no depth buffer, drawn back to front. Per-instance varyings are `flat` — an interpolated float `kind` will occasionally round to the wrong branch. |
+| `resource/sky/bright_stars.json` | The 5000 brightest Yale BSC5 stars (public domain), generated by `scripts/generate-star-catalog.mjs --input <catalog>` (the raw catalogue is not committed; `--check` validates the committed file, or compares against `--input`). Columnar `[ra, dec, vmag, bv]` in J2000 degrees, sorted by magnitude so a quality tier draws a prefix (`observeStarCount`: Low 500, Medium 2000, Full 5000). Preloaded for web (`--preload-file resource/sky`) and read lazily on the first Observe frame. Proper motion is ignored. |
+| `ObserveRenderer.cpp` | `Renderer::RenderObserveSky` (view/projection, XR eyes) and `RenderObserveHud` (compass, body names, readout, disclaimer). |
+
+**Seated sky in a headset.** `RenderXrStereoFrame` already calls `RenderFrameContent` per eye, so Observe needs only the sky pass to accept the eye matrices. `SeatedView::ViewRotation` (header-only, unit-tested) is `mat3(eye.view) * rotateY(heading)`: the headset supplies pitch, roll and yaw inside the room, and a single rotation about the vertical — the azimuth the room's forward currently faces, which is the camera yaw + 90° — ties that to the horizon frame. Translation is dropped (the sky is at infinity) and the camera's pitch is ignored (it is the viewer's own head). A level head reproduces the flat-screen camera exactly (test). `ObserveSky` already sizes stars and planets in pixels from the eye's viewport and projection, and the world-anchored compass/body/star labels are drawn per eye through `RenderObserveLabels`, scaled with the eye's resolution; the 2D readout is not drawn in a headset. In `webxr.ts`, while Observe is active the sticks stop flying: the left stick scrubs time (quadratic, up to 3 simulated hours per second, via `setSimulationEpoch`), the right stick snap-turns the heading by 30° (via `setObserveView`), `setTouchMovement` is held at zero, and the XR tooltip says so. Not exercised in CI (the Enter VR button stays hidden without `navigator.xr`); the maths is covered by `tests/test_seated_view.cpp`.
+
+The epoch is still `OrbitLayout::GetJulianDate()`, so the date controls and `SetSimulationEpoch` keep working; in Observe the frame loop advances it at wall-clock UTC × `timeRate` (instead of the orrery's 3 days per second) and honours Pause. The scene camera is parked just above Earth each frame so staged loading, LOD and the nearest-planet search behave as if the viewer were there; scene components are not drawn or re-placed while Observe is active, so their positions are stale until Explore resumes.
+
+Web: `web/src/observe.ts` (panel, sites, rates, 2017 preset, `ObserveState` parsing), `deepLink.ts` (`mode`, `lat`, `lon`, `az`, `el`, `fov`, `rate`; an Observe share link omits the fly-through pose), exports `SetObserveMode`/`SetObserverSite`/`SetObserveView`/`SetObserveFov`/`SetObserveTimeRate`/`GetObserveStateJson`. Accuracy is visualizer-grade (§11): UTC is fed straight into GMST, nutation and refraction are ignored, and the Moon comes from the Meeus ch. 47 series (§11), so eclipses land within seconds of NASA's circumstances.
 
 ---
 
@@ -423,6 +444,7 @@ Each planet system lives in `src/Solar_System/<Name>_System/`. `SolarSystem.h` a
 | `src/main.ts` | Module init, `updateLoadingProgress`, `updateStreamingProgress`, `setCameraPose`, settings persistence |
 | `src/tourPlayer.ts` | Guided-tour playlist over `SolarSystemRuntime` |
 | `src/educationalLayer.ts` | Mission list + tour controls |
+| `src/observe.ts` | Explore/Observe switch, site + UTC time + rate controls, 2017 eclipse preset, `ObserveState` parsing |
 | `vite.config.ts` | Base path `/solar-system/` |
 | `public/SolarSystem.{wasm,data}` | Generated by `./build-web.sh` |
 
@@ -621,9 +643,25 @@ for Pluto, Ceres, and Vesta) and `Ephemeris::SatellitePosition` answers parent-r
 moons. `SkyEvents`, `OrbitLayout`, and `CatalogSatellite` all read through those two calls, so
 swapping in a different backend — a truncated VSOP87D, say — moves every consumer at once.
 
-**Moons.** A satellite is placed from its catalog `orbit.keplerian` row only when its index is
-listed in `kKeplerianSatellites` (`Ephemeris.cpp`): today the Moon, Io, Europa, Ganymede,
-Callisto, Titan, and Triton. Everything else still uses the circular `SatelliteOrbit::Offset` /
+**The Moon** is the exception to everything below: `StandishEphemeris::SatelliteParentRelative(12)`
+returns `LunarTheory::MoonGeocentricJ2000Au`, the Meeus ch. 47 series (60 longitude/distance and 60
+latitude terms, plus the Venus/Jupiter/flattening additives; the tables are generated from a public
+transcription of Meeus's, cross-checked against his worked Example 47.a to 2e-6°). The series is in
+TT and referred to the mean equinox of date, so the backend adds `Ephemeris::DeltaTSeconds` (Espenak
+& Meeus polynomials; the ~69 s of the 2020s moves the Moon by 0.01°) and `EclipticOfDateToJ2000`
+carries it to the J2000 ecliptic (Meeus 21.5, tested against an independent route through the mean
+obliquity and `Observer::PrecessionJ2000ToDate`). The catalog row's `keplerian` block is now only
+the *scene* size reference (`aKm`) — `SatelliteOrbit::EphemerisOffset` still rescales the real
+distance onto `sceneOrbitRadius`, so the scene Moon's distance now swings between perigee and
+apogee like the real one. Measured against NASA's 2017-08-21 circumstances: geocentric greatest
+eclipse within ~1 s, totality at Casper, WY 17:42:27–17:45:00 (published 17:42:36–17:45:02). Two
+corrections make that so, and both are easy to lose: the Sun's apparent longitude is the geometric
+one minus 20.4898″/R (`SkyEvents::geocentricKm`, Meeus ch. 25 — without it every solar eclipse is
+~36 s late), and ΔT is applied to the Moon only (the planets move too slowly for it to show).
+
+**Other moons.** A satellite is placed from its catalog `orbit.keplerian` row only when its index
+is listed in `kKeplerianSatellites` (`Ephemeris.cpp`): today Io, Europa, Ganymede, Callisto,
+Titan, and Triton. Everything else still uses the circular `SatelliteOrbit::Offset` /
 `OffsetXY` helpers, because its row's node and periapsis angles are placeholder zeros and a
 confidently wrong orbital plane is worse than an obviously simplified one. `SatelliteOrbit::
 EphemerisOffset` rescales the AU vector so the semi-major axis lands on the catalog
@@ -638,7 +676,7 @@ A `SetSimulationEpoch` jump therefore moves every moon to the pose that date imp
 scrubbing back returns it exactly. For placeholder rows the absolute phase is still art.
 
 Elements are J2000 mean elements with secular node and periapsis rates and **no periodic
-terms**. Frames: the Moon's and Triton's are genuinely ecliptic; the Galileans' and Titan's are
+terms** (the Moon has them: see above). Frames: Triton's is genuinely ecliptic; the Galileans' and Titan's are
 fits of Horizons ecliptic osculating elements, so their inclinations carry the parent's
 obliquity (2.2° for Jupiter, 27.7° for Saturn) rather than being Laplace-plane values.
 
@@ -647,9 +685,12 @@ same terminator and scrubbing backwards is exact. The texture's prime meridian i
 art constant that has not been calibrated against a reference image — the rate and the epoch
 behaviour are the honest parts.
 
-**Time scale.** Julian dates are treated as UTC throughout. UTC↔TT (~69 s, leap seconds and all)
-and UT1↔UTC (< 0.9 s) are not modelled; both are far below the arcminute the planet series
-provides. Do not read event times as contact times.
+**Time scale.** Julian dates are treated as UTC (≈ UT1) throughout, which is exactly right for
+Earth rotation (GMST) and good enough for the planets: UTC↔TT (~69 s) and UT1↔UTC (< 0.9 s) are
+far below the arcminute the planet series provides. The Moon is the one body that needs it, and
+gets `Ephemeris::DeltaTSeconds` applied (see "The Moon" above). Event times for the Moon and
+Sun are good to ~10 s against NASA's 2017 circumstances; the planets' are good to minutes. Do
+not read them as contact times for any other body.
 
 **Umbra rendering** is a decal in the lighting pass, not a second shadow map.
 `Application::ConfigureEclipseUmbra` picks at most one moon per planet — the one whose shadow

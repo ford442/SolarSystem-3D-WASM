@@ -85,9 +85,10 @@ The web build is a small orrery you can send a URL into. None of this talks to l
 - **Sky-event overlays** — Next conjunction, eclipse, or transit chip plus documented landmarks (for example the 2017-08-21 total solar eclipse).
 - **Mission paths** — Sampled Voyager 1/2 polylines (`resource/missions/catalog.json`). Click a mission in Explorer to follow the probe; share with `?mission=voyager1&jd=…`. Low quality draws fewer samples.
 - **Guided tours** — **Play inner-system tour** runs a 60-second playlist (Sun → Earth scale modes → Saturn → 2017 eclipse). `?tour=inner-system&step=2` deep-links a beat; **Copy link to this tour step** reuses the share URL.
+- **Observe mode** — Simulation panel **Observe** (or `O`) puts the camera on Earth at a lat/lon and a UTC instant and shows the sky at true angular size: the Sun, Moon (with phase) and the five naked-eye planets over a day/twilight/night gradient and a flat horizon. Pick a site or enter lat/lon, scrub the date and time, change the rate (paused to ×86400), and share it with `?mode=observe&lat=42.87&lon=-106.31&jd=2457986.2375&az=150&el=50&fov=20`. **2017 total eclipse (Casper, WY)** jumps to mid-totality (17:43:45 UTC on 2017-08-21). A visualization, not an almanac — planets are good to ~an arcminute, the Moon and Sun to a few arcseconds (eclipse contacts to ~10 s), there is no refraction, and times are UTC. About 5000 catalog stars (Yale Bright Star Catalogue, V ≲ 6, with B−V colours) fade in through twilight; Low draws the brightest 500, Medium 2000. The Moon wears its diffuse texture once its system has loaded, oriented from the IAU lunar rotation model (so libration and the sky position angle of its pole come out right), and the next-sky-event chip says whether the bodies involved are above your horizon when it happens. In VR, Observe is a seated sky: look around with your head, the left stick scrubs time, the right stick snap-turns, and nothing flies. Native: `SOLARSYSTEM_OBSERVE=lat,lon[,jd[,az,el,fov]]` opens straight into Observe.
 - **VR** — Enter VR when `navigator.xr` reports immersive-vr. Controller rays and a focus-planet tooltip show in-headset (HTML overlay and/or a tiny GL ribbon). Non-XR browsers never see the button.
 
-Console helpers: `window.focusMission(0)`, `window.startTour('inner-system')`.
+Console helpers: `window.focusMission(0)`, `window.startTour('inner-system')`, `window.setObserveMode(true)`, `window.getObserveState()`.
 
 <h2 id="documentation">Documentation</h2>
 
@@ -237,16 +238,19 @@ therefore reliable to within a day, not a minute. `tests/test_sky_events.cpp` an
 The moons are held to the same bar. Their elements are a least-squares fit of Horizons
 osculating elements over 2000–2036, carried forward with secular node and periapsis rates but
 **no periodic terms**: measured direction error over that span is under 0.1° for Titan and the
-outer Galileans, under 0.7° for Io and Triton, and up to 2.4° for the Moon, whose evection
-(1.27°) and variation (0.66°) are not modelled. Those two terms very nearly cancel at new and
-full moon, which is why eclipse *dates* still come out right — every solar and lunar eclipse in
-the 2017–2019 canon is found on its published day — while the *time of day* can be a couple of
-hours off greatest eclipse. Treat none of it as observing-grade: these are not contact times.
+outer Galileans and under 0.7° for Io and Triton. The Moon is the exception: it does not use
+catalog elements at all but the 120 periodic terms of Meeus ch. 47 (a truncated ELP-2000/82,
+good to ~10″), with the Sun's light-time/aberration shift (20.5″, which is worth 37 s of the
+Moon's motion) and a proper ΔT (the ~69 s UT→TT offset, worth a minute). That is what puts
+every solar and lunar eclipse in the 2017–2019 canon on its published *date* and the geocentric
+greatest eclipse of 2017-08-21 within ~1 s of NASA's 18:25:32 UT. The other moons are still
+elements-only: treat them as not observing-grade — these are not contact times.
 The umbra is drawn on a planet rendered several times oversized relative to its moon's orbit,
 so the spot tracks across the disc faster than life and, on Jupiter, cannot reach the poles —
 but *whether* it appears is decided from real radii and distances, which is why it shows up on
-the right days. Time is handled as UTC throughout; the ~69 s UTC↔TT offset and leap seconds
-are not modelled, which is far below the arcminute the planet series itself provides.
+the right days. Time is handled as UTC throughout; only the Moon gets the ~69 s UT→TT offset
+(`Ephemeris::DeltaTSeconds`), because it is the one body fast enough for it to show — the planets
+move far less than the arcminute their series is good for in that time.
 
 <h2 id="runtime-asset-hosting">Runtime asset hosting</h2>
 

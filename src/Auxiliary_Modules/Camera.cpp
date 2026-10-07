@@ -78,6 +78,7 @@ glm::vec3 Camera::GetWorldUpVector() const {
 
 // processes input received from any keyboard-like input system. Accepts input parameter in the form of camera defined ENUM (to abstract it from windowing systems)
 void Camera::ProcessKeyboard(CameraVector direction, float deltaTime) {
+    if (_movementLocked) return;
     float velocity = _movementSpeed * deltaTime;
     if (direction == CameraVector::FORWARD)
         _position += _frontVector * velocity;
@@ -118,7 +119,7 @@ void Camera::ProcessMouseMovement(float xoffset, float yoffset, bool constrainPi
 
 // processes input received from a mouse scroll-wheel event. Only requires input on the vertical wheel-axis
 void Camera::ProcessMouseScroll(float yoffset) {
-    _zoom = glm::clamp(_zoom - yoffset, 1.0f, 45.0f);
+    _zoom = glm::clamp(_zoom - yoffset, _zoomMin, _zoomMax);
 }
 
 void Camera::UpdateCameraVectors() {

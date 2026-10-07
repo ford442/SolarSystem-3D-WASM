@@ -4,6 +4,8 @@
 #include "JsBridge.h"
 #include "SimState.h"
 #include "WasmExports.h"
+#include "Auxiliary_Modules/Ephemeris.h"
+#include "Solar_System/OrbitLayout.h"
 #include <algorithm>
 #include <cmath>
 
@@ -197,8 +199,21 @@ void Application::KeyCallback(GLFWwindow* window, int key, int, int action, int)
         VertSync(app->_isVertSyncEnabled);
     }
 
+    if (key == GLFW_KEY_O && action == GLFW_PRESS) {
+        if (!app->IsObserveActive()) {
+            // Entering from the keyboard starts at the current wall-clock UTC, running live.
+            OrbitLayout::SetJulianDate(Ephemeris::JulianDateNowUtc());
+            gSimState->timePaused = false;
+            app->SetObserveTimeRate(1.0);
+            NotifySettingsChanged("simulationEpoch");
+            NotifySettingsChanged("paused");
+        }
+        app->SetObserveMode(!app->IsObserveActive());
+    }
+
     if (action == GLFW_PRESS) {
-        // Planet focus presets (smooth transition to live orbital positions)
+        // Planet focus presets (smooth transition to live orbital positions); FocusPlanetByIndex
+        // ignores them while Observe keeps the viewer on the ground.
         if (key == GLFW_KEY_F2) app->FocusPlanetByIndex(1);  // Mercury
         if (key == GLFW_KEY_F3) app->FocusPlanetByIndex(2);  // Venus
         if (key == GLFW_KEY_F4) app->FocusPlanetByIndex(3);  // Earth

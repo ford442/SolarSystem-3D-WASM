@@ -216,10 +216,11 @@ TEST(EphemerisTest, IndicesPastTheCatalogReturnZeros) {
 // span; they exist to catch a regression in the propagator or a corrupted catalog row, not
 // to prove the model.
 //
-// Tolerances below are the measured error rounded up, not aspirations. The Moon's is the
-// loosest because its row carries only secular rates: the periodic terms (evection 1.27
-// deg, variation 0.66 deg) are not modelled. Those terms very nearly cancel at syzygy,
-// which is why the eclipse searches in test_sky_events.cpp land on the right day anyway.
+// Tolerances below are the measured error rounded up, not aspirations. The Moon is not a
+// catalog-element fit at all: it comes from the Meeus ch. 47 series, so these three Horizons
+// vectors are an independent check on it, ~0.01 deg off. That residual is the time scale, not
+// the model: Horizons labels these epochs TDB, while the app takes UTC and adds DeltaT (~64-69 s,
+// i.e. ~0.01 deg of the Moon's motion) — a convention difference these tests do not undo.
 
 namespace {
 
@@ -262,9 +263,9 @@ constexpr int kTitanId = 24;
 constexpr int kTritonId = 31;
 
 constexpr SatelliteReference kSatelliteReferences[] = {
-    {kMoonId, 2451545.0, {-1.949281649687e-03, -1.838126040073e-03, 2.424579738821e-04}, 1.0, 1.0},
-    {kMoonId, 2461041.5, {9.647578994046e-04, 2.201875129334e-03, 2.122555367575e-04}, 2.5, 1.0},
-    {kMoonId, 2464328.5, {-2.617952893689e-03, -2.350614012334e-04, 7.383486146070e-05}, 1.0, 1.0},
+    {kMoonId, 2451545.0, {-1.949281649687e-03, -1.838126040073e-03, 2.424579738821e-04}, 0.03, 0.01},
+    {kMoonId, 2461041.5, {9.647578994046e-04, 2.201875129334e-03, 2.122555367575e-04}, 0.03, 0.01},
+    {kMoonId, 2464328.5, {-2.617952893689e-03, -2.350614012334e-04, 7.383486146070e-05}, 0.03, 0.01},
     {kIoId, 2451545.0, {2.671924636756e-03, 8.640941902565e-04, 7.127946422890e-05}, 0.1, 0.5},
     {kIoId, 2461041.5, {2.481204857656e-03, -1.345564381596e-03, -1.316300073474e-05}, 0.7, 0.5},
     {kIoId, 2464328.5, {2.129236690923e-03, -1.829581848466e-03, -3.572002024210e-05}, 0.2, 0.5},

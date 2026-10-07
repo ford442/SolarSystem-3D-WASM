@@ -261,6 +261,41 @@ export interface SolarSystemCwrap {
     argTypes: [],
   ): (...args: number[]) => string;
   (
+    ident: 'SetObserveMode',
+    returnType: null,
+    argTypes: ['number'],
+  ): (...args: number[]) => void;
+  (
+    ident: 'GetObserveMode',
+    returnType: 'number',
+    argTypes: [],
+  ): (...args: number[]) => number;
+  (
+    ident: 'SetObserverSite',
+    returnType: null,
+    argTypes: ['number', 'number', 'number'],
+  ): (...args: number[]) => void;
+  (
+    ident: 'SetObserveView',
+    returnType: null,
+    argTypes: ['number', 'number'],
+  ): (...args: number[]) => void;
+  (
+    ident: 'SetObserveFov',
+    returnType: null,
+    argTypes: ['number'],
+  ): (...args: number[]) => void;
+  (
+    ident: 'SetObserveTimeRate',
+    returnType: null,
+    argTypes: ['number'],
+  ): (...args: number[]) => void;
+  (
+    ident: 'GetObserveStateJson',
+    returnType: 'string',
+    argTypes: [],
+  ): (...args: number[]) => string;
+  (
     ident: 'SetOrbitLines',
     returnType: null,
     argTypes: ['number'],
@@ -368,7 +403,10 @@ export type SettingsChangeField =
   | 'simulationEpoch'
   | 'orbitLines'
   | 'magneticFields'
-  | 'magneticFieldMode';
+  | 'magneticFieldMode'
+  | 'observeMode'
+  | 'observeSite'
+  | 'observeTimeRate';
 
 export interface SolarSystemModuleConfig {
   canvas: HTMLCanvasElement;
@@ -446,6 +484,13 @@ export interface SolarSystemModule {
   _GetNextConjunctionBodyB: () => number;
   _GetNextConjunctionSeparationDeg: () => number;
   _GetNextSkyEventJson: () => number;
+  _SetObserveMode: (...args: number[]) => void;
+  _GetObserveMode: () => number;
+  _SetObserverSite: (...args: number[]) => void;
+  _SetObserveView: (...args: number[]) => void;
+  _SetObserveFov: (...args: number[]) => void;
+  _SetObserveTimeRate: (...args: number[]) => void;
+  _GetObserveStateJson: () => number;
   _SetOrbitLines: (...args: number[]) => void;
   _GetOrbitLines: () => number;
   _SetMagneticFields: (...args: number[]) => void;
@@ -497,6 +542,10 @@ declare global {
       z: number;
     };
     startTour?: (id?: string) => void;
+    /** Observe mode console helpers (see observe.ts / ObserveState). */
+    setObserveMode?: (enabled: boolean) => void;
+    setObserverSite?: (latDeg: number, lonDeg: number, altM?: number) => void;
+    getObserveState?: () => import('./observe').ObserveState;
     /** Runtime asset base URL for WebResourceFetcher. */
     __solarSystemAssetBase?: string;
     /** KTX2 texture packs published by this deployment — read by PlatformWindow.cpp. */

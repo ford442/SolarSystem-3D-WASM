@@ -157,7 +157,8 @@ bool Contains(const std::vector<std::string>& dates, const std::string& date) {
 
 TEST(SkyEventsTest, SolarEclipsesLandOnTheirPublishedDates) {
     // NASA GSFC five-millennium canon, 2017-2019. Every solar eclipse in the window must be
-    // found and no extra one invented, so the size check matters as much as the contents.
+    // found and no extra one invented, so the size check matters as much as the contents. The
+    // dates are the canon's, not "within a day": the Moon now comes from the Meeus ch. 47 series.
     const std::vector<std::string> found = EventDatesInWindow(
         SkyEvents::EventKind::SolarEclipse, Ephemeris::JulianDateFromYmd(2017, 1, 1), 1080.0);
 
@@ -166,10 +167,9 @@ TEST(SkyEventsTest, SolarEclipsesLandOnTheirPublishedDates) {
     EXPECT_TRUE(Contains(found, "2018-02-15")); // partial, southern South America
     EXPECT_TRUE(Contains(found, "2018-07-13")); // partial, south of Australia
     EXPECT_TRUE(Contains(found, "2018-08-11")); // partial, northern Europe / Asia
-    // The canon dates this one 2019-01-06; greatest eclipse is 01:42 UTC, and the search
-    // reports ~23:50 on the 5th. That two-hour lead is exactly the accuracy the header
-    // promises, and it is why nothing here asserts a time of day.
-    EXPECT_TRUE(Contains(found, "2019-01-05"));
+    // Greatest eclipse is 2019-01-06 ~01:42 UTC. With the old mean-element Moon the search put
+    // this two hours early, on the 5th; the Meeus lunar series lands it on the canon's date.
+    EXPECT_TRUE(Contains(found, "2019-01-06"));
     EXPECT_TRUE(Contains(found, "2019-07-02")); // total, South Pacific / Chile / Argentina
     EXPECT_EQ(found.size(), 7u) << "found an eclipse the canon does not list";
 }

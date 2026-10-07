@@ -35,15 +35,15 @@ QualityTierSettings GetQualitySettings(int preset, bool mobile) {
     // rather than shader cost decides.
     if (mobile) {
         switch (preset) {
-            case 0: return {1024, 0, 0, false, false, 0, 400, TextureLodTier::Low, false, 0, false, 0, "low"};
-            case 1: return {2048, 2, 0, true, true, 1, 900, TextureLodTier::Mid, true, 8, false, 0, "medium"};
-            default: return {3000, 2, 0, true, true, 1, 1400, TextureLodTier::High, true, 12, true, 16, "full"};
+            case 0: return {1024, 0, 0, false, false, 0, 400, TextureLodTier::Low, false, 0, false, 0, 500, "low"};
+            case 1: return {2048, 2, 0, true, true, 1, 900, TextureLodTier::Mid, true, 8, false, 0, 1500, "medium"};
+            default: return {3000, 2, 0, true, true, 1, 1400, TextureLodTier::High, true, 12, true, 16, 2500, "full"};
         }
     }
     switch (preset) {
-        case 0: return {1024, 0, 0, false, false, 0, 600, TextureLodTier::Low, false, 0, false, 0, "low"};
-        case 1: return {2048, 2, 0, true, true, 1, 1800, TextureLodTier::Mid, true, 8, true, 16, "medium"};
-        default: return {3000, 4, 4, true, true, 2, 4000, TextureLodTier::High, true, 16, true, 32, "full"};
+        case 0: return {1024, 0, 0, false, false, 0, 600, TextureLodTier::Low, false, 0, false, 0, 500, "low"};
+        case 1: return {2048, 2, 0, true, true, 1, 1800, TextureLodTier::Mid, true, 8, true, 16, 2000, "medium"};
+        default: return {3000, 4, 4, true, true, 2, 4000, TextureLodTier::High, true, 16, true, 32, 5000, "full"};
     }
 }
 
@@ -71,6 +71,7 @@ void LogQualityTier(const QualityTierSettings& settings, bool hdrEnabled, int sh
               << (settings.enablePbrAtmosphere ? "LUT " + std::to_string(settings.atmosphereSteps) + " steps" : "O'Neil")
               << " | corona="
               << (settings.enableVolumetricCorona ? std::to_string(settings.coronaSlices) + " slices" : "billboard")
+              << " | observe stars=" << settings.observeStarCount
               << std::defaultfloat << std::endl;
 #ifdef __EMSCRIPTEN__
     std::cout << "[Quality] WebGL MSAA is fixed when the context is created; reload with ?quality="

@@ -36,6 +36,18 @@ void ExpectEffects(const QualityTierSettings& settings, bool pbrAtmosphere, int 
 
 } // namespace
 
+TEST(QualitySettingsTest, ObserveStarCountGrowsWithTier) {
+    EXPECT_EQ(GetQualitySettings(0, false).observeStarCount, 500);
+    EXPECT_EQ(GetQualitySettings(1, false).observeStarCount, 2000);
+    EXPECT_EQ(GetQualitySettings(2, false).observeStarCount, 5000);
+    EXPECT_EQ(GetQualitySettings(0, true).observeStarCount, 500);
+    EXPECT_LT(GetQualitySettings(2, true).observeStarCount, GetQualitySettings(2, false).observeStarCount);
+    for (const bool mobile : {false, true}) {
+        EXPECT_LT(GetQualitySettings(0, mobile).observeStarCount, GetQualitySettings(1, mobile).observeStarCount);
+        EXPECT_LT(GetQualitySettings(1, mobile).observeStarCount, GetQualitySettings(2, mobile).observeStarCount);
+    }
+}
+
 TEST(QualitySettingsTest, DesktopPresetMapping) {
     ExpectTier(GetQualitySettings(0, false), 1024, 0, 0, false, false, 0, 600, TextureLodTier::Low, "low");
     ExpectTier(GetQualitySettings(1, false), 2048, 2, 0, true, true, 1, 1800, TextureLodTier::Mid, "medium");
