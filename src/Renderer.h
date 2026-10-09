@@ -2,12 +2,14 @@
 #define SOLARSYSTEM_RENDERER_H
 #include "ApplicationTypes.h"
 #include "SystemModules.h"
+#include "Solar_System/ObserveSky.h"
 #include <deque>
 #include <functional>
 #include <string>
 
 class Application;
 class SpaceObject;
+struct QualityTierSettings;
 struct MagneticFieldParams;
 
 /**
@@ -27,11 +29,16 @@ public:
 
     /** Build shaders + GPU resources sized to the current display/quality settings. */
     void Init();
+    /** Atmosphere/corona effect levels from a quality tier (preset changes call this too). */
+    void ApplyEffectQuality(const QualityTierSettings& settings);
 
     void ConfigureMainShaders();
     void ProcessSceneComponentsRendering();
     void ProcessStarRendering();
+    /** Flat corona billboard (Low, or coronaSlices == 0); drawn before the planets. */
     void RenderStarCorona() const;
+    /** Instanced-slice corona (coronaSlices > 0); drawn after the planets so they occlude it. */
+    void RenderStarCoronaVolume() const;
     void RenderStarEffects() const;
     void RenderPlanetSatelliteStarDistances() const;
     void RenderHints() const;
@@ -41,6 +48,10 @@ public:
     void RenderAsteroidField();
     void RenderMissionPaths() const;
     void RenderXrPointers() const;
+    /** Observe mode: the ground-level sky pass (replaces every scene pass). */
+    void RenderObserveSky();
+    /** Observe mode: compass, body labels and the readout line, drawn over the sky. */
+    void RenderObserveHud();
     void EnsureMagneticFieldsBuilt();
     void RebuildMissionPaths();
 
@@ -66,7 +77,13 @@ public:
     std::unique_ptr<Shader> mainSkyBoxShader, mainTextShader, mainStarShader, mainCoronaStarShader,
         mainPlanetShader, mainAtmosphereShader, mainCloudsShader, mainRingShader;
     std::unique_ptr<Shader> hdrShader, lensFlareShader, starGlowShader;
+    // LUT atmosphere (atmosphere.vs + atmospherePbr.fs). Null if it failed to compile, in
+    // which case every shell stays on mainAtmosphereShader.
+    std::unique_ptr<Shader> pbrAtmosphereShader;
+    std::unique_ptr<Shader> coronaVolumeShader;
     std::unique_ptr<LensFlare> lensFlare;
+    // Null if its shaders failed to compile; Observe then draws an empty sky.
+    std::unique_ptr<ObserveSky> observeSky;
     std::unique_ptr<OrbitPathRenderer> orbitPathRenderer;
     std::unique_ptr<XrPointerRenderer> xrPointerRenderer;
     std::unique_ptr<MagneticFieldLineRenderer> magneticFieldRenderer;
@@ -82,6 +99,14 @@ public:
     bool isRenderPlanetStarDistances = true;
     bool isRenderSatelliteDistances = true;
 
+    // From the quality tier (ApplyEffectQuality); 0 = effect off.
+    int pbrAtmosphereSteps = 0;
+    int coronaSlices = 0;
+    int observeStarCount = 0; // brightest catalog stars Observe draws; see QualityTierSettings
+    // Corona slices follow the view direction (not the camera->Sun axis) while the camera
+    // is inside the corona; kept across frames for hysteresis.
+    mutable bool coronaSlicesViewAligned = false;
+
     float starExposure = 8.0f;
     float starGamma = 0.4545454f;
     float starTemperatureInKelvin = 5778.0f;
@@ -94,8 +119,15 @@ public:
 private:
     void ShadowMapPass(const RenderableSceneComponent& component);
     void RenderPass(const RenderableSceneComponent& component);
-    void RenderAtmospheres(const std::vector<RenderableAtmosphere>& renderableAtmospheres,
-                           const glm::mat4& lightSpaceMatrix, const PlanetaryRing* ring) const;
+    void RenderAtmospheres(const RenderableSceneComponent& component) const;
+    /** Compass points and body/star names projected onto `_observeFrame`; `textScale` grows them for a headset. */
+    void RenderObserveLabels(float width, float height, float textScale);
+    void RenderOneilAtmosphere(const RenderableAtmosphere& renderableAtmosphere,
+                               const RenderableSceneComponent& component) const;
+    void RenderPbrAtmosphere(const RenderableAtmosphere& renderableAtmosphere,
+                             const RenderableSceneComponent& component) const;
+    /** Camera position for the current eye (XR-correct), from the view matrix. */
+    glm::vec3 CameraWorldPosition() const;
     void RenderClouds(Clouds* renderableClouds, const glm::mat4& lightSpaceMatrix) const;
     void RenderPlanetaryRing(const Shader& shader, PlanetaryRing* planetaryRing, const glm::mat4& lightSpaceMatrix) const;
     void RenderStar() const;
@@ -104,6 +136,16 @@ private:
     void ConfigureMainPlanetShader(const RenderableSceneComponent& renderableComponent);
     /** Upload (or clear) the one moon currently casting an umbra on this component's planet. */
     void ConfigureEclipseUmbra(const RenderableSceneComponent& renderableComponent);
+    struct EclipseUmbra {
+        bool active = false;
+        glm::vec3 casterCenter{0.0f};
+        float casterRadius = 0.0f;
+        float starRadius = 0.0f;
+    };
+    EclipseUmbra ComputeEclipseUmbra(const RenderableSceneComponent& renderableComponent) const;
+
+    // View state of the last RenderObserveSky(), reused to project HUD labels onto the same frame.
+    ObserveSky::Frame _observeFrame;
 
     // Pre-allocated containers for RenderHints to eliminate per-frame allocations
     mutable std::deque<wchar_t> distanceInfoCache;

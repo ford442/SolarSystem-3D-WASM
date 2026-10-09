@@ -36,6 +36,14 @@ double JulianDateNowUtc();
 double GreenwichMeanSiderealTimeDeg(double julianDate);
 
 /**
+ * TT − UT1 in seconds (Espenak & Meeus polynomials, 1800–2150 with a parabola outside). It is
+ * what turns a UTC-ish Julian Date into the Julian Ephemeris Day the lunar series wants: the
+ * Moon moves ~0.55 deg/h, so leaving the ~69 s (2020s) out would shift an eclipse's timing by
+ * a minute. Not used for the planets, which move too slowly for it to show.
+ */
+double DeltaTSeconds(double julianDateUt);
+
+/**
  * Heliocentric ecliptic lon/lat/radius for Mercury–Vesta; Sun/unknown return zeros.
  * Delegates to the active backend (see SetBackend); the default is Standish Table 1.
  */
@@ -63,8 +71,9 @@ public:
      * Axes are the J2000 ecliptic, same convention as PlanetHeliocentric: x toward the
      * equinox, z toward the north ecliptic pole. The Standish backend implements this for
      * the moons whose catalog rows carry real (non-placeholder) node and periapsis angles
-     * — see kKeplerianSatellites in Ephemeris.cpp. Every other satellite returns false and
-     * keeps its circular SatelliteOrbit offset.
+     * — see kKeplerianSatellites in Ephemeris.cpp. The Moon (12) is the exception: it comes from
+     * the Meeus ch. 47 lunar series (LunarTheory), not from catalog elements. Every other
+     * satellite returns false and keeps its circular SatelliteOrbit offset.
      */
     virtual bool SatelliteParentRelative(int /*satelliteId*/, double /*julianDate*/,
                                          double outXyzAu[3]) const {

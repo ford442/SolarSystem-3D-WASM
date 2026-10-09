@@ -1,5 +1,4 @@
 #version 300 es
-precision highp float;
 
 layout (location = 0) in vec3 aPos;
 layout (location = 1) in vec3 aNormal;
@@ -14,6 +13,8 @@ uniform mat4 projection;
 uniform mat4 view;
 uniform float zCoef;
 
+#include "common/log_depth.glsl"
+
 void main() {
     vec4 worldPos = aInstanceMatrix * vec4(aPos, 1.0);
     vFragPos = worldPos.xyz;
@@ -21,6 +22,5 @@ void main() {
     vColor = aInstanceColor.rgb;
 
     gl_Position = projection * view * worldPos;
-    gl_Position.z = log2(max(1e-6, gl_Position.w + 1.0)) * zCoef - 1.0;
-    gl_Position.z *= gl_Position.w;
+    gl_Position = ApplyLogDepth(gl_Position, zCoef);
 }

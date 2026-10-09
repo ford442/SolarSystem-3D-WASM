@@ -26,6 +26,8 @@ out float fLogZ;
 out vec3 vEyePos;
 out vec3 vLight0Pos;
 
+#include "common/log_depth.glsl"
+
 void main() {
     fWorldPosition = vec3(model * vec4(aPos, 1.0));
     fPosition = vec3(aPos.x, 0.0, aPos.z);
@@ -40,9 +42,7 @@ void main() {
     texCoords = aTexCoords;
     gl_Position = projection * view * model * vec4(aPos.x, 0.0, aPos.z, 1.0);
 
-    // Log z-buffer [логарифмический z-буфер]
-    gl_Position.z = log2(max(1e-6, gl_Position.w + 1.0)) * zCoef - 1.0;
-    gl_Position.z *= gl_Position.w;
+    gl_Position = ApplyLogDepth(gl_Position, zCoef);
 
     fLogZ = 1.0 + gl_Position.w;
 }

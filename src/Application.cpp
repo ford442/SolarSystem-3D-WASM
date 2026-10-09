@@ -88,8 +88,18 @@ void Application::RunOneFrame() {
     _deltaTime = currentFrame - _lastFrame;
     _lastFrame = currentFrame;
 
-    gSimState->simDeltaSeconds = gSimState->timePaused ? 0.0f : static_cast<float>(_deltaTime) * gSimState->timeScale;
-    OrbitLayout::Advance(gSimState->simDeltaSeconds);
+    if (_observe.active) {
+        // Sky watching runs on wall-clock UTC at timeRate, not the orrery's 3 days per second.
+        gSimState->simDeltaSeconds = 0.0f;
+        if (!gSimState->timePaused) {
+            OrbitLayout::SetJulianDate(OrbitLayout::GetJulianDate() +
+                                       _deltaTime * _observe.timeRate / 86400.0);
+        }
+        UpdateObserveFrame();
+    } else {
+        gSimState->simDeltaSeconds = gSimState->timePaused ? 0.0f : static_cast<float>(_deltaTime) * gSimState->timeScale;
+        OrbitLayout::Advance(gSimState->simDeltaSeconds);
+    }
 #ifdef __EMSCRIPTEN__
     RefreshPlanetProxyPositions();
 #endif
@@ -119,10 +129,14 @@ void Application::RunOneFrame() {
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
     RenderFrameContent();
 
-    if (_renderer.isRenderPlanetStarDistances || _renderer.isRenderSatelliteDistances)
-        _renderer.RenderPlanetSatelliteStarDistances();
-    if (_renderer.isRenderHints)
-        _renderer.RenderHints();
+    if (_observe.active) {
+        _renderer.RenderObserveHud();
+    } else {
+        if (_renderer.isRenderPlanetStarDistances || _renderer.isRenderSatelliteDistances)
+            _renderer.RenderPlanetSatelliteStarDistances();
+        if (_renderer.isRenderHints)
+            _renderer.RenderHints();
+    }
 
     TextureLoadingQueue::GetInstance().ProcessQueue();
     _renderer.RenderTextureLoadingProgress();
@@ -143,6 +157,11 @@ void Application::RunOneFrame() {
 }
 
 void Application::RenderFrameContent() {
+    if (_observe.active) {
+        // Ground-level sky pass only: no scene meshes, orbit lines, glow or lens flare.
+        _renderer.RenderObserveSky();
+        return;
+    }
     _renderer.ConfigureMainShaders();
     _renderer.skyBox->Render(*_renderer.mainSkyBoxShader);
     _renderer.RenderOrbitPaths();
@@ -150,6 +169,7 @@ void Application::RenderFrameContent() {
     _renderer.RenderXrPointers();
     _renderer.RenderStarCorona();
     _renderer.ProcessSceneComponentsRendering();
+    _renderer.RenderStarCoronaVolume();
     _renderer.RenderAsteroidField();
     _renderer.RenderMagneticFields();
 #ifdef __EMSCRIPTEN__
@@ -204,9 +224,11 @@ void Application::InitSceneObjects() {
 
     StartSearchNearestPlanet();
     StartPlayBackgroundMusic();
+    ApplyObserveEnvOverride();
 }
 
 void Application::FocusPlanetByIndex(int idx) {
+    if (_observe.active) return; // the viewer stays on the ground in Observe
     StopMissionFollow();
     idx = std::clamp(idx, 0, OrbitLayout::kBodyCount - 1);
     _focusedPlanetIndex = idx;
@@ -288,6 +310,7 @@ void Application::FocusMissionByIndex(int idx) {
         StopMissionFollow();
         return;
     }
+    if (_observe.active) return; // the viewer stays on the ground in Observe
     if (idx >= static_cast<int>(_missionCatalog.missions.size())) {
         return;
     }

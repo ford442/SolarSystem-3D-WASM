@@ -1,6 +1,7 @@
 #include "Ephemeris.h"
 
 #include "../Solar_System/BodyCatalog.generated.h"
+#include "LunarTheory.h"
 
 #include <algorithm>
 #include <chrono>
@@ -16,6 +17,7 @@ constexpr double kDegToRad = kPi / 180.0;
 constexpr double kRadToDeg = 180.0 / kPi;
 constexpr double kDaysPerCentury = 36525.0;
 constexpr double kKmPerAu = 149597870.7;
+constexpr int kMoonId = 12;
 
 // Catalog satellites whose orbit.keplerian row carries real angles for all six elements.
 // Every other satellite row still ships OmegaDeg / omegaDeg / M0Deg = 0 placeholders, which
@@ -23,17 +25,17 @@ constexpr double kKmPerAu = 149597870.7;
 // SatelliteOrbit offset. Add an id here once its catalog row gets measured angles.
 //
 // Two documented approximations:
+// The Moon is not in this list: it comes from the Meeus ch. 47 series (LunarTheory), because
+// mean elements cannot get its evection, variation and annual equation (up to 2.4 deg).
+//
 //  - Elements are J2000-epoch mean elements. The node and periapsis rates the row carries
-//    are applied (the Moon's are what make its eclipse seasons land on the right month);
-//    the large periodic terms are not — evection (1.27 deg) and variation (0.66 deg) for
-//    the Moon, the Laplace resonance for the Galileans. Good enough to put a shadow on the
-//    right day, not to time a contact.
-//  - We treat i / Omega / omega as referred to the J2000 ecliptic. For the Moon and Triton
-//    that is the published frame. For the Galileans and Titan the published frame is the
+//    are applied; the large periodic terms are not — the Laplace resonance for the Galileans.
+//    Good enough to put a shadow on the right day, not to time a contact.
+//  - We treat i / Omega / omega as referred to the J2000 ecliptic. For Triton that is the
+//    published frame. For the Galileans and Titan the published frame is the
 //    parent's Laplace plane, so their orbit planes come out tilted by the parent's own
 //    obliquity (~3.1 deg for Jupiter, ~26.7 deg for Saturn) from the truth.
 constexpr int kKeplerianSatellites[] = {
-    12, // Moon
     15, // Io
     16, // Europa
     17, // Ganymede
@@ -220,6 +222,54 @@ HelioLB keplerPosition(const KeplerBody& body, double jd) {
 
 } // namespace
 
+double DeltaTSeconds(double jd) {
+    // Espenak & Meeus, "Five Millennium Canon of Solar Eclipses" polynomials. y is a decimal year.
+    const double y = 2000.0 + (jd - kJ2000) / 365.25;
+    if (y < 1800.0 || y >= 2150.0) {
+        const double u = (y - 1820.0) / 100.0;
+        return -20.0 + 32.0 * u * u;
+    }
+    if (y < 1860.0) {
+        const double t = y - 1800.0;
+        return 13.72 - 0.332447 * t + 0.0068612 * t * t + 0.0041116 * t * t * t -
+               0.00037436 * t * t * t * t + 0.0000121272 * std::pow(t, 5) -
+               0.0000001699 * std::pow(t, 6) + 0.000000000875 * std::pow(t, 7);
+    }
+    if (y < 1900.0) {
+        const double t = y - 1860.0;
+        return 7.62 + 0.5737 * t - 0.251754 * t * t + 0.01680668 * t * t * t -
+               0.0004473624 * t * t * t * t + std::pow(t, 5) / 233174.0;
+    }
+    if (y < 1920.0) {
+        const double t = y - 1900.0;
+        return -2.79 + 1.494119 * t - 0.0598939 * t * t + 0.0061966 * t * t * t -
+               0.000197 * t * t * t * t;
+    }
+    if (y < 1941.0) {
+        const double t = y - 1920.0;
+        return 21.20 + 0.84493 * t - 0.076100 * t * t + 0.0020936 * t * t * t;
+    }
+    if (y < 1961.0) {
+        const double t = y - 1950.0;
+        return 29.07 + 0.407 * t - t * t / 233.0 + t * t * t / 2547.0;
+    }
+    if (y < 1986.0) {
+        const double t = y - 1975.0;
+        return 45.45 + 1.067 * t - t * t / 260.0 - t * t * t / 718.0;
+    }
+    if (y < 2005.0) {
+        const double t = y - 2000.0;
+        return 63.86 + 0.3345 * t - 0.060374 * t * t + 0.0017275 * t * t * t +
+               0.000651814 * std::pow(t, 4) + 0.00002373599 * std::pow(t, 5);
+    }
+    if (y < 2050.0) {
+        const double t = y - 2000.0;
+        return 62.92 + 0.32217 * t + 0.005589 * t * t;
+    }
+    const double u = (y - 1820.0) / 100.0;
+    return -20.0 + 32.0 * u * u - 0.5628 * (2150.0 - y);
+}
+
 double JulianDateFromYmd(int year, int month, int day) {
     // Meeus / Fliegel–Van Flandern civil calendar → Julian Date at 0h UT.
     const int a = (14 - month) / 12;
@@ -283,6 +333,11 @@ public:
     bool SatelliteParentRelative(int satelliteId, double julianDate,
                                  double outXyzAu[3]) const override {
         outXyzAu[0] = outXyzAu[1] = outXyzAu[2] = 0.0;
+        if (satelliteId == kMoonId) {
+            // Meeus ch. 47 wants Julian Ephemeris Days; our dates are UTC-ish (≈ UT1).
+            LunarTheory::MoonGeocentricJ2000Au(julianDate + DeltaTSeconds(julianDate) / 86400.0, outXyzAu);
+            return true;
+        }
         if (!hasKeplerianSolution(satelliteId)) {
             return false;
         }

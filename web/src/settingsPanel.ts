@@ -1,4 +1,5 @@
 import { copyShareableLink, type DeepLinkViewState } from './deepLink';
+import { eventVisibilitySuffix } from './observe';
 import { bindSkyEventChip } from './skyEvents';
 import {
     isoDateFromJulianDate,
@@ -59,6 +60,11 @@ export interface SettingsPanelInitOptions {
     deepLink: DeepLinkViewState;
     isMobileDevice: boolean;
     onSettingsChanged?: (field: SettingsChangeField) => void;
+    /**
+     * Observe mode only: fraction of a day for the UTC time field, so setting the date keeps the
+     * time of day instead of snapping to 00:00 UTC. Returns 0 outside Observe.
+     */
+    getObserveTimeOfDayDays?: () => number;
 }
 
 function isQualityPreset(value: unknown): value is QualityPreset {
@@ -104,7 +110,7 @@ function formatTimeScale(scale: number): string {
 }
 
 export function initSettingsPanel(options: SettingsPanelInitOptions): void {
-    const { elements, runtime, deepLink, isMobileDevice } = options;
+    const { elements, runtime, deepLink, isMobileDevice, getObserveTimeOfDayDays } = options;
     const {
         settingsPanel,
         settingsToggle,
@@ -180,7 +186,7 @@ export function initSettingsPanel(options: SettingsPanelInitOptions): void {
             return;
         }
         simulationDateInput.value = isoDate;
-        runtime.setSimulationEpoch(jd);
+        runtime.setSimulationEpoch(jd + (runtime.getObserveMode() ? (getObserveTimeOfDayDays?.() ?? 0) : 0));
         settingsStatus.textContent = statusMessage ?? `Date set to ${isoDate}`;
         persistPanelSettings();
     }
@@ -302,7 +308,10 @@ export function initSettingsPanel(options: SettingsPanelInitOptions): void {
         runtime.setMusicVolume(musicVolumePercent / 100);
     }
 
-    if (deepLink.camera) {
+    if (deepLink.mode === 'observe') {
+        // Observe opens on the ground at a site (observe.ts); a fly-through pose or focus target
+        // in the same link would only fight it.
+    } else if (deepLink.camera) {
         runtime.setCameraPose(
             deepLink.camera.x,
             deepLink.camera.y,
@@ -416,6 +425,7 @@ export function initSettingsPanel(options: SettingsPanelInitOptions): void {
             getFocusedPlanetIndex: () => runtime.getFocusedPlanetIndex(),
             getFocusedMission: () => runtime.getFocusedMission(),
             getCameraPose: () => runtime.getCameraPose(),
+            getObserveState: () => runtime.getObserveState(),
             isoDateFromJulianDate,
         })
             .then(() => {
@@ -460,6 +470,7 @@ export function initSettingsPanel(options: SettingsPanelInitOptions): void {
         jumpButton: skyEventJump,
         landmarkButton: skyEventLandmark,
         getNextSkyEvent: () => runtime.getNextSkyEvent(),
+        getTextSuffix: () => eventVisibilitySuffix(runtime.getObserveMode() ? runtime.getObserveState() : null),
         setSimulationEpoch: (jd) => runtime.setSimulationEpoch(jd),
         onJumped: (julianDate) => {
             simulationDateInput.value = isoDateFromJulianDate(julianDate);

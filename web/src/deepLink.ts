@@ -15,6 +15,10 @@ export interface DeepLinkViewState {
     mission?: string;
     tour?: string;
     tourStep?: number;
+    /** `?mode=observe` opens straight into Observe mode (camera on Earth). */
+    mode?: 'explore' | 'observe';
+    /** Observe-mode site, view, field of view and time rate (`lat`, `lon`, `az`, `el`, `fov`, `rate`). */
+    observer?: DeepLinkObserver;
     camera?: {
         x: number;
         y: number;
@@ -24,7 +28,26 @@ export interface DeepLinkViewState {
     };
 }
 
+export interface DeepLinkObserver {
+    lat?: number;
+    lon?: number;
+    az?: number;
+    el?: number;
+    fov?: number;
+    rate?: number;
+}
+
 export interface DeepLinkRuntimeReaders {
+    /** Observe-mode state; when `active`, the link opens in Observe instead of a fly-through pose. */
+    getObserveState?: () => {
+        active: boolean;
+        latDeg: number;
+        lonDeg: number;
+        azDeg: number;
+        elDeg: number;
+        fovDeg: number;
+        timeRate: number;
+    } | null;
     getQualityPreset?: () => QualityPreset;
     getTimeScale?: () => number;
     getPaused?: () => boolean;
@@ -134,6 +157,30 @@ function parseTourId(value: string | null): string | undefined {
     return parseMissionId(value);
 }
 
+function parseMode(value: string | null): 'explore' | 'observe' | undefined {
+    if (!value) return undefined;
+    const normalized = value.toLowerCase();
+    return normalized === 'observe' || normalized === 'explore' ? normalized : undefined;
+}
+
+function parseObserver(params: URLSearchParams): DeepLinkObserver | undefined {
+    const lat = parseFiniteNumber(params.get('lat'));
+    const lon = parseFiniteNumber(params.get('lon'));
+    const az = parseFiniteNumber(params.get('az'));
+    const el = parseFiniteNumber(params.get('el'));
+    const fov = parseFiniteNumber(params.get('fov'));
+    const rate = parseFiniteNumber(params.get('rate'));
+    const observer: DeepLinkObserver = {
+        lat: lat !== undefined && lat >= -90 && lat <= 90 ? lat : undefined,
+        lon: lon !== undefined && lon >= -360 && lon <= 360 ? lon : undefined,
+        az,
+        el: el !== undefined && el >= -90 && el <= 90 ? el : undefined,
+        fov: fov !== undefined && fov >= 1 && fov <= 120 ? fov : undefined,
+        rate: rate !== undefined && rate >= 0 && rate <= 1e7 ? rate : undefined,
+    };
+    return Object.values(observer).some((value) => value !== undefined) ? observer : undefined;
+}
+
 function roundCoord(value: number): number {
     return Math.round(value * 100) / 100;
 }
@@ -158,6 +205,8 @@ export function parseDeepLinkFromUrl(search = window.location.search): DeepLinkV
     const mission = parseMissionId(params.get('mission') ?? params.get('probe'));
     const tour = parseTourId(params.get('tour'));
     const tourStep = parseFiniteNumber(params.get('step'));
+    const mode = parseMode(params.get('mode'));
+    const observer = parseObserver(params);
 
     const x = parseFiniteNumber(params.get('x'));
     const y = parseFiniteNumber(params.get('y'));
@@ -185,6 +234,8 @@ export function parseDeepLinkFromUrl(search = window.location.search): DeepLinkV
         tourStep: tourStep !== undefined && Number.isInteger(tourStep) && tourStep >= 0
             ? tourStep
             : undefined,
+        mode,
+        observer,
         camera,
     };
 }
@@ -242,6 +293,20 @@ export function buildShareableUrl(
     const magneticFields = readers.getMagneticFields?.();
     if (magneticFields !== undefined) {
         url.searchParams.set('fields', magneticFields ? '1' : '0');
+    }
+
+    // In Observe the view is a site plus a look direction; a fly-through pose or focus target
+    // would mean nothing (and `mode=observe` ignores them on load anyway).
+    const observe = readers.getObserveState?.();
+    if (observe?.active) {
+        url.searchParams.set('mode', 'observe');
+        url.searchParams.set('lat', String(Math.round(observe.latDeg * 10000) / 10000));
+        url.searchParams.set('lon', String(Math.round(observe.lonDeg * 10000) / 10000));
+        url.searchParams.set('az', String(roundAngle(observe.azDeg)));
+        url.searchParams.set('el', String(roundAngle(observe.elDeg)));
+        url.searchParams.set('fov', String(roundAngle(observe.fovDeg)));
+        url.searchParams.set('rate', String(observe.timeRate));
+        return url.toString();
     }
 
     const focusedPlanet = readers.getFocusedPlanetIndex?.() ?? -1;

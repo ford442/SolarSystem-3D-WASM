@@ -128,7 +128,7 @@ The CMakeLists.txt has separate configurations for EMSCRIPTEN vs native builds, 
 - Web receives `WebResourceFetcher` events and updates progress bar
 
 **Asset Resolution**
-- Shaders, fonts, icons preloaded into Emscripten virtual filesystem via `--preload-file`
+- Shaders, fonts, icons, and the baked atmosphere LUTs (`resource/atmosphere/`) preloaded into Emscripten virtual filesystem via `--preload-file`
 - Textures lazy-loaded at runtime via `WebResourceFetcher`
 - Web sets `window.__solarSystemAssetBase` for runtime asset fetch base URL
 
@@ -138,7 +138,8 @@ The CMakeLists.txt has separate configurations for EMSCRIPTEN vs native builds, 
 
 ## Key Architectural Decisions
 
-- **Catalog-driven celestial bodies**: planets and moons are `CatalogBody`/`CatalogSatellite` rows from `planets.catalog.json`, and all of them bind their material through `CatalogMaterial::BindMaterial`. The only dedicated classes left are for the Sun, the ring meshes, cloud shells, and atmospheres (list in ARCHITECTURE §9.1).
+- **Catalog-driven celestial bodies**: planets and moons are `CatalogBody`/`CatalogSatellite` rows from `planets.catalog.json`, and all of them bind their material through `CatalogMaterial::BindMaterial`. The only dedicated classes left are for the Sun, the ring meshes, cloud shells, and atmospheres (list in ARCHITECTURE §9.1). Atmosphere numbers are catalog data too (`render.atmosphere`, ARCHITECTURE §9.2).
+- **Baked atmosphere LUTs**: `render.atmosphere.physical` is baked by `tools/atmosphere_lut_baker` into `resource/atmosphere/*.ktx2`, which are committed. After editing it, rerun the generator and the baker; the `AtmosphereLutsFresh` ctest fails on a stale bake.
 - **Poses are functions of the date**: planets (`OrbitLayout`), moons (`SatelliteOrbit::EphemerisOffset` / `MeanAnomalyAt`), and spins (`SpinDegreesAt`) derive from `OrbitLayout::GetJulianDate()`. Do not add per-frame accumulators — they break date-scrubber jumps.
 - **Lazy texture loading**: Large DDS textures are not preloaded; `WebResourceFetcher` fetches them on-demand to avoid blocking initialization.
 - **No blocking fetches**: every download goes through callback-based `WebResourceFetcher::DownloadFile` (`emscripten_async_wget2`), and C++ only ever reads files that are already resident in MEMFS. That keeps the build free of `ASYNCIFY`/`JSPI` and lets it use native `-fwasm-exceptions`. Anything that needs a new asset must stage it through `DownloadFile` (core resources, a planet manifest, or `TextureLoadingQueue`) before the code that reads it runs — see `docs/plans/PORTING_GUIDE.md` §3b.
@@ -156,17 +157,21 @@ The CMakeLists.txt has separate configurations for EMSCRIPTEN vs native builds, 
 4. Add Keplerian elements to `Ephemeris.cpp` if the body is not in the Standish table
 5. No factory edit: `InitStarSystem()` / `MakePlanetInitFunc` construct any catalog primary via `InitCatalogSystem`
 
+An atmosphere is a `render.atmosphere` row block, on a planet or a moon (Titan is the moon example): `oneil` for the cheap shell, plus `physical` for the LUT path — then build the `atmosphere_lut_baker` target (`-DSOLARSYSTEM_BUILD_TOOLS=ON`) and run `atmosphere_lut_baker --out resource/atmosphere` from the repo root (ARCHITECTURE §9.2).
+
 Ceres, Vesta, Mercury–Pluto, the Moon, and the Galileans are the worked examples. Moons need `parent`, `orbit.keplerian` (elements plus the `OmegaDotDegPerDay` / `omegaDotDegPerDay` secular rates), and `orbit.sceneOrbitRadius`. A moon is only *placed* from those elements once its index is listed in `kKeplerianSatellites` in `Ephemeris.cpp`; until then it keeps the circular `SatelliteOrbit` offset, which is the right default while a row still carries placeholder node/periapsis angles. See docs/ARCHITECTURE.md § 11. `scripts/make_placeholder_dds.py` writes the stand-in textures that `resource/textures_low/` ships until real ones are uploaded.
 
 **Hand-written path (Sun, ring meshes, or a shader that does not fit catalog flags).**
 1. Keep or add a dedicated class (e.g., `Sun`, `SaturnRing`)
-2. Register atmosphere/ring *numbers* in `src/Solar_System/SystemVisuals.h` rather than a new `Init*System`
+2. Register ring *numbers* in `src/Solar_System/SystemVisuals.h` rather than a new `Init*System`
 3. Add textures/models to `resource/` and ensure they are accessible to the loader
 
 ### Modifying Shaders
 - Shaders are in `resource/shaders/`
 - Changes are reflected immediately in web (dev mode with Vite)
 - Every shader is authored once as `#version 300 es`; native `Shader.cpp` rewrites the directive to `#version 460 core` at load (ARCHITECTURE §9.1)
+- Shared helpers live in `resource/shaders/common/` and are pulled in with `#include "common/x.glsl"` (expanded once per stage by `ShaderSource`, with `#line` so errors name the right file); `common/preamble.glsl` supplies the precision defaults. Don't paste a helper into a shader that can include it — `test_shader_source.cpp` fails on duplicate definitions
+- `SOLARSYSTEM_SHADER_SELFTEST=1 ./build/SolarSystem` compiles every stage as both `460 core` and `300 es` and exits (under Mesa/Xvfb also set `MESA_GLSL_VERSION_OVERRIDE=460`)
 - Native reads `resource/shaders/` from disk at runtime — restart the app, no recompile needed
 
 ### Adjusting Graphics Settings (Shadows, Scattering, etc.)

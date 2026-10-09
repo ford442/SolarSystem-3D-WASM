@@ -7,6 +7,7 @@ import type {
     SolarSystemModule,
 } from './SolarSystem.js';
 import type { NextConjunction } from './conjunction.js';
+import { parseObserveStateJson, type ObserveState } from './observe.js';
 import { parseSkyEventJson, type NextSkyEvent } from './skyEvents.js';
 import { createCachedCwrapExports } from './wasmBridge.exports.js';
 import { clearWasmCallback, registerWasmCallbacks } from './wasmCallbacks.js';
@@ -20,6 +21,7 @@ import { clearWasmCallback, registerWasmCallbacks } from './wasmCallbacks.js';
 export type { PlanetIndex, QualityPreset, SettingsChangeField, ShadowQuality, OrbitScaleMode };
 export type { NextConjunction };
 export type { NextSkyEvent };
+export type { ObserveState };
 
 export interface MissionInfo {
     id: string;
@@ -141,6 +143,16 @@ export interface SolarSystemRuntime {
     getNextConjunction(): NextConjunction;
     /** Next event of any kind — conjunction, eclipse, transit or shadow transit. */
     getNextSkyEvent(): NextSkyEvent;
+    /** Observe mode: camera on Earth at a lat/lon looking at the sky (see observe.ts). */
+    setObserveMode(enabled: boolean): void;
+    getObserveMode(): boolean;
+    setObserverSite(latDeg: number, lonDeg: number, altM?: number): void;
+    /** Azimuth from north through east, elevation above the horizon, degrees. */
+    setObserveView(azimuthDeg: number, elevationDeg: number): void;
+    setObserveFov(fovDeg: number): void;
+    /** Simulated seconds per wall second while running (1 = real time). */
+    setObserveTimeRate(rate: number): void;
+    getObserveState(): ObserveState;
     focusMission(index: number): void;
     getFocusedMissionIndex(): number;
     getMissionCount(): number;
@@ -228,6 +240,13 @@ export function createSolarSystemRuntime(instance: SolarSystemModule): SolarSyst
             };
         },
         getNextSkyEvent: () => parseSkyEventJson(exports.getNextSkyEventJson()),
+        setObserveMode: (enabled) => exports.setObserveMode(enabled ? 1 : 0),
+        getObserveMode: () => exports.getObserveMode() !== 0,
+        setObserverSite: (latDeg, lonDeg, altM = 0) => exports.setObserverSite(latDeg, lonDeg, altM),
+        setObserveView: (azimuthDeg, elevationDeg) => exports.setObserveView(azimuthDeg, elevationDeg),
+        setObserveFov: (fovDeg) => exports.setObserveFov(fovDeg),
+        setObserveTimeRate: (rate) => exports.setObserveTimeRate(rate),
+        getObserveState: () => parseObserveStateJson(exports.getObserveStateJson()),
         focusMission: (index) => exports.focusMission(index),
         getFocusedMissionIndex: exports.getFocusedMissionIndex,
         getMissionCount: exports.getMissionCount,
@@ -287,6 +306,9 @@ export function exposeConsoleHelpers(runtime: SolarSystemRuntime): void {
     window.getNextConjunction = runtime.getNextConjunction.bind(runtime);
     window.focusMission = runtime.focusMission.bind(runtime);
     window.getFocusedMission = runtime.getFocusedMission.bind(runtime);
+    window.setObserveMode = runtime.setObserveMode.bind(runtime);
+    window.setObserverSite = runtime.setObserverSite.bind(runtime);
+    window.getObserveState = runtime.getObserveState.bind(runtime);
 }
 
 export function subscribeSettingsChanges(

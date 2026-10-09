@@ -19,7 +19,6 @@ void SaturnRing::AdjustToParent() {
     Rotate(tiltZ, glm::vec3(0, 0, 1));
     Rotate(tiltX, glm::vec3(1, 0, 0));
     UpdateRingNormal();
-    UpdateModelMatrix();
 }
 
 void SaturnRing::Render() const {

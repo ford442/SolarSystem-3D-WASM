@@ -7,9 +7,6 @@
 //
 // Copyright (c) 2004 Sean O'Neil
 //
-precision highp float;
-precision highp int;
-
 in vec3 fWorldPosition;
 in vec3 fPosition;
 in mat3 modelMat3;
@@ -59,6 +56,11 @@ uniform float SCALE_L_FACTOR;
 
 out vec4 fragColor;
 
+#include "common/raytrace.glsl"
+#include "common/ring.glsl"
+#include "common/phase.glsl"
+#include "common/tonemap.glsl"
+
 vec3 rayDirection(vec3 camPos) {
     vec3 ray = normalize(modelMat3 * fPosition - camPos);
     return ray;
@@ -79,27 +81,6 @@ vec2 rayIntersection(vec3 p, vec3 dir, float radius) {
     float far = -b + d;
 
     return vec2(near, far);
-}
-
-// Mie
-// g : ( -0.75, -0.999 )
-//      3 * ( 1 - g^2 )               1 + c^2
-// F = ----------------- * -------------------------------
-//      2 * ( 2 + g^2 )     ( 1 + g^2 - 2 * g * c )^(3/2)
-float miePhase(float g, float c, float cc) {
-    float gg = g * g;
-
-    float a = (1.0 - gg) * (1.0 + cc);
-
-    float b = 1.0 + gg - 2.0 * g * c;
-    b *= sqrt(b);
-    b *= 2.0 + gg;
-
-    return 1.5 * a / b;
-}
-
-float rayleighPhase(float cc) {
-    return 0.75 * (1.0 + cc);
 }
 
 float density(vec3 p) {
@@ -141,95 +122,6 @@ vec3 colorInScatter(vec3 o, vec3 dir, vec2 e, vec3 l) {
     return sum * (K_R * C_R * rayleighPhase(cc) + K_M * miePhase(G_M, c, cc) * mieTint) * E;
 }
 
-// https://knarkowicz.wordpress.com/2016/01/06/aces-filmic-tone-mapping-curve/
-vec3 acesFilm(const vec3 x) {
-    const float a = 2.51;
-    const float b = 0.03;
-    const float c = 2.43;
-    const float d = 0.59;
-    const float e = 0.14;
-    return clamp((x * (a * x + b)) / (x * (c * x + d ) + e), 0.0, 1.0);
-}
-
-void swap(out float left, out float right) {
-    float temp = left;
-    left = right;
-    right = temp;
-}
-
-bool solveQuadratic(float a, float b, float c, out float x0, out float x1) {
-    float discr = b * b - 4.0 * a * c;
-
-    if (discr < 0.0)
-    return false;
-
-    else if (discr == 0.0) {
-        x0 = x1 = - 0.5 * b / a;
-    }
-    else {
-        float q = (b > 0.0) ? -0.5 * (b + sqrt(discr)) : -0.5 * (b - sqrt(discr));
-        x0 = q / a;
-        x1 = c / q;
-    }
-
-    if (x0 > x1)
-        swap(x0, x1);
-
-    return true;
-}
-
-// https://www.scratchapixel.com/lessons/3d-basic-rendering/minimal-ray-tracer-rendering-simple-shapes/ray-sphere-intersection
-bool intersectSphere(vec3 dir) {
-    float t0, t1;
-
-    // Analytic solution
-    vec3 L = fWorldPosition - ringParentPlanetCenter;
-    float a = dot(dir, dir);
-    float b = 2.0 * dot(dir, L);
-    float c = dot(L, L) - ringParentPlanetRadiusSquared;
-
-    if (!solveQuadratic(a, b, c, t0, t1))
-    return false;
-
-    if (t0 > t1)
-        swap(t0, t1);
-
-    if (t0 < 0.0) {
-        t0 = t1; // If t0 is negative, let's use t1 instead
-        if (t0 < 0.0) { // Both t0 and t1 are negative
-            return false;
-        }
-    }
-
-    return true;
-}
-
-bool intersectPlane(vec3 n, vec3 p0, vec3 l0, vec3 l, out float t) {
-    // Assuming vectors are all normalized
-    float denom = dot(n, l);
-    if (denom > 1e-6) {
-        vec3 p0l0 = p0 - l0;
-        t = dot(p0l0, n) / denom;
-        return (t >= 0.0);
-    }
-
-    return false;
-}
-
-// https://www.scratchapixel.com/lessons/3d-basic-rendering/minimal-ray-tracer-rendering-simple-shapes/ray-plane-and-ray-disk-intersection
-bool intersectDisk(vec3 n, vec3 p0, float radius, vec3 l0, vec3 l, out float intersectSquared) {
-    float t = 0.0;
-    if (intersectPlane(n, p0, l0, l, t)) {
-        vec3 p = l0 + l * t;
-        vec3 v = p - p0;
-        float d2 = dot(v, v);
-        intersectSquared = sqrt(d2);
-        return d2 <= radius * radius;
-    }
-
-    return false;
-}
-
 float CalculateShadow(vec4 fragPosLightSpace) {
     // Perform perspective divide
     vec3 projCoords = fragPosLightSpace.xyz / fragPosLightSpace.w;
@@ -248,27 +140,19 @@ float CalculateShadow(vec4 fragPosLightSpace) {
     float shadow = currentDepth - bias > closestDepth ? 1.0 : 0.0;
 
     if (isNearbyPlanetaryRing) {
-        if (isUseSphereIntersect && intersectSphere(normalize(lightPos - modelMat3 * fPosition)))
+        // Behind the ringed parent planet: in its shadow, not the ring's.
+        if (isUseSphereIntersect && intersectSphereAhead(fWorldPosition, normalize(lightPos - modelMat3 * fPosition),
+                                                         ringParentPlanetCenter, ringParentPlanetRadiusSquared))
             return 1.0;
 
-        float intersectSquared;
-        float NdotL = dot(ringNormal, lightDir);
-        vec3 correctRingNormal = ringNormal;
-
-        if (NdotL < 0.0)
-            correctRingNormal = -ringNormal;
-
-        if (intersectDisk(correctRingNormal, ringCenter, ringInnerOuterRadiuses.y, fWorldPosition, lightDir, intersectSquared)) {
-            if (intersectSquared > ringInnerOuterRadiuses.x) {
-                // If some planet obscures the ring
-                if (shadow > 0.0 && length(lightPos - ringCenter) - (closestDepth - bias) * farPlane > ringInnerOuterRadiuses.y) {
-                    return shadow;
-                }
-
-                float u = (intersectSquared - ringInnerOuterRadiuses.x) / (ringInnerOuterRadiuses.y - ringInnerOuterRadiuses.x);
-                vec4 ringColor = texture(ringDiffuse, vec2(u, 0.0));
-                return (ringColor.r + ringColor.g + ringColor.b) * ringColor.a;
+        float u;
+        if (RingCrossing(fWorldPosition, lightDir, lightDir, ringCenter, ringNormal, ringInnerOuterRadiuses, u)) {
+            // If some planet obscures the ring
+            if (shadow > 0.0 && length(lightPos - ringCenter) - (closestDepth - bias) * farPlane > ringInnerOuterRadiuses.y) {
+                return shadow;
             }
+
+            return RingOpacity(texture(ringDiffuse, vec2(u, 0.0)));
         }
     }
 

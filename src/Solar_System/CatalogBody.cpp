@@ -44,7 +44,6 @@ void CatalogBody::AdjustToParent(float /*timeScale*/) {
         Rotate(_entry.artTiltXDegrees, glm::vec3(1.0f, 0.0f, 0.0f));
     }
     Rotate(OrbitLayout::GetAxialSpinDegrees(_body), glm::vec3(0.0f, 1.0f, 0.0f));
-    UpdateModelMatrix();
 }
 
 void CatalogBody::Render() const {

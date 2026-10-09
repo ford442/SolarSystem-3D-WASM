@@ -19,6 +19,17 @@ struct QualityTierSettings {
     int magneticBloomPasses;
     int asteroidInstanceCount;
     TextureLodTier maxTextureLodTier;
+    // LUT-based atmosphere (atmospherePbr.fs) on bodies whose catalog row has a `physical`
+    // block; atmosphereSteps is the view-ray sample count. Off = the O'Neil shell.
+    bool enablePbrAtmosphere;
+    int atmosphereSteps;
+    // Instanced corona slices (starCoronaVolume.*), perpendicular to the camera->Sun axis
+    // (view-aligned inside the corona). Off = the flat billboard.
+    bool enableVolumetricCorona;
+    int coronaSlices;
+    // How many of the brightest catalog stars Observe mode draws (the list is sorted by
+    // magnitude, so this is a prefix). Planets, Sun and Moon are always drawn.
+    int observeStarCount;
     const char* name;
 };
 

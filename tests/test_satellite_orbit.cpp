@@ -39,9 +39,10 @@ TEST(SatelliteOrbitTest, PlaceholderRowsKeepTheCircularOffset) {
 }
 
 TEST(SatelliteOrbitTest, OffsetRadiusStaysNearTheCatalogArtRadius) {
-    // The AU vector is rescaled so semi-major axis maps onto sceneOrbitRadius. Eccentricity
-    // survives that (the Moon's e = 0.055), so the radius should hover within a few percent
-    // of the art radius rather than sitting exactly on it.
+    // The AU vector is rescaled so the catalog semi-major axis (384,400 km) maps onto
+    // sceneOrbitRadius. The real Moon's distance swings between ~356,400 km (perigee) and
+    // ~406,700 km (apogee) and the swing varies month to month, so the radius should hover
+    // within those bounds rather than sitting exactly on the art radius or on a*(1 +/- e).
     const BodyCatalog::Entry& moon = Row(kMoonIndex);
     float minRadius = 1.0e9f;
     float maxRadius = 0.0f;
@@ -54,8 +55,11 @@ TEST(SatelliteOrbitTest, OffsetRadiusStaysNearTheCatalogArtRadius) {
         maxRadius = std::max(maxRadius, radius);
     }
 
-    EXPECT_NEAR(minRadius, moon.sceneOrbitRadius * (1.0f - moon.keplerian.e), 0.2f);
-    EXPECT_NEAR(maxRadius, moon.sceneOrbitRadius * (1.0f + moon.keplerian.e), 0.2f);
+    const float art = moon.sceneOrbitRadius;
+    EXPECT_GT(minRadius, art * 356000.0f / 384400.0f);
+    EXPECT_LT(minRadius, art * 0.97f);   // it does swing: a month always passes through a perigee
+    EXPECT_GT(maxRadius, art * 1.03f);
+    EXPECT_LT(maxRadius, art * 406800.0f / 384400.0f);
 }
 
 TEST(SatelliteOrbitTest, OffsetLeavesTheParentEquatorialPlane) {

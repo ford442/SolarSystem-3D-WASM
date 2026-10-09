@@ -1,7 +1,4 @@
 #version 300 es
-precision highp float;
-precision highp int;
-
 in vec3 vFragPos;
 in vec2 vTexCoords;
 in vec3 vTangentLightPos;
@@ -50,162 +47,15 @@ uniform vec2 ringInnerOuterRadiuses; // x = Inner, y = Outer
 
 out vec4 fragColor;
 
-void swap(out float left, out float right) {
-    float temp = left;
-    left = right;
-    right = temp;
-}
+#include "common/raytrace.glsl"
+#include "common/ring.glsl"
+#include "common/eclipse.glsl"
+#include "common/shadow_pcf.glsl"
 
-bool solveQuadratic(float a, float b, float c, out float x0, out float x1) {
-    float discr = b * b - 4.0 * a * c;
-
-    if (discr < 0.0)
-        return false;
-
-    else if (discr == 0.0) {
-        x0 = x1 = - 0.5 * b / a;
-    }
-    else {
-        float q = (b > 0.0) ? -0.5 * (b + sqrt(discr)) : -0.5 * (b - sqrt(discr));
-        x0 = q / a;
-        x1 = c / q;
-    }
-
-    if (x0 > x1)
-        swap(x0, x1);
-
-    return true;
-}
-
-// https://www.scratchapixel.com/lessons/3d-basic-rendering/minimal-ray-tracer-rendering-simple-shapes/ray-sphere-intersection
-bool intersectSphere(vec3 dir) {
-    float t0, t1;
-
-    // Analytic solution
-    vec3 L = vFragPos - parentPlanetCenter;
-    float a = dot(dir, dir);
-    float b = 2.0 * dot(dir, L);
-    float c = dot(L, L) - parentPlanetRadiusSquared;
-
-    if (!solveQuadratic(a, b, c, t0, t1))
-        return false;
-
-    if (t0 > t1)
-        swap(t0, t1);
-
-    if (t0 < 0.0) {
-        t0 = t1; // If t0 is negative, let's use t1 instead
-        if (t0 < 0.0) { // Both t0 and t1 are negative
-            return false;
-        }
-    }
-
-    return true;
-}
-
-bool intersectPlane(vec3 n, vec3 p0, vec3 l0, vec3 l, out float t) {
-    // Assuming vectors are all normalized
-    float denom = dot(n, l);
-    if (denom > 1e-6) {
-        vec3 p0l0 = p0 - l0;
-        t = dot(p0l0, n) / denom;
-        return (t >= 0.0);
-    }
-
-    return false;
-}
-
-// https://www.scratchapixel.com/lessons/3d-basic-rendering/minimal-ray-tracer-rendering-simple-shapes/ray-plane-and-ray-disk-intersection
-bool intersectDisk(vec3 n, vec3 p0, float radius, vec3 l0, vec3 l, out float intersectSquared) {
-    float t = 0.0;
-    if (intersectPlane(n, p0, l0, l, t)) {
-        vec3 p = l0 + l * t;
-        vec3 v = p - p0;
-        float d2 = dot(v, v);
-        intersectSquared = sqrt(d2);
-        return d2 <= radius * radius;
-    }
-
-    return false;
-}
-
-/**
- * Fraction of the star still reaching this fragment past the eclipse caster, in [0, 1].
- *
- * Treats the caster as a sphere on the segment between the fragment and the star centre.
- * Inside the geometric umbra radius the star is fully blocked; out to the penumbra radius
- * it fades, both from similar triangles on the shadow cone.
- *
- * The caller passes radii already converted into the caster's own orbital scale (see
- * Application::ConfigureEclipseUmbra), so the cone here is close to the real one even
- * though the planet under it is drawn several times oversized. The planet's exaggerated
- * radius is the remaining error and it makes the shadow track across the disc faster than
- * life; it does not change whether the eclipse happens, which is decided on the CPU at
- * true scale.
- */
 float EclipseVisibility() {
     if (!hasEclipseCaster)
         return 1.0;
-
-    vec3 toLight = lightPos - vFragPos;
-    float lightDist = length(toLight);
-    if (lightDist < 1e-4)
-        return 1.0;
-    vec3 lightDirNorm = toLight / lightDist;
-
-    vec3 toCaster = eclipseCasterCenter - vFragPos;
-    float along = dot(toCaster, lightDirNorm);
-    // Caster behind this fragment, or past the star: it cannot shadow us.
-    if (along <= 0.0 || along >= lightDist)
-        return 1.0;
-
-    float miss = length(toCaster - lightDirNorm * along);
-
-    // Shadow cone cross-section at the caster's distance from the fragment.
-    float spread = along / max(lightDist - along, 1e-4);
-    float umbra = max(eclipseCasterRadius - (eclipseStarRadius - eclipseCasterRadius) * spread, 0.0);
-    float penumbra = eclipseCasterRadius + (eclipseStarRadius + eclipseCasterRadius) * spread;
-    penumbra = max(penumbra, umbra + 1e-4);
-
-    return smoothstep(umbra, penumbra, miss);
-}
-
-// https://www.youtube.com/watch?v=yn5UJzMqxj0
-float SampleShadowMap(vec2 coords, float compare) {
-    return step(compare, texture(shadowMap, coords).r);
-}
-
-float SampleShadowMapLinear(vec2 coords, float compare, vec2 texelSize) {
-    vec2 pixelPos = coords / texelSize + vec2(0.5);
-    vec2 fracPart = fract(pixelPos);
-    vec2 startTexel = (pixelPos - fracPart) * texelSize;
-
-    float blTexel = SampleShadowMap(startTexel, compare);
-    float brTexel = SampleShadowMap(startTexel + vec2(texelSize.x, 0.0), compare);
-    float tlTexel = SampleShadowMap(startTexel + vec2(0.0, texelSize.y), compare);
-    float trTexel = SampleShadowMap(startTexel + texelSize, compare);
-
-    float mixA = mix(blTexel, tlTexel, fracPart.y);
-    float mixB = mix(brTexel, trTexel, fracPart.y);
-
-    return mix(mixA, mixB, fracPart.x);
-}
-
-void ApplyPCF(out float shadow, vec3 projCoords, float currentDepth) {
-    const float NUM_SAMPLES = 3.0; // Change this (lower to increase fps or higher to increase softening)
-    const float SAMPLES_START = (NUM_SAMPLES - 1.0) / 2.0;
-    const float NUM_SAMPLES_SQUARED = NUM_SAMPLES * NUM_SAMPLES;
-
-    shadow = 0.0;
-    vec2 texelSize = 1.0 / vec2(textureSize(shadowMap, 0));
-
-    for(float y = -SAMPLES_START; y <= SAMPLES_START; y += 1.0) {
-        for(float x = -SAMPLES_START; x <= SAMPLES_START; x += 1.0) {
-            shadow += SampleShadowMapLinear(projCoords.xy + vec2(x, y) * texelSize, currentDepth - bias, texelSize);
-        }
-    }
-
-    shadow /= NUM_SAMPLES_SQUARED;
+    return EclipseVisibilityAt(vFragPos, lightPos, eclipseCasterCenter, eclipseCasterRadius, eclipseStarRadius);
 }
 
 float CalculateShadow(vec4 fragPosLightSpace) {
@@ -226,35 +76,24 @@ float CalculateShadow(vec4 fragPosLightSpace) {
     float shadow = currentDepth - bias > closestDepth ? 1.0 : 0.0;
 
     if (isNearbyPlanetaryRing) {
-        if (isUseSphereIntersect && intersectSphere(normalize(lightPos - vFragPos))) // Behind the parent planet with rings (to avoid shadow from the ring)
+        // Behind the parent planet with rings (to avoid shadow from the ring)
+        if (isUseSphereIntersect && intersectSphereAhead(vFragPos, lightDirNorm, parentPlanetCenter, parentPlanetRadiusSquared))
             return 0.0;
 
-        float intersectSquared;
-        float NdotL = dot(ringNormal, lightDirNorm);
-        vec3 correctRingNormal = ringNormal;
-
-        if (NdotL < 0.0)
-            correctRingNormal = -ringNormal;
-
-        if (intersectDisk(correctRingNormal, ringCenter, ringInnerOuterRadiuses.y, vFragPos, lightDirNorm, intersectSquared)) {
-            if (intersectSquared > ringInnerOuterRadiuses.x) {
-                // If some planet obscures the ring
-                if (shadow > 0.0 && length(lightPos - ringCenter) - closestDepth * farPlane > ringInnerOuterRadiuses.y) {
-                    // PCF won't work, because physically in the place where the penumbra from the PCF should be, there will be a shadow from the ring, and not from the planet
-                    // ApplyPCF(shadow, projCoords, currentDepth);
-                    return 1.0 - shadow;
-                }
-
-                // Very high quality shadow from the ring with alpha blending
-                float u = (intersectSquared - ringInnerOuterRadiuses.x) / (ringInnerOuterRadiuses.y - ringInnerOuterRadiuses.x);
-                vec4 ringColor = texture(ringDiffuse, vec2(u, 0.0));
-                return 1.0 - (ringColor.r + ringColor.g + ringColor.b) * ringColor.a;
+        float u;
+        if (RingCrossing(vFragPos, lightDirNorm, lightDirNorm, ringCenter, ringNormal, ringInnerOuterRadiuses, u)) {
+            // If some planet obscures the ring
+            if (shadow > 0.0 && length(lightPos - ringCenter) - closestDepth * farPlane > ringInnerOuterRadiuses.y) {
+                // PCF won't work, because physically in the place where the penumbra from the PCF should be, there will be a shadow from the ring, and not from the planet
+                return 1.0 - shadow;
             }
+
+            // Very high quality shadow from the ring with alpha blending
+            return 1.0 - RingOpacity(texture(ringDiffuse, vec2(u, 0.0)));
         }
     }
 
-    ApplyPCF(shadow, projCoords, currentDepth);
-    return shadow;
+    return ApplyPCF(shadowMap, projCoords, currentDepth - bias);
 }
 
 void main() {

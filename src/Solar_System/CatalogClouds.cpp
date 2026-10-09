@@ -25,7 +25,6 @@ void CatalogClouds::AdjustToParent(float /*timeScale*/) {
         Rotate(_parentEntry.artTiltXDegrees, glm::vec3(1.0f, 0.0f, 0.0f));
     }
     Rotate(spinDegrees, glm::vec3(0.0f, 1.0f, 0.0f));
-    UpdateModelMatrix();
 }
 
 void CatalogClouds::Render() const {

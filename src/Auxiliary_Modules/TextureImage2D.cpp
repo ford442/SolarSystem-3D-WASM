@@ -144,7 +144,10 @@ namespace {
 
         UploadResult result;
         result.hasMipmaps = uploadedLevels > 1;
-        result.allowGenerateMipmap = !layout.compressed && uploadedLevels == 1;
+        // Half-float is filterable but not colour-renderable without EXT_color_buffer_float,
+        // so glGenerateMipmap would fail on it in WebGL 2.
+        result.allowGenerateMipmap = !layout.compressed && uploadedLevels == 1 &&
+                                     uncompressed.type != GL_HALF_FLOAT;
         return result;
     }
 

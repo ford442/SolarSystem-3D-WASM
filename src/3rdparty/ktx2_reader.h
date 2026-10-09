@@ -20,6 +20,7 @@
 #include <cstddef>
 #include <cstdint>
 #include <string>
+#include <utility>
 #include <vector>
 
 namespace ktx2 {
@@ -43,8 +44,12 @@ struct File {
     std::uint32_t levelCount = 1;
     std::uint32_t supercompressionScheme = 0;
     std::vector<Level> levels;
+    // Key/value data, in file order. Values have their trailing NUL (if any) stripped.
+    std::vector<std::pair<std::string, std::string>> keyValues;
 
     bool IsCompressedBlockFormat() const;
+    /** Value for `key`, or nullptr when the file has no such entry. */
+    const std::string* FindValue(const std::string& key) const;
 };
 
 /** True if `data` starts with the 12-byte KTX2 identifier. Never throws. */

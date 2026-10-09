@@ -1,5 +1,4 @@
 #version 300 es
-precision highp float;
 
 layout (location = 0) in vec2 aCorner;
 layout (location = 1) in vec2 aUV;
@@ -15,6 +14,8 @@ uniform vec3 cameraRight;
 uniform float tailLength;
 uniform float tailWidth;
 uniform float zCoef;
+
+#include "common/log_depth.glsl"
 
 void main() {
     vec3 antiSun = nucleusPos - lightPos;
@@ -34,6 +35,5 @@ void main() {
     vFade = 1.0 - aUV.y;
 
     gl_Position = projection * view * vec4(world, 1.0);
-    gl_Position.z = log2(max(1e-6, gl_Position.w + 1.0)) * zCoef - 1.0;
-    gl_Position.z *= gl_Position.w;
+    gl_Position = ApplyLogDepth(gl_Position, zCoef);
 }

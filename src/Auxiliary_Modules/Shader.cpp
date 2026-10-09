@@ -1,53 +1,24 @@
 #include "Shader.h"
 
+#ifndef __EMSCRIPTEN__
+#include <algorithm>
+#include <filesystem>
+#endif
+
 namespace {
 
-// The shader sources in resource/shaders/ are authored once, in GLSL ES 3.00, because
-// that is the only dialect WebGL 2 accepts. The native build runs an OpenGL 4.6 core
-// context, where `#version 300 es` is only accepted via ARB_ES3_compatibility — widely
-// implemented, but not guaranteed. Rewriting the version directive to the matching
-// desktop dialect (GLSL ES 3.00 is a subset of desktop GLSL 4.60, precision qualifiers
-// included) removes that dependency. The replacement keeps the directive on its own
-// first line so compiler error line numbers still match the file on disk.
-// See docs/ARCHITECTURE.md §9.1.
-#ifndef __EMSCRIPTEN__
-constexpr const char* kNativeVersionDirective = "#version 460 core";
-
-void PatchVersionDirective(std::string& source) {
-    const size_t directive = source.find("#version");
-    if (directive == std::string::npos) {
-        return; // Empty/unreadable file; the compile error below will report it.
+// Shader sources are authored once as GLSL ES 3.00 (the only dialect WebGL 2 accepts) and
+// assembled by ShaderSource: the native build rewrites `#version 300 es` to
+// `#version 460 core`, the shared common/preamble.glsl is inserted and
+// `#include "common/…"` lines are expanded. See docs/ARCHITECTURE.md §9.1.
+ShaderSource::Result AssembleShader(const std::string& path, ShaderSource::Stage stage,
+                                    ShaderSource::Dialect dialect = ShaderSource::NativeDialect()) {
+    ShaderSource::Result result = ShaderSource::Preprocess(path, stage, dialect, ShaderSource::ReadFileFromDisk);
+    if (!result.ok) {
+        std::cerr << "ERROR::SHADER::PREPROCESS_FAILED: " << result.error << std::endl;
+        throw std::runtime_error("ERROR::SHADER::PREPROCESS_FAILED: " + result.error);
     }
-    size_t lineEnd = source.find('\n', directive);
-    if (lineEnd == std::string::npos) {
-        lineEnd = source.size();
-    }
-    const std::string original = source.substr(directive, lineEnd - directive);
-    if (original.find("es") == std::string::npos) {
-        return; // Already a desktop directive; leave it alone.
-    }
-    source.replace(directive, lineEnd - directive, kNativeVersionDirective);
-}
-#endif
-
-std::string ReadShaderFile(const std::string& path) {
-    std::ifstream file;
-    file.exceptions(std::ifstream::failbit | std::ifstream::badbit);
-    std::string source;
-    try {
-        file.open(path);
-        std::ostringstream stream;
-        stream << file.rdbuf();
-        file.close();
-        source = stream.str();
-    } catch (const std::ifstream::failure&) {
-        std::cerr << "ERROR::SHADER::FILE_NOT_SUCCESFULLY_READ: " << path << std::endl;
-        return source;
-    }
-#ifndef __EMSCRIPTEN__
-    PatchVersionDirective(source);
-#endif
-    return source;
+    return result;
 }
 
 } // namespace
@@ -71,33 +42,32 @@ void Shader::Build(const std::string& vertexPath, const std::string& fragmentPat
     (void)geometryPath;
 #endif
 
-    const std::string vertexCode = ReadShaderFile(vertexPath);
-    const std::string fragmentCode = ReadShaderFile(fragmentPath);
+    const ShaderSource::Result vertexSource = AssembleShader(vertexPath, ShaderSource::Stage::Vertex);
+    const ShaderSource::Result fragmentSource = AssembleShader(fragmentPath, ShaderSource::Stage::Fragment);
 
-    const char* vShaderCode = vertexCode.c_str();
-    const char* fShaderCode = fragmentCode.c_str();
+    const char* vShaderCode = vertexSource.code.c_str();
+    const char* fShaderCode = fragmentSource.code.c_str();
 
     const GLuint vertex = glCreateShader(GL_VERTEX_SHADER);
     glShaderSource(vertex, 1, &vShaderCode, nullptr);
     glCompileShader(vertex);
-    CheckCompileErrors(vertex, ShaderType::VertexShader, vertexPath);
+    CheckCompileErrors(vertex, ShaderType::VertexShader, vertexPath, &vertexSource);
 
     const GLuint fragment = glCreateShader(GL_FRAGMENT_SHADER);
     glShaderSource(fragment, 1, &fShaderCode, nullptr);
     glCompileShader(fragment);
-    CheckCompileErrors(fragment, ShaderType::FragmentShader, fragmentPath);
+    CheckCompileErrors(fragment, ShaderType::FragmentShader, fragmentPath, &fragmentSource);
 
 #ifndef __EMSCRIPTEN__
     GLuint geometry = 0;
     const bool hasGeometry = !geometryPath.empty();
-    std::string geometryCode;
     if (hasGeometry) {
-        geometryCode = ReadShaderFile(geometryPath);
-        const char* gShaderCode = geometryCode.c_str();
+        const ShaderSource::Result geometrySource = AssembleShader(geometryPath, ShaderSource::Stage::Geometry);
+        const char* gShaderCode = geometrySource.code.c_str();
         geometry = glCreateShader(GL_GEOMETRY_SHADER);
         glShaderSource(geometry, 1, &gShaderCode, nullptr);
         glCompileShader(geometry);
-        CheckCompileErrors(geometry, ShaderType::GeometryShader, geometryPath);
+        CheckCompileErrors(geometry, ShaderType::GeometryShader, geometryPath, &geometrySource);
     }
 #endif
 
@@ -376,7 +346,57 @@ size_t Shader::GetProgramId() const {
     return _shaderProgramID;
 }
 
-void Shader::CheckCompileErrors(size_t shader, ShaderType type, const std::string& path) {
+#ifndef __EMSCRIPTEN__
+int Shader::SelfTestDirectory(const std::string& directory) {
+    std::vector<std::filesystem::path> files;
+    for (const auto& entry : std::filesystem::directory_iterator(directory)) {
+        const std::string extension = entry.path().extension().string();
+        if (entry.is_regular_file() && (extension == ".vs" || extension == ".fs")) {
+            files.push_back(entry.path());
+        }
+    }
+    std::sort(files.begin(), files.end());
+
+    // Both dialects: the native one, and GLSL ES 3.00 exactly as the web build assembles it.
+    // Desktop drivers that expose ARB_ES3_compatibility (Mesa does) compile `#version 300 es`
+    // too, so CI catches an ES-only error without a browser.
+    const ShaderSource::Dialect dialects[] = {ShaderSource::Dialect::Desktop460, ShaderSource::Dialect::GlslEs300};
+    int failures = 0;
+    size_t compiled = 0;
+    for (const ShaderSource::Dialect dialect : dialects) {
+        const char* dialectName = dialect == ShaderSource::Dialect::Desktop460 ? "460 core" : "300 es";
+        for (const auto& file : files) {
+            const bool vertex = file.extension() == ".vs";
+            const std::string path = directory + "/" + file.filename().string();
+            try {
+                const ShaderSource::Result source =
+                    AssembleShader(path, vertex ? ShaderSource::Stage::Vertex : ShaderSource::Stage::Fragment, dialect);
+                const char* code = source.code.c_str();
+                const GLuint shader = glCreateShader(vertex ? GL_VERTEX_SHADER : GL_FRAGMENT_SHADER);
+                glShaderSource(shader, 1, &code, nullptr);
+                glCompileShader(shader);
+                try {
+                    CheckCompileErrors(shader, vertex ? ShaderType::VertexShader : ShaderType::FragmentShader,
+                                       path + " (" + dialectName + ")", &source);
+                } catch (...) {
+                    glDeleteShader(shader);
+                    throw;
+                }
+                glDeleteShader(shader);
+                ++compiled;
+            } catch (const std::exception&) {
+                ++failures; // already printed by AssembleShader / CheckCompileErrors
+            }
+        }
+    }
+    std::cout << "[ShaderSelfTest] " << compiled << "/" << (compiled + static_cast<size_t>(failures))
+              << " shader stages compiled (460 core + 300 es)" << (failures == 0 ? " OK" : " - FAILURES") << std::endl;
+    return failures;
+}
+#endif
+
+void Shader::CheckCompileErrors(size_t shader, ShaderType type, const std::string& path,
+                                const ShaderSource::Result* source) {
     int success;
     char infoLog[1024];
     if (type != ShaderType::ShaderProgram) {
@@ -384,7 +404,14 @@ void Shader::CheckCompileErrors(size_t shader, ShaderType type, const std::strin
         if (!success) {
             glGetShaderInfoLog(shader, 1024, nullptr, infoLog);
             std::cerr << "ERROR::SHADER::COMPILATION_FAILED\nType: " << ShaderTypeToString(type)
-                      << "\nPath: " << path << "\n" << infoLog << "\n -- --------------------------------------------------- -- " << std::endl;
+                      << "\nPath: " << path << "\n" << infoLog;
+            if (source) {
+                // Errors are reported as <source string>:<line>; map the numbers back to
+                // files, and dump the assembled text in case a driver numbers #line oddly.
+                std::cerr << "Source strings:\n" << ShaderSource::DescribeSources(*source)
+                          << "Assembled source:\n" << ShaderSource::NumberedListing(source->code);
+            }
+            std::cerr << "\n -- --------------------------------------------------- -- " << std::endl;
             throw std::runtime_error("ERROR::SHADER_COMPILATION_ERROR of type: " + ShaderTypeToString(type) + " " + path + "\n" + std::string(infoLog) + "\n -- --------------------------------------------------- -- ");
         }
     }

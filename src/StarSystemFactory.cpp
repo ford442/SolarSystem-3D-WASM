@@ -3,6 +3,8 @@
 #include "Solar_System/CatalogClouds.h"
 #include "Solar_System/CatalogSatellite.h"
 #include "Solar_System/SystemVisuals.h"
+#include "Solar_System/AtmosphereModel.h"
+#include "Auxiliary_Modules/FloatLutTexture.h"
 #include <iostream>
 #include <unordered_set>
 
@@ -38,18 +40,54 @@ SatelliteInfo MakeSatelliteInfo(const MeshHolder& model, const BodyCatalog::Entr
                          LoadLodTexture(entry.lod.specular));
 }
 
+// Physical rows get their baked LUTs whatever the current preset, so switching to
+// Medium/Full later needs no reload. Any problem leaves the shell on the O'Neil path.
+void LoadAtmosphereLuts(Atmosphere& atmosphere) {
+    const BodyCatalog::AtmosphereRow& row = atmosphere.GetRow();
+    if (!row.physical.enabled) {
+        return;
+    }
+    auto transmittance = LoadRgba16fLut(AtmosphereModel::TransmittanceLutPath(row.bodyId),
+                                        AtmosphereModel::kTransmittanceWidth, AtmosphereModel::kTransmittanceHeight);
+    auto multiScattering = LoadRgba16fLut(AtmosphereModel::MultiScatteringLutPath(row.bodyId),
+                                          AtmosphereModel::kMultiScatteringSize, AtmosphereModel::kMultiScatteringSize);
+    const auto release = [](std::optional<FloatLut>& lut) {
+        if (lut) {
+            glDeleteTextures(1, &lut->texture);
+            lut.reset();
+        }
+    };
+    for (auto* lut : {&transmittance, &multiScattering}) {
+        if (*lut && (*lut)->mappingVersion != AtmosphereModel::kLutMappingVersion) {
+            std::cout << "[Atmosphere] " << row.bodyId << ": LUT mapping version " << (*lut)->mappingVersion
+                      << " != " << AtmosphereModel::kLutMappingVersion << " (rebake); using the O'Neil shell" << std::endl;
+            release(*lut);
+        }
+    }
+    if (!transmittance || !multiScattering) {
+        release(transmittance);
+        release(multiScattering);
+        return;
+    }
+    const std::string expected = AtmosphereModel::ParamsHashHex(row.physical);
+    if (transmittance->paramsHash != expected) {
+        // Still usable (same mapping), just baked from other numbers; CI's
+        // AtmosphereLutsFresh test is what keeps this from shipping.
+        std::cout << "[Atmosphere] " << row.bodyId << ": LUTs were baked from parameters "
+                  << transmittance->paramsHash << ", the catalog is " << expected
+                  << " — rerun atmosphere_lut_baker" << std::endl;
+    }
+    atmosphere.SetLuts(transmittance->texture, multiScattering->texture);
+}
+
 RenderableAtmosphere MakeAtmosphere(const MeshHolder& sphereModel, Shader& atmosphereShader,
-                                    const SystemVisuals::AtmosphereSpec& spec,
+                                    const BodyCatalog::AtmosphereRow& row,
                                     const std::shared_ptr<SpaceObject>& parent,
-                                    float parentRadius, float parentEarthSize, bool toneMapping) {
-    const float inner = spec.innerRadiusMinusEpsilon ? parentRadius - 0.00007f : parentRadius;
-    AtmosphereInfo info(sphereModel, atmosphereShader, spec.scaleFactor, spec.color, inner,
-                        spec.outerRadius, spec.mieTint);
+                                    float parentRadius, float parentEarthSize) {
     RenderableAtmosphere renderable;
-    renderable.atmosphere = std::make_unique<Atmosphere>(info, parent);
-    renderable.hScaleFactor = spec.hScaleFactor;
+    renderable.atmosphere = std::make_unique<Atmosphere>(sphereModel, atmosphereShader, row, parent, parentRadius);
     renderable.parentEarthSizeCoefficient = parentEarthSize;
-    renderable.isUseToneMapping = toneMapping;
+    LoadAtmosphereLuts(*renderable.atmosphere);
     return renderable;
 }
 
@@ -105,7 +143,9 @@ void Application::InitCatalogSystem(const MeshHolder& sphereModel, const std::st
         MagneticFieldCatalog::IntrinsicParamsForBody(static_cast<OrbitLayout::Body>(primary->index)));
 
     vector<shared_ptr<Satellite>> satellites;
-    shared_ptr<Satellite> titan;
+    // Moons whose catalog row carries render.atmosphere (Titan). Their shells render with
+    // this component, after the primary's.
+    vector<pair<shared_ptr<Satellite>, const BodyCatalog::AtmosphereRow*>> satelliteAtmospheres;
     for (const BodyCatalog::Entry& entry : BodyCatalog::kEntries) {
         if (entry.kind != BodyCatalog::Kind::Satellite || !entry.parentId ||
             !BodyCatalog::StrEq(entry.parentId, primary->id)) {
@@ -115,35 +155,28 @@ void Application::InitCatalogSystem(const MeshHolder& sphereModel, const std::st
             MeshHolder mesh(entry.meshPath);
             SatelliteInfo satInfo = MakeSatelliteInfo(mesh, entry, *_renderer.mainPlanetShader);
             auto sat = make_shared<CatalogSatellite>(satInfo, planet, entry);
-            if (BodyCatalog::StrEq(entry.id, "titan")) {
-                titan = sat;
+            if (const auto* row = BodyCatalog::FindAtmosphere(entry.id)) {
+                satelliteAtmospheres.emplace_back(sat, row);
             }
             satellites.push_back(std::move(sat));
         } else {
             SatelliteInfo satInfo = MakeSatelliteInfo(sphereModel, entry, *_renderer.mainPlanetShader);
             auto sat = make_shared<CatalogSatellite>(satInfo, planet, entry);
-            if (BodyCatalog::StrEq(entry.id, "titan")) {
-                titan = sat;
+            if (const auto* row = BodyCatalog::FindAtmosphere(entry.id)) {
+                satelliteAtmospheres.emplace_back(sat, row);
             }
             satellites.push_back(std::move(sat));
         }
     }
 
     RenderableSceneComponent component;
-    if (primary->hasAtmosphere) {
-        if (const auto* spec = SystemVisuals::FindAtmosphere(primary->id)) {
-            component.atmospheres.push_back(
-                MakeAtmosphere(sphereModel, *_renderer.mainAtmosphereShader, *spec, planet,
-                               planet->GetRadius(), planet->GetEarthSizeCoefficient(),
-                               primary->atmosphereToneMapping));
-        }
+    if (const auto* row = BodyCatalog::FindAtmosphere(primary->id)) {
+        component.atmospheres.push_back(MakeAtmosphere(sphereModel, *_renderer.mainAtmosphereShader, *row, planet,
+                                                       planet->GetRadius(), planet->GetEarthSizeCoefficient()));
     }
-    if (titan) {
-        if (const auto* spec = SystemVisuals::FindAtmosphere("titan")) {
-            component.atmospheres.push_back(
-                MakeAtmosphere(sphereModel, *_renderer.mainAtmosphereShader, *spec, titan,
-                               titan->GetRadius(), titan->GetEarthSizeCoefficient(), false));
-        }
+    for (const auto& [satellite, row] : satelliteAtmospheres) {
+        component.atmospheres.push_back(MakeAtmosphere(sphereModel, *_renderer.mainAtmosphereShader, *row, satellite,
+                                                       satellite->GetRadius(), satellite->GetEarthSizeCoefficient()));
     }
 
     if (primary->hasCloudLayer && primary->cloudLayer.diffuse) {

@@ -20,6 +20,7 @@ void Application::ApplyQualityPreset(int preset) {
     }
 
     ApplyRenderResources(settings.shadowResolution, settings.enableHdr);
+    _renderer.ApplyEffectQuality(settings);
     if (_asteroidField) {
         _asteroidField->SetInstanceCount(settings.asteroidInstanceCount);
     }

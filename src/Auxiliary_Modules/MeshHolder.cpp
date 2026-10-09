@@ -39,7 +39,7 @@ void MeshHolder::ProcessNode(aiNode* node, const aiScene* scene) {
 
 Mesh MeshHolder::ProcessMesh(aiMesh* mesh, const aiScene* scene) {
     std::vector<Vertex> vertices;
-    std::vector<size_t> indices;
+    std::vector<GLuint> indices;
     std::vector<Texture> textures;
 
     // Обход каждой вершины меша

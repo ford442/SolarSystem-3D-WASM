@@ -35,7 +35,7 @@ jobs:
         run: |
           rm -rf build-test
           cmake -G Ninja -DCMAKE_BUILD_TYPE=Release -DSOLARSYSTEM_BUILD_TESTS=ON -B build-test
-          cmake --build build-test --target SolarSystemTests
+          cmake --build build-test --target SolarSystemTests atmosphere_lut_baker
 
       - name: Run unit tests
         run: ctest --test-dir build-test --output-on-failure

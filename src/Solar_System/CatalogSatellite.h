@@ -26,6 +26,9 @@ public:
 
     const BodyCatalog::Entry& GetEntry() const { return _entry; }
 
+    /** GL name of the current diffuse texture (it changes when the LOD tier reloads); 0 if none. */
+    unsigned int GetDiffuseTexture() const { return _diffuses.empty() ? 0u : _diffuses.front().GetTexture(); }
+
 private:
     const BodyCatalog::Entry& _entry;
     CatalogMaterial::Material _material;

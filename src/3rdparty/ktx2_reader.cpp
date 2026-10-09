@@ -46,6 +46,15 @@ bool File::IsCompressedBlockFormat() const {
     return vkFormat >= 131 && vkFormat <= 184;
 }
 
+const std::string* File::FindValue(const std::string& key) const {
+    for (const auto& [k, v] : keyValues) {
+        if (k == key) {
+            return &v;
+        }
+    }
+    return nullptr;
+}
+
 bool HasIdentifier(const std::uint8_t* data, std::size_t size) {
     return data != nullptr && size >= sizeof(kIdentifier) &&
            std::memcmp(data, kIdentifier, sizeof(kIdentifier)) == 0;
@@ -134,6 +143,36 @@ File Parse(const std::uint8_t* data, std::size_t size, const std::string& debugN
         level.width = std::max<std::uint32_t>(file.pixelWidth >> i, 1);
         level.height = std::max<std::uint32_t>(baseHeight >> i, 1);
         file.levels.push_back(level);
+    }
+
+    // Key/value data: a run of { u32 keyAndValueByteLength; key NUL value; pad to 4 }.
+    const std::uint32_t kvdByteOffset = ReadU32(h + 44);
+    const std::uint32_t kvdByteLength = ReadU32(h + 48);
+    if (kvdByteLength != 0) {
+        if (kvdByteOffset > size || kvdByteLength > size - kvdByteOffset) {
+            Fail(debugName, "key/value data runs past the end of the file");
+        }
+        std::size_t at = kvdByteOffset;
+        const std::size_t end = static_cast<std::size_t>(kvdByteOffset) + kvdByteLength;
+        while (at + 4 <= end) {
+            const std::uint32_t length = ReadU32(data + at);
+            at += 4;
+            if (length > end - at) {
+                Fail(debugName, "key/value entry runs past the key/value data");
+            }
+            const char* entry = reinterpret_cast<const char*>(data + at);
+            const char* nul = static_cast<const char*>(std::memchr(entry, '\0', length));
+            if (nul == nullptr) {
+                Fail(debugName, "key/value entry has no NUL-terminated key");
+            }
+            std::string key(entry, nul);
+            std::string value(nul + 1, entry + length);
+            if (!value.empty() && value.back() == '\0') {
+                value.pop_back();
+            }
+            file.keyValues.emplace_back(std::move(key), std::move(value));
+            at += (static_cast<std::size_t>(length) + 3) & ~static_cast<std::size_t>(3);
+        }
     }
 
     return file;

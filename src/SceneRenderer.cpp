@@ -7,10 +7,12 @@
 #include "QualitySettings.h"
 #include "ResourceManifest.h"
 #include "Solar_System/EclipseCaster.h"
+#include "Solar_System/AtmosphereModel.h"
 #include "SimState.h"
 #include "Solar_System/OrbitLayout.h"
 #include "Auxiliary_Modules/Ephemeris.h"
 #include "Auxiliary_Modules/TextureLoadingQueue.h"
+#include <algorithm>
 #include <deque>
 #include <iomanip>
 #include <optional>
@@ -32,9 +34,6 @@ void Renderer::Init() {
     hdrEnabled = hdr->IsEnabled();
     LogQualityTier(qualitySettings, hdrEnabled, gSimState->shadowQuality);
 
-    const vector<string> skyBoxFaces = GetSkyBoxFaces();
-
-    skyBox = make_unique<SkyBox>(skyBoxFaces);
     mainTextShader = make_unique<Shader>("resource/shaders/text.vs", "resource/shaders/text.fs");
     textRenderer = make_unique<TextRenderer>(app._ft, "resource/fonts/Arial.ttf");
     FT_Done_FreeType(app._ft);
@@ -44,9 +43,28 @@ void Renderer::Init() {
     mainCoronaStarShader = make_unique<Shader>("resource/shaders/starCorona.vs", "resource/shaders/starCorona.fs");
     mainPlanetShader = make_unique<Shader>("resource/shaders/planetLighting.vs", "resource/shaders/planetLighting.fs");
     mainAtmosphereShader = make_unique<Shader>("resource/shaders/atmosphere.vs", "resource/shaders/atmosphere.fs");
+    try {
+        pbrAtmosphereShader = make_unique<Shader>("resource/shaders/atmosphere.vs", "resource/shaders/atmospherePbr.fs");
+    } catch (const std::exception&) {
+        // Already reported by Shader (and fatal to the CI shader self-test); the O'Neil
+        // shell still draws every atmosphere.
+        std::cerr << "[Atmosphere] LUT atmosphere shader unavailable; using the O'Neil shell" << std::endl;
+        pbrAtmosphereShader.reset();
+    }
     mainCloudsShader = make_unique<Shader>("resource/shaders/planetLighting.vs", "resource/shaders/cloudsLighting.fs");
     mainRingShader = make_unique<Shader>("resource/shaders/planetaryRingLighting.vs", "resource/shaders/planetaryRingLighting.fs");
     lensFlareShader = make_unique<Shader>("resource/shaders/lensFlare.vs", "resource/shaders/lensFlare.fs");
+    try {
+        coronaVolumeShader = make_unique<Shader>("resource/shaders/starCoronaVolume.vs", "resource/shaders/starCoronaVolume.fs");
+    } catch (const std::exception&) {
+        std::cerr << "[Corona] volumetric corona shader unavailable; using the flat corona" << std::endl;
+        coronaVolumeShader.reset();
+    }
+
+    // After every program is built: a missing skybox face aborts start-up (native has no
+    // checkerboard fallback), and the native CI smoke run should still have compiled the
+    // shaders by then.
+    skyBox = make_unique<SkyBox>(GetSkyBoxFaces());
     lensFlare = make_unique<LensFlare>(*lensFlareShader, TextureImage2D(TexturePaths::Resolve("resource/textures_low/flares_bright_Low.dds")),
             FlaresInfo {4,
             {
@@ -59,6 +77,12 @@ void Renderer::Init() {
                 FlareSprite{false, 2.25, 0.2, 3},
                 FlareSprite{false, 2.75, 2.0, 7}
             }});
+    try {
+        observeSky = make_unique<ObserveSky>();
+    } catch (const std::exception&) {
+        std::cerr << "[Observe] sky shaders unavailable; Observe mode will draw an empty sky" << std::endl;
+        observeSky.reset();
+    }
     orbitPathRenderer = make_unique<OrbitPathRenderer>();
     xrPointerRenderer = make_unique<XrPointerRenderer>();
     magneticFieldRenderer = make_unique<MagneticFieldLineRenderer>();
@@ -66,7 +90,23 @@ void Renderer::Init() {
         const auto fieldQuality = GetQualitySettings(gSimState->qualityPreset, gSimState->isMobileWeb);
         magneticFieldBloom = make_unique<MagneticFieldBloom>(app._displayWidth, app._displayHeight,
                                                               fieldQuality.enableMagneticBloom);
+        ApplyEffectQuality(fieldQuality);
     }
+}
+
+void Renderer::ApplyEffectQuality(const QualityTierSettings& settings) {
+    pbrAtmosphereSteps = settings.enablePbrAtmosphere ? settings.atmosphereSteps : 0;
+    coronaSlices = settings.enableVolumetricCorona ? settings.coronaSlices : 0;
+    observeStarCount = settings.observeStarCount;
+    if (observeSky) {
+        observeSky->SetStarLimit(observeStarCount);
+    }
+}
+
+glm::vec3 Renderer::CameraWorldPosition() const {
+    // The view matrix is the current eye's (ConfigureMainShaders swaps in the XR eye), so
+    // this is right per eye where _app._camera.GetPosition() is the head.
+    return glm::vec3(glm::inverse(cameraView)[3]);
 }
 
 void Renderer::ProcessSceneComponentsRendering() {
@@ -82,6 +122,8 @@ void Renderer::ProcessSceneComponentsRendering() {
             component.clouds->AdjustToParent(timeScale);
         }
         for (const auto& renderableAtmosphere : component.atmospheres) {
+            // Before AdjustToParent: the two paths draw different shell sizes.
+            renderableAtmosphere.atmosphere->SetPhysicalPathActive(pbrAtmosphereSteps > 0 && pbrAtmosphereShader);
             renderableAtmosphere.atmosphere->AdjustToParent();
         }
         if (component.planetaryRing) {
@@ -169,53 +211,149 @@ void Renderer::RenderPass(const RenderableSceneComponent& component) {
         && component.planet == _app._renderableSceneComponents[static_cast<size_t>(_app._nearestPlanetIndex)].planet)
         ProcessStarRendering();
 
-    RenderAtmospheres(component.atmospheres, component.lightSpaceMatrix, component.planetaryRing.get());
-    RenderClouds(component.clouds.get(), component.lightSpaceMatrix);
+    // The LUT atmosphere attenuates what is behind it, so the cloud deck has to be there
+    // first; the additive O'Neil shell keeps its historical order.
+    const bool physicalAtmosphere =
+        std::any_of(component.atmospheres.begin(), component.atmospheres.end(),
+                    [](const RenderableAtmosphere& a) { return a.atmosphere->IsPhysicalPathActive(); });
+    if (physicalAtmosphere) {
+        RenderClouds(component.clouds.get(), component.lightSpaceMatrix);
+        RenderAtmospheres(component);
+    } else {
+        RenderAtmospheres(component);
+        RenderClouds(component.clouds.get(), component.lightSpaceMatrix);
+    }
     RenderPlanetaryRing(*mainRingShader, component.planetaryRing.get(), component.lightSpaceMatrix);
 }
 
-void Renderer::RenderAtmospheres(const std::vector<RenderableAtmosphere>& renderableAtmospheres, const glm::mat4& lightSpaceMatrix, const PlanetaryRing* ring) const {
-    if (!renderableAtmospheres.empty()) {
-        glDepthMask(GL_FALSE);
-        glEnable(GL_BLEND);
-        glBlendFunc(GL_ONE, GL_ONE);
-
-        mainAtmosphereShader->Use();
-        mainAtmosphereShader->SetMat4("lightSpaceMatrix", lightSpaceMatrix);
-
-        for (const auto& renderableAtmosphere : renderableAtmospheres) {
-            mainAtmosphereShader->SetVec3("camPosition", _app._camera.GetPosition() - renderableAtmosphere.atmosphere->GetPosition());
-            mainAtmosphereShader->SetVec3("lightPos", _app._sun->GetPosition() - renderableAtmosphere.atmosphere->GetPosition());
-            mainAtmosphereShader->SetVec3("mieTint", renderableAtmosphere.atmosphere->GetMieTint());
-            mainAtmosphereShader->SetFloat("SCALE_H_FACTOR", renderableAtmosphere.hScaleFactor);
-            mainAtmosphereShader->SetFloat("SCALE_L_FACTOR", 1.0f);
-            mainAtmosphereShader->SetFloat("earthSizeCoefficient", renderableAtmosphere.parentEarthSizeCoefficient);
-            mainAtmosphereShader->SetBool("isUseToneMapping", renderableAtmosphere.isUseToneMapping);
-            mainAtmosphereShader->SetBool("isNearbyPlanetaryRing", ring != nullptr);
-
-            if (ring) {
-                mainAtmosphereShader->SetVec3("ringParentPlanetCenter", ring->GetParent()->GetPosition());
-                mainAtmosphereShader->SetFloat("ringParentPlanetRadiusSquared", ring->GetParent()->GetRadius() * ring->GetParent()->GetRadius());
-                mainAtmosphereShader->SetBool("isUseSphereIntersect", ring->GetParent() != renderableAtmosphere.atmosphere->GetParent());
-
-                mainAtmosphereShader->SetVec3("ringCenter", ring->GetPosition());
-                mainAtmosphereShader->SetVec3("ringNormal", ring->GetRingNormal());
-                mainAtmosphereShader->SetVec2("ringInnerOuterRadiuses", glm::vec2(ring->GetInnerRadius(), ring->GetOuterRadius()));
-                mainAtmosphereShader->SetInt("ringDiffuse", 9);
-                glBindTextureUnit(9, ring->GetRingTexture());
-            }
-
-            if (_app.CalculateSpaceObjectDistance(renderableAtmosphere.atmosphere.get()) <= renderableAtmosphere.atmosphere->GetAtmosphereOuterBoundary())
-                glFrontFace(GL_CW);
-
-            renderableAtmosphere.atmosphere->Render();
-
-            glFrontFace(GL_CCW);
-        }
-
-        glDisable(GL_BLEND);
-        glDepthMask(GL_TRUE);
+void Renderer::RenderAtmospheres(const RenderableSceneComponent& component) const {
+    if (component.atmospheres.empty()) {
+        return;
     }
+    glDepthMask(GL_FALSE);
+    glEnable(GL_BLEND);
+
+    for (const auto& renderableAtmosphere : component.atmospheres) {
+        // Inside the shell, draw its far side (the near side is behind the camera).
+        const bool inside = glm::distance(CameraWorldPosition(), renderableAtmosphere.atmosphere->GetPosition()) <=
+                            renderableAtmosphere.atmosphere->GetAtmosphereOuterBoundary();
+        if (inside) {
+            glFrontFace(GL_CW);
+        }
+        if (renderableAtmosphere.atmosphere->IsPhysicalPathActive()) {
+            RenderPbrAtmosphere(renderableAtmosphere, component);
+        } else {
+            RenderOneilAtmosphere(renderableAtmosphere, component);
+        }
+        glFrontFace(GL_CCW);
+    }
+
+    glDisable(GL_BLEND);
+    glDepthMask(GL_TRUE);
+}
+
+void Renderer::RenderOneilAtmosphere(const RenderableAtmosphere& renderableAtmosphere,
+                                     const RenderableSceneComponent& component) const {
+    Atmosphere& atmosphere = *renderableAtmosphere.atmosphere;
+    const PlanetaryRing* ring = component.planetaryRing.get();
+    glBlendFunc(GL_ONE, GL_ONE);
+
+    mainAtmosphereShader->Use();
+    mainAtmosphereShader->SetMat4("lightSpaceMatrix", component.lightSpaceMatrix);
+    // Per-shell constants are set here, after Use(): Saturn and Titan share a component,
+    // so setting them at placement time let the last shell's values win for both.
+    mainAtmosphereShader->SetVec3("C_R", atmosphere.GetAtmosphereColor());
+    mainAtmosphereShader->SetFloat("innerRadius", atmosphere.GetInnerRadius());
+    mainAtmosphereShader->SetFloat("outerRadius", atmosphere.GetOuterRadius());
+    mainAtmosphereShader->SetVec3("camPosition", CameraWorldPosition() - atmosphere.GetPosition());
+    mainAtmosphereShader->SetVec3("lightPos", _app._sun->GetPosition() - atmosphere.GetPosition());
+    mainAtmosphereShader->SetVec3("mieTint", atmosphere.GetMieTint());
+    mainAtmosphereShader->SetFloat("SCALE_H_FACTOR", atmosphere.GetRow().oneil.hScaleFactor);
+    mainAtmosphereShader->SetFloat("SCALE_L_FACTOR", 1.0f);
+    mainAtmosphereShader->SetFloat("earthSizeCoefficient", renderableAtmosphere.parentEarthSizeCoefficient);
+    mainAtmosphereShader->SetBool("isUseToneMapping", atmosphere.GetRow().oneil.toneMapping);
+    mainAtmosphereShader->SetBool("isNearbyPlanetaryRing", ring != nullptr);
+
+    if (ring) {
+        mainAtmosphereShader->SetVec3("ringParentPlanetCenter", ring->GetParent()->GetPosition());
+        mainAtmosphereShader->SetFloat("ringParentPlanetRadiusSquared", ring->GetParent()->GetRadius() * ring->GetParent()->GetRadius());
+        mainAtmosphereShader->SetBool("isUseSphereIntersect", ring->GetParent() != atmosphere.GetParent());
+
+        mainAtmosphereShader->SetVec3("ringCenter", ring->GetPosition());
+        mainAtmosphereShader->SetVec3("ringNormal", ring->GetRingNormal());
+        mainAtmosphereShader->SetVec2("ringInnerOuterRadiuses", glm::vec2(ring->GetInnerRadius(), ring->GetOuterRadius()));
+        mainAtmosphereShader->SetInt("ringDiffuse", 9);
+        glBindTextureUnit(9, ring->GetRingTexture());
+    }
+
+    atmosphere.SetShader(*mainAtmosphereShader);
+    atmosphere.Render();
+}
+
+void Renderer::RenderPbrAtmosphere(const RenderableAtmosphere& renderableAtmosphere,
+                                   const RenderableSceneComponent& component) const {
+    Atmosphere& atmosphere = *renderableAtmosphere.atmosphere;
+    const PlanetaryRing* ring = component.planetaryRing.get();
+    const BodyCatalog::AtmosphereRow& row = atmosphere.GetRow();
+    const AtmosphereModel::Params params = AtmosphereModel::FromCatalog(row.physical);
+    const glm::vec3 center = atmosphere.GetPosition();
+    const glm::vec3 camera = CameraWorldPosition();
+
+    // Premultiplied: rgb is in-scattered light, alpha what survives of the scene behind.
+    glBlendFunc(GL_ONE, GL_SRC_ALPHA);
+
+    Shader& shader = *pbrAtmosphereShader;
+    shader.Use();
+    shader.SetMat4("lightSpaceMatrix", component.lightSpaceMatrix);
+    shader.SetVec3("camPosition", camera - center);
+    shader.SetVec3("lightPos", _app._sun->GetPosition() - center);
+    shader.SetFloat("kmPerSceneUnit", atmosphere.GetKmPerSceneUnit());
+    shader.SetBool("isCameraInsideShell", glm::length(camera - center) <= atmosphere.GetAtmosphereOuterBoundary());
+    shader.SetInt("uSteps", pbrAtmosphereSteps);
+    shader.SetFloat("uExposure", row.physical.exposure);
+
+    shader.SetFloat("uAtmosphere.bottomRadius", static_cast<float>(params.bottomRadius));
+    shader.SetFloat("uAtmosphere.topRadius", static_cast<float>(params.topRadius));
+    shader.SetVec3("uAtmosphere.rayleighScattering", glm::vec3(params.rayleighScattering));
+    shader.SetFloat("uAtmosphere.rayleighScaleHeight", static_cast<float>(params.rayleighScaleHeight));
+    shader.SetVec3("uAtmosphere.mieScattering", glm::vec3(params.mieScattering));
+    shader.SetVec3("uAtmosphere.mieExtinction", glm::vec3(params.mieExtinction));
+    shader.SetFloat("uAtmosphere.mieScaleHeight", static_cast<float>(params.mieScaleHeight));
+    shader.SetFloat("uAtmosphere.miePhaseG", static_cast<float>(params.miePhaseG));
+    shader.SetVec3("uAtmosphere.absorptionExtinction", glm::vec3(params.absorptionExtinction));
+    shader.SetFloat("uAtmosphere.absorptionCenter", static_cast<float>(params.absorptionCenter));
+    shader.SetFloat("uAtmosphere.absorptionHalfWidth", static_cast<float>(params.absorptionHalfWidth));
+
+    shader.SetInt("transmittanceLut", 12);
+    glBindTextureUnit(12, atmosphere.GetTransmittanceLut());
+    shader.SetInt("multiScatteringLut", 13);
+    glBindTextureUnit(13, atmosphere.GetMultiScatteringLut());
+
+    shader.SetBool("isNearbyPlanetaryRing", ring != nullptr);
+    if (ring) {
+        shader.SetVec3("ringParentPlanetCenter", ring->GetParent()->GetPosition());
+        shader.SetFloat("ringParentPlanetRadiusSquared", ring->GetParent()->GetRadius() * ring->GetParent()->GetRadius());
+        shader.SetBool("isUseSphereIntersect", ring->GetParent() != atmosphere.GetParent());
+        shader.SetVec3("ringCenter", ring->GetPosition());
+        shader.SetVec3("ringNormal", ring->GetRingNormal());
+        shader.SetVec2("ringInnerOuterRadiuses", glm::vec2(ring->GetInnerRadius(), ring->GetOuterRadius()));
+        shader.SetInt("ringDiffuse", 9);
+        glBindTextureUnit(9, ring->GetRingTexture());
+    }
+
+    // A moon's umbra darkens the air above it as well as the ground. Only the primary's
+    // atmosphere has casters (its moons); a moon's own atmosphere skips this.
+    const EclipseUmbra umbra = atmosphere.GetParent() == component.planet ? ComputeEclipseUmbra(component)
+                                                                           : EclipseUmbra{};
+    shader.SetBool("hasEclipseCaster", umbra.active);
+    if (umbra.active) {
+        shader.SetVec3("eclipseCasterCenter", umbra.casterCenter - center);
+        shader.SetFloat("eclipseCasterRadius", umbra.casterRadius);
+        shader.SetFloat("eclipseStarRadius", umbra.starRadius);
+    }
+
+    atmosphere.SetShader(shader);
+    atmosphere.Render();
 }
 
 void Renderer::RenderClouds(Clouds* renderableClouds, const glm::mat4& lightSpaceMatrix) const {
@@ -295,6 +433,9 @@ void Renderer::UpdateOcclusionQuery() {
 }
 
 void Renderer::RenderStarCorona() const {
+    if (coronaSlices > 0 && coronaVolumeShader) {
+        return; // RenderStarCoronaVolume draws the corona instead.
+    }
     glDepthMask(GL_FALSE);
     glEnable(GL_BLEND);
     glBlendFunc(GL_ONE, GL_ONE);
@@ -307,6 +448,84 @@ void Renderer::RenderStarCorona() const {
 
     glDepthMask(GL_TRUE);
     glDisable(GL_BLEND);
+}
+
+void Renderer::RenderStarCoronaVolume() const {
+    if (coronaSlices <= 0 || !coronaVolumeShader) {
+        return;
+    }
+    // In solar radii. The K-corona is visible to a few radii; 6 keeps the slices' discs
+    // small enough that the stack stays cheap from planetary distances.
+    constexpr float kCoronaExtent = 6.0f;
+    // Tuned by eye so the streamers read against black without the inner corona clipping;
+    // the HDR glow and lens flare sit on top of it.
+    constexpr float kCoronaIntensity = 0.8f;
+
+    const glm::vec3 sunCenter = _app._sun->GetPosition();
+    const float sunRadius = _app._sun->GetSceneRadius();
+    const glm::mat4 inverseView = glm::inverse(cameraView);
+    const glm::vec3 camera(inverseView[3]);
+    const glm::vec3 cameraUp(inverseView[1]);
+    const glm::vec3 cameraLocal = (camera - sunCenter) / sunRadius;
+    const float distance = glm::length(cameraLocal);
+    if (distance <= 1.0f) {
+        return; // Inside the photosphere.
+    }
+
+    // Outside, slices are perpendicular to the camera->Sun axis, so the whole corona is
+    // crossed squarely. Inside, rays to the edge of the screen would graze those slices, so
+    // they follow the view direction instead (every on-screen ray within FOV/2 of normal).
+    // The thresholds differ so the switch does not flicker at the boundary.
+    coronaSlicesViewAligned = distance < (coronaSlicesViewAligned ? 1.25f : 1.15f) * kCoronaExtent;
+    const glm::vec3 forward = coronaSlicesViewAligned ? -glm::normalize(glm::vec3(inverseView[2]))
+                                                      : -cameraLocal / distance;
+
+    // Slice depths along `forward` from the Sun's centre: only the part of the sphere in front
+    // of the camera, starting a little past the near plane so no slab is clipped by it.
+    const float nearMargin = std::max(2.0f * _app._camera.GetNear() / sunRadius, 0.05f);
+    const float depthMax = kCoronaExtent;
+    const float depthMin = std::max(-kCoronaExtent, glm::dot(cameraLocal, forward) + nearMargin);
+    if (depthMin >= depthMax) {
+        return; // The corona is entirely behind the camera.
+    }
+
+    glm::vec3 right = glm::cross(forward, cameraUp);
+    if (glm::dot(right, right) < 1e-8f) {
+        right = glm::cross(forward, glm::vec3(1.0f, 0.0f, 0.0f));
+    }
+    right = glm::normalize(right);
+    const glm::vec3 up = glm::cross(right, forward);
+
+    glDepthMask(GL_FALSE);
+    glEnable(GL_BLEND);
+    glBlendFunc(GL_ONE, GL_ONE);
+    glDisable(GL_CULL_FACE);
+
+    Shader& shader = *coronaVolumeShader;
+    shader.Use();
+    shader.SetMat4("projection", cameraProjection);
+    shader.SetMat4("view", cameraView);
+    shader.SetFloat("zCoef", static_cast<float>(2.0 / glm::log2(_app._camera.GetFar() + 1.0)));
+    shader.SetVec3("sunCenter", sunCenter);
+    shader.SetFloat("sunRadius", sunRadius);
+    shader.SetVec3("sliceForward", forward);
+    shader.SetVec3("sliceRight", right);
+    shader.SetVec3("sliceUp", up);
+    shader.SetFloat("coronaExtent", kCoronaExtent);
+    shader.SetInt("sliceCount", coronaSlices);
+    shader.SetFloat("sliceDepthMin", depthMin);
+    shader.SetFloat("sliceDepthMax", depthMax);
+    shader.SetFloat("nearMargin", nearMargin);
+    shader.SetVec3("cameraLocal", cameraLocal);
+    shader.SetFloat("sliceSpacing", (depthMax - depthMin) / static_cast<float>(coronaSlices));
+    shader.SetVec3("coronaColor", _app._sun->GetShiftColor());
+    shader.SetFloat("coronaIntensity", kCoronaIntensity);
+    shader.SetFloat("time", static_cast<float>(glfwGetTime() * 0.004));
+    _app._sun->DrawCoronaSlices(coronaSlices);
+
+    glEnable(GL_CULL_FACE);
+    glDisable(GL_BLEND);
+    glDepthMask(GL_TRUE);
 }
 
 void Renderer::RenderStar() const {
@@ -655,10 +874,9 @@ void Renderer::ConfigureMainShaders() {
     mainStarShader->Use();
     mainStarShader->SetMat4("projection", cameraProjection);
     mainStarShader->SetMat4("view", cameraView);
-    mainStarShader->SetVec3("centerDir", glm::normalize(_app._camera.GetPosition() - _app._sun->GetPosition()));
+    mainStarShader->SetVec3("viewPos", CameraWorldPosition());
     mainStarShader->SetVec3("shiftStarColor", _app._sun->GetShiftColor());
     mainStarShader->SetVec3("colorMult", glm::vec3(0.96862745, 0.58039215, 0.235294117) * _app._sun->GetShiftColor());
-    mainStarShader->SetFloat("sunTemperatureInKelvin", _app._sun->GetStarTemperatureInKelvin());
     mainStarShader->SetFloat("starRadiusInKilometers", _app._sun->GetStarRadius());
     mainStarShader->SetFloat("zCoef", zCoef);
     mainStarShader->SetFloat("uColorMap", _app._sun->GetTemperatureColorUCoordinate());
@@ -670,8 +888,10 @@ void Renderer::ConfigureMainShaders() {
     mainCoronaStarShader->SetMat4("projection", cameraProjection);
     mainCoronaStarShader->SetMat4("view", cameraView);
     mainCoronaStarShader->SetVec3("center", _app._sun->GetPosition());
-    mainCoronaStarShader->SetVec3("cameraRight", _app._camera.GetRightVector());
-    mainCoronaStarShader->SetVec3("cameraUp", _app._camera.GetUpVector());
+    // The eye's axes, not the head's (the billboard faces each XR eye).
+    const glm::mat4 inverseView = glm::inverse(cameraView);
+    mainCoronaStarShader->SetVec3("cameraRight", glm::normalize(glm::vec3(inverseView[0])));
+    mainCoronaStarShader->SetVec3("cameraUp", glm::normalize(glm::vec3(inverseView[1])));
     mainCoronaStarShader->SetVec3("starShiftColor", _app._sun->GetShiftColor());
     mainCoronaStarShader->SetFloat("zCoef", zCoef);
     mainCoronaStarShader->SetFloat("maxSize", 7.1);
@@ -705,6 +925,14 @@ void Renderer::ConfigureMainShaders() {
     mainAtmosphereShader->SetInt("shadowMap", 11);
     glBindTextureUnit(11, shadowMapFBO->GetShadowMap());
 
+    if (pbrAtmosphereShader) {
+        pbrAtmosphereShader->Use();
+        pbrAtmosphereShader->SetMat4("projection", cameraProjection);
+        pbrAtmosphereShader->SetMat4("view", cameraView);
+        pbrAtmosphereShader->SetFloat("zCoef", zCoef);
+        pbrAtmosphereShader->SetFloat("uSurfaceDim", atmosphereDim);
+    }
+
     mainCloudsShader->Use();
     mainCloudsShader->SetMat4("projection", cameraProjection);
     mainCloudsShader->SetMat4("view", cameraView);
@@ -729,7 +957,7 @@ void Renderer::ConfigureMainShaders() {
     mainRingShader->SetInt("shadowMap", 5);
     glBindTextureUnit(5, shadowMapFBO->GetShadowMap());
 }
-void Renderer::ConfigureEclipseUmbra(const RenderableSceneComponent& renderableComponent) {
+Renderer::EclipseUmbra Renderer::ComputeEclipseUmbra(const RenderableSceneComponent& renderableComponent) const {
     // Real physical constants, because the eclipse *decision* has to be made at true scale.
     // The scene draws body radii, moon orbits, and planet orbits at three different
     // exaggerations; at art scale the Moon sits 12.5 Earth-radii away instead of 60, so its
@@ -742,8 +970,7 @@ void Renderer::ConfigureEclipseUmbra(const RenderableSceneComponent& renderableC
 
     const std::shared_ptr<Planet>& planet = renderableComponent.planet;
     if (!planet || !_app._sun || renderableComponent.satellites.empty()) {
-        mainPlanetShader->SetBool("hasEclipseCaster", false);
-        return;
+        return {};
     }
 
     const glm::vec3 planetPosition = planet->GetPosition();
@@ -784,8 +1011,7 @@ void Renderer::ConfigureEclipseUmbra(const RenderableSceneComponent& renderableC
     }
 
     if (!caster) {
-        mainPlanetShader->SetBool("hasEclipseCaster", false);
-        return;
+        return {};
     }
 
     // Draw radius: the moon's real radius in its own orbital scale, not the exaggerated
@@ -804,10 +1030,22 @@ void Renderer::ConfigureEclipseUmbra(const RenderableSceneComponent& renderableC
     // one smoothstep and no extra bandwidth.
     const bool softPenumbra = gSimState->qualityPreset >= 2;
 
-    mainPlanetShader->SetBool("hasEclipseCaster", true);
-    mainPlanetShader->SetVec3("eclipseCasterCenter", caster->GetPosition());
-    mainPlanetShader->SetFloat("eclipseCasterRadius", casterRadius);
-    mainPlanetShader->SetFloat("eclipseStarRadius", softPenumbra ? starRadius : 0.0f);
+    EclipseUmbra umbra;
+    umbra.active = true;
+    umbra.casterCenter = caster->GetPosition();
+    umbra.casterRadius = casterRadius;
+    umbra.starRadius = softPenumbra ? starRadius : 0.0f;
+    return umbra;
+}
+
+void Renderer::ConfigureEclipseUmbra(const RenderableSceneComponent& renderableComponent) {
+    const EclipseUmbra umbra = ComputeEclipseUmbra(renderableComponent);
+    mainPlanetShader->SetBool("hasEclipseCaster", umbra.active);
+    if (umbra.active) {
+        mainPlanetShader->SetVec3("eclipseCasterCenter", umbra.casterCenter);
+        mainPlanetShader->SetFloat("eclipseCasterRadius", umbra.casterRadius);
+        mainPlanetShader->SetFloat("eclipseStarRadius", umbra.starRadius);
+    }
 }
 
 void Renderer::ConfigureMainPlanetShader(const RenderableSceneComponent& renderableComponent) {

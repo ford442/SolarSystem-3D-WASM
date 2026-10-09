@@ -248,7 +248,8 @@ input {
 }
 
 .settings-row select,
-.settings-row input[type="date"] {
+.settings-row input[type="date"],
+.settings-row input[type="time"] {
   min-width: 128px;
   min-height: 42px;
   padding: 7px 11px;
@@ -757,4 +758,106 @@ input {
     scroll-behavior: auto !important;
     transition-duration: 0.01ms !important;
   }
+}
+
+/* Observe mode: view-mode switch, site/time controls and readout (observe.ts). */
+.observe-section {
+  margin: 0 0 12px;
+  padding-bottom: 10px;
+  border-bottom: 1px solid rgba(137, 209, 255, 0.2);
+}
+
+.observe-mode {
+  display: flex;
+  gap: 0;
+  margin-bottom: 8px;
+}
+
+.observe-mode-btn {
+  flex: 1;
+  min-height: 42px;
+  color: #dcecf5;
+  background: rgba(255, 255, 255, 0.07);
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  cursor: pointer;
+  touch-action: manipulation;
+}
+
+.observe-mode-btn:first-child {
+  border-radius: 8px 0 0 8px;
+}
+
+.observe-mode-btn:last-child {
+  border-left: 0;
+  border-radius: 0 8px 8px 0;
+}
+
+.observe-mode-btn[aria-pressed="true"] {
+  color: #06121f;
+  font-weight: 700;
+  background: #79dcff;
+  border-color: #79dcff;
+}
+
+.observe-latlon {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 6px;
+}
+
+.observe-latlon label {
+  display: flex;
+  flex: 1;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.9rem;
+}
+
+.observe-latlon input {
+  width: 100%;
+  min-width: 0;
+  min-height: 40px;
+  padding: 6px 8px;
+  color: #f7fbff;
+  background: #101d2d;
+  border: 1px solid rgba(137, 209, 255, 0.38);
+  border-radius: 8px;
+  color-scheme: dark;
+}
+
+.observe-controls .settings-date-actions {
+  margin: 4px 0 8px;
+}
+
+.observe-controls .settings-date-btn {
+  padding: 0 6px;
+  white-space: nowrap;
+}
+
+.observe-controls .settings-share {
+  width: 100%;
+}
+
+.observe-readout {
+  margin: 8px 0 4px;
+  color: #c7e9ff;
+  font-size: 0.78rem;
+  line-height: 1.4;
+  font-variant-numeric: tabular-nums;
+}
+
+.observe-disclaimer {
+  display: block;
+  color: #a9bac8;
+  font-size: 0.72rem;
+  line-height: 1.35;
+}
+
+/* Observe replaces the fly-through: the explorer's focus controls and the orrery-only toggles
+   have nothing to act on, so they stay visible but inert. */
+.explorer-panel.is-observing,
+body.observe-mode #orbit-lines-enabled,
+body.observe-mode #magnetic-fields-enabled {
+  opacity: 0.45;
+  pointer-events: none;
 }

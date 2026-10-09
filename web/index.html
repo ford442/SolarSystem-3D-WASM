@@ -94,6 +94,50 @@
             </select>
           </label>
 
+          <section id="observe-section" class="observe-section" aria-label="View mode">
+            <div class="observe-mode" role="group" aria-label="View mode">
+              <button id="mode-explore" class="observe-mode-btn" type="button" aria-pressed="true">Explore</button>
+              <button id="mode-observe" class="observe-mode-btn" type="button" aria-pressed="false" title="Stand on Earth at a place and time and look up (O)">Observe</button>
+            </div>
+            <div id="observe-controls" class="observe-controls" hidden>
+              <label class="settings-row" for="observe-site">
+                <span>Site</span>
+                <select id="observe-site"></select>
+              </label>
+              <div class="observe-latlon">
+                <label for="observe-lat"><span>Lat</span>
+                  <input id="observe-lat" type="number" min="-90" max="90" step="0.01" inputmode="decimal" />
+                </label>
+                <label for="observe-lon"><span>Lon</span>
+                  <input id="observe-lon" type="number" min="-180" max="180" step="0.01" inputmode="decimal" />
+                </label>
+              </div>
+              <button id="observe-locate" class="settings-date-btn" type="button">Use my location</button>
+              <label class="settings-row" for="observe-time">
+                <span>Time (UTC)</span>
+                <input id="observe-time" type="time" step="1" />
+              </label>
+              <div class="settings-date-actions">
+                <button class="settings-date-btn" type="button" data-step-days="-1">−1 d</button>
+                <button class="settings-date-btn" type="button" data-step-days="-0.0416667">−1 h</button>
+                <button class="settings-date-btn" type="button" data-step-days="0.0416667">+1 h</button>
+                <button class="settings-date-btn" type="button" data-step-days="1">+1 d</button>
+                <button id="observe-now" class="settings-date-btn" type="button">Now</button>
+              </div>
+              <label class="settings-row" for="observe-rate">
+                <span>Rate</span>
+                <select id="observe-rate"></select>
+              </label>
+              <div class="settings-date-actions">
+                <button id="observe-look-sun" class="settings-date-btn" type="button">Look at Sun</button>
+                <button id="observe-look-moon" class="settings-date-btn" type="button">Look at Moon</button>
+              </div>
+              <button id="observe-eclipse" class="settings-share" type="button">2017 total eclipse (Casper, WY)</button>
+              <p id="observe-readout" class="observe-readout" aria-live="off"></p>
+              <small class="observe-disclaimer">Visualization, not an almanac: planets ~arcminute, Sun and Moon a few arcseconds, no refraction, times in UTC. Drag to look, scroll to zoom.</small>
+            </div>
+          </section>
+
           <label class="settings-row" for="simulation-date">
             <span>Simulation date</span>
             <input id="simulation-date" type="date" min="1800-01-01" max="2050-12-31" />

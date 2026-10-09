@@ -37,6 +37,23 @@ public:
     glm::vec3 GetUpVector() const;
     glm::vec3 GetWorldUpVector() const;
 
+    // Zoom is the vertical FOV in degrees. Explore keeps the default 1..45 range; Observe widens it.
+    void SetZoom(float zoom) { _zoom = glm::clamp(zoom, _zoomMin, _zoomMax); }
+    void SetZoomRange(float minZoom, float maxZoom) {
+        _zoomMin = minZoom;
+        _zoomMax = maxZoom;
+        _zoom = glm::clamp(_zoom, _zoomMin, _zoomMax);
+    }
+    float GetZoomMin() const { return _zoomMin; }
+    float GetZoomMax() const { return _zoomMax; }
+
+    // While locked, ProcessKeyboard (WASD, Space/C, touch joystick, XR stick) is a no-op; look
+    // and zoom still work. Observe mode uses this so the viewer cannot leave the ground.
+    void SetMovementLocked(bool locked) { _movementLocked = locked; }
+    bool IsMovementLocked() const { return _movementLocked; }
+
+    void CancelTransition() { _transitionActive = false; }
+
     void SetPosition(const glm::vec3& position) { _position = position; }
     void SetYawPitch(float yaw, float pitch) { _yaw = yaw; _pitch = pitch; UpdateCameraVectors(); }
 
@@ -67,6 +84,8 @@ private:
     float _movementSpeed;
     float _mouseSensitivity;
     float _zoom;
+    float _zoomMin = 1.0f, _zoomMax = 45.0f;
+    bool _movementLocked = false;
     float _nearPlane, _farPlane, _aspect;
 
     // Smooth transition state

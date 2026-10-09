@@ -10,6 +10,10 @@ constexpr std::uint32_t kVkR8G8B8Unorm       = 23;
 constexpr std::uint32_t kVkR8G8B8Srgb        = 29;
 constexpr std::uint32_t kVkR8G8B8A8Unorm     = 37;
 constexpr std::uint32_t kVkR8G8B8A8Srgb      = 43;
+// Half-float RGBA: the atmosphere LUTs (resource/atmosphere/). Sampling and LINEAR
+// filtering it are core in WebGL 2 / ES 3.0; *rendering* to it (and so glGenerateMipmap)
+// needs EXT_color_buffer_float, so load it with mip filtering off (FloatLutTexture does).
+constexpr std::uint32_t kVkR16G16B16A16Sfloat = 97;
 constexpr std::uint32_t kVkBc1RgbUnorm       = 131;
 constexpr std::uint32_t kVkBc1RgbSrgb        = 132;
 constexpr std::uint32_t kVkBc1RgbaUnorm      = 133;
@@ -37,6 +41,8 @@ constexpr std::uint32_t kGlSrgb8Alpha8                = 0x8C43;
 constexpr std::uint32_t kGlRgb                        = 0x1907;
 constexpr std::uint32_t kGlRgba                       = 0x1908;
 constexpr std::uint32_t kGlUnsignedByte               = 0x1401;
+constexpr std::uint32_t kGlRgba16f                    = 0x881A;
+constexpr std::uint32_t kGlHalfFloat                  = 0x140B;
 constexpr std::uint32_t kGlRgbS3tcDxt1                = 0x83F0;
 constexpr std::uint32_t kGlRgbaS3tcDxt1               = 0x83F1;
 constexpr std::uint32_t kGlRgbaS3tcDxt3               = 0x83F2;
@@ -79,6 +85,7 @@ std::uint32_t GlInternalFormatFromVkFormat(std::uint32_t vkFormat) {
         case kVkR8G8B8Srgb:       return kGlSrgb8;
         case kVkR8G8B8A8Unorm:    return kGlRgba8;
         case kVkR8G8B8A8Srgb:     return kGlSrgb8Alpha8;
+        case kVkR16G16B16A16Sfloat: return kGlRgba16f;
         case kVkBc1RgbUnorm:      return kGlRgbS3tcDxt1;
         case kVkBc1RgbSrgb:       return kGlSrgbS3tcDxt1;
         case kVkBc1RgbaUnorm:     return kGlRgbaS3tcDxt1;
@@ -118,6 +125,8 @@ BlockLayout LayoutFromVkFormat(std::uint32_t vkFormat) {
         case kVkR8G8B8A8Unorm:
         case kVkR8G8B8A8Srgb:
             return {1, 1, 4, false};
+        case kVkR16G16B16A16Sfloat:
+            return {1, 1, 8, false};
         // 8 bytes per 4x4 block: BC1 and the ETC2 formats with no (or 1-bit) alpha.
         case kVkBc1RgbUnorm:
         case kVkBc1RgbSrgb:
@@ -157,6 +166,7 @@ UncompressedUpload UncompressedUploadFromVkFormat(std::uint32_t vkFormat) {
         case kVkR8G8B8Srgb:    return {kGlSrgb8,       kGlRgb,  kGlUnsignedByte};
         case kVkR8G8B8A8Unorm: return {kGlRgba8,       kGlRgba, kGlUnsignedByte};
         case kVkR8G8B8A8Srgb:  return {kGlSrgb8Alpha8, kGlRgba, kGlUnsignedByte};
+        case kVkR16G16B16A16Sfloat: return {kGlRgba16f, kGlRgba, kGlHalfFloat};
         default:               return {};
     }
 }
@@ -177,7 +187,7 @@ bool IsFormatSupported(std::uint32_t vkFormat, const FormatCapabilities& caps) {
         return false;
     }
     if (!layout.compressed) {
-        return true;  // RGB8/RGBA8 is always uploadable.
+        return true;  // RGB8/RGBA8/RGBA16F are core in every target (RGBA16F: no mip generation).
     }
     if (IsAstc(vkFormat)) {
         return caps.astc;

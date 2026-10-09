@@ -21,6 +21,17 @@ export type XrBindings = {
   getXrMatrixScratchPtr: () => number;
   runXrFrame: () => void;
   getHeapF32: () => Float32Array;
+  /**
+   * Observe mode (camera on Earth, seated sky): the sticks stop flying and instead scrub time
+   * (left) and snap-turn the sky heading (right). Absent or inactive = the fly-through mapping.
+   */
+  observe?: {
+    isActive: () => boolean;
+    /** Advance simulated time by this many seconds (negative rewinds). */
+    scrubTime: (seconds: number) => void;
+    /** Turn the sky heading by this many degrees (positive turns right, toward east). */
+    turn: (degrees: number) => void;
+  };
   setXrControllerRay?: (
     hand: number,
     ox: number,
@@ -44,6 +55,10 @@ const XR_DEPTH_NEAR = 0.001;
 const XR_DEPTH_FAR = 20000;
 const SNAP_TURN_DEG = 30;
 const SNAP_TURN_COOLDOWN_MS = 350;
+// Observe mode: full deflection of the left stick scrubs this many simulated seconds per
+// real second (3 hours); the response is quadratic so small pushes stay fine-grained.
+const OBSERVE_SCRUB_SECONDS_PER_SECOND = 3 * 3600;
+const OBSERVE_TOOLTIP = 'Observe — left stick: scrub time · right stick: turn';
 
 const XR_BODY_NAMES = [
   'Sun', 'Mercury', 'Venus', 'Earth', 'Mars', 'Jupiter', 'Saturn',
@@ -165,6 +180,7 @@ export async function initWebXr(options: {
   let gl: WebGL2RenderingContext | null = null;
   let qualityBeforeVr: number | null = null;
   let lastSnapTurnMs = 0;
+  let lastPollMs = performance.now();
   let rafHandle = 0;
   // The XRWebGLLayer's framebuffer, once it has a name in Emscripten's GL table. C++
   // rebinds it after the shadow pass instead of FBO 0; without it the shadow pass is
@@ -230,6 +246,12 @@ export async function initWebXr(options: {
     let right = 0;
     let vertical = 0;
     let lookX = 0;
+    let scrub = 0;
+    let turnDegrees = 0;
+    const observing = bindings.observe?.isActive() ?? false;
+    const pollNow = performance.now();
+    const dtSeconds = Math.min(0.1, Math.max(0, (pollNow - lastPollMs) / 1000));
+    lastPollMs = pollNow;
     let leftConnected = false;
     let rightConnected = false;
     const cam = bindings.getCameraPosition();
@@ -269,17 +291,28 @@ export async function initWebXr(options: {
       const ay = clampAxis(pad.axes[3] ?? pad.axes[1] ?? 0);
 
       if (handedness === 'left' || handedness === 'none') {
-        // Match touch joystick: forward = -Y, right = +X
-        forward += -ay;
-        right += ax;
-        if (pad.buttons[1]?.pressed) {
-          vertical += 0.85;
+        if (observing) {
+          scrub += -ay; // push forward = later
+        } else {
+          // Match touch joystick: forward = -Y, right = +X
+          forward += -ay;
+          right += ax;
+          if (pad.buttons[1]?.pressed) {
+            vertical += 0.85;
+          }
         }
       } else if (handedness === 'right') {
-        vertical += -ay;
+        if (!observing) {
+          vertical += -ay;
+        }
         const now = performance.now();
         if (Math.abs(ax) > 0.7 && now - lastSnapTurnMs > SNAP_TURN_COOLDOWN_MS) {
-          lookX = ax > 0 ? SNAP_TURN_DEG : -SNAP_TURN_DEG;
+          const signed = ax > 0 ? SNAP_TURN_DEG : -SNAP_TURN_DEG;
+          if (observing) {
+            turnDegrees = signed;
+          } else {
+            lookX = signed;
+          }
           lastSnapTurnMs = now;
         }
       }
@@ -307,9 +340,23 @@ export async function initWebXr(options: {
     const nearest = bindings.getNearestPlanetIndex?.() ?? -1;
     const bodyIndex = focused >= 0 ? focused : nearest;
     if (tooltip) {
-      tooltip.textContent = bodyIndex >= 0 && bodyIndex < XR_BODY_NAMES.length
-        ? XR_BODY_NAMES[bodyIndex]
-        : '';
+      tooltip.textContent = observing
+        ? OBSERVE_TOOLTIP
+        : bodyIndex >= 0 && bodyIndex < XR_BODY_NAMES.length
+          ? XR_BODY_NAMES[bodyIndex]
+          : '';
+    }
+
+    if (observing) {
+      // Seated sky: no locomotion at all (the camera is locked on the ground in C++ too).
+      bindings.setTouchMovement(0, 0, 0);
+      if (scrub !== 0 && dtSeconds > 0) {
+        bindings.observe?.scrubTime(Math.sign(scrub) * scrub * scrub * OBSERVE_SCRUB_SECONDS_PER_SECOND * dtSeconds);
+      }
+      if (turnDegrees !== 0) {
+        bindings.observe?.turn(turnDegrees);
+      }
+      return;
     }
 
     const mag = Math.hypot(forward, right, vertical);

@@ -11,6 +11,7 @@
 #include <SDL_image.h>
 #include <algorithm>
 #include <cmath>
+#include <cstdlib>
 #include <cstring>
 #include <iostream>
 
@@ -192,6 +193,12 @@ void Application::InitSystems() {
 #ifndef __EMSCRIPTEN__
     glewExperimental = true;
     glewInit();
+
+    if (const char* selfTest = std::getenv("SOLARSYSTEM_SHADER_SELFTEST"); selfTest && *selfTest && std::string(selfTest) != "0") {
+        const int failures = Shader::SelfTestDirectory("resource/shaders");
+        glfwTerminate();
+        std::exit(failures == 0 ? EXIT_SUCCESS : EXIT_FAILURE);
+    }
 #endif
 
     FT_Init_FreeType(&_ft);
