@@ -223,7 +223,9 @@ void AsteroidField::InitShaders() {
 void AsteroidField::RebuildInstanceBuffer() {
     for (int i = 0; i < _activeCount; ++i) {
         const OrbitalElements& el = _asteroids[static_cast<size_t>(i)];
-        const glm::vec3 pos = AsteroidOrbit::HeliocentricPosition(el);
+        // Render frame, subtracted in double: a Kuiper rock beside the camera at 40 AU
+        // would otherwise sit on a ~0.008-unit float grid.
+        const glm::vec3 pos = OrbitLayout::ToRenderFrame(AsteroidOrbit::HeliocentricScenePosition(el));
         glm::mat4 model(1.0f);
         model = glm::translate(model, pos);
         model = glm::rotate(model, el.spinPhaseRad, glm::vec3(0.3f, 1.0f, 0.2f));
@@ -295,7 +297,7 @@ void AsteroidField::Render(const glm::mat4& projection, const glm::mat4& view,
         if (comet.ephemerisBody >= 0) {
             continue; // nucleus is a catalog focus body (e.g. 1P/Halley); only the tail is ours
         }
-        const glm::vec3 pos = AsteroidOrbit::HeliocentricPosition(comet);
+        const glm::vec3 pos = OrbitLayout::ToRenderFrame(AsteroidOrbit::HeliocentricScenePosition(comet));
         glm::mat4 model(1.0f);
         model = glm::translate(model, pos);
         model = glm::rotate(model, comet.spinPhaseRad, glm::vec3(0.2f, 1.0f, 0.1f));
@@ -330,7 +332,7 @@ void AsteroidField::Render(const glm::mat4& projection, const glm::mat4& view,
 
         glBindVertexArray(_tailVao);
         for (const auto& comet : _comets) {
-            const glm::vec3 pos = AsteroidOrbit::HeliocentricPosition(comet);
+            const glm::vec3 pos = OrbitLayout::ToRenderFrame(AsteroidOrbit::HeliocentricScenePosition(comet));
             const float e = std::clamp(comet.eccentricity, 0.0f, 0.999f);
             const float rAuExact = AsteroidOrbit::CurrentRadiusAu(comet);
             const float peri = comet.semiMajorAu * (1.0f - e);

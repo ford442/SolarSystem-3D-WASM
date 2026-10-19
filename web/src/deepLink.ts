@@ -193,6 +193,18 @@ function roundCoord(value: number): number {
     return Math.round(value * 100) / 100;
 }
 
+/**
+ * Camera coordinates. Realistic scale keeps 1e-6 scene units: Earth's radius there is ~0.08
+ * units, so the compressed 0.01 rounding would move a pose by an eighth of an Earth radius,
+ * and setCameraPose takes doubles, so the extra digits survive the round trip.
+ */
+function roundPosition(value: number, orbitScale: OrbitScaleMode | undefined): number {
+    if (orbitScale === 1) {
+        return Math.round(value * 1e6) / 1e6;
+    }
+    return roundCoord(value);
+}
+
 function roundAngle(value: number): number {
     return Math.round(value * 10) / 10;
 }
@@ -337,9 +349,9 @@ export function buildShareableUrl(
     const yaw = pose?.yaw ?? readers.getCameraYaw?.();
     const pitch = pose?.pitch ?? readers.getCameraPitch?.();
     if (position && yaw !== undefined && pitch !== undefined) {
-        url.searchParams.set('x', String(roundCoord(position.x)));
-        url.searchParams.set('y', String(roundCoord(position.y)));
-        url.searchParams.set('z', String(roundCoord(position.z)));
+        url.searchParams.set('x', String(roundPosition(position.x, orbitScale)));
+        url.searchParams.set('y', String(roundPosition(position.y, orbitScale)));
+        url.searchParams.set('z', String(roundPosition(position.z, orbitScale)));
         url.searchParams.set('yaw', String(roundAngle(yaw)));
         url.searchParams.set('pitch', String(roundAngle(pitch)));
     }

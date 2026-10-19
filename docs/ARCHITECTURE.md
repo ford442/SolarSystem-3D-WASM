@@ -713,6 +713,40 @@ than a fan of `GetEclipseX/Y/Z` scalars, because an event's body pair only means
 alongside its kind tag. `web/src/skyEvents.ts` parses it and owns the chip; `web/src/
 conjunction.ts` remains for the explorer's conjunction-only chip.
 
+### 11.1 Render origin (how positions reach the GPU)
+
+Realistic scale puts Neptune ~57 000 scene units from the Sun, where adjacent floats are ~0.004
+apart — a tenth of Earth's realistic radius (~0.08). Logarithmic depth (`common/log_depth.glsl`)
+fixes the depth buffer, not vertex positions, so the simulation stays heliocentric in double and
+only the *rendered* frame is camera-relative:
+
+- `OrbitLayout` keeps the ephemeris cache (lon, lat, r) in double and exposes
+  `GetHeliocentricScenePosition(body)`. `GetOffset` is that cast to float, for coarse callers
+  only (nearest-planet search, activation radii).
+- A **render origin** (`OrbitLayout::GetRenderOrigin`, double) is subtracted in double before
+  anything becomes a `glm::vec3`: `ToRenderFrame(helio)`, `GetRenderPosition(body)`. Every float
+  scene position in the engine — `Transformable::GetPosition`, `Camera` position, the Sun's own
+  position (`-origin`), uniforms, model matrices, overlay VBOs — is in that frame.
+- `Application::UpdateRenderOrigin` runs once per frame after input. `ChooseRenderOrigin` moves the
+  origin onto the camera only when it is more than `kRenderOriginRebaseDistance` (512) units away,
+  so ordinary flight does not rebase every frame. `MoveRenderOrigin` then carries what holds a
+  render-frame position across frames: the camera and its transition endpoints, this frame's XR eye
+  views (webxr.ts built them before the shift), XR pointer rays, staged-loading proxies, mission
+  path VBOs, and the bodies themselves (re-placed at once so the LOD manager sees them next to the
+  shifted camera).
+- On compressed scale the origin is pinned at the Sun, so the render frame is the heliocentric
+  frame and positions are what they always were.
+- The shadow light view is built with a double `lookAt` (its eye is the Sun, far from the origin);
+  lighting gets the Sun's render-frame position, which shaders only use as a direction.
+- The camera pose JS reads and writes is heliocentric: `SetCameraPose` takes doubles and, on
+  realistic scale, rebases onto the pose so the camera stores an exact zero; deep links carry
+  1e-6-unit coordinates on realistic scale. `GetCameraPositionX/Y/Z` stay render-frame because
+  webxr.ts composes eye views from them.
+
+`tests/test_render_origin.cpp` pins this down: a camera one Earth radius from Eris (≥ 50 AU)
+sees it at the double offset, a rebase mid-flight moves it on screen by under a pixel, and
+compressed positions match the old float computation.
+
 ## 12. Common pitfalls
 
 1. Do not use a blocking main loop on WASM.
@@ -723,6 +757,8 @@ conjunction.ts` remains for the explorer's conjunction-only chip.
 6. Do not preload sounds in the Emscripten CMake block (Git LFS files may be missing).
 7. After `TextureImage2D::ReloadTexture`, render passes must rebind texture IDs each frame.
 8. Black textures on web usually mean incorrect `GL_TEXTURE_MAX_LEVEL` — verify mip chain upload.
+9. Do not add a heliocentric float to a render-frame float (`sun->GetPosition() + GetOffset(...)`)
+   or cache a render-frame position across frames without shifting it in `MoveRenderOrigin` (§11.1).
 
 ---
 

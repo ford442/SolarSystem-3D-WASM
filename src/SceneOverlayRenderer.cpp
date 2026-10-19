@@ -185,19 +185,24 @@ void Renderer::RenderOrbitPaths() const {
 }
 
 void Renderer::RebuildMissionPaths() {
-    missionPathMeshes.clear();
-    missionPathMeshes.reserve(_app._missionCatalog.missions.size());
-    for (const auto& mission : _app._missionCatalog.missions) {
-        auto pathRenderer = std::make_unique<MissionPathRenderer>();
-        const auto auSamples = MissionCatalog::DownsampledAu(mission, gSimState->qualityPreset);
+    // Vertices are uploaded in the render frame, so this also runs whenever the render
+    // origin moves. Reuse the renderers (each owns a compiled shader) and only re-upload.
+    const auto& missions = _app._missionCatalog.missions;
+    if (missionPathMeshes.size() != missions.size()) {
+        missionPathMeshes.clear();
+        missionPathMeshes.reserve(missions.size());
+        for (size_t i = 0; i < missions.size(); ++i) {
+            missionPathMeshes.push_back(std::make_unique<MissionPathRenderer>());
+        }
+    }
+    for (size_t i = 0; i < missions.size(); ++i) {
+        const auto auSamples = MissionCatalog::DownsampledAu(missions[i], gSimState->qualityPreset);
         std::vector<glm::vec3> scene;
         scene.reserve(auSamples.size());
-        const glm::vec3 sunPos = _app._sun ? _app._sun->GetPosition() : glm::vec3(0.0f);
         for (const auto& au : auSamples) {
-            scene.push_back(sunPos + OrbitLayout::HelioAuToScene(au));
+            scene.push_back(OrbitLayout::ToRenderFrame(OrbitLayout::HelioAuToSceneDouble(glm::dvec3(au))));
         }
-        pathRenderer->Upload(scene);
-        missionPathMeshes.push_back(std::move(pathRenderer));
+        missionPathMeshes[i]->Upload(scene);
     }
 }
 

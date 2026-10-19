@@ -166,20 +166,29 @@ float SolveKepler(float meanAnomaly, float eccentricity) {
     return eAnom;
 }
 
+namespace {
+
+glm::dvec3 orbitalToCartesian(double radius, double trueAnomaly,
+                              double inclination, double argPeriapsis, double longAscNode) {
+    const double u = argPeriapsis + trueAnomaly;
+    const double cosO = std::cos(longAscNode);
+    const double sinO = std::sin(longAscNode);
+    const double cosI = std::cos(inclination);
+    const double sinI = std::sin(inclination);
+    const double cosU = std::cos(u);
+    const double sinU = std::sin(u);
+
+    const double x = radius * (cosO * cosU - sinO * sinU * cosI);
+    const double yEcl = radius * (sinO * cosU + cosO * sinU * cosI);
+    const double zEcl = radius * (sinU * sinI);
+    return glm::dvec3(x, zEcl, yEcl);
+}
+
+} // namespace
+
 glm::vec3 OrbitalToCartesian(float radius, float trueAnomaly,
                              float inclination, float argPeriapsis, float longAscNode) {
-    const float u = argPeriapsis + trueAnomaly;
-    const float cosO = std::cos(longAscNode);
-    const float sinO = std::sin(longAscNode);
-    const float cosI = std::cos(inclination);
-    const float sinI = std::sin(inclination);
-    const float cosU = std::cos(u);
-    const float sinU = std::sin(u);
-
-    const float x = radius * (cosO * cosU - sinO * sinU * cosI);
-    const float yEcl = radius * (sinO * cosU + cosO * sinU * cosI);
-    const float zEcl = radius * (sinU * sinI);
-    return glm::vec3(x, zEcl, yEcl);
+    return glm::vec3(orbitalToCartesian(radius, trueAnomaly, inclination, argPeriapsis, longAscNode));
 }
 
 float CurrentRadiusAu(const OrbitalElements& el) {
@@ -192,17 +201,23 @@ float CurrentRadiusAu(const OrbitalElements& el) {
 }
 
 glm::vec3 HeliocentricPosition(const OrbitalElements& el) {
+    return glm::vec3(HeliocentricScenePosition(el));
+}
+
+glm::dvec3 HeliocentricScenePosition(const OrbitalElements& el) {
     if (el.ephemerisBody >= 0) {
-        return OrbitLayout::GetOffset(static_cast<OrbitLayout::Body>(el.ephemerisBody));
+        return OrbitLayout::GetHeliocentricScenePosition(static_cast<OrbitLayout::Body>(el.ephemerisBody));
     }
-    const float e = std::clamp(el.eccentricity, 0.0f, 0.999f);
-    const float eAnom = SolveKepler(el.meanAnomalyRad, e);
-    const float cosE = std::cos(eAnom);
-    const float sinE = std::sin(eAnom);
-    const float trueAnomaly = std::atan2(std::sqrt(1.0f - e * e) * sinE, cosE - e);
-    const float rAu = el.semiMajorAu * (1.0f - e * cosE);
-    const float rScene = OrbitLayout::AuToSceneDistance(rAu);
-    return OrbitalToCartesian(rScene, trueAnomaly, el.inclinationRad, el.argPeriapsisRad, el.longAscNodeRad);
+    // The Kepler solve stays in float (its error is in the anomaly, a smooth function of
+    // time); the placement at tens of thousands of scene units is what needs double.
+    const double e = std::clamp(el.eccentricity, 0.0f, 0.999f);
+    const double eAnom = SolveKepler(el.meanAnomalyRad, static_cast<float>(e));
+    const double cosE = std::cos(eAnom);
+    const double sinE = std::sin(eAnom);
+    const double trueAnomaly = std::atan2(std::sqrt(1.0 - e * e) * sinE, cosE - e);
+    const double rAu = el.semiMajorAu * (1.0 - e * cosE);
+    return orbitalToCartesian(OrbitLayout::AuToSceneDistanceDouble(rAu), trueAnomaly,
+                              el.inclinationRad, el.argPeriapsisRad, el.longAscNodeRad);
 }
 
 } // namespace AsteroidOrbit

@@ -57,6 +57,9 @@ export interface CachedCwrapExports {
     getCameraPositionX: () => number;
     getCameraPositionY: () => number;
     getCameraPositionZ: () => number;
+    getCameraHeliocentricX: () => number;
+    getCameraHeliocentricY: () => number;
+    getCameraHeliocentricZ: () => number;
     getCameraYaw: () => number;
     getCameraPitch: () => number;
 }
@@ -118,9 +121,12 @@ export function createCachedCwrapExports(cwrap: SolarSystemCwrap): CachedCwrapEx
     getCameraPositionX: cwrap('GetCameraPositionX', 'number', []) as () => number,
     getCameraPositionY: cwrap('GetCameraPositionY', 'number', []) as () => number,
     getCameraPositionZ: cwrap('GetCameraPositionZ', 'number', []) as () => number,
+    getCameraHeliocentricX: cwrap('GetCameraHeliocentricX', 'number', []) as () => number,
+    getCameraHeliocentricY: cwrap('GetCameraHeliocentricY', 'number', []) as () => number,
+    getCameraHeliocentricZ: cwrap('GetCameraHeliocentricZ', 'number', []) as () => number,
     getCameraYaw: cwrap('GetCameraYaw', 'number', []) as () => number,
     getCameraPitch: cwrap('GetCameraPitch', 'number', []) as () => number,
     };
 }
 
-export const EXPORT_COUNT = 57;
+export const EXPORT_COUNT = 64;

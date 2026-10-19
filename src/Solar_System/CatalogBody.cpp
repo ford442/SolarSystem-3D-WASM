@@ -11,7 +11,7 @@ CatalogBody::CatalogBody(const PlanetInfo& planetInfo, std::shared_ptr<Star> par
       _diffuses(planetInfo.diffuseTextures),
       _normalMap(planetInfo.normalMap),
       _specular(planetInfo.specularTexture) {
-    Translate(_parentStar->GetPosition() + OrbitLayout::GetOffset(_body));
+    Translate(OrbitLayout::GetRenderPosition(_body));
 
     const TexturePaths::Paths diffuse = TexturePaths::ForTextureId(entry.lod.diffuse);
     _diffuseLOD.Configure(_diffuses.at(0), diffuse.low, diffuse.mid, diffuse.high, entry.lod.diffuse,
@@ -37,7 +37,10 @@ CatalogBody::CatalogBody(const PlanetInfo& planetInfo, std::shared_ptr<Star> par
 
 void CatalogBody::AdjustToParent(float /*timeScale*/) {
     LoadIdentityModelMatrix();
-    Translate(_parentStar->GetPosition() + OrbitLayout::GetOffset(_body));
+    // Not _parentStar->GetPosition() + GetOffset(): that sum is two large floats on
+    // realistic scale. The Sun is the simulation origin, so the render-frame position is
+    // the heliocentric one minus the render origin, taken in double.
+    Translate(OrbitLayout::GetRenderPosition(_body));
     Scale(glm::vec3(_earthSizeCoefficient));
     Rotate(_entry.axialTiltDegrees, glm::vec3(0.0f, 0.0f, 1.0f));
     if (_entry.artTiltXDegrees != 0.0f) {

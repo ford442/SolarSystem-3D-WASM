@@ -192,10 +192,12 @@ export function createSolarSystemRuntime(instance: SolarSystemModule): SolarSyst
         heapF32: instance.HEAPF32,
 
         setCameraPose: exports.setCameraPose,
+        // Heliocentric, in double, the frame setCameraPose takes. getCameraPosition below is
+        // the render frame (relative to the render origin) that WebXR composes eye views in.
         getCameraPose: () => ({
-            x: exports.getCameraPositionX(),
-            y: exports.getCameraPositionY(),
-            z: exports.getCameraPositionZ(),
+            x: exports.getCameraHeliocentricX(),
+            y: exports.getCameraHeliocentricY(),
+            z: exports.getCameraHeliocentricZ(),
             yaw: exports.getCameraYaw(),
             pitch: exports.getCameraPitch(),
         }),

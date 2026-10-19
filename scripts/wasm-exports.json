@@ -55,6 +55,9 @@
   "_GetCameraPositionX",
   "_GetCameraPositionY",
   "_GetCameraPositionZ",
+  "_GetCameraHeliocentricX",
+  "_GetCameraHeliocentricY",
+  "_GetCameraHeliocentricZ",
   "_GetCameraYaw",
   "_GetCameraPitch"
 ]

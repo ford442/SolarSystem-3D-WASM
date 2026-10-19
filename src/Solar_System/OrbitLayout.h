@@ -60,15 +60,64 @@ double GetJulianDate();
 /** Advance ephemeris epoch and axial spin by scaled wall-clock seconds. */
 void Advance(float scaledDtSeconds);
 
-/** Reset to J2000.0 and zero axial spin (tests / deterministic restarts). */
+/** Reset to J2000.0, zero axial spin, compressed scale, render origin at the Sun (tests). */
 void ResetForTests();
 
 /**
  * Current heliocentric offset from the Sun in scene units for the active scale mode.
  * Direction from Standish/Keplerian ecliptic lon/lat at the current Julian date;
  * radius from GetOrbitRadius (compressed art length or AU-scaled).
+ *
+ * Float, so only for coarse callers (nearest-planet search, activation radii). On realistic
+ * scale a float at Neptune's distance is ~0.004 scene units coarse, which is a tenth of
+ * Earth's realistic radius: anything that becomes a model matrix or a uniform must go
+ * through GetRenderPosition instead.
  */
 glm::vec3 GetOffset(Body body);
+
+/** GetOffset in double: the heliocentric scene position before any float rounding. */
+glm::dvec3 GetHeliocentricScenePosition(Body body);
+
+// --- Render origin -----------------------------------------------------------------------
+//
+// The simulation origin is the Sun, but the frame the GPU sees is centred on a render
+// origin near the camera so that the float positions near the viewer stay fine-grained.
+// Every glm::vec3 scene position in the engine (Transformable::GetPosition, the camera,
+// the Sun's own position, uniforms, model matrices) is in this render frame:
+//
+//     render = float(heliocentricScene - renderOrigin)
+//
+// computed in double. The origin only moves when the camera strays more than
+// kRenderOriginRebaseDistance from it (ChooseRenderOrigin), and on compressed scale it
+// stays pinned at the Sun, so the render frame is the heliocentric frame there.
+
+/**
+ * How far (scene units) the camera may stray from the render origin before it rebases.
+ * Floats below 512 are spaced at most 6e-5 units apart, under a thousandth of Earth's
+ * realistic radius (~0.08), so a body one Earth radius away is placed to well under a pixel.
+ * At the top fly speed (150 units/s) that is a rebase every few seconds, not every frame;
+ * only a focus transition across the system rebases on most frames for its two seconds.
+ */
+constexpr float kRenderOriginRebaseDistance = 512.0f;
+
+glm::dvec3 GetRenderOrigin();
+void SetRenderOrigin(const glm::dvec3& origin);
+
+/** Heliocentric scene position (double) → render frame (float), subtracting in double. */
+glm::vec3 ToRenderFrame(const glm::dvec3& heliocentricScene);
+
+/** Render frame (float) → heliocentric scene position (double). */
+glm::dvec3 ToHeliocentricScene(const glm::vec3& renderFrame);
+
+/** GetHeliocentricScenePosition(body) in the render frame. The Sun's is -origin. */
+glm::vec3 GetRenderPosition(Body body);
+
+/**
+ * The origin the render frame should use given where the camera is in it. Compressed:
+ * always the Sun. Realistic: the current origin until the camera is more than
+ * kRenderOriginRebaseDistance from it, then the camera's own heliocentric position.
+ */
+glm::dvec3 ChooseRenderOrigin(const glm::vec3& cameraRenderFrame);
 
 /** Semi-major axis in astronomical units (NASA fact-sheet averages). */
 float GetAuDistance(Body body);
@@ -80,11 +129,17 @@ float GetAuDistance(Body body);
  */
 float AuToSceneDistance(float au);
 
+/** AuToSceneDistance in double. */
+double AuToSceneDistanceDouble(double au);
+
 /**
  * Map a heliocentric AU vector in scene axes (ecliptic x,z,y) to scene units.
  * Preserves direction; length uses AuToSceneDistance so compressed/realistic both work.
  */
 glm::vec3 HelioAuToScene(const glm::vec3& auSceneAxes);
+
+/** HelioAuToScene in double, for positions that will go through ToRenderFrame. */
+glm::dvec3 HelioAuToSceneDouble(const glm::dvec3& auSceneAxes);
 
 /**
  * Orbit radius in scene units (scale-mode aware). Independent of anomaly for Mercury–Vesta,

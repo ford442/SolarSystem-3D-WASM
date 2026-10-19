@@ -109,11 +109,10 @@ glm::vec3 Renderer::CameraWorldPosition() const {
     return glm::vec3(glm::inverse(cameraView)[3]);
 }
 
-void Renderer::ProcessSceneComponentsRendering() {
+void Renderer::PlaceSceneComponents() {
     const float timeScale = gSimState->timePaused ? 0.0f : gSimState->timeScale;
 
     for (auto& component : _app._renderableSceneComponents) {
-        // Place bodies once per frame (shadow + color passes only render).
         component.planet->AdjustToParent(timeScale);
         for (const auto& satellite : component.satellites) {
             satellite->AdjustToParent(timeScale);
@@ -129,11 +128,23 @@ void Renderer::ProcessSceneComponentsRendering() {
         if (component.planetaryRing) {
             component.planetaryRing->AdjustToParent();
         }
+    }
+}
 
+void Renderer::ProcessSceneComponentsRendering() {
+    // Place bodies once per frame (shadow + color passes only render).
+    PlaceSceneComponents();
+
+    for (auto& component : _app._renderableSceneComponents) {
         // Shadow frustum tracks the planet's current heliocentric position.
         const float extent = component.planet->GetRadius() * 3.0f;
         const glm::mat4 lightProjection = glm::ortho(-extent, extent, -extent, extent, _app._camera.GetNear(), _app._camera.GetFar());
-        const glm::mat4 lightView = glm::lookAt(_app._sun->GetPosition(), component.planet->GetPosition(), glm::vec3(0.0f, 1.0f, 0.0f));
+        // Built in double: the eye is the Sun, tens of thousands of units from the render
+        // origin on realistic scale, and a float lookAt folds that into the light-space x/y
+        // the shadow lookup reads. In double those reduce to the planet's own small offset.
+        const glm::mat4 lightView(glm::lookAt(glm::dvec3(_app._sun->GetPosition()),
+                                              glm::dvec3(component.planet->GetPosition()),
+                                              glm::dvec3(0.0, 1.0, 0.0)));
         component.lightSpaceMatrix = lightProjection * lightView;
 
         ShadowMapPass(component);

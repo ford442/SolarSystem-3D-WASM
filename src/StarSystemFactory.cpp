@@ -210,8 +210,10 @@ void Application::InitCatalogSystem(const MeshHolder& sphereModel, const std::st
     const glm::mat4 lightProjection =
         glm::ortho(-planet->GetRadius() * 3.0f, planet->GetRadius() * 3.0f,
                    -planet->GetRadius() * 3.0f, planet->GetRadius() * 3.0f, _camera.GetNear(), lightFar);
-    const glm::mat4 lightView =
-        glm::lookAt(_sun->GetPosition(), planet->GetPosition() - _sun->GetPosition(), glm::vec3(0.0, 1.0, 0.0));
+    // Same frame as the per-frame matrix in ProcessSceneComponentsRendering, which replaces
+    // this one before the first shadow pass.
+    const glm::mat4 lightView(glm::lookAt(glm::dvec3(_sun->GetPosition()), glm::dvec3(planet->GetPosition()),
+                                          glm::dvec3(0.0, 1.0, 0.0)));
 
     component.lightSpaceMatrix = lightProjection * lightView;
     component.planet = std::move(planet);
