@@ -184,7 +184,7 @@ if(EMSCRIPTEN)
         "SHELL:--preload-file ${CMAKE_SOURCE_DIR}/resource/fonts@/resource/fonts"
         "SHELL:--preload-file ${CMAKE_SOURCE_DIR}/resource/icons@/resource/icons"
         "SHELL:--preload-file ${CMAKE_SOURCE_DIR}/resource/textures_low@/resource/textures_low"
-        # Baked atmosphere LUTs (~560 KB): tools/atmosphere_lut_baker, ARCHITECTURE §9.2.
+        # Baked atmosphere LUTs (~1.1 MB, 8 bodies): tools/atmosphere_lut_baker, ARCHITECTURE §9.2.
         "SHELL:--preload-file ${CMAKE_SOURCE_DIR}/resource/atmosphere@/resource/atmosphere"
         "SHELL:-sMODULARIZE=1"
         "SHELL:-sEXPORT_ES6=1"

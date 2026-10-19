@@ -1,4 +1,5 @@
 #include "CatalogBody.h"
+#include "BodyShape.h"
 
 #include <glm/glm.hpp>
 
@@ -45,6 +46,10 @@ void CatalogBody::AdjustToParent(float /*timeScale*/) {
     Rotate(_entry.axialTiltDegrees, glm::vec3(0.0f, 0.0f, 1.0f));
     if (_entry.artTiltXDegrees != 0.0f) {
         Rotate(_entry.artTiltXDegrees, glm::vec3(1.0f, 0.0f, 0.0f));
+    }
+    // Flatten along the pole (render.oblateness); the cloud and atmosphere shells match.
+    if (BodyShape::IsOblate(_entry)) {
+        Scale(BodyShape::PolarScale(_entry));
     }
     Rotate(OrbitLayout::GetAxialSpinDegrees(_body), glm::vec3(0.0f, 1.0f, 0.0f));
 }

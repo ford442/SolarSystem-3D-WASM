@@ -89,6 +89,7 @@
               "ambientFactor": { "type": "number" },
               "useSphereIntersect": { "type": "boolean" },
               "artTiltXDegrees": { "type": "number", "description": "Optional extra Rotate(X) overlay (Saturn rings)." },
+              "oblateness": { "type": "number", "minimum": 0, "exclusiveMaximum": 0.5, "description": "Flattening 1 - polar/equatorial. Squashes the surface, cloud and atmosphere meshes along the pole (BodyShape.h); the mesh radius stays equatorial, and physical.groundRadiusKm is the equatorial radius. Primaries only." },
               "mesh": { "type": ["string", "null"], "description": "Optional non-sphere mesh path (Phobos/Deimos)." },
               "lod": {
                 "type": "object",
@@ -134,7 +135,7 @@
                     "description": "Per-km coefficients at the ground; colour triples are ~680/550/440 nm.",
                     "required": ["groundRadiusKm", "topRadiusKm", "thicknessScale", "rayleigh", "mie", "absorption", "groundAlbedo", "exposure"],
                     "properties": {
-                      "groundRadiusKm": { "type": "number" },
+                      "groundRadiusKm": { "type": "number", "description": "The surface the view ray stops at: the ground, or for Venus and the giants the cloud deck (the giants' 1-bar equatorial radius)." },
                       "topRadiusKm": { "type": "number" },
                       "thicknessScale": { "type": "number", "description": "Art knob: widens the shell while preserving vertical optical depth." },
                       "rayleigh": { "type": "object", "properties": { "scatteringPerKm": { "type": "array", "items": { "type": "number", "minimum": 0 }, "minItems": 3, "maxItems": 3 }, "scaleHeightKm": { "type": "number" } } },

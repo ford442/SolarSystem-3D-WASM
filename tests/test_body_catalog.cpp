@@ -138,7 +138,7 @@ TEST(BodyCatalogTest, OneilAtmosphereNumbersMovedFromSystemVisualsUnchanged) {
     }
 }
 
-TEST(BodyCatalogTest, PhysicalAtmospheresAreEarthVenusMarsTitan) {
+TEST(BodyCatalogTest, PhysicalAtmospheresAreTerrestrialsTitanAndGiants) {
     std::vector<std::string> physical;
     for (const BodyCatalog::AtmosphereRow& row : BodyCatalog::kAtmospheres) {
         if (!row.physical.enabled) {
@@ -154,7 +154,8 @@ TEST(BodyCatalogTest, PhysicalAtmospheresAreEarthVenusMarsTitan) {
         EXPECT_LE(p.mieScattering.b, p.mieExtinction.b) << row.bodyId;
     }
     std::sort(physical.begin(), physical.end());
-    EXPECT_EQ(physical, (std::vector<std::string>{"earth", "mars", "titan", "venus"}));
+    EXPECT_EQ(physical, (std::vector<std::string>{"earth", "jupiter", "mars", "neptune", "saturn", "titan", "uranus",
+                                                  "venus"}));
 }
 
 TEST(BodyCatalogTest, TitanAtmosphereIsAnOrdinaryCatalogRow) {

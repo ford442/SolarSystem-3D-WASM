@@ -565,6 +565,7 @@
           "normal": "Jupiter_Normal",
           "specular": null
         },
+        "oblateness": 0.06487,
         "atmosphere": {
           "oneil": {
             "shellScale": 11.4,
@@ -574,6 +575,21 @@
             "mieTint": [1, 1, 1],
             "hScaleFactor": 26,
             "toneMapping": true
+          },
+          "physical": {
+            "groundRadiusKm": 71492,
+            "topRadiusKm": 71792,
+            "thicknessScale": 6,
+            "rayleigh": { "scatteringPerKm": [0.0006, 0.0014, 0.0033], "scaleHeightKm": 27 },
+            "mie": {
+              "scatteringPerKm": [0.0023, 0.0019, 0.0013],
+              "extinctionPerKm": [0.0025, 0.0025, 0.0025],
+              "scaleHeightKm": 40,
+              "phaseG": 0.5
+            },
+            "absorption": { "extinctionPerKm": [0.0002, 5e-05, 0], "layerCenterKm": 0, "layerHalfWidthKm": 150 },
+            "groundAlbedo": [0.55, 0.5, 0.4],
+            "exposure": 5
           }
         }
       }
@@ -669,6 +685,7 @@
           "specular": null
         },
         "artTiltXDegrees": -15,
+        "oblateness": 0.09796,
         "atmosphere": {
           "oneil": {
             "shellScale": 9.34,
@@ -678,6 +695,21 @@
             "mieTint": [1, 1, 1],
             "hScaleFactor": 27,
             "toneMapping": true
+          },
+          "physical": {
+            "groundRadiusKm": 60268,
+            "topRadiusKm": 60868,
+            "thicknessScale": 2.5,
+            "rayleigh": { "scatteringPerKm": [0.0002, 0.0005, 0.0012], "scaleHeightKm": 60 },
+            "mie": {
+              "scatteringPerKm": [0.00294, 0.00276, 0.00228],
+              "extinctionPerKm": [0.003, 0.003, 0.003],
+              "scaleHeightKm": 80,
+              "phaseG": 0.5
+            },
+            "absorption": { "extinctionPerKm": [0.0001, 3e-05, 0], "layerCenterKm": 0, "layerHalfWidthKm": 300 },
+            "groundAlbedo": [0.62, 0.56, 0.42],
+            "exposure": 5
           }
         }
       }
@@ -779,6 +811,7 @@
           "spinDegPerSimSecond": 3.447,
           "ambientFactor": 0
         },
+        "oblateness": 0.02293,
         "atmosphere": {
           "oneil": {
             "shellScale": 4,
@@ -788,6 +821,21 @@
             "mieTint": [1, 1, 1],
             "hScaleFactor": 24,
             "toneMapping": true
+          },
+          "physical": {
+            "groundRadiusKm": 25559,
+            "topRadiusKm": 25859,
+            "thicknessScale": 2,
+            "rayleigh": { "scatteringPerKm": [0.0017, 0.004, 0.0097], "scaleHeightKm": 28 },
+            "mie": {
+              "scatteringPerKm": [0.0026, 0.0039, 0.0039],
+              "extinctionPerKm": [0.004, 0.004, 0.004],
+              "scaleHeightKm": 40,
+              "phaseG": 0.6
+            },
+            "absorption": { "extinctionPerKm": [0.004, 0.0005, 0.0001], "layerCenterKm": 0, "layerHalfWidthKm": 200 },
+            "groundAlbedo": [0.45, 0.62, 0.65],
+            "exposure": 5
           }
         }
       }
@@ -878,6 +926,7 @@
           "spinDegPerSimSecond": 4.8,
           "ambientFactor": 0
         },
+        "oblateness": 0.01708,
         "atmosphere": {
           "oneil": {
             "shellScale": 3.9,
@@ -887,6 +936,21 @@
             "mieTint": [1, 1, 1],
             "hScaleFactor": 23,
             "toneMapping": true
+          },
+          "physical": {
+            "groundRadiusKm": 24764,
+            "topRadiusKm": 24984,
+            "thicknessScale": 2.8,
+            "rayleigh": { "scatteringPerKm": [0.0021, 0.0048, 0.0116], "scaleHeightKm": 20 },
+            "mie": {
+              "scatteringPerKm": [0.0025, 0.0037, 0.0039],
+              "extinctionPerKm": [0.004, 0.004, 0.004],
+              "scaleHeightKm": 30,
+              "phaseG": 0.6
+            },
+            "absorption": { "extinctionPerKm": [0.006, 0.0008, 0.0002], "layerCenterKm": 0, "layerHalfWidthKm": 150 },
+            "groundAlbedo": [0.35, 0.5, 0.7],
+            "exposure": 5
           }
         }
       }

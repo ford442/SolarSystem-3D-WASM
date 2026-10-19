@@ -15,6 +15,7 @@
 #include <chrono>
 #include <cmath>
 #include <cstdio>
+#include <cstdlib>
 #include <iostream>
 #include <sstream>
 #include <thread>
@@ -228,7 +229,34 @@ void Application::InitSceneObjects() {
 
     StartSearchNearestPlanet();
     StartPlayBackgroundMusic();
+    ApplyCameraPoseEnvOverride();
     ApplyObserveEnvOverride();
+}
+
+void Application::ApplyCameraPoseEnvOverride() {
+    // Same arguments as the web's window.setCameraPose, plus an optional Julian date that
+    // pins (and pauses) the clock, so a native and a web capture can share one pose.
+    const char* spec = std::getenv("SOLARSYSTEM_CAMERA_POSE");
+    if (!spec || !*spec) {
+        return;
+    }
+    double values[6] = {0.0, 0.0, 0.0, 0.0, 0.0, 0.0};
+    int parsed = 0;
+    std::stringstream stream(spec);
+    std::string token;
+    while (parsed < 6 && std::getline(stream, token, ',')) {
+        values[parsed++] = std::atof(token.c_str());
+    }
+    if (parsed < 5) {
+        std::cerr << "[Camera] SOLARSYSTEM_CAMERA_POSE needs x,y,z,yaw,pitch[,jd]" << std::endl;
+        return;
+    }
+    if (parsed >= 6 && values[5] > 0.0) {
+        OrbitLayout::SetJulianDate(values[5]);
+        gSimState->timePaused = true;
+    }
+    _camera.SetPosition(glm::vec3(values[0], values[1], values[2]));
+    _camera.SetYawPitch(static_cast<float>(values[3]), static_cast<float>(values[4]));
 }
 
 void Application::FocusPlanetByIndex(int idx) {
