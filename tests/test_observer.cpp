@@ -208,6 +208,30 @@ TEST(ObserverTest, SunAndMoonHaveTheirRealAngularSizes) {
     EXPECT_NEAR(sun.magnitude, -26.74, 0.1);
 }
 
+TEST(ObserverTest, PlanetsHaveTheirTelescopeDiscSizes) {
+    const Observer::Site site{40.0, -75.0, 0.0};
+    // Jupiter at its 2022-09-26 opposition: 49.9" across (closest since 1963).
+    const Observer::SkyBody jupiter =
+        Observer::ComputeSky(Ephemeris::JulianDateFromYmd(2022, 9, 26), site).bodies[Observer::kSkyJupiter];
+    EXPECT_NEAR(jupiter.angRadiusDeg * 3600.0, 24.95, 0.5);
+
+    // Venus near its 2023-08-13 inferior conjunction: ~58" across and a sliver of a crescent.
+    const Observer::SkyBody venus =
+        Observer::ComputeSky(Ephemeris::JulianDateFromYmd(2023, 8, 13), site).bodies[Observer::kSkyVenus];
+    EXPECT_GT(venus.angRadiusDeg * 3600.0, 27.0);
+    EXPECT_LT(venus.angRadiusDeg * 3600.0, 31.0);
+    EXPECT_LT(venus.illuminatedFraction, 0.03);
+
+    // Every planet stays far below the 0.25 deg telescope floor, so a disc never fills the field.
+    for (int day = 0; day < 800; day += 20) {
+        const Observer::Sky sky = Observer::ComputeSky(kEquinoxNoonJd + day, site);
+        for (int slot = Observer::kSkyMercury; slot < Observer::kSkyBodyCount; ++slot) {
+            EXPECT_GT(sky.bodies[slot].angRadiusDeg * 3600.0, 1.0) << sky.bodies[slot].name;
+            EXPECT_LT(sky.bodies[slot].angRadiusDeg * 3600.0, 34.0) << sky.bodies[slot].name;
+        }
+    }
+}
+
 TEST(ObserverTest, MoonParallaxLowersItByAboutAHorizontalParallaxTimesCosAltitude) {
     const Observer::Site site{45.0, 10.0, 0.0};
     int checked = 0;

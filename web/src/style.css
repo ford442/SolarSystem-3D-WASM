@@ -853,6 +853,65 @@ input {
   line-height: 1.35;
 }
 
+/* Telescope eyepiece (Observe at FOV <= 2 deg): a circular field over the canvas, darkened
+   outside, with a faint crosshair. Purely an overlay — look and zoom still reach the canvas. */
+.telescope-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 800;
+  overflow: hidden;
+  pointer-events: none;
+}
+
+.telescope-overlay[hidden] {
+  display: none;
+}
+
+.telescope-field {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: min(96vw, 96vh);
+  aspect-ratio: 1;
+  transform: translate(-50%, -50%);
+  border: 1px solid rgba(137, 209, 255, 0.35);
+  border-radius: 50%;
+  box-shadow: 0 0 0 200vmax rgba(0, 0, 0, 0.9), inset 0 0 40px rgba(0, 0, 0, 0.6);
+}
+
+.telescope-field::before,
+.telescope-field::after {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  content: "";
+  background: rgba(137, 209, 255, 0.22);
+  transform: translate(-50%, -50%);
+}
+
+.telescope-field::before {
+  width: 12%;
+  height: 1px;
+}
+
+.telescope-field::after {
+  width: 1px;
+  height: 12%;
+}
+
+.telescope-label {
+  position: absolute;
+  left: 50%;
+  bottom: max(12px, env(safe-area-inset-bottom));
+  margin: 0;
+  max-width: calc(100vw - 32px);
+  color: #c7e9ff;
+  font-size: 0.8rem;
+  font-variant-numeric: tabular-nums;
+  text-align: center;
+  transform: translateX(-50%);
+}
+
 /* Observe replaces the fly-through: the explorer's focus controls and the orrery-only toggles
    have nothing to act on, so they stay visible but inert. */
 .explorer-panel.is-observing,

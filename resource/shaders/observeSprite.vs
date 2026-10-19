@@ -1,11 +1,12 @@
 #version 300 es
 
 // One instanced quad per Sun/Moon/planet/star. The Sun and Moon are discs laid on the tangent
-// plane at their direction; planets and stars are fixed-size screen-space points.
+// plane at their direction; stars and planets are fixed-size screen-space points, except a planet
+// a narrow field resolves (iParams.y > 0), which becomes a tangent-plane disc too.
 layout (location = 0) in vec2 aCorner;
 layout (location = 1) in vec4 iPosSize;  // direction xyz, half-extent (tan units for discs, pixels for points)
 layout (location = 2) in vec4 iColor;
-layout (location = 3) in vec4 iParams;   // x = kind, y = disc radius / extent
+layout (location = 3) in vec4 iParams;   // x = kind, y = disc radius / extent (planets: 0 = point)
 
 uniform mat3 viewRot;
 uniform mat4 projection;
@@ -29,7 +30,7 @@ void main() {
     bool isStar = kind > KIND_STAR;
     // Stars and planets are points: a fixed size in pixels, so they stay round out to the edge
     // of a wide field of view. The Sun and Moon are true angular discs on the tangent plane.
-    bool isPoint = isStar || kind < KIND_SUN;
+    bool isPoint = isStar || (kind < KIND_SUN && iParams.y <= 0.0);
 
     vec3 d = normalize(iPosSize.xyz);
     float halfExtent = iPosSize.w;   // pixels for points, tan-plane units for discs

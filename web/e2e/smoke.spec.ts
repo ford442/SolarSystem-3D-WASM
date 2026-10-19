@@ -200,6 +200,21 @@ test('Observe mode puts the camera on Earth, ignores movement, and restores Expl
     { timeout: 5_000 },
   );
 
+  // Telescope: the 0.25 deg eyepiece narrows the camera and shows the eyepiece overlay;
+  // "Naked eye" puts the link's 20 deg field back and hides it.
+  await expect(page.locator('#telescope-overlay')).toBeHidden();
+  await page.locator('#observe-eyepiece').selectOption('0.25');
+  await page.waitForFunction(() => Math.abs((window.getObserveState?.()?.fovDeg ?? 0) - 0.25) < 0.01, undefined, {
+    timeout: 5_000,
+  });
+  await expect(page.locator('#telescope-overlay')).toBeVisible();
+  await expect(page.locator('#telescope-label')).toContainText('0.25° field');
+  await page.locator('#observe-eyepiece').selectOption('0');
+  await page.waitForFunction(() => Math.abs((window.getObserveState?.()?.fovDeg ?? 0) - 20) < 0.5, undefined, {
+    timeout: 5_000,
+  });
+  await expect(page.locator('#telescope-overlay')).toBeHidden();
+
   // Back to Explore without reloading the module.
   await page.locator('#mode-explore').click();
   await page.waitForFunction(() => window.getObserveState?.()?.active === false, undefined, {

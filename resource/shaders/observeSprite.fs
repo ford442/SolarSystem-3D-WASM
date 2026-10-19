@@ -92,6 +92,22 @@ void main() {
         float intensity = r < 1.0 ? disc : halo + corona;
         vec3 tint = mix(vec3(1.0, 0.95, 0.85), vec3(0.92, 0.95, 1.0), totality);
         fragColor = vec4(tint * intensity, aboveHorizon);
+    } else if (vParams.y > 0.0) {
+        // A planet a telescope field resolves: a disc lit from the Sun, whose direction from the
+        // planet is the phase angle (z) away from the viewer, toward the bright limb at angle w
+        // in the tangent basis — so Venus shows its crescent and Mars its gibbous phase.
+        vec2 du = vUv / vParams.y;
+        float r2 = dot(du, du);
+        if (r2 >= 1.0) {
+            discard;
+        }
+        float mu = sqrt(1.0 - r2);
+        vec3 n = vRight * du.x + vUp * du.y - vDir * mu;
+        vec3 limb = vRight * cos(vParams.w) + vUp * sin(vParams.w);
+        vec3 toSun = -vDir * cos(vParams.z) + limb * sin(vParams.z);
+        float lit = smoothstep(-0.03, 0.05, dot(n, toSun)) * (0.7 + 0.3 * mu);
+        float edge = 1.0 - smoothstep(0.94, 1.0, sqrt(r2));
+        fragColor = vec4(vColor.rgb * lit, vColor.a * edge * aboveHorizon);
     } else {
         float profile = exp(-dot(vUv, vUv) * 2.5);
         fragColor = vec4(vColor.rgb, vColor.a * profile * aboveHorizon);

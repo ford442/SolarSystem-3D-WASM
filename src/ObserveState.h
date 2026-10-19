@@ -25,9 +25,10 @@ struct ObserveState {
     float savedZoomMax = 45.0f;
     bool savedMovementLocked = false;
 
-    // Where Observe looks on entry, and the FOV range while it is active.
+    // Where Observe looks on entry, and the FOV range while it is active. The floor is a
+    // telescope field (web: TELESCOPE_EYEPIECES); planets turn into discs once they span pixels.
     static constexpr float kDefaultFovDeg = 60.0f;
-    static constexpr float kMinFovDeg = 2.0f;
+    static constexpr float kMinFovDeg = 0.25f;
     static constexpr float kMaxFovDeg = 90.0f;
     static constexpr float kDefaultAzimuthDeg = 180.0f; // facing south from the northern hemisphere
     static constexpr float kDefaultElevationDeg = 25.0f;
