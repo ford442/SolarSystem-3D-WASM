@@ -38,10 +38,12 @@ static_assert(sizeof(kBodies) / sizeof(kBodies[0]) == static_cast<std::size_t>(k
 
 ScaleMode g_scaleMode = ScaleMode::Compressed;
 double g_julianDate = Ephemeris::kJ2000;
-float g_lonRad[kBodyCount] = {};
-float g_latRad[kBodyCount] = {};
-float g_rAu[kBodyCount] = {};
+// Kept in double: rounding these to float is what put a ~0.004-unit grid under Neptune.
+double g_lonRad[kBodyCount] = {};
+double g_latRad[kBodyCount] = {};
+double g_rAu[kBodyCount] = {};
 float g_axialSpinDeg[kBodyCount] = {};
+glm::dvec3 g_renderOrigin(0.0);
 
 int bodyIndex(Body body) {
     const int idx = static_cast<int>(body);
@@ -51,10 +53,24 @@ int bodyIndex(Body body) {
 void refreshEphemerisCache() {
     for (int i = 0; i < kBodyCount; ++i) {
         const Ephemeris::HelioLB pos = Ephemeris::Position(i, g_julianDate);
-        g_lonRad[i] = static_cast<float>(pos.lonRad);
-        g_latRad[i] = static_cast<float>(pos.latRad);
-        g_rAu[i] = static_cast<float>(pos.rAu);
+        g_lonRad[i] = pos.lonRad;
+        g_latRad[i] = pos.latRad;
+        g_rAu[i] = pos.rAu;
     }
+}
+
+/** GetOrbitRadius in double. */
+double orbitRadius(Body body) {
+    if (body == Body::Sun) {
+        return 0.0;
+    }
+    if (UsesTrueRadius(body)) {
+        return AuToSceneDistanceDouble(g_rAu[bodyIndex(body)]);
+    }
+    if (g_scaleMode == ScaleMode::Compressed) {
+        return static_cast<double>(glm::length(GetCompressedOffset(body)));
+    }
+    return AuToSceneDistanceDouble(static_cast<double>(GetAuDistance(body)));
 }
 
 } // namespace
@@ -81,6 +97,7 @@ void ResetForTests() {
         g_axialSpinDeg[i] = 0.0f;
     }
     g_scaleMode = ScaleMode::Compressed;
+    g_renderOrigin = glm::dvec3(0.0);
     SetJulianDate(Ephemeris::kJ2000);
 }
 
@@ -119,30 +136,27 @@ float GetAuDistance(Body body) {
     return kBodies[bodyIndex(body)].auDistance;
 }
 
-float AuToSceneDistance(float au) {
-    if (au <= 0.0f) {
-        return 0.0f;
+double AuToSceneDistanceDouble(double au) {
+    if (au <= 0.0) {
+        return 0.0;
     }
     if (g_scaleMode == ScaleMode::Realistic) {
-        return au * kAuToSceneUnits;
+        return au * static_cast<double>(kAuToSceneUnits);
     }
 
     // Piecewise-linear remap through planet compressed orbit radii so the
     // main belt (and comets) sit between Mars and Jupiter in art scale.
     struct Key {
-        float au;
-        float scene;
+        double au;
+        double scene;
+    };
+    const auto key = [](Body body) {
+        return Key{GetAuDistance(body), glm::length(GetCompressedOffset(body))};
     };
     const Key keys[] = {
-        {GetAuDistance(Body::Mercury), glm::length(GetCompressedOffset(Body::Mercury))},
-        {GetAuDistance(Body::Venus), glm::length(GetCompressedOffset(Body::Venus))},
-        {GetAuDistance(Body::Earth), glm::length(GetCompressedOffset(Body::Earth))},
-        {GetAuDistance(Body::Mars), glm::length(GetCompressedOffset(Body::Mars))},
-        {GetAuDistance(Body::Jupiter), glm::length(GetCompressedOffset(Body::Jupiter))},
-        {GetAuDistance(Body::Saturn), glm::length(GetCompressedOffset(Body::Saturn))},
-        {GetAuDistance(Body::Uranus), glm::length(GetCompressedOffset(Body::Uranus))},
-        {GetAuDistance(Body::Neptune), glm::length(GetCompressedOffset(Body::Neptune))},
-        {GetAuDistance(Body::Pluto), glm::length(GetCompressedOffset(Body::Pluto))},
+        key(Body::Mercury), key(Body::Venus), key(Body::Earth),
+        key(Body::Mars), key(Body::Jupiter), key(Body::Saturn),
+        key(Body::Uranus), key(Body::Neptune), key(Body::Pluto),
     };
     constexpr int keyCount = static_cast<int>(sizeof(keys) / sizeof(keys[0]));
 
@@ -151,12 +165,16 @@ float AuToSceneDistance(float au) {
     }
     for (int i = 0; i < keyCount - 1; ++i) {
         if (au <= keys[i + 1].au) {
-            const float t = (au - keys[i].au) / (keys[i + 1].au - keys[i].au);
+            const double t = (au - keys[i].au) / (keys[i + 1].au - keys[i].au);
             return keys[i].scene + t * (keys[i + 1].scene - keys[i].scene);
         }
     }
     const Key& last = keys[keyCount - 1];
     return last.scene * (au / last.au);
+}
+
+float AuToSceneDistance(float au) {
+    return static_cast<float>(AuToSceneDistanceDouble(static_cast<double>(au)));
 }
 
 glm::vec3 HelioAuToScene(const glm::vec3& auSceneAxes) {
@@ -165,6 +183,14 @@ glm::vec3 HelioAuToScene(const glm::vec3& auSceneAxes) {
         return glm::vec3(0.0f);
     }
     return auSceneAxes * (AuToSceneDistance(r) / r);
+}
+
+glm::dvec3 HelioAuToSceneDouble(const glm::dvec3& auSceneAxes) {
+    const double r = glm::length(auSceneAxes);
+    if (r < 1.0e-12) {
+        return glm::dvec3(0.0);
+    }
+    return auSceneAxes * (AuToSceneDistanceDouble(r) / r);
 }
 
 float GetOrbitalPeriodDays(Body body) {
@@ -176,17 +202,7 @@ float GetSiderealRotationDays(Body body) {
 }
 
 float GetOrbitRadius(Body body) {
-    if (body == Body::Sun) {
-        return 0.0f;
-    }
-    if (UsesTrueRadius(body)) {
-        return AuToSceneDistance(g_rAu[bodyIndex(body)]);
-    }
-    const glm::vec3 compressed = GetCompressedOffset(body);
-    if (g_scaleMode == ScaleMode::Compressed) {
-        return glm::length(compressed);
-    }
-    return AuToSceneDistance(GetAuDistance(body));
+    return static_cast<float>(orbitRadius(body));
 }
 
 bool UsesTrueRadius(Body body) {
@@ -194,7 +210,7 @@ bool UsesTrueRadius(Body body) {
 }
 
 float GetHeliocentricRadiusAu(Body body) {
-    return g_rAu[bodyIndex(body)];
+    return static_cast<float>(g_rAu[bodyIndex(body)]);
 }
 
 float GetSceneDistance(Body body) {
@@ -226,25 +242,59 @@ float GetInclinationDegrees(Body body) {
     return kBodies[bodyIndex(body)].inclinationDeg;
 }
 
-glm::vec3 GetOffset(Body body) {
+glm::dvec3 GetHeliocentricScenePosition(Body body) {
     if (body == Body::Sun) {
-        return glm::vec3(0.0f);
+        return glm::dvec3(0.0);
     }
 
     const int idx = bodyIndex(body);
-    const float radius = GetOrbitRadius(body);
-    if (radius < 0.001f) {
-        return glm::vec3(0.0f);
+    const double radius = orbitRadius(body);
+    if (radius < 0.001) {
+        return glm::dvec3(0.0);
     }
 
-    const float lon = g_lonRad[idx];
-    const float lat = g_latRad[idx];
-    const float cosLat = std::cos(lat);
+    const double lon = g_lonRad[idx];
+    const double lat = g_latRad[idx];
+    const double cosLat = std::cos(lat);
     // Scene Y-up: ecliptic x→X, ecliptic z→Y, ecliptic y→Z.
-    return glm::vec3(
+    return glm::dvec3(
         radius * std::cos(lon) * cosLat,
         radius * std::sin(lat),
         radius * std::sin(lon) * cosLat);
+}
+
+glm::vec3 GetOffset(Body body) {
+    return glm::vec3(GetHeliocentricScenePosition(body));
+}
+
+glm::dvec3 GetRenderOrigin() {
+    return g_renderOrigin;
+}
+
+void SetRenderOrigin(const glm::dvec3& origin) {
+    g_renderOrigin = origin;
+}
+
+glm::vec3 ToRenderFrame(const glm::dvec3& heliocentricScene) {
+    return glm::vec3(heliocentricScene - g_renderOrigin);
+}
+
+glm::dvec3 ToHeliocentricScene(const glm::vec3& renderFrame) {
+    return glm::dvec3(renderFrame) + g_renderOrigin;
+}
+
+glm::vec3 GetRenderPosition(Body body) {
+    return ToRenderFrame(GetHeliocentricScenePosition(body));
+}
+
+glm::dvec3 ChooseRenderOrigin(const glm::vec3& cameraRenderFrame) {
+    if (g_scaleMode != ScaleMode::Realistic) {
+        return glm::dvec3(0.0);
+    }
+    if (glm::length(cameraRenderFrame) <= kRenderOriginRebaseDistance) {
+        return g_renderOrigin;
+    }
+    return ToHeliocentricScene(cameraRenderFrame);
 }
 
 Body BodyFromName(const std::string& name) {

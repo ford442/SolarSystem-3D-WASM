@@ -108,6 +108,8 @@ void Application::RunOneFrame() {
     UpdateMissionFollow();
 
     ProcessInput(_mainWindow);
+    // After everything that moves the camera this frame, before anything reads positions.
+    UpdateRenderOrigin();
     UpdatePlanetSystemLoading();
     UpdateLOD();
     UpdateMusicDucking();
@@ -266,7 +268,7 @@ void Application::FocusPlanetByIndex(int idx) {
             focusRadius = std::max(found->GetRadius() * 4.0f, 2.0f);
         } else {
             // Not loaded yet (web staged loading): fly to where the ephemeris says it is.
-            target = OrbitLayout::GetOffset(body);
+            target = OrbitLayout::GetRenderPosition(body);
             focusRadius = 20.0f;
         }
     }
@@ -292,20 +294,76 @@ void Application::StopMissionFollow() {
     _focusedMissionIndex = -1;
 }
 
-bool Application::SampleMissionScenePosition(int idx, glm::vec3& outScene) const {
+bool Application::SampleMissionHeliocentricPosition(int idx, glm::dvec3& outScene) const {
     if (idx < 0 || idx >= static_cast<int>(_missionCatalog.missions.size())) {
         return false;
     }
-    glm::vec3 au{0.0f};
+    glm::dvec3 au{0.0};
     if (!MissionCatalog::InterpolateAu(_missionCatalog.missions[static_cast<size_t>(idx)],
                                       OrbitLayout::GetJulianDate(), au)) {
         return false;
     }
-    outScene = OrbitLayout::HelioAuToScene(au);
-    if (_sun) {
-        outScene += _sun->GetPosition();
-    }
+    outScene = OrbitLayout::HelioAuToSceneDouble(au);
     return true;
+}
+
+bool Application::SampleMissionScenePosition(int idx, glm::vec3& outScene) const {
+    glm::dvec3 heliocentric{0.0};
+    if (!SampleMissionHeliocentricPosition(idx, heliocentric)) {
+        return false;
+    }
+    outScene = OrbitLayout::ToRenderFrame(heliocentric);
+    return true;
+}
+
+void Application::SetCameraHeliocentricPose(const glm::dvec3& position, float yaw, float pitch) {
+    if (OrbitLayout::GetScaleMode() == OrbitLayout::ScaleMode::Realistic) {
+        // Rebase onto the pose itself: the camera then stores an exact zero instead of a
+        // position tens of thousands of units out, rounded to that distance's float grid.
+        MoveRenderOrigin(position);
+    }
+    _camera.SetPosition(OrbitLayout::ToRenderFrame(position));
+    _camera.SetYawPitch(yaw, pitch);
+}
+
+glm::dvec3 Application::GetCameraHeliocentricPosition() const {
+    return OrbitLayout::ToHeliocentricScene(_camera.GetPosition());
+}
+
+void Application::UpdateRenderOrigin() {
+    MoveRenderOrigin(OrbitLayout::ChooseRenderOrigin(_camera.GetPosition()));
+}
+
+void Application::MoveRenderOrigin(const glm::dvec3& origin) {
+    const glm::dvec3 previous = OrbitLayout::GetRenderOrigin();
+    if (origin == previous) {
+        return;
+    }
+    OrbitLayout::SetRenderOrigin(origin);
+
+    // Bodies, overlays and uniforms are re-derived from the ephemeris every frame and need
+    // nothing here. What follows is everything that holds a render-frame position across
+    // frames, moved so it stays put in the heliocentric frame.
+    const glm::vec3 shift(origin - previous);
+    _camera.ShiftOrigin(shift);
+#ifdef __EMSCRIPTEN__
+    // webxr.ts composed this frame's eye views from the camera before the shift.
+    const glm::mat4 undoShift = glm::translate(glm::mat4(1.0f), shift);
+    for (auto& eye : _xr.eyes) {
+        eye.view = eye.view * undoShift;
+    }
+#endif
+    if (_renderer.xrPointerRenderer) {
+        _renderer.xrPointerRenderer->ShiftOrigin(shift);
+    }
+    if (_sun) {
+        _sun->TakeStarSystemCenter();
+    }
+    // Re-place the bodies now rather than at draw time: the LOD manager and staged loading
+    // compare them with the (already shifted) camera before this frame draws.
+    _renderer.PlaceSceneComponents();
+    RefreshPlanetProxyPositions();
+    _renderer.RebuildMissionPaths();
 }
 
 void Application::FocusMissionByIndex(int idx) {
@@ -361,8 +419,8 @@ std::string Application::GetFocusedMissionJson() const {
         _focusedMissionIndex >= static_cast<int>(_missionCatalog.missions.size())) {
         return R"({"valid":false})";
     }
-    glm::vec3 pos{0.0f};
-    if (!SampleMissionScenePosition(_focusedMissionIndex, pos)) {
+    glm::dvec3 pos{0.0};
+    if (!SampleMissionHeliocentricPosition(_focusedMissionIndex, pos)) {
         return R"({"valid":false})";
     }
     const auto& mission = _missionCatalog.missions[static_cast<size_t>(_focusedMissionIndex)];

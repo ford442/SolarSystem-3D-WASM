@@ -374,29 +374,38 @@ int IndexById(const Catalog& catalog, const std::string& id) {
 }
 
 bool InterpolateAu(const Mission& mission, double julianDate, glm::vec3& outAu) {
+    glm::dvec3 au{0.0};
+    if (!InterpolateAu(mission, julianDate, au)) {
+        return false;
+    }
+    outAu = glm::vec3(au);
+    return true;
+}
+
+bool InterpolateAu(const Mission& mission, double julianDate, glm::dvec3& outAu) {
     if (mission.samples.empty()) {
         return false;
     }
     if (julianDate <= mission.samples.front().julianDate) {
-        outAu = mission.samples.front().au;
+        outAu = glm::dvec3(mission.samples.front().au);
         return true;
     }
     if (julianDate >= mission.samples.back().julianDate) {
-        outAu = mission.samples.back().au;
+        outAu = glm::dvec3(mission.samples.back().au);
         return true;
     }
     auto it = std::lower_bound(
         mission.samples.begin(), mission.samples.end(), julianDate,
         [](const Sample& sample, double jd) { return sample.julianDate < jd; });
     if (it == mission.samples.begin()) {
-        outAu = it->au;
+        outAu = glm::dvec3(it->au);
         return true;
     }
     const Sample& b = *it;
     const Sample& a = *(it - 1);
     const double span = b.julianDate - a.julianDate;
-    const float t = span > 1.0e-9 ? static_cast<float>((julianDate - a.julianDate) / span) : 0.0f;
-    outAu = a.au + t * (b.au - a.au);
+    const double t = span > 1.0e-9 ? (julianDate - a.julianDate) / span : 0.0;
+    outAu = glm::dvec3(a.au) + t * (glm::dvec3(b.au) - glm::dvec3(a.au));
     return true;
 }
 

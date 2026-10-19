@@ -28,7 +28,7 @@ void Application::SetObserveMode(bool active) {
     }
 
     if (active) {
-        _observe.savedPosition = _camera.GetPosition();
+        _observe.savedPosition = OrbitLayout::ToHeliocentricScene(_camera.GetPosition());
         _observe.savedYaw = _camera.GetYaw();
         _observe.savedPitch = _camera.GetPitch();
         _observe.savedZoom = _camera.GetZoom();
@@ -52,8 +52,7 @@ void Application::SetObserveMode(bool active) {
         _camera.SetZoomRange(_observe.savedZoomMin, _observe.savedZoomMax);
         _camera.SetZoom(_observe.savedZoom);
         _camera.CancelTransition();
-        _camera.SetPosition(_observe.savedPosition);
-        _camera.SetYawPitch(_observe.savedYaw, _observe.savedPitch);
+        SetCameraHeliocentricPose(_observe.savedPosition, _observe.savedYaw, _observe.savedPitch);
     }
     NotifySettingsChanged("observeMode");
 }
@@ -152,7 +151,7 @@ void Application::UpdateObserveFrame() {
     // The sky pass draws from the horizon frame, not from this position. Parking the camera
     // just above Earth keeps everything keyed on camera distance (staged planet loading, the
     // LOD manager, the nearest-planet search) behaving as if the viewer were there.
-    const glm::vec3 earth = OrbitLayout::GetOffset(OrbitLayout::Body::Earth);
+    const glm::vec3 earth = OrbitLayout::GetRenderPosition(OrbitLayout::Body::Earth);
     _camera.SetPosition(earth + glm::vec3(0.0f, ObserveState::kEarthSurfaceSceneUnits, 0.0f));
 
     // Scene components are not drawn (so not re-placed) in Observe; keep Earth and its moons at

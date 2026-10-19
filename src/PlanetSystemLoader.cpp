@@ -98,10 +98,9 @@ void Application::RefreshPlanetProxyPositions() {
     if (_planetSystemManifests.empty()) {
         return;
     }
-    const glm::vec3 sunPos = _sun ? _sun->GetPosition() : glm::vec3(0.0f);
     for (auto& manifest : _planetSystemManifests) {
         const OrbitLayout::Body body = OrbitLayout::BodyFromName(manifest.name);
-        manifest.proxyPosition = sunPos + OrbitLayout::GetOffset(body);
+        manifest.proxyPosition = OrbitLayout::GetRenderPosition(body);
     }
 #endif
 }

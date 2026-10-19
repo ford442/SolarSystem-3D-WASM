@@ -24,7 +24,7 @@ Exploratory WebXR path for the C++/Emscripten WebGL 2 app. Companion Three.js no
 | `SetXrEyeCount` / `SetXrEyeViewport` | Per-eye viewports from `XRWebGLLayer` |
 | `GetXrMatrixScratch` + `CommitXrEyeMatrices` | JS writes view/proj (column-major float16×2) into WASM |
 | `RunXrFrame` | One `RunOneFrame` without `glfwSwapBuffers` / FBO 0 |
-| `GetCameraPositionX/Y/Z` | Fly-camera position for `view * T(-cam)` |
+| `GetCameraPositionX/Y/Z` | Fly-camera position for `view * T(-cam)`, in the render frame (relative to the render origin, ARCHITECTURE §11.1) — not the heliocentric pose `GetCameraHeliocentricX/Y/Z` returns |
 
 Per XR frame, C++ renders each eye with overridden view/projection (skybox uses the eye projection).
 

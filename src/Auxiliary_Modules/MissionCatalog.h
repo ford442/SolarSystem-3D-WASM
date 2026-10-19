@@ -46,6 +46,8 @@ int IndexById(const Catalog& catalog, const std::string& id);
  * has no samples.
  */
 bool InterpolateAu(const Mission& mission, double julianDate, glm::vec3& outAu);
+/** InterpolateAu with the blend done in double (a probe at 30 AU is placed in double). */
+bool InterpolateAu(const Mission& mission, double julianDate, glm::dvec3& outAu);
 
 /**
  * Downsample a mission polyline for a quality preset (0=low stride 4, 1=medium stride 2,

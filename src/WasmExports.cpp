@@ -48,12 +48,12 @@ extern "C" {
     // If the web API grows to return planet lists or settings snapshots,
     // migrate those structured values to embind then; keep these scalars as
     // cwrap. See docs/plans/PORTING_GUIDE.md § JS control surface.
-    EMSCRIPTEN_KEEPALIVE void SetCameraPose(float x, float y, float z, float yaw, float pitch) {
+    // Heliocentric scene position, in double: on realistic scale a pose at Neptune needs
+    // more digits than a float carries (see OrbitLayout's render origin).
+    EMSCRIPTEN_KEEPALIVE void SetCameraPose(double x, double y, double z, float yaw, float pitch) {
         if (!activeApplication) return;
         if (activeApplication->IsObserveActive()) return; // Observe keeps the viewer on the ground
-        Camera& cam = activeApplication->GetCamera();
-        cam.SetPosition(glm::vec3(x, y, z));
-        cam.SetYawPitch(yaw, pitch);
+        activeApplication->SetCameraHeliocentricPose(glm::dvec3(x, y, z), yaw, pitch);
     }
     EMSCRIPTEN_KEEPALIVE void SetQualityPreset(int preset) {
         gSimState->qualityPreset = (preset < 0 ? 0 : preset > 2 ? 2 : preset);
@@ -339,6 +339,9 @@ extern "C" {
             activeApplication->SetXrControllerRay(hand, ox, oy, oz, dx, dy, dz, visible);
         }
     }
+    // Render-frame camera position (relative to the render origin). webxr.ts composes the
+    // eye views from it, so it must be the frame the scene is drawn in; deep links and tours
+    // read GetCameraHeliocentric* instead.
     EMSCRIPTEN_KEEPALIVE float GetCameraPositionX() {
         return activeApplication ? activeApplication->GetCamera().GetPosition().x : 0.0f;
     }
@@ -347,6 +350,15 @@ extern "C" {
     }
     EMSCRIPTEN_KEEPALIVE float GetCameraPositionZ() {
         return activeApplication ? activeApplication->GetCamera().GetPosition().z : 0.0f;
+    }
+    EMSCRIPTEN_KEEPALIVE double GetCameraHeliocentricX() {
+        return activeApplication ? activeApplication->GetCameraHeliocentricPosition().x : 0.0;
+    }
+    EMSCRIPTEN_KEEPALIVE double GetCameraHeliocentricY() {
+        return activeApplication ? activeApplication->GetCameraHeliocentricPosition().y : 0.0;
+    }
+    EMSCRIPTEN_KEEPALIVE double GetCameraHeliocentricZ() {
+        return activeApplication ? activeApplication->GetCameraHeliocentricPosition().z : 0.0;
     }
     EMSCRIPTEN_KEEPALIVE float GetCameraYaw() {
         return activeApplication ? activeApplication->GetCamera().GetYaw() : -90.0f;

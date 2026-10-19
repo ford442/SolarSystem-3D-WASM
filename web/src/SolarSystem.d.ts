@@ -385,6 +385,21 @@ export interface SolarSystemCwrap {
     argTypes: [],
   ): (...args: number[]) => number;
   (
+    ident: 'GetCameraHeliocentricX',
+    returnType: 'number',
+    argTypes: [],
+  ): (...args: number[]) => number;
+  (
+    ident: 'GetCameraHeliocentricY',
+    returnType: 'number',
+    argTypes: [],
+  ): (...args: number[]) => number;
+  (
+    ident: 'GetCameraHeliocentricZ',
+    returnType: 'number',
+    argTypes: [],
+  ): (...args: number[]) => number;
+  (
     ident: 'GetCameraYaw',
     returnType: 'number',
     argTypes: [],
@@ -512,6 +527,9 @@ export interface SolarSystemModule {
   _GetCameraPositionX: () => number;
   _GetCameraPositionY: () => number;
   _GetCameraPositionZ: () => number;
+  _GetCameraHeliocentricX: () => number;
+  _GetCameraHeliocentricY: () => number;
+  _GetCameraHeliocentricZ: () => number;
   _GetCameraYaw: () => number;
   _GetCameraPitch: () => number;
   // END GENERATED MODULE EXPORTS

@@ -33,6 +33,8 @@ public:
     void ApplyEffectQuality(const QualityTierSettings& settings);
 
     void ConfigureMainShaders();
+    /** Re-derive every body's render-frame placement from the ephemeris (no drawing). */
+    void PlaceSceneComponents();
     void ProcessSceneComponentsRendering();
     void ProcessStarRendering();
     /** Flat corona billboard (Low, or coronaSlices == 0); drawn before the planets. */

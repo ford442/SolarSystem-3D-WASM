@@ -21,6 +21,11 @@ public:
     XrPointerRenderer& operator=(const XrPointerRenderer&) = delete;
 
     void SetRay(int hand, const glm::vec3& origin, const glm::vec3& direction, bool visible);
+    /** Rays are in the render frame; keep them in place when its origin moves by `shift`. */
+    void ShiftOrigin(const glm::vec3& shift) {
+        _rays[0].origin -= shift;
+        _rays[1].origin -= shift;
+    }
     void Clear();
     bool AnyVisible() const { return _rays[0].visible || _rays[1].visible; }
 

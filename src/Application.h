@@ -106,6 +106,15 @@ public:
     bool GetMagneticFieldsEnabled() const;
     void ForEachEnabledMagneticField(
         const std::function<void(const SpaceObject& object, const MagneticFieldParams& params)>& fn) const;
+    /**
+     * Place the fly camera at a heliocentric scene position (deep links, tours, leaving
+     * Observe). On realistic scale the render origin moves onto the pose first, so a link to
+     * Neptune does not land on a float grid tens of thousands of units from the origin.
+     */
+    void SetCameraHeliocentricPose(const glm::dvec3& position, float yaw, float pitch);
+    /** The camera's heliocentric scene position: render origin + camera, in double. */
+    glm::dvec3 GetCameraHeliocentricPosition() const;
+    // The Camera's own position is in the render frame (see OrbitLayout's render origin).
     Camera& GetCamera() { return _camera; }
     const Camera& GetCamera() const { return _camera; }
     SimState& GetSimState() { return _simState; }
@@ -222,7 +231,13 @@ private:
     void UpdateObserveFrame();          // Observe: park the camera above Earth so loading/LOD follow it
     void ApplyObserveEnvOverride();     // SOLARSYSTEM_OBSERVE=lat,lon[,jd[,az,el,fov]] for headless captures
     void StopMissionFollow();
+    bool SampleMissionHeliocentricPosition(int idx, glm::dvec3& outScene) const;
+    /** SampleMissionHeliocentricPosition in the render frame. */
     bool SampleMissionScenePosition(int idx, glm::vec3& outScene) const;
+    /** Once per frame, after input: rebase the render origin if the camera strayed from it. */
+    void UpdateRenderOrigin();
+    /** Move the render origin and carry every render-frame position cached across frames. */
+    void MoveRenderOrigin(const glm::dvec3& origin);
     void UpdateMusicDucking();
     void RenderFrameContent(); // Sky → planets → effects (one eye / mono)
 #ifdef __EMSCRIPTEN__

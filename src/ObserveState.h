@@ -16,8 +16,9 @@ struct ObserveState {
     Observer::Site site{51.4769, 0.0, 0.0}; // Greenwich, the default when nothing else is chosen
     double timeRate = 1.0;                  // simulated seconds per wall second; 1 = real time
 
-    // Explore-mode camera, restored when Observe is left.
-    glm::vec3 savedPosition{0.0f};
+    // Explore-mode camera, restored when Observe is left. Heliocentric (double), not the
+    // render frame: the render origin follows the camera to Earth while Observe is active.
+    glm::dvec3 savedPosition{0.0};
     float savedYaw = -90.0f;
     float savedPitch = 0.0f;
     float savedZoom = 45.0f;

@@ -71,6 +71,8 @@ void Application::ApplyShadowQuality(int quality) {
 void Application::ApplyOrbitScaleMode(int mode) {
     const auto scaleMode = mode == 1 ? OrbitLayout::ScaleMode::Realistic : OrbitLayout::ScaleMode::Compressed;
     OrbitLayout::SetScaleMode(scaleMode);
+    // Compressed pins the render origin back to the Sun; realistic may need to rebase.
+    UpdateRenderOrigin();
     RefreshPlanetProxyPositions();
     if (_asteroidField) {
         _asteroidField->Update(0.0f); // rebuild instance matrices for new AU→scene mapping

@@ -38,6 +38,7 @@ set(SOLARSYSTEM_TEST_SOURCES
 
 add_executable(SolarSystemTests
     test_orbit_layout.cpp
+    test_render_origin.cpp
     test_ephemeris.cpp
     test_quality_settings.cpp
     test_planet_manifest_loader.cpp

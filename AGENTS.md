@@ -46,7 +46,7 @@ cd web && npm run preview                   # http://localhost:4173/solar-system
 ## Quick test helpers
 
 ```js
-// Browser console — teleport camera (Sun at origin)
+// Browser console — teleport camera (heliocentric scene units, Sun at origin; doubles)
 window.setCameraPose(x, y, z, yaw, pitch);  // yaw=0 → +X, yaw=90 → +Z
 window.setQualityPreset(0);                 // 0=low, 1=medium, 2=full; no LOD upgrades on 0
 window.getQualityPreset();                  // read the active preset

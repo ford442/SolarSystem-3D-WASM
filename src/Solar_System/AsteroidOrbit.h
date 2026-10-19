@@ -55,6 +55,8 @@ glm::vec3 OrbitalToCartesian(float radius, float trueAnomaly,
                              float inclination, float argPeriapsis, float longAscNode);
 /** Scene position; uses OrbitLayout::GetOffset when el.ephemerisBody is set. */
 glm::vec3 HeliocentricPosition(const OrbitalElements& el);
+/** HeliocentricPosition in double (the orbit is solved in double too), for ToRenderFrame. */
+glm::dvec3 HeliocentricScenePosition(const OrbitalElements& el);
 float CurrentRadiusAu(const OrbitalElements& el);
 
 } // namespace AsteroidOrbit

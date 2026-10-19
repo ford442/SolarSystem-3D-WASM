@@ -61,6 +61,14 @@ public:
     void CancelTransition() { _transitionActive = false; }
 
     void SetPosition(const glm::vec3& position) { _position = position; }
+    // Positions here are in the render frame (OrbitLayout::ToRenderFrame). When the render
+    // origin moves by `shift`, this keeps the camera (and any transition in flight) where it
+    // was in the heliocentric frame. The double pose lives with the origin, not here.
+    void ShiftOrigin(const glm::vec3& shift) {
+        _position -= shift;
+        _transitionStartPos -= shift;
+        _transitionTargetPos -= shift;
+    }
     void SetYawPitch(float yaw, float pitch) { _yaw = yaw; _pitch = pitch; UpdateCameraVectors(); }
 
     // Processes input received from any keyboard-like input system. Accepts input parameter in the form of camera defined ENUM (to abstract it from windowing systems)
