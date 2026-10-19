@@ -13,8 +13,8 @@
 namespace SkyEvents {
 
 /** Catalog body indices the event search names beyond the planets. */
-constexpr int kMoon = 12;
-constexpr int kIo = 15;
+constexpr int kMoon = 16;
+constexpr int kIo = 19;
 
 /** Two bodies sharing a geocentric ecliptic longitude — the classical conjunction. */
 struct Conjunction {

@@ -3,7 +3,8 @@
 
 // Standish/JPL low-precision heliocentric positions (Table 1, 1800–2050) plus fixed-element
 // Keplerian approximations for Pluto and the catalog belt bodies.
-// Body indices match OrbitLayout::Body / FocusPlanet (0=Sun … 9=Pluto, 10=Ceres, 11=Vesta).
+// Body indices match OrbitLayout::Body / FocusPlanet (0=Sun … 9=Pluto, 10=Ceres, 11=Vesta,
+// 12=Eris, 13=Haumea, 14=Makemake, 15=1P/Halley).
 namespace Ephemeris {
 
 constexpr double kJ2000 = 2451545.0;
@@ -44,7 +45,7 @@ double GreenwichMeanSiderealTimeDeg(double julianDate);
 double DeltaTSeconds(double julianDateUt);
 
 /**
- * Heliocentric ecliptic lon/lat/radius for Mercury–Vesta; Sun/unknown return zeros.
+ * Heliocentric ecliptic lon/lat/radius for Mercury–Halley; Sun/unknown return zeros.
  * Delegates to the active backend (see SetBackend); the default is Standish Table 1.
  */
 HelioLB Position(int bodyIndex, double julianDate);
@@ -66,12 +67,12 @@ public:
 
     /**
      * Parent-relative satellite position in AU, for a catalog satellite id
-     * (BodyCatalog::Entry::index, e.g. 12 = Moon, 15 = Io).
+     * (BodyCatalog::Entry::index, e.g. 16 = Moon, 19 = Io).
      *
      * Axes are the J2000 ecliptic, same convention as PlanetHeliocentric: x toward the
      * equinox, z toward the north ecliptic pole. The Standish backend implements this for
      * the moons whose catalog rows carry real (non-placeholder) node and periapsis angles
-     * — see kKeplerianSatellites in Ephemeris.cpp. The Moon (12) is the exception: it comes from
+     * — see kKeplerianSatellites in Ephemeris.cpp. The Moon (16) is the exception: it comes from
      * the Meeus ch. 47 lunar series (LunarTheory), not from catalog elements. Every other
      * satellite returns false and keeps its circular SatelliteOrbit offset.
      */

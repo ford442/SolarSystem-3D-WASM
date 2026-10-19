@@ -153,13 +153,13 @@ The CMakeLists.txt has separate configurations for EMSCRIPTEN vs native builds, 
 **Catalog-driven path (preferred for a body with no unique shader needs).** No new class:
 1. Add a body to `resource/planets.catalog.json` with a `render` block, `system.initTag` (also on `initTagAllowlist`), and `assets.requiredLow`
 2. Run `node scripts/generate-planet-metadata.mjs`
-3. Add the `OrbitLayout::Body` enum value and its `BodyFromName` mapping (focus indices 0–11 are frozen)
+3. Add the `OrbitLayout::Body` enum value and its `BodyFromName` mapping (focus indices 0–11 are frozen; Eris–Halley are 12–15, satellites follow at 16+)
 4. Add Keplerian elements to `Ephemeris.cpp` if the body is not in the Standish table
 5. No factory edit: `InitStarSystem()` / `MakePlanetInitFunc` construct any catalog primary via `InitCatalogSystem`
 
 An atmosphere is a `render.atmosphere` row block, on a planet or a moon (Titan is the moon example): `oneil` for the cheap shell, plus `physical` for the LUT path — then build the `atmosphere_lut_baker` target (`-DSOLARSYSTEM_BUILD_TOOLS=ON`) and run `atmosphere_lut_baker --out resource/atmosphere` from the repo root (ARCHITECTURE §9.2).
 
-Ceres, Vesta, Mercury–Pluto, the Moon, and the Galileans are the worked examples. Moons need `parent`, `orbit.keplerian` (elements plus the `OmegaDotDegPerDay` / `omegaDotDegPerDay` secular rates), and `orbit.sceneOrbitRadius`. A moon is only *placed* from those elements once its index is listed in `kKeplerianSatellites` in `Ephemeris.cpp`; until then it keeps the circular `SatelliteOrbit` offset, which is the right default while a row still carries placeholder node/periapsis angles. See docs/ARCHITECTURE.md § 11. `scripts/make_placeholder_dds.py` writes the stand-in textures that `resource/textures_low/` ships until real ones are uploaded.
+Ceres, Vesta, Eris/Haumea/Makemake, 1P/Halley (kind `comet`), Mercury–Pluto, the Moon, and the Galileans are the worked examples. Moons need `parent`, `orbit.keplerian` (elements plus the `OmegaDotDegPerDay` / `omegaDotDegPerDay` secular rates), and `orbit.sceneOrbitRadius`. A moon is only *placed* from those elements once its index is listed in `kKeplerianSatellites` in `Ephemeris.cpp`; until then it keeps the circular `SatelliteOrbit` offset, which is the right default while a row still carries placeholder node/periapsis angles. See docs/ARCHITECTURE.md § 11. `scripts/make_placeholder_dds.py` writes the stand-in textures that `resource/textures_low/` ships until real ones are uploaded.
 
 **Hand-written path (Sun, ring meshes, or a shader that does not fit catalog flags).**
 1. Keep or add a dedicated class (e.g., `Sun`, `SaturnRing`)

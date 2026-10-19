@@ -30,7 +30,7 @@
         "properties": {
           "id": { "type": "string", "pattern": "^[a-z][a-z0-9_]*$" },
           "index": { "type": "integer", "minimum": 0 },
-          "kind": { "type": "string", "enum": ["star", "planet", "dwarf_planet", "satellite", "ring", "clouds"] },
+          "kind": { "type": "string", "enum": ["star", "planet", "dwarf_planet", "comet", "satellite", "ring", "clouds"] },
           "parent": { "type": ["string", "null"] },
           "displayName": {
             "type": "object",

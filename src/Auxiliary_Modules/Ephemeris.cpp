@@ -17,7 +17,7 @@ constexpr double kDegToRad = kPi / 180.0;
 constexpr double kRadToDeg = 180.0 / kPi;
 constexpr double kDaysPerCentury = 36525.0;
 constexpr double kKmPerAu = 149597870.7;
-constexpr int kMoonId = 12;
+constexpr int kMoonId = 16;
 
 // Catalog satellites whose orbit.keplerian row carries real angles for all six elements.
 // Every other satellite row still ships OmegaDeg / omegaDeg / M0Deg = 0 placeholders, which
@@ -36,12 +36,12 @@ constexpr int kMoonId = 12;
 //    parent's Laplace plane, so their orbit planes come out tilted by the parent's own
 //    obliquity (~3.1 deg for Jupiter, ~26.7 deg for Saturn) from the truth.
 constexpr int kKeplerianSatellites[] = {
-    15, // Io
-    16, // Europa
-    17, // Ganymede
-    18, // Callisto
-    24, // Titan
-    31, // Triton
+    19, // Io
+    20, // Europa
+    21, // Ganymede
+    22, // Callisto
+    28, // Titan
+    35, // Triton
 };
 
 struct Elements {
@@ -110,6 +110,22 @@ constexpr KeplerBody kVesta{
     2461200.5, 2.361365965127599, 0.09020374382834395, 7.143925545058711,
     103.701293265032, 151.4686478221564, 81.19015607686903, 0.2716183613599909};
 
+// Outer system (focus 12–15). Rounded JPL SBDB osculating elements; mean motion from
+// Kepler's third law (0.9856076686 / a^1.5 deg/day), so the period matches `a`.
+// The TNOs move < 1.5 deg/decade, so a fixed-element ellipse is fine for decades around
+// the epoch. Refresh from https://ssd-api.jpl.nasa.gov/sbdb.api?sstr=<name> if needed.
+constexpr KeplerBody kEris{
+    2460600.5, 67.86, 0.4370, 44.04, 35.95, 151.64, 205.99, 0.0017631258};
+constexpr KeplerBody kHaumea{
+    2460600.5, 43.12, 0.1964, 28.21, 121.80, 240.89, 219.62, 0.0034808551};
+constexpr KeplerBody kMakemake{
+    2460600.5, 45.51, 0.1604, 29.03, 79.27, 297.08, 168.83, 0.0032102867};
+// 1P/Halley: epoch is the 1986 perihelion (T = 1986-Feb-09.46 TDB), so M0 = 0. Planetary
+// perturbations shift each return by months; this ellipse lands the 1986 perihelion
+// exactly and the 2061 one within a few months — fine for a deep link, not for observing.
+constexpr KeplerBody kHalley{
+    2446470.96, 17.834, 0.96714, 162.26, 58.42, 111.33, 0.0, 0.0130867236};
+
 double wrapDeg180(double deg) {
     deg = std::fmod(deg + 180.0, 360.0);
     if (deg < 0.0) {
@@ -133,8 +149,10 @@ double solveKepler(double MRad, double e) {
         MRad -= kTwoPi;
     }
 
-    double E = MRad + e * std::sin(MRad); // good starter for e < ~0.3
-    for (int i = 0; i < 12; ++i) {
+    // M + e sin M is a good starter for e < ~0.3; Halley (e = 0.967) needs E0 = pi
+    // (Danby) or Newton can overshoot near perihelion.
+    double E = (e < 0.8) ? MRad + e * std::sin(MRad) : (MRad < 0.0 ? -kPi : kPi);
+    for (int i = 0; i < 50; ++i) {
         const double dM = MRad - (E - e * std::sin(E));
         const double dE = dM / (1.0 - e * std::cos(E));
         E += dE;
@@ -313,7 +331,7 @@ public:
     const char* Name() const override { return "standish"; }
 
     HelioLB PlanetHeliocentric(int bodyIndex, double julianDate) const override {
-        // 0=Sun, 1=Mercury … 8=Neptune, 9=Pluto, 10=Ceres, 11=Vesta
+        // 0=Sun, 1=Mercury … 8=Neptune, 9=Pluto, 10=Ceres, 11=Vesta, 12–15 outer system
         switch (bodyIndex) {
             case 9:
                 return keplerPosition(kPluto, julianDate);
@@ -321,6 +339,14 @@ public:
                 return keplerPosition(kCeres, julianDate);
             case 11:
                 return keplerPosition(kVesta, julianDate);
+            case 12:
+                return keplerPosition(kEris, julianDate);
+            case 13:
+                return keplerPosition(kHaumea, julianDate);
+            case 14:
+                return keplerPosition(kMakemake, julianDate);
+            case 15:
+                return keplerPosition(kHalley, julianDate);
             default:
                 break;
         }

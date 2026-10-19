@@ -35,15 +35,15 @@ QualityTierSettings GetQualitySettings(int preset, bool mobile) {
     // rather than shader cost decides.
     if (mobile) {
         switch (preset) {
-            case 0: return {1024, 0, 0, false, false, 0, 400, TextureLodTier::Low, false, 0, false, 0, 500, "low"};
-            case 1: return {2048, 2, 0, true, true, 1, 900, TextureLodTier::Mid, true, 8, false, 0, 1500, "medium"};
-            default: return {3000, 2, 0, true, true, 1, 1400, TextureLodTier::High, true, 12, true, 16, 2500, "full"};
+            case 0: return {1024, 0, 0, false, false, 0, 400, 0, TextureLodTier::Low, false, 0, false, 0, 500, "low"};
+            case 1: return {2048, 2, 0, true, true, 1, 900, 400, TextureLodTier::Mid, true, 8, false, 0, 1500, "medium"};
+            default: return {3000, 2, 0, true, true, 1, 1400, 800, TextureLodTier::High, true, 12, true, 16, 2500, "full"};
         }
     }
     switch (preset) {
-        case 0: return {1024, 0, 0, false, false, 0, 600, TextureLodTier::Low, false, 0, false, 0, 500, "low"};
-        case 1: return {2048, 2, 0, true, true, 1, 1800, TextureLodTier::Mid, true, 8, true, 16, 2000, "medium"};
-        default: return {3000, 4, 4, true, true, 2, 4000, TextureLodTier::High, true, 16, true, 32, 5000, "full"};
+        case 0: return {1024, 0, 0, false, false, 0, 600, 0, TextureLodTier::Low, false, 0, false, 0, 500, "low"};
+        case 1: return {2048, 2, 0, true, true, 1, 1800, 800, TextureLodTier::Mid, true, 8, true, 16, 2000, "medium"};
+        default: return {3000, 4, 4, true, true, 2, 4000, 2000, TextureLodTier::High, true, 16, true, 32, 5000, "full"};
     }
 }
 
@@ -67,6 +67,7 @@ void LogQualityTier(const QualityTierSettings& settings, bool hdrEnabled, int sh
               << " | LOD distance multiplier=" << (std::strcmp(settings.name, "medium") == 0 ? 1.5f : 1.0f)
               << " | MSAA=" << settings.requestedMsaaSamples << "x"
               << " | asteroids=" << settings.asteroidInstanceCount
+              << " | kuiper=" << settings.kuiperInstanceCount
               << " | atmosphere="
               << (settings.enablePbrAtmosphere ? "LUT " + std::to_string(settings.atmosphereSteps) + " steps" : "O'Neil")
               << " | corona="

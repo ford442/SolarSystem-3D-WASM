@@ -41,13 +41,13 @@ constexpr int kJupiter = 5;
 
 double satelliteRadiusKm(int satelliteIndex) {
     switch (satelliteIndex) {
-        case 12: return kMoonRadiusKm;
-        case 15: return kIoRadiusKm;
-        case 16: return 1560.8;  // Europa
-        case 17: return 2634.1;  // Ganymede
-        case 18: return 2410.3;  // Callisto
-        case 24: return 2574.7;  // Titan
-        case 31: return 1353.4;  // Triton
+        case 16: return kMoonRadiusKm;
+        case 19: return kIoRadiusKm;
+        case 20: return 1560.8;  // Europa
+        case 21: return 2634.1;  // Ganymede
+        case 22: return 2410.3;  // Callisto
+        case 28: return 2574.7;  // Titan
+        case 35: return 1353.4;  // Triton
         default: return 0.0;
     }
 }
@@ -549,13 +549,13 @@ const char* BodyName(int bodyIndex) {
         case 11: return "Vesta";
         // Only the satellites the event searches can name. Everything else stays with the
         // catalog's own display names, which are wide strings.
-        case 12: return "Moon";
-        case 15: return "Io";
-        case 16: return "Europa";
-        case 17: return "Ganymede";
-        case 18: return "Callisto";
-        case 24: return "Titan";
-        case 31: return "Triton";
+        case 16: return "Moon";
+        case 19: return "Io";
+        case 20: return "Europa";
+        case 21: return "Ganymede";
+        case 22: return "Callisto";
+        case 28: return "Titan";
+        case 35: return "Triton";
         default: return "";
     }
 }

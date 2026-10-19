@@ -16,7 +16,7 @@ TEST(BodyCatalogTest, FocusIndicesUnchanged) {
     EXPECT_EQ(static_cast<int>(OrbitLayout::Body::Pluto), 9);
     EXPECT_EQ(static_cast<int>(OrbitLayout::Body::Ceres), 10);
     EXPECT_EQ(static_cast<int>(OrbitLayout::Body::Vesta), 11);
-    EXPECT_EQ(OrbitLayout::kBodyCount, 12);
+    EXPECT_EQ(OrbitLayout::kBodyCount, 16);
 }
 
 TEST(BodyCatalogTest, MercuryThroughPlutoHaveCatalogRows) {
@@ -47,7 +47,7 @@ TEST(BodyCatalogTest, MoonAndIoAreCatalogSatellites) {
     EXPECT_STREQ(moon->initTag, "EarthSystem");
     EXPECT_FLOAT_EQ(moon->sceneOrbitRadius, 25.0f);
     EXPECT_GT(moon->keplerian.aKm, 0.0f);
-    EXPECT_EQ(moon->index, 12);
+    EXPECT_EQ(moon->index, 16);
 
     const BodyCatalog::Entry* io = BodyCatalog::FindById("io");
     ASSERT_NE(io, nullptr);

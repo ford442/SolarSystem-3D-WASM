@@ -46,7 +46,7 @@ TEST_F(OrbitLayoutTest, BodyFromNameMapsKnownPlanets) {
 }
 
 TEST_F(OrbitLayoutTest, BodyFromNameFallsBackToSun) {
-    EXPECT_EQ(OrbitLayout::BodyFromName("Eris"), OrbitLayout::Body::Sun);
+    EXPECT_EQ(OrbitLayout::BodyFromName("Sedna"), OrbitLayout::Body::Sun);
     EXPECT_EQ(OrbitLayout::BodyFromName("ceres"), OrbitLayout::Body::Sun); // manifest names are capitalised
     EXPECT_EQ(OrbitLayout::BodyFromName(""), OrbitLayout::Body::Sun);
 }
@@ -56,6 +56,45 @@ TEST_F(OrbitLayoutTest, BodyFromNameResolvesCatalogDwarfs) {
     // so a miss here silently parks the proxy marker on the Sun.
     EXPECT_EQ(OrbitLayout::BodyFromName("Ceres"), OrbitLayout::Body::Ceres);
     EXPECT_EQ(OrbitLayout::BodyFromName("Vesta"), OrbitLayout::Body::Vesta);
+}
+
+TEST_F(OrbitLayoutTest, BodyFromNameResolvesOuterSystem) {
+    EXPECT_EQ(OrbitLayout::BodyFromName("Eris"), OrbitLayout::Body::Eris);
+    EXPECT_EQ(OrbitLayout::BodyFromName("Haumea"), OrbitLayout::Body::Haumea);
+    EXPECT_EQ(OrbitLayout::BodyFromName("Makemake"), OrbitLayout::Body::Makemake);
+    EXPECT_EQ(OrbitLayout::BodyFromName("Halley"), OrbitLayout::Body::Halley);
+    // Focus indices 0–11 are ABI; the outer system appends after them.
+    EXPECT_EQ(static_cast<int>(OrbitLayout::Body::Vesta), 11);
+    EXPECT_EQ(static_cast<int>(OrbitLayout::Body::Eris), 12);
+    EXPECT_EQ(static_cast<int>(OrbitLayout::Body::Halley), 15);
+    EXPECT_EQ(OrbitLayout::kBodyCount, 16);
+}
+
+TEST_F(OrbitLayoutTest, HalleyFollowsItsEllipseInBothScaleModes) {
+    const double perihelion1986 = Ephemeris::JulianDateFromYmd(1986, 2, 9);
+    const double aphelion2023 = Ephemeris::JulianDateFromYmd(2023, 12, 9);
+    for (const auto mode : {OrbitLayout::ScaleMode::Compressed, OrbitLayout::ScaleMode::Realistic}) {
+        OrbitLayout::SetScaleMode(mode);
+        OrbitLayout::SetJulianDate(perihelion1986);
+        const float nearSun = OrbitLayout::GetOrbitRadius(OrbitLayout::Body::Halley);
+        EXPECT_LT(nearSun, OrbitLayout::GetOrbitRadius(OrbitLayout::Body::Earth));
+        EXPECT_NEAR(glm::length(OrbitLayout::GetOffset(OrbitLayout::Body::Halley)), nearSun, 0.01f * nearSun);
+
+        OrbitLayout::SetJulianDate(aphelion2023);
+        EXPECT_GT(OrbitLayout::GetOrbitRadius(OrbitLayout::Body::Halley),
+                  OrbitLayout::GetOrbitRadius(OrbitLayout::Body::Neptune));
+    }
+}
+
+TEST_F(OrbitLayoutTest, OuterDwarfsSitBeyondNeptuneInRealisticScale) {
+    OrbitLayout::SetScaleMode(OrbitLayout::ScaleMode::Realistic);
+    OrbitLayout::SetJulianDate(Ephemeris::JulianDateFromYmd(2026, 1, 1));
+    const float neptune = OrbitLayout::GetOrbitRadius(OrbitLayout::Body::Neptune);
+    for (const auto body : {OrbitLayout::Body::Eris, OrbitLayout::Body::Haumea, OrbitLayout::Body::Makemake}) {
+        EXPECT_GT(OrbitLayout::GetOrbitRadius(body), neptune) << static_cast<int>(body);
+    }
+    EXPECT_GT(OrbitLayout::GetOrbitRadius(OrbitLayout::Body::Eris),
+              OrbitLayout::AuToSceneDistance(OrbitLayout::kKuiperBeltOuterAu));
 }
 
 TEST_F(OrbitLayoutTest, BeltDwarfsOrbitBetweenMarsAndJupiter) {

@@ -37,7 +37,11 @@ export type SetTouchMovement = (forward: number, right: number, vertical: number
 export type AddTouchLook = (deltaX: number, deltaY: number) => void;
 export type AddTouchZoom = (delta: number) => void;
 
-export type PlanetIndex = 0 | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10 | 11;
+/**
+ * Focus index: 0–11 (Sun … Vesta) are frozen; 12=Eris, 13=Haumea, 14=Makemake, 15=1P/Halley.
+ * Matches OrbitLayout::Body. Catalog satellites (16+) are not focusable.
+ */
+export type PlanetIndex = 0 | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10 | 11 | 12 | 13 | 14 | 15;
 
 export type OrbitScaleMode = 0 | 1;
 
@@ -46,13 +50,13 @@ export type GetMusicVolume = () => number;
 export type SetMusicMuted = (muted: boolean) => void;
 export type GetMusicMuted = () => boolean;
 
-/** Planet index accepted by FocusPlanet: 0=sun, 1=Mercury, ..., 9=Pluto, 10=Ceres, 11=Vesta. */
+/** Planet index accepted by FocusPlanet: 0=sun, 1=Mercury, ..., 11=Vesta, 12=Eris … 15=1P/Halley. */
 export type FocusPlanet = (index: PlanetIndex) => void;
 
 /** 0=compressed artistic orbits, 1=AU-proportional spacing. */
 export type SetOrbitScaleMode = (mode: OrbitScaleMode) => void;
 export type GetOrbitScaleMode = () => OrbitScaleMode;
-/** Returns 1–11 for nearest loaded planet, or -1 when unknown. */
+/** Returns 1–15 for nearest loaded planet, or -1 when unknown. */
 export type GetNearestPlanetIndex = () => number;
 export type GetFocusedPlanetIndex = () => number;
 export type GetPlanetSceneDistance = (index: PlanetIndex) => number;
