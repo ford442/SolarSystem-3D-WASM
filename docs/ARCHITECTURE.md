@@ -11,7 +11,7 @@ Canonical architecture reference for contributors. For build commands and deploy
 | Target | Graphics | Windowing | Audio |
 |--------|----------|-----------|-------|
 | **Native desktop** | OpenGL 4.6 Core + GLEW | GLFW3 | irrKlang |
-| **Web (WASM)** | WebGL 2 / OpenGL ES 3.0 | GLFW3 (Emscripten port) | SDL_mixer |
+| **Web (WASM)** | WebGL 2 / OpenGL ES 3.0 | GLFW3 (Emscripten port) | HTMLAudioElement (`web/src/music.ts`) |
 
 The web build adds async resource loading, staged planet initialization, and distance-based texture LOD. The native build loads everything synchronously at startup with full-resolution textures only.
 
@@ -146,7 +146,6 @@ Application()
     → InitSystems()          # GLFW, OpenGL, audio
     → InitScene()
         → LoadCoreResources()    # async download of core assets
-        → LoadOptionalSounds()   # fire-and-forget music tracks
         → _appState = LOADING
     → Exec() → RunOneFrame() loop
 
@@ -171,7 +170,6 @@ Downloads a **small fixed set** before the scene can run (~15 files: models, sun
 void Application::InitScene() {
 #ifdef __EMSCRIPTEN__
     LoadCoreResources();
-    LoadOptionalSounds();
 #else
     InitSceneObjects();
     _appState = AppState::RUNNING;

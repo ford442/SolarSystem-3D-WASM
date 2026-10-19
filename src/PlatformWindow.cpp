@@ -204,12 +204,9 @@ void Application::InitSystems() {
     FT_Init_FreeType(&_ft);
 
 #ifdef __EMSCRIPTEN__
-    // SDL_INIT_EVERYTHING pulls in video/joystick subsystems we do not want on web
-    // (GLFW owns the canvas), but SDL_mixer and SDL_image below still need SDL itself
-    // initialized, so bring up just the subsystems they use.
-    if (SDL_Init(SDL_INIT_AUDIO | SDL_INIT_EVENTS)) {
-        std::cerr << "[SDL] Failed to init audio/events subsystem: " << SDL_GetError() << std::endl;
-    }
+    // No SDL_Init on web: GLFW owns the canvas and web/src/music.ts owns audio. Calling it
+    // would keep SDL's audio subsystem (a deprecated ScriptProcessorNode device) linked in.
+    // IMG_Init below does not need it.
 #else
     if (SDL_Init(SDL_INIT_EVERYTHING)) {
         Dispose();
@@ -226,7 +223,7 @@ void Application::InitSystems() {
         _mixerInitialized = true;
         std::cout << "[Audio] SDL_mixer initialized" << std::endl;
     }
-#else
+#elif !defined(__EMSCRIPTEN__)
     _soundEngine = createIrrKlangDevice(ESOD_AUTO_DETECT, ESEO_MULTI_THREADED | ESEO_LOAD_PLUGINS);
     if (!_soundEngine) {
         throw runtime_error("Failed to init sound engine");

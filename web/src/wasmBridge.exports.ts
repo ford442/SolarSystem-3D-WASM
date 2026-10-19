@@ -17,10 +17,6 @@ export interface CachedCwrapExports {
     addTouchLook: (...args: number[]) => void;
     addTouchZoom: (...args: number[]) => void;
     isMobileWeb: () => number;
-    setMusicVolume: (...args: number[]) => void;
-    getMusicVolume: () => number;
-    setMusicMuted: (...args: number[]) => void;
-    getMusicMuted: () => number;
     focusPlanet: (...args: number[]) => void;
     focusMission: (...args: number[]) => void;
     getFocusedMissionIndex: () => number;
@@ -82,10 +78,6 @@ export function createCachedCwrapExports(cwrap: SolarSystemCwrap): CachedCwrapEx
     addTouchLook: cwrap('AddTouchLook', null, ['number', 'number']) as (...args: number[]) => void,
     addTouchZoom: cwrap('AddTouchZoom', null, ['number']) as (...args: number[]) => void,
     isMobileWeb: cwrap('IsMobileWeb', 'number', []) as () => number,
-    setMusicVolume: cwrap('SetMusicVolume', null, ['number']) as (...args: number[]) => void,
-    getMusicVolume: cwrap('GetMusicVolume', 'number', []) as () => number,
-    setMusicMuted: cwrap('SetMusicMuted', null, ['number']) as (...args: number[]) => void,
-    getMusicMuted: cwrap('GetMusicMuted', 'number', []) as () => number,
     focusPlanet: cwrap('FocusPlanet', null, ['number']) as (...args: number[]) => void,
     focusMission: cwrap('FocusMission', null, ['number']) as (...args: number[]) => void,
     getFocusedMissionIndex: cwrap('GetFocusedMissionIndex', 'number', []) as () => number,
@@ -131,4 +123,4 @@ export function createCachedCwrapExports(cwrap: SolarSystemCwrap): CachedCwrapEx
     };
 }
 
-export const EXPORT_COUNT = 61;
+export const EXPORT_COUNT = 57;

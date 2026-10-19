@@ -6,6 +6,7 @@ import { initObservePanel, type ObservePanelController } from './observe';
 import { publishInitConfig, resolveInitConfig } from './initialSettings';
 import { PlanetExplorer } from './planetExplorer';
 import { createProgressCallbacks } from './progressOverlay';
+import { createMusicPlayer } from './music';
 import { initSettingsPanel } from './settingsPanel';
 import { initTouchControls, isMobileLikeDevice } from './touchControls';
 import { initWebXr } from './webxr';
@@ -106,6 +107,11 @@ const progressCallbacks = createProgressCallbacks({
 });
 
 window.__solarSystemAssetBase = runtimeAssetBase;
+
+// Music is a browser media concern: tracks stream straight from the asset base, outside the
+// WASM core-resource count, and a missing mp3 just logs and skips.
+const music = createMusicPlayer({ assetBase: runtimeAssetBase });
+music.start();
 window.__solarSystemTexturePacks = publishedTexturePacks;
 
 // Resolve quality/mobile before WASM main() creates the GLFW/WebGL context.
@@ -148,7 +154,7 @@ const moduleConfig: SolarSystemModuleConfig = installWasmCallbacksOnConfig({
     onRuntimeInitialized: () => {
         console.log('SolarSystem WASM initialized');
     },
-}, progressCallbacks);
+}, { ...progressCallbacks, onMusicDuck: (duck: number) => music.setDuck(duck) });
 
 void Module(moduleConfig).then((instance) => {
     console.log('Module loaded successfully', instance);
@@ -267,6 +273,7 @@ void Module(moduleConfig).then((instance) => {
             skyEventLandmark,
         },
         runtime,
+        music,
         deepLink,
         isMobileDevice,
     });

@@ -37,6 +37,15 @@ void NotifyStreamingProgress(int completed, int total, int active, int tierCode)
     }, completed, total, active, tierCode);
 }
 
+// 0–1 gain the music bed should apply for scene proximity; web/src/music.ts owns the device.
+void NotifyMusicDuck(float duck) {
+    EM_ASM({
+        if (typeof Module['onMusicDuck'] === 'function') {
+            Module['onMusicDuck']($0);
+        }
+    }, duck);
+}
+
 void NotifyPlanetFocused(int index) {
     EM_ASM({
         if (typeof Module['onPlanetFocused'] === 'function') {

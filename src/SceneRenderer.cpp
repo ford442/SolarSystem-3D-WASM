@@ -655,6 +655,7 @@ void Renderer::RenderHints() const {
     gpuHintCache.clear();
     gpuHintCache.emplace_back(wstring(gpuHintString.begin(), gpuHintString.end()));
 
+#ifndef __EMSCRIPTEN__ // web: volume and track live in the settings panel (web/src/music.ts)
     soundVolumeHintCache.clear();
     stringstream soundVolumeStream;
 #ifdef SOLARSYSTEM_USE_SDL_MIXER
@@ -667,6 +668,7 @@ void Renderer::RenderHints() const {
 
     tmpStringCache.clear();
     tmpStringCache.emplace_back(wstring(_app._currentMusicTrack.begin(), _app._currentMusicTrack.end()));
+#endif
 
     deque<wstring> timeRunHint;
     timeRunHint.emplace_back(L"Time (P:pause, +/-:scale, .:step): ");
@@ -742,13 +744,17 @@ void Renderer::RenderHints() const {
     magneticHint.emplace_back(L"Magnetic fields(M): ");
     magneticHint.emplace_back(magneticFieldsEnabled ? L"On" : L"Off");
 
+#ifndef __EMSCRIPTEN__
     textRenderer->ReverseRender(*mainTextShader, tmpStringCache, 0.99 * _app._displayWidth, 0.95 * _app._displayHeight, 0.35, textColor);
+#endif
     if (!conjunctionHint.empty()) {
         textRenderer->ReverseRender(*mainTextShader, conjunctionHint, 0.99 * _app._displayWidth, 0.925 * _app._displayHeight, 0.35, textColor);
     }
     textRenderer->Render(*mainTextShader, fpsHintCache, 0.01 * _app._displayWidth, 0.95 * _app._displayHeight, 0.35, _app.CurrentFpsColor());
     textRenderer->Render(*mainTextShader, gpuHintCache, 0.01 * _app._displayWidth, 0.925 * _app._displayHeight, 0.35, textColor);
+#ifndef __EMSCRIPTEN__
     textRenderer->Render(*mainTextShader, soundVolumeHintCache, 0.01 * _app._displayWidth, 0.9 * _app._displayHeight, 0.35, textColor);
+#endif
     textRenderer->Render(*mainTextShader, timeRunHint, 0.01 * _app._displayWidth, 0.875 * _app._displayHeight, 0.35, textColor);
     textRenderer->Render(*mainTextShader, planetStarHint, 0.01 * _app._displayWidth, 0.85 * _app._displayHeight, 0.35, textColor);
     textRenderer->Render(*mainTextShader, satelliteHint, 0.01 * _app._displayWidth, 0.825 * _app._displayHeight, 0.35, textColor);
