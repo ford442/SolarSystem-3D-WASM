@@ -130,10 +130,6 @@ export interface SolarSystemRuntime {
     addTouchLook(deltaX: number, deltaY: number): void;
     addTouchZoom(delta: number): void;
     isMobileWeb(): boolean;
-    setMusicVolume(volume: number): void;
-    getMusicVolume(): number;
-    setMusicMuted(muted: boolean): void;
-    getMusicMuted(): boolean;
     focusPlanet(index: PlanetIndex): void;
     setOrbitScaleMode(mode: OrbitScaleMode): void;
     getOrbitScaleMode(): OrbitScaleMode;
@@ -217,10 +213,6 @@ export function createSolarSystemRuntime(instance: SolarSystemModule): SolarSyst
         addTouchLook: exports.addTouchLook,
         addTouchZoom: exports.addTouchZoom,
         isMobileWeb: () => exports.isMobileWeb() !== 0,
-        setMusicVolume: exports.setMusicVolume,
-        getMusicVolume: exports.getMusicVolume,
-        setMusicMuted: (muted) => exports.setMusicMuted(muted ? 1 : 0),
-        getMusicMuted: () => exports.getMusicMuted() !== 0,
         focusPlanet: (index) => exports.focusPlanet(index),
         setOrbitScaleMode: (mode) => exports.setOrbitScaleMode(mode),
         getOrbitScaleMode: () => exports.getOrbitScaleMode() as OrbitScaleMode,

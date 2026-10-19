@@ -114,26 +114,6 @@ void Application::LoadCoreResources() {
     }
 }
 
-void Application::LoadOptionalSounds() {
-#ifdef __EMSCRIPTEN__
-    const auto& songPaths = GetBackgroundSongPaths();
-    std::cout << "[Audio] Starting optional background music download ("
-              << songPaths.size() << " tracks)..." << std::endl;
-
-    for (const auto& path : songPaths) {
-        WebResourceFetcher::DownloadFile(path, path, [this, path](bool success) {
-            if (success && WebResourceFetcher::ResourceExists(path)) {
-                _availableSongPaths.insert(path);
-                std::cout << "[Audio] Loaded track: " << path << std::endl;
-                return;
-            }
-
-            std::cerr << "[Audio] Missing track (skipped): " << path << std::endl;
-        });
-    }
-#endif
-}
-
 void Application::InitSongList() {
     _backgroundSongPaths = GetBackgroundSongPaths();
 

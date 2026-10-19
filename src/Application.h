@@ -22,10 +22,11 @@
 #include <emscripten/html5.h>
 #endif
 
+// Web has no native audio backend: the music bed is an HTMLAudioElement in web/src/music.ts.
 #ifdef SOLARSYSTEM_USE_SDL_MIXER
 #include <SDL.h>
 #include <SDL_mixer.h>
-#else
+#elif !defined(__EMSCRIPTEN__)
 #include <irrKlang.h>
 using namespace irrklang;
 #endif
@@ -96,10 +97,13 @@ public:
     std::string GetObserveStateJson() const;
     /** GL name of the Moon's diffuse texture once its system is loaded, else 0 (Observe draws it on the Moon disc). */
     unsigned int ObserveMoonTexture() const;
+#ifndef __EMSCRIPTEN__
+    // On web, volume/mute live in web/src/music.ts; C++ only reports MusicDuckAmount().
     void SetMusicVolume(float volume);
     float GetMusicVolume() const;
     void SetMusicMuted(bool muted);
     bool GetMusicMuted() const;
+#endif
     void SetOrbitLinesEnabled(bool enabled);
     bool GetOrbitLinesEnabled() const;
     void SetMagneticFieldsEnabled(bool enabled);
@@ -156,7 +160,7 @@ private:
 #ifdef __EMSCRIPTEN__
     int _nearestPlanetSearchFrameCounter = 0;
 #endif
-#ifndef SOLARSYSTEM_USE_SDL_MIXER
+#if !defined(SOLARSYSTEM_USE_SDL_MIXER) && !defined(__EMSCRIPTEN__)
     ISoundEngine* _soundEngine = nullptr;
     std::unique_ptr<std::thread> _backgroundMusicThread;
 #endif
@@ -198,7 +202,6 @@ private:
     void InitSystems();
     void InitScene();
     void LoadCoreResources(); // Download only core assets (skybox, sun, models)
-    void LoadOptionalSounds(); // Fire-and-forget background music downloads (WASM)
     void InitSceneObjects();
     void InitStarSystem();
     void LoadPlanetSystemManifests(); // WASM: parse resource/planet_manifest.json
@@ -223,7 +226,12 @@ private:
     void ApplyObserveEnvOverride();     // SOLARSYSTEM_OBSERVE=lat,lon[,jd[,az,el,fov]] for headless captures
     void StopMissionFollow();
     bool SampleMissionScenePosition(int idx, glm::vec3& outScene) const;
+    /** 1 = full volume, down to 0.32 when the camera is close to the nearest planet. */
+    float MusicDuckAmount() const;
     void UpdateMusicDucking();
+#ifdef __EMSCRIPTEN__
+    float _reportedMusicDuck = 1.0f;
+#endif
     void RenderFrameContent(); // Sky → planets → effects (one eye / mono)
 #ifdef __EMSCRIPTEN__
     void RenderXrStereoFrame();

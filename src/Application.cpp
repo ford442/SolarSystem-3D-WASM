@@ -189,7 +189,6 @@ void Application::InitScene() {
     // Explorer / deep links see Voyager rows before InitSceneObjects builds GL meshes.
     LoadMissionCatalog();
     LoadCoreResources();
-    LoadOptionalSounds();
 #else
     InitSceneObjects();
     _appState = AppState::RUNNING;

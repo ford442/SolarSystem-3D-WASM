@@ -4,6 +4,8 @@ export interface WasmModuleCallbacks {
     updateLoadingProgress?: (loaded: number, total: number) => void;
     updateStreamingProgress?: (completed: number, total: number, active?: number, tierCode?: number) => void;
     onPlanetFocused?: (index: number) => void;
+    /** 0–1 gain for scene proximity, reported by C++ (Application::UpdateMusicDucking). */
+    onMusicDuck?: (duck: number) => void;
     onSettingsChanged?: (field: SettingsChangeField | string) => void;
 }
 

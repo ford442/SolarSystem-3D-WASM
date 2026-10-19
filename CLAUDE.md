@@ -42,7 +42,7 @@ The build script:
 3. Builds with `emmake make`
 4. Deploys artifacts: `SolarSystem.js` → `web/src/`, `SolarSystem.wasm` and `SolarSystem.data` → `web/public/`
 
-The CMakeLists.txt has separate configurations for EMSCRIPTEN vs native builds, using Emscripten ports for GLFW, SDL2, SDL2_image, SDL_mixer, and FreeType.
+The CMakeLists.txt has separate configurations for EMSCRIPTEN vs native builds, using Emscripten ports for GLFW, SDL2, SDL2_image, and FreeType (no SDL_mixer).
 
 ### Native Build (Windows)
 
@@ -63,7 +63,7 @@ The CMakeLists.txt has separate configurations for EMSCRIPTEN vs native builds, 
   - `Application.cpp` — lifecycle (ctor/dtor, `InitScene`/`InitSceneObjects`) and the frame loop
   - `PlatformWindow.cpp` — GLFW/SDL/GL bring-up, window icon, resize, vsync, `Dispose`
   - `InputHandler.cpp` — polled input plus the mouse/scroll/key callbacks
-  - `AudioPlayer.cpp` — background music (SDL_mixer on web, irrKlang on native)
+  - `AudioPlayer.cpp` — native background music (SDL_mixer on Linux, irrKlang on Windows); web music is `web/src/music.ts`, C++ only reports `MusicDuckAmount()` via `onMusicDuck`
   - `RenderSettings.cpp` — quality/shadow presets, orbit scale mode, texture LOD manager
   - `StarSystemFactory.cpp` / `PlanetSystemLoader.cpp` — scene construction and staged web loading
   - `XrSession.cpp` — WebXR eye state and the stereo render pass (web only)
@@ -203,7 +203,7 @@ npm run dev
 - Assimp — 3D model loading (pre-built WASM version in `external/assimp/build-wasm/`)
 - GLM — Math library (header-only, in `external/glm/`)
 - FreeType — Font rendering (Emscripten port)
-- irrKlang — Audio (Windows native only; replaced with SDL_mixer on Emscripten)
+- irrKlang — Audio (Windows native only; SDL_mixer on Linux; web uses HTMLAudioElement)
 
 **Web Libraries**
 - Vite 7.2+ — Build tool and dev server

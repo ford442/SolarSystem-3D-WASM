@@ -45,11 +45,6 @@ export type PlanetIndex = 0 | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10 | 11 | 12 |
 
 export type OrbitScaleMode = 0 | 1;
 
-export type SetMusicVolume = (volume: number) => void;
-export type GetMusicVolume = () => number;
-export type SetMusicMuted = (muted: boolean) => void;
-export type GetMusicMuted = () => boolean;
-
 /** Planet index accepted by FocusPlanet: 0=sun, 1=Mercury, ..., 11=Vesta, 12=Eris … 15=1P/Halley. */
 export type FocusPlanet = (index: PlanetIndex) => void;
 
@@ -161,26 +156,6 @@ export interface SolarSystemCwrap {
   ): (...args: number[]) => void;
   (
     ident: 'IsMobileWeb',
-    returnType: 'number',
-    argTypes: [],
-  ): (...args: number[]) => number;
-  (
-    ident: 'SetMusicVolume',
-    returnType: null,
-    argTypes: ['number'],
-  ): (...args: number[]) => void;
-  (
-    ident: 'GetMusicVolume',
-    returnType: 'number',
-    argTypes: [],
-  ): (...args: number[]) => number;
-  (
-    ident: 'SetMusicMuted',
-    returnType: null,
-    argTypes: ['number'],
-  ): (...args: number[]) => void;
-  (
-    ident: 'GetMusicMuted',
     returnType: 'number',
     argTypes: [],
   ): (...args: number[]) => number;
@@ -402,8 +377,6 @@ export type SettingsChangeField =
   | 'timeScale'
   | 'paused'
   | 'shadowQuality'
-  | 'musicVolume'
-  | 'musicMuted'
   | 'simulationEpoch'
   | 'orbitLines'
   | 'magneticFields'
@@ -422,6 +395,8 @@ export interface SolarSystemModuleConfig {
   updateLoadingProgress?: (loaded: number, total: number) => void;
   updateStreamingProgress?: (completed: number, total: number, active?: number, tierCode?: number) => void;
   onPlanetFocused?: (index: number) => void;
+  /** 0–1 music gain for scene proximity; web/src/music.ts applies it. */
+  onMusicDuck?: (duck: number) => void;
   onSettingsChanged?: (field: SettingsChangeField | string) => void;
   /**
    * A WebGL2 context created by the caller (see web/src/webglContext.ts), reused as-is by
@@ -468,10 +443,6 @@ export interface SolarSystemModule {
   _AddTouchLook: (...args: number[]) => void;
   _AddTouchZoom: (...args: number[]) => void;
   _IsMobileWeb: () => number;
-  _SetMusicVolume: (...args: number[]) => void;
-  _GetMusicVolume: () => number;
-  _SetMusicMuted: (...args: number[]) => void;
-  _GetMusicMuted: () => number;
   _FocusPlanet: (...args: number[]) => void;
   _FocusMission: (...args: number[]) => void;
   _GetFocusedMissionIndex: () => number;

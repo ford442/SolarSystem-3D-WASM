@@ -45,7 +45,7 @@ Then open `http://localhost:5173/solar-system/` (dev) or the `preview` URL Vite 
 The build system now properly handles Emscripten-specific configuration:
 - Uses `-s USE_GLFW=3` for GLFW support
 - Uses `-s USE_SDL=2` and `-s USE_SDL_IMAGE=2` for SDL support
-- Uses `-s USE_SDL_MIXER=2` for audio (replacement for irrKlang)
+- No audio port: music is an `HTMLAudioElement` in `web/src/music.ts` (SDL_mixer's Emscripten backend used a deprecated ScriptProcessorNode)
 - Uses `-s USE_FREETYPE=1` for text rendering
 - Uses `-s FULL_ES3=1` for WebGL 2.0 support
 - Preloads assets with `--preload-file resource@/resource`
@@ -70,11 +70,11 @@ The `Shader.cpp` file conditionally compiles uniform methods:
 - Native builds continue to use double precision
 
 ### ✅ Audio System Replacement
-irrKlang has been replaced with SDL_mixer for web compatibility:
-- Native builds continue to use irrKlang
-- Web builds use SDL_mixer with `Mix_Music` and `Mix_PlayMusic`
-- Volume control and fade in/out implemented using SDL_mixer API
-- Music playback managed in the main loop for web builds
+Audio is a browser media concern on web:
+- Windows uses irrKlang, Linux uses SDL_mixer
+- Web builds link no audio library; `web/src/music.ts` plays the tracks with `HTMLAudioElement`
+  (shuffle, 5 s fades, loop) and owns volume/mute
+- C++ only reports a 0–1 proximity duck through `Module['onMusicDuck']` (`NotifyMusicDuck`)
 
 ### ✅ Threading Refactoring
 Threads have been converted to frame-based logic for web compatibility:
@@ -85,7 +85,7 @@ Threads have been converted to frame-based logic for web compatibility:
 
 **Background Music:**
 - Native: Uses `std::thread` with volume fading logic
-- Web: Managed per-frame in `UpdateBackgroundMusic()` with SDL_mixer
+- Web: `web/src/music.ts` (HTMLAudioElement); C++ plays nothing
 
 ### ✅ OpenGL Context Configuration
 The initialization code properly handles both platforms:
@@ -100,7 +100,7 @@ The initialization code properly handles both platforms:
 *   **Graphics**: The project uses OpenGL 4.6 but does not utilize Geometry, Tessellation, or Compute shaders. Port to WebGL 2 (OpenGL ES 3.0) is fully compatible.
     *   WebGL 2 does not support double precision floats - handled via conditional compilation.
 *   **Windowing**: GLFW has excellent Emscripten support - works out of the box.
-*   **Audio**: irrKlang is not web-compatible - successfully replaced with SDL_mixer.
+*   **Audio**: irrKlang is not web-compatible - web music is played from TypeScript (`HTMLAudioElement`).
 *   **Threading**: `std::thread` replaced with frame-based logic for web builds.
 
 ### Assets (DDS Textures)
@@ -420,7 +420,7 @@ The codebase uses `#ifdef __EMSCRIPTEN__` to conditionally compile platform-spec
 
 ```cpp
 #ifdef __EMSCRIPTEN__
-    // Web-specific code (SDL_mixer, frame-based logic, etc.)
+    // Web-specific code (frame-based logic, JS bridges, etc.)
 #else
     // Native code (irrKlang, threads, etc.)
 #endif
@@ -433,7 +433,7 @@ The codebase uses `#ifdef __EMSCRIPTEN__` to conditionally compile platform-spec
 | **GLFW** | ✅ Linked | ✅ `-s USE_GLFW=3` | Working |
 | **SDL2** | ✅ Linked | ✅ `-s USE_SDL=2` | Working |
 | **SDL_image** | ✅ Linked | ✅ `-s USE_SDL_IMAGE=2` | Working |
-| **SDL_mixer** | ❌ Not used | ✅ `-s USE_SDL_MIXER=2` | Working |
+| **SDL_mixer** | ✅ Linux only | ❌ Not linked (web uses `HTMLAudioElement`) | Working |
 | **GLEW** | ✅ Required | ❌ Not needed | N/A on web |
 | **irrKlang** | ✅ Audio engine | ❌ Unsupported | Replaced |
 | **Assimp** | ✅ Linked | ✅ Build from source | Required (`setup_web_dependencies.sh`) |

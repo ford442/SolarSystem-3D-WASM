@@ -115,24 +115,6 @@ extern "C" {
     EMSCRIPTEN_KEEPALIVE int IsMobileWeb() {
         return gSimState->isMobileWeb ? 1 : 0;
     }
-    EMSCRIPTEN_KEEPALIVE void SetMusicVolume(float volume) {
-        if (activeApplication) {
-            activeApplication->SetMusicVolume(volume);
-        }
-        NotifySettingsChanged("musicVolume");
-    }
-    EMSCRIPTEN_KEEPALIVE float GetMusicVolume() {
-        return activeApplication ? activeApplication->GetMusicVolume() : 0.3f;
-    }
-    EMSCRIPTEN_KEEPALIVE void SetMusicMuted(int muted) {
-        if (activeApplication) {
-            activeApplication->SetMusicMuted(muted != 0);
-        }
-        NotifySettingsChanged("musicMuted");
-    }
-    EMSCRIPTEN_KEEPALIVE int GetMusicMuted() {
-        return activeApplication && activeApplication->GetMusicMuted() ? 1 : 0;
-    }
     EMSCRIPTEN_KEEPALIVE void FocusPlanet(int idx) {
         if (activeApplication) {
             activeApplication->FocusPlanetByIndex(idx);
