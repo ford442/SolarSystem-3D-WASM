@@ -93,7 +93,7 @@ TEST(EclipseCasterTest, EphemerisMoonEclipsesAFewTimesAYearNotEveryMonth) {
     // years and count distinct shadow episodes. There are 2-5 solar eclipses a year, and
     // 49 new moons in four years — so anything near 49 would mean the orbit is effectively
     // flat, which is exactly what the old circular XZ offset produced.
-    const BodyCatalog::Entry* moonRow = BodyCatalog::FindByIndex(12);
+    const BodyCatalog::Entry* moonRow = BodyCatalog::FindByIndex(16);
     ASSERT_NE(moonRow, nullptr);
 
     int episodes = 0;

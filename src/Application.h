@@ -166,6 +166,7 @@ private:
     int _focusedMissionIndex = -1;
     bool _missionFollowActive = false;
     std::unique_ptr<AsteroidField> _asteroidField;
+    std::unique_ptr<AsteroidField> _kuiperField; // Population::Kuiper; realistic scale only
     std::shared_ptr<Star> _sun;
     std::vector<RenderableSceneComponent> _renderableSceneComponents;
     std::vector<std::string> _backgroundSongPaths;

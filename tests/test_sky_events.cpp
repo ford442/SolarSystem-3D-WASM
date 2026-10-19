@@ -99,7 +99,7 @@ TEST(SkyEventsTest, BodyNamesCoverTheCatalogAndRejectStrays) {
     // callers never get a half-built label for a moon no search reports.
     EXPECT_STREQ(SkyEvents::BodyName(SkyEvents::kMoon), "Moon");
     EXPECT_STREQ(SkyEvents::BodyName(SkyEvents::kIo), "Io");
-    EXPECT_STREQ(SkyEvents::BodyName(19), ""); // Mimas — no ephemeris solution, no name
+    EXPECT_STREQ(SkyEvents::BodyName(23), ""); // Mimas — no ephemeris solution, no name
     EXPECT_STREQ(SkyEvents::BodyName(99), "");
 }
 

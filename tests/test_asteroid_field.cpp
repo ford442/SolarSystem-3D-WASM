@@ -2,6 +2,7 @@
 
 #include <cmath>
 
+#include "Auxiliary_Modules/Ephemeris.h"
 #include "Solar_System/AsteroidOrbit.h"
 #include "Solar_System/OrbitLayout.h"
 
@@ -98,4 +99,31 @@ TEST_F(AsteroidOrbitTest, KeplerCircularOrbitRadiusMatchesSemiMajor) {
     el.eccentricity = 0.0f;
     el.meanAnomalyRad = 1.234f;
     EXPECT_TRUE(Near(AsteroidOrbit::CurrentRadiusAu(el), 2.5f, 1e-4f));
+}
+
+TEST_F(AsteroidOrbitTest, KuiperDiskIsDistinctFromTheMainBelt) {
+    const auto disk = AsteroidOrbit::GenerateKuiperDisk(AsteroidOrbit::kDefaultSeed, 400);
+    ASSERT_EQ(disk.size(), 400u);
+    int plutinos = 0;
+    for (const auto& el : disk) {
+        EXPECT_GE(el.semiMajorAu, OrbitLayout::kKuiperBeltInnerAu);
+        EXPECT_LE(el.semiMajorAu, OrbitLayout::kKuiperBeltOuterAu);
+        EXPECT_GT(el.semiMajorAu, OrbitLayout::kMainBeltOuterAu * 5.0f);
+        EXPECT_LT(el.eccentricity, 0.26f);
+        EXPECT_EQ(el.ephemerisBody, -1);
+        plutinos += (el.semiMajorAu > 39.0f && el.semiMajorAu < 39.8f) ? 1 : 0;
+    }
+    EXPECT_GT(plutinos, 40); // ~1/4 sit in the 3:2 resonance
+}
+
+TEST_F(AsteroidOrbitTest, HalleyTailFollowsTheCatalogNucleus) {
+    const auto comets = AsteroidOrbit::GenerateComets();
+    ASSERT_FALSE(comets.empty());
+    const auto& halley = comets.front();
+    ASSERT_EQ(halley.ephemerisBody, static_cast<int>(OrbitLayout::Body::Halley));
+    OrbitLayout::SetJulianDate(Ephemeris::JulianDateFromYmd(1986, 2, 9));
+    const glm::vec3 tail = AsteroidOrbit::HeliocentricPosition(halley);
+    const glm::vec3 nucleus = OrbitLayout::GetOffset(OrbitLayout::Body::Halley);
+    EXPECT_LT(glm::length(tail - nucleus), 1e-3f);
+    EXPECT_NEAR(AsteroidOrbit::CurrentRadiusAu(halley), 0.586f, 0.01f);
 }

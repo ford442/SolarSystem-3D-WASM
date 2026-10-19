@@ -18,6 +18,8 @@ struct QualityTierSettings {
     bool enableMagneticBloom;
     int magneticBloomPasses;
     int asteroidInstanceCount;
+    // Kuiper-disk rocks (a second AsteroidField population, drawn in realistic scale only).
+    int kuiperInstanceCount;
     TextureLodTier maxTextureLodTier;
     // LUT-based atmosphere (atmospherePbr.fs) on bodies whose catalog row has a `physical`
     // block; atmosphereSteps is the view-ray sample count. Off = the O'Neil shell.

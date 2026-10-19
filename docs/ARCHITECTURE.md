@@ -82,14 +82,17 @@ resource/asset-manifest.json  ◄──  web/deploy.py --update-manifest  (fill 
 `OrbitLayout::kBodies[]` (heliocentric compressed-art offset, AU distance, orbital period,
 inclination, sidereal rotation) is generated into
 `src/Solar_System/OrbitLayoutBodies.generated.inc` and `#include`d by `OrbitLayout.cpp`. Focus-body
-row count must stay in lockstep with `OrbitLayout::Body` / `kBodyCount` (Sun=0 … Vesta=11).
+row count must stay in lockstep with `OrbitLayout::Body` / `kBodyCount` (Sun=0 … Halley=15).
+Outer-system bodies (`OrbitLayout::UsesTrueRadius`, Eris … Halley) are placed at their
+ephemeris distance in both scale modes instead of a fixed art radius, so eccentric orbits read.
 
 `src/Solar_System/BodyCatalog.generated.h` is generated from each body's `render` block
 (shader flags, ambient factor, texture LOD ids, display names, `earthRadiusScale`,
 `axialTiltDegrees`) for planets, dwarf planets, and moons. `CatalogBody` /
 `CatalogSatellite` / `CatalogClouds` consume a row directly, so a rocky body whose
 only distinguishing features fit in that row needs **no C++ class at all**. Mercury–Pluto,
-Ceres, Vesta, the Moon, the Galileans, and the other currently rendered moons are built
+Ceres, Vesta, Eris, Haumea, Makemake, 1P/Halley's nucleus, the Moon, the Galileans, and the
+other currently rendered moons are built
 this way. Adding another catalog-only rocky body is: catalog row + textures + `initTag`
 on the allowlist (the factory loops catalog systems; `MakePlanetInitFunc` is generic).
 
@@ -620,8 +623,11 @@ table. A **moon** gets its Keplerian elements from its own catalog row
 (`orbit.keplerian`, including the `OmegaDotDegPerDay` / `omegaDotDegPerDay` secular rates)
 rather than from `Ephemeris.cpp`; it is only placed from those elements once its id is added
 to `kKeplerianSatellites` in `Ephemeris.cpp`, which is the gate that keeps rows still carrying
-placeholder angles on the old circular `SatelliteOrbit::Offset` path. See § Ephemeris accuracy. Keep focus indices **0–11 frozen** (Sun=0 … Vesta=11); new focus bodies continue at 12+
-only after moons (moons already occupy 12+ as non-focus catalog rows).
+placeholder angles on the old circular `SatelliteOrbit::Offset` path. See § Ephemeris accuracy. Keep focus indices **0–11 frozen** (Sun=0 … Vesta=11). The outer system appends after them:
+**12=Eris, 13=Haumea, 14=Makemake, 15=1P/Halley** (kind `comet`). Satellites are numbered
+*after* the last focus index (Moon=16 … Charon=36) — the generator rejects a satellite index at
+or below it — so adding a focus body shifts the satellite ids, not the focus ids. Satellite ids
+are internal (Ephemeris / SkyEvents / tests), never in URLs or the JS API.
 
 **Atmosphere:** add a `render.atmosphere` block to the row (planet *or* moon). `oneil` alone
 gives the cheap shell; add `physical` and rebake (§9.2) for the LUT path. No C++ change.
@@ -645,7 +651,7 @@ for Pluto, Ceres, and Vesta) and `Ephemeris::SatellitePosition` answers parent-r
 moons. `SkyEvents`, `OrbitLayout`, and `CatalogSatellite` all read through those two calls, so
 swapping in a different backend — a truncated VSOP87D, say — moves every consumer at once.
 
-**The Moon** is the exception to everything below: `StandishEphemeris::SatelliteParentRelative(12)`
+**The Moon** is the exception to everything below: `StandishEphemeris::SatelliteParentRelative(16)`
 returns `LunarTheory::MoonGeocentricJ2000Au`, the Meeus ch. 47 series (60 longitude/distance and 60
 latitude terms, plus the Venus/Jupiter/flattening additives; the tables are generated from a public
 transcription of Meeus's, cross-checked against his worked Example 47.a to 2e-6°). The series is in

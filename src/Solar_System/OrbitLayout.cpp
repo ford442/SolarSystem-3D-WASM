@@ -40,6 +40,7 @@ ScaleMode g_scaleMode = ScaleMode::Compressed;
 double g_julianDate = Ephemeris::kJ2000;
 float g_lonRad[kBodyCount] = {};
 float g_latRad[kBodyCount] = {};
+float g_rAu[kBodyCount] = {};
 float g_axialSpinDeg[kBodyCount] = {};
 
 int bodyIndex(Body body) {
@@ -52,6 +53,7 @@ void refreshEphemerisCache() {
         const Ephemeris::HelioLB pos = Ephemeris::Position(i, g_julianDate);
         g_lonRad[i] = static_cast<float>(pos.lonRad);
         g_latRad[i] = static_cast<float>(pos.latRad);
+        g_rAu[i] = static_cast<float>(pos.rAu);
     }
 }
 
@@ -177,11 +179,22 @@ float GetOrbitRadius(Body body) {
     if (body == Body::Sun) {
         return 0.0f;
     }
+    if (UsesTrueRadius(body)) {
+        return AuToSceneDistance(g_rAu[bodyIndex(body)]);
+    }
     const glm::vec3 compressed = GetCompressedOffset(body);
     if (g_scaleMode == ScaleMode::Compressed) {
         return glm::length(compressed);
     }
     return AuToSceneDistance(GetAuDistance(body));
+}
+
+bool UsesTrueRadius(Body body) {
+    return static_cast<int>(body) >= static_cast<int>(Body::Eris);
+}
+
+float GetHeliocentricRadiusAu(Body body) {
+    return g_rAu[bodyIndex(body)];
 }
 
 float GetSceneDistance(Body body) {
@@ -246,6 +259,10 @@ Body BodyFromName(const std::string& name) {
     if (name == "Pluto") return Body::Pluto;
     if (name == "Ceres") return Body::Ceres;
     if (name == "Vesta") return Body::Vesta;
+    if (name == "Eris") return Body::Eris;
+    if (name == "Haumea") return Body::Haumea;
+    if (name == "Makemake") return Body::Makemake;
+    if (name == "Halley") return Body::Halley;
     return Body::Sun;
 }
 

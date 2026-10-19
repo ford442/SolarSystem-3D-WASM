@@ -8,7 +8,9 @@
 #include <vector>
 
 /**
- * Procedural main-belt asteroid field + a few named comets.
+ * Procedural main-belt asteroid field + a few named comets, or (Population::Kuiper) the
+ * sparse trans-Neptunian disk with no comets, drawn only in realistic scale so it never
+ * piles up on Pluto's compressed art orbit.
  * Asteroids are drawn with a single glDrawElementsInstanced call.
  * Comet nuclei share the rock mesh; tails are additive billboards.
  */
@@ -20,7 +22,11 @@ public:
 
     using OrbitalElements = AsteroidOrbit::OrbitalElements;
 
-    explicit AsteroidField(uint32_t seed = kDefaultSeed, int instanceCount = 1800);
+    enum class Population { MainBelt, Kuiper };
+    static constexpr uint32_t kKuiperSeed = 0x6B1D2E57u;
+
+    explicit AsteroidField(uint32_t seed = kDefaultSeed, int instanceCount = 1800,
+                           Population population = Population::MainBelt);
     ~AsteroidField();
 
     AsteroidField(const AsteroidField&) = delete;
@@ -59,6 +65,7 @@ private:
     void UploadInstances() const;
 
     uint32_t _seed = kDefaultSeed;
+    Population _population = Population::MainBelt;
     int _activeCount = 0;
     std::vector<OrbitalElements> _asteroids;
     std::vector<OrbitalElements> _comets;

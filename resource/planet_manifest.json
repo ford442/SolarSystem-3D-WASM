@@ -248,6 +248,66 @@
         "resource/textures_low/Vesta_Normal_Low.dds"
       ],
       "optional": []
+    },
+    {
+      "name": "Eris",
+      "init": "Eris",
+      "proxyPosition": [
+        0,
+        0,
+        5680
+      ],
+      "activationRadius": 2500,
+      "required": [
+        "resource/textures_low/Eris_Diffuse_Low.dds",
+        "resource/textures_low/Eris_Normal_Low.dds"
+      ],
+      "optional": []
+    },
+    {
+      "name": "Haumea",
+      "init": "Haumea",
+      "proxyPosition": [
+        -2550,
+        0,
+        -2550
+      ],
+      "activationRadius": 2000,
+      "required": [
+        "resource/textures_low/Haumea_Diffuse_Low.dds",
+        "resource/textures_low/Haumea_Normal_Low.dds"
+      ],
+      "optional": []
+    },
+    {
+      "name": "Makemake",
+      "init": "Makemake",
+      "proxyPosition": [
+        2700,
+        0,
+        -2700
+      ],
+      "activationRadius": 2000,
+      "required": [
+        "resource/textures_low/Makemake_Diffuse_Low.dds",
+        "resource/textures_low/Makemake_Normal_Low.dds"
+      ],
+      "optional": []
+    },
+    {
+      "name": "Halley",
+      "init": "Halley",
+      "proxyPosition": [
+        -2100,
+        0,
+        1200
+      ],
+      "activationRadius": 2500,
+      "required": [
+        "resource/textures_low/Halley_Diffuse_Low.dds",
+        "resource/textures_low/Halley_Normal_Low.dds"
+      ],
+      "optional": []
     }
   ]
 }

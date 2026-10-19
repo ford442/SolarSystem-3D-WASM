@@ -84,7 +84,15 @@ const PLANET_IDS: Record<string, PlanetIndex> = {
     pluto: 9,
     ceres: 10,
     vesta: 11,
+    eris: 12,
+    haumea: 13,
+    makemake: 14,
+    // 1P/Halley at its last perihelion: ?planet=halley&date=1986-02-09
+    halley: 15,
 };
+
+/** Highest focus index (OrbitLayout::kBodyCount - 1). */
+const MAX_PLANET_INDEX = 15;
 
 const PLANET_ID_BY_INDEX = Object.fromEntries(
     Object.entries(PLANET_IDS).map(([id, index]) => [index, id]),
@@ -126,7 +134,7 @@ function parsePlanetIndex(value: string | null): PlanetIndex | undefined {
         return PLANET_IDS[normalized];
     }
     const asNumber = Number(value);
-    if (Number.isInteger(asNumber) && asNumber >= 0 && asNumber <= 11) {
+    if (Number.isInteger(asNumber) && asNumber >= 0 && asNumber <= MAX_PLANET_INDEX) {
         return asNumber as PlanetIndex;
     }
     return undefined;
@@ -315,7 +323,7 @@ export function buildShareableUrl(
     }
 
     const focusedPlanet = readers.getFocusedPlanetIndex?.() ?? -1;
-    if (focusedPlanet >= 0 && focusedPlanet <= 11) {
+    if (focusedPlanet >= 0 && focusedPlanet <= MAX_PLANET_INDEX) {
         url.searchParams.set('planet', PLANET_ID_BY_INDEX[focusedPlanet as PlanetIndex]);
     }
 

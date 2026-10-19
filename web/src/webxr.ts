@@ -63,6 +63,7 @@ const OBSERVE_TOOLTIP = 'Observe — left stick: scrub time · right stick: turn
 const XR_BODY_NAMES = [
   'Sun', 'Mercury', 'Venus', 'Earth', 'Mars', 'Jupiter', 'Saturn',
   'Uranus', 'Neptune', 'Pluto', 'Ceres', 'Vesta',
+  'Eris', 'Haumea', 'Makemake', '1P/Halley',
 ] as const;
 
 function rotateVectorByQuat(

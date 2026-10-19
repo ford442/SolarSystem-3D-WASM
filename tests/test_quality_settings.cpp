@@ -63,6 +63,17 @@ TEST(QualitySettingsTest, MobileScalesAsteroidCountsDown) {
     ExpectTier(GetQualitySettings(1, true), 2048, 2, 0, true, true, 1, 900, TextureLodTier::Mid, "medium");
 }
 
+TEST(QualitySettingsTest, KuiperDiskIsOffOnLowAndSmallerThanTheBelt) {
+    for (const bool mobile : {false, true}) {
+        EXPECT_EQ(GetQualitySettings(0, mobile).kuiperInstanceCount, 0);
+        for (int preset = 1; preset <= 2; ++preset) {
+            const QualityTierSettings s = GetQualitySettings(preset, mobile);
+            EXPECT_GT(s.kuiperInstanceCount, 0) << s.name;
+            EXPECT_LT(s.kuiperInstanceCount, s.asteroidInstanceCount) << s.name;
+        }
+    }
+}
+
 TEST(QualitySettingsTest, OutOfRangePresetUsesFullTier) {
     ExpectTier(GetQualitySettings(99, false), 3000, 4, 4, true, true, 2, 4000, TextureLodTier::High, "full");
 }

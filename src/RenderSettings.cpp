@@ -24,6 +24,9 @@ void Application::ApplyQualityPreset(int preset) {
     if (_asteroidField) {
         _asteroidField->SetInstanceCount(settings.asteroidInstanceCount);
     }
+    if (_kuiperField) {
+        _kuiperField->SetInstanceCount(settings.kuiperInstanceCount);
+    }
     _renderer.RebuildMissionPaths();
     if (_renderer.magneticFieldsEnabled) {
         _renderer.magneticFieldsBuilt = false;
@@ -71,6 +74,9 @@ void Application::ApplyOrbitScaleMode(int mode) {
     RefreshPlanetProxyPositions();
     if (_asteroidField) {
         _asteroidField->Update(0.0f); // rebuild instance matrices for new AU→scene mapping
+    }
+    if (_kuiperField) {
+        _kuiperField->Update(0.0f);
     }
     _renderer.RebuildMissionPaths();
     std::cout << "[OrbitScale] " << (scaleMode == OrbitLayout::ScaleMode::Realistic ? "realistic" : "compressed")

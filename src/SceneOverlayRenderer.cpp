@@ -267,4 +267,12 @@ void Renderer::RenderAsteroidField() {
                            _app._sun->GetPosition(), _app._camera.GetPosition(),
                            _app._camera.GetRightVector(), _app._camera.GetUpVector(),
                            zCoef);
+
+    if (_app._kuiperField) {
+        _app._kuiperField->Update(gSimState->simDeltaSeconds);
+        _app._kuiperField->Render(cameraProjection, cameraView,
+                                  _app._sun->GetPosition(), _app._camera.GetPosition(),
+                                  _app._camera.GetRightVector(), _app._camera.GetUpVector(),
+                                  zCoef);
+    }
 }

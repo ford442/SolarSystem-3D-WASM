@@ -20,11 +20,16 @@ enum class Body : int {
     Neptune = 8,
     Pluto = 9,
     Ceres = 10,
-    Vesta = 11
+    Vesta = 11,
+    // Outer system (catalog-only). New focus bodies append here; never renumber 0–11.
+    Eris = 12,
+    Haumea = 13,
+    Makemake = 14,
+    Halley = 15
 };
 
 /** Number of bodies in the layout table; valid Body values are 0 … kBodyCount-1. */
-constexpr int kBodyCount = static_cast<int>(Body::Vesta) + 1;
+constexpr int kBodyCount = static_cast<int>(Body::Halley) + 1;
 
 enum class ScaleMode : int {
     Compressed = 0,
@@ -40,6 +45,10 @@ constexpr float kAuToSceneUnits = 1900.0f;
 /** Main-belt semi-major axis range in AU (approximate). */
 constexpr float kMainBeltInnerAu = 2.1f;
 constexpr float kMainBeltOuterAu = 3.3f;
+
+/** Classical Kuiper-belt semi-major axis range in AU (inside the 2:1 resonance at ~48). */
+constexpr float kKuiperBeltInnerAu = 30.0f;
+constexpr float kKuiperBeltOuterAu = 50.0f;
 
 void SetScaleMode(ScaleMode mode);
 ScaleMode GetScaleMode();
@@ -77,8 +86,18 @@ float AuToSceneDistance(float au);
  */
 glm::vec3 HelioAuToScene(const glm::vec3& auSceneAxes);
 
-/** Orbit radius in scene units (scale-mode aware; independent of anomaly). */
+/**
+ * Orbit radius in scene units (scale-mode aware). Independent of anomaly for Mercury–Vesta,
+ * which keep their art/mean radius; outer-system bodies (UsesTrueRadius) follow the
+ * ephemeris distance so Eris and Halley swing in and out along their real ellipses.
+ */
 float GetOrbitRadius(Body body);
+
+/** True for the eccentric outer-system bodies (Eris … Halley) placed at their real r. */
+bool UsesTrueRadius(Body body);
+
+/** Heliocentric distance in AU at the current Julian date (from the ephemeris cache). */
+float GetHeliocentricRadiusAu(Body body);
 
 /** Alias of GetOrbitRadius — scene distance from the Sun. */
 float GetSceneDistance(Body body);

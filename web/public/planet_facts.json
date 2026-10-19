@@ -1,7 +1,7 @@
 {
   "version": 2,
   "generatedFrom": "resource/planets.catalog.json",
-  "indexConvention": "Sun=0 … Vesta=11; matches OrbitLayout::Body and Module focus APIs",
+  "indexConvention": "Sun=0 … Vesta=11 (frozen), Eris=12 … Halley=15; matches OrbitLayout::Body and Module focus APIs",
   "sceneNote": "Distances in the 3D scene are artistic. Toggle scale mode to compare compressed orbits vs AU-proportional spacing.",
   "bodies": [
     {
@@ -183,6 +183,66 @@
       "moons": 0,
       "summary": "Second-most massive main-belt body; a differentiated protoplanet with a giant south-polar impact basin.",
       "summaryRu": "Второе по массе тело главного пояса; дифференцированная протопланета с гигантским ударным бассейном у южного полюса."
+    },
+    {
+      "index": 12,
+      "id": "eris",
+      "name": "Eris",
+      "nameRu": "Эрида",
+      "type": "dwarf_planet",
+      "diameterKm": 2326,
+      "massEarths": 0.0028,
+      "siderealRotationDays": 15.786,
+      "orbitalPeriodDays": 203830,
+      "distanceAu": 67.86,
+      "moons": 1,
+      "summary": "Most massive known dwarf planet; a scattered-disk world on a 44° inclined, highly eccentric orbit that reaches ~97 AU.",
+      "summaryRu": "Самая массивная из известных карликовых планет; объект рассеянного диска на сильно вытянутой орбите с наклоном 44°, уходящей до ~97 а.е."
+    },
+    {
+      "index": 13,
+      "id": "haumea",
+      "name": "Haumea",
+      "nameRu": "Хаумеа",
+      "type": "dwarf_planet",
+      "diameterKm": 1632,
+      "massEarths": 0.00067,
+      "siderealRotationDays": 0.1631,
+      "orbitalPeriodDays": 103774,
+      "distanceAu": 43.12,
+      "moons": 2,
+      "summary": "Fast-spinning Kuiper-belt dwarf planet (3.9 h day) stretched into an ellipsoid; has a ring and two moons.",
+      "summaryRu": "Быстро вращающаяся карликовая планета пояса Койпера (сутки 3,9 ч), вытянутая в эллипсоид; имеет кольцо и два спутника."
+    },
+    {
+      "index": 14,
+      "id": "makemake",
+      "name": "Makemake",
+      "nameRu": "Макемаке",
+      "type": "dwarf_planet",
+      "diameterKm": 1430,
+      "massEarths": 0.00052,
+      "siderealRotationDays": 0.9511,
+      "orbitalPeriodDays": 111845,
+      "distanceAu": 45.51,
+      "moons": 1,
+      "summary": "Bright, reddish classical Kuiper-belt dwarf planet coated in methane ice.",
+      "summaryRu": "Яркая красноватая карликовая планета классического пояса Койпера, покрытая метановым льдом."
+    },
+    {
+      "index": 15,
+      "id": "halley",
+      "name": "1P/Halley",
+      "nameRu": "Комета Галлея",
+      "type": "comet",
+      "diameterKm": 11,
+      "massEarths": 0,
+      "siderealRotationDays": 2.2,
+      "orbitalPeriodDays": 27510,
+      "distanceAu": 17.83,
+      "moons": 0,
+      "summary": "The famous 76-year periodic comet; retrograde, e = 0.967. Last perihelion 1986-02-09, next 2061-07-28.",
+      "summaryRu": "Знаменитая периодическая комета с периодом 76 лет; обратное движение, e = 0,967. Последний перигелий 9 февраля 1986 г., следующий — 28 июля 2061 г."
     }
   ],
   "scaleModes": {

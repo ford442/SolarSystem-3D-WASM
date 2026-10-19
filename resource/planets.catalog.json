@@ -44,7 +44,11 @@
     "NeptuneSystem",
     "PlutoSystem",
     "Ceres",
-    "Vesta"
+    "Vesta",
+    "Eris",
+    "Haumea",
+    "Makemake",
+    "Halley"
   ],
   "bodies": [
     {
@@ -1120,8 +1124,296 @@
       }
     },
     {
-      "id": "moon",
+      "id": "eris",
       "index": 12,
+      "kind": "dwarf_planet",
+      "parent": "sun",
+      "displayName": {
+        "en": "Eris",
+        "ru": "Эрида"
+      },
+      "type": "dwarf_planet",
+      "facts": {
+        "diameterKm": 2326,
+        "massEarths": 0.0028,
+        "siderealRotationDays": 15.786,
+        "orbitalPeriodDays": 203830,
+        "distanceAu": 67.86,
+        "moons": 1,
+        "summary": {
+          "en": "Most massive known dwarf planet; a scattered-disk world on a 44° inclined, highly eccentric orbit that reaches ~97 AU.",
+          "ru": "Самая массивная из известных карликовых планет; объект рассеянного диска на сильно вытянутой орбите с наклоном 44°, уходящей до ~97 а.е."
+        }
+      },
+      "orbit": {
+        "compressedOffset": [
+          0,
+          0,
+          5680
+        ],
+        "inclinationDeg": 44.04,
+        "siderealRotationDays": 15.786,
+        "orbitalPeriodDays": 203830,
+        "distanceAu": 67.86,
+        "axialTiltDegrees": 78,
+        "earthRadiusScale": 0.1825,
+        "rotationRate": 0.00032
+      },
+      "system": {
+        "name": "Eris",
+        "initTag": "Eris",
+        "activationRadius": 2500,
+        "lodThreshold": 20,
+        "proxyPosition": [
+          0,
+          0,
+          5680
+        ]
+      },
+      "assets": {
+        "requiredLow": [
+          "resource/textures_low/Eris_Diffuse_Low.dds",
+          "resource/textures_low/Eris_Normal_Low.dds"
+        ],
+        "optionalLow": [],
+        "optionalHigh": [],
+        "companionTexture": "Eris_Diffuse.ktx2",
+        "fallbackColor": "#d9d6d0"
+      },
+      "includeInCompanion": false,
+      "render": {
+        "shaderFlags": {
+          "hasNightTexture": false,
+          "hasSpecularMap": false,
+          "hasClouds": false
+        },
+        "ambientFactor": 0,
+        "lod": {
+          "diffuse": "Eris_Diffuse",
+          "normal": "Eris_Normal",
+          "specular": null
+        }
+      }
+    },
+    {
+      "id": "haumea",
+      "index": 13,
+      "kind": "dwarf_planet",
+      "parent": "sun",
+      "displayName": {
+        "en": "Haumea",
+        "ru": "Хаумеа"
+      },
+      "type": "dwarf_planet",
+      "facts": {
+        "diameterKm": 1632,
+        "massEarths": 0.00067,
+        "siderealRotationDays": 0.1631,
+        "orbitalPeriodDays": 103774,
+        "distanceAu": 43.12,
+        "moons": 2,
+        "summary": {
+          "en": "Fast-spinning Kuiper-belt dwarf planet (3.9 h day) stretched into an ellipsoid; has a ring and two moons.",
+          "ru": "Быстро вращающаяся карликовая планета пояса Койпера (сутки 3,9 ч), вытянутая в эллипсоид; имеет кольцо и два спутника."
+        }
+      },
+      "orbit": {
+        "compressedOffset": [
+          -2550,
+          0,
+          -2550
+        ],
+        "inclinationDeg": 28.21,
+        "siderealRotationDays": 0.1631,
+        "orbitalPeriodDays": 103774,
+        "distanceAu": 43.12,
+        "axialTiltDegrees": 126,
+        "earthRadiusScale": 0.128,
+        "rotationRate": 0.03066
+      },
+      "system": {
+        "name": "Haumea",
+        "initTag": "Haumea",
+        "activationRadius": 2000,
+        "lodThreshold": 20,
+        "proxyPosition": [
+          -2550,
+          0,
+          -2550
+        ]
+      },
+      "assets": {
+        "requiredLow": [
+          "resource/textures_low/Haumea_Diffuse_Low.dds",
+          "resource/textures_low/Haumea_Normal_Low.dds"
+        ],
+        "optionalLow": [],
+        "optionalHigh": [],
+        "companionTexture": "Haumea_Diffuse.ktx2",
+        "fallbackColor": "#cfcac2"
+      },
+      "includeInCompanion": false,
+      "render": {
+        "shaderFlags": {
+          "hasNightTexture": false,
+          "hasSpecularMap": false,
+          "hasClouds": false
+        },
+        "ambientFactor": 0,
+        "lod": {
+          "diffuse": "Haumea_Diffuse",
+          "normal": "Haumea_Normal",
+          "specular": null
+        }
+      }
+    },
+    {
+      "id": "makemake",
+      "index": 14,
+      "kind": "dwarf_planet",
+      "parent": "sun",
+      "displayName": {
+        "en": "Makemake",
+        "ru": "Макемаке"
+      },
+      "type": "dwarf_planet",
+      "facts": {
+        "diameterKm": 1430,
+        "massEarths": 0.00052,
+        "siderealRotationDays": 0.9511,
+        "orbitalPeriodDays": 111845,
+        "distanceAu": 45.51,
+        "moons": 1,
+        "summary": {
+          "en": "Bright, reddish classical Kuiper-belt dwarf planet coated in methane ice.",
+          "ru": "Яркая красноватая карликовая планета классического пояса Койпера, покрытая метановым льдом."
+        }
+      },
+      "orbit": {
+        "compressedOffset": [
+          2700,
+          0,
+          -2700
+        ],
+        "inclinationDeg": 29.03,
+        "siderealRotationDays": 0.9511,
+        "orbitalPeriodDays": 111845,
+        "distanceAu": 45.51,
+        "axialTiltDegrees": 0,
+        "earthRadiusScale": 0.112,
+        "rotationRate": 0.00526
+      },
+      "system": {
+        "name": "Makemake",
+        "initTag": "Makemake",
+        "activationRadius": 2000,
+        "lodThreshold": 20,
+        "proxyPosition": [
+          2700,
+          0,
+          -2700
+        ]
+      },
+      "assets": {
+        "requiredLow": [
+          "resource/textures_low/Makemake_Diffuse_Low.dds",
+          "resource/textures_low/Makemake_Normal_Low.dds"
+        ],
+        "optionalLow": [],
+        "optionalHigh": [],
+        "companionTexture": "Makemake_Diffuse.ktx2",
+        "fallbackColor": "#c99b7a"
+      },
+      "includeInCompanion": false,
+      "render": {
+        "shaderFlags": {
+          "hasNightTexture": false,
+          "hasSpecularMap": false,
+          "hasClouds": false
+        },
+        "ambientFactor": 0,
+        "lod": {
+          "diffuse": "Makemake_Diffuse",
+          "normal": "Makemake_Normal",
+          "specular": null
+        }
+      }
+    },
+    {
+      "id": "halley",
+      "index": 15,
+      "kind": "comet",
+      "parent": "sun",
+      "displayName": {
+        "en": "1P/Halley",
+        "ru": "Комета Галлея"
+      },
+      "type": "comet",
+      "facts": {
+        "diameterKm": 11,
+        "massEarths": 0.0,
+        "siderealRotationDays": 2.2,
+        "orbitalPeriodDays": 27510,
+        "distanceAu": 17.83,
+        "moons": 0,
+        "summary": {
+          "en": "The famous 76-year periodic comet; retrograde, e = 0.967. Last perihelion 1986-02-09, next 2061-07-28.",
+          "ru": "Знаменитая периодическая комета с периодом 76 лет; обратное движение, e = 0,967. Последний перигелий 9 февраля 1986 г., следующий — 28 июля 2061 г."
+        }
+      },
+      "orbit": {
+        "compressedOffset": [
+          -2100,
+          0,
+          1200
+        ],
+        "inclinationDeg": 162.26,
+        "siderealRotationDays": 2.2,
+        "orbitalPeriodDays": 27510,
+        "distanceAu": 17.83,
+        "axialTiltDegrees": 0,
+        "earthRadiusScale": 0.01,
+        "rotationRate": 0.00227
+      },
+      "system": {
+        "name": "Halley",
+        "initTag": "Halley",
+        "activationRadius": 2500,
+        "lodThreshold": 20,
+        "proxyPosition": [
+          -2100,
+          0,
+          1200
+        ]
+      },
+      "assets": {
+        "requiredLow": [
+          "resource/textures_low/Halley_Diffuse_Low.dds",
+          "resource/textures_low/Halley_Normal_Low.dds"
+        ],
+        "optionalLow": [],
+        "optionalHigh": [],
+        "companionTexture": "Halley_Diffuse.ktx2",
+        "fallbackColor": "#a6adb8"
+      },
+      "includeInCompanion": false,
+      "render": {
+        "shaderFlags": {
+          "hasNightTexture": false,
+          "hasSpecularMap": false,
+          "hasClouds": false
+        },
+        "ambientFactor": 0,
+        "lod": {
+          "diffuse": "Halley_Diffuse",
+          "normal": "Halley_Normal",
+          "specular": null
+        }
+      }
+    },
+    {
+      "id": "moon",
+      "index": 16,
       "kind": "satellite",
       "parent": "earth",
       "displayName": {
@@ -1191,7 +1483,7 @@
     },
     {
       "id": "phobos",
-      "index": 13,
+      "index": 17,
       "kind": "satellite",
       "parent": "mars",
       "displayName": {
@@ -1261,7 +1553,7 @@
     },
     {
       "id": "deimos",
-      "index": 14,
+      "index": 18,
       "kind": "satellite",
       "parent": "mars",
       "displayName": {
@@ -1331,7 +1623,7 @@
     },
     {
       "id": "io",
-      "index": 15,
+      "index": 19,
       "kind": "satellite",
       "parent": "jupiter",
       "displayName": {
@@ -1402,7 +1694,7 @@
     },
     {
       "id": "europa",
-      "index": 16,
+      "index": 20,
       "kind": "satellite",
       "parent": "jupiter",
       "displayName": {
@@ -1473,7 +1765,7 @@
     },
     {
       "id": "ganymede",
-      "index": 17,
+      "index": 21,
       "kind": "satellite",
       "parent": "jupiter",
       "displayName": {
@@ -1544,7 +1836,7 @@
     },
     {
       "id": "callisto",
-      "index": 18,
+      "index": 22,
       "kind": "satellite",
       "parent": "jupiter",
       "displayName": {
@@ -1615,7 +1907,7 @@
     },
     {
       "id": "mimas",
-      "index": 19,
+      "index": 23,
       "kind": "satellite",
       "parent": "saturn",
       "displayName": {
@@ -1685,7 +1977,7 @@
     },
     {
       "id": "enceladus",
-      "index": 20,
+      "index": 24,
       "kind": "satellite",
       "parent": "saturn",
       "displayName": {
@@ -1755,7 +2047,7 @@
     },
     {
       "id": "tethys",
-      "index": 21,
+      "index": 25,
       "kind": "satellite",
       "parent": "saturn",
       "displayName": {
@@ -1825,7 +2117,7 @@
     },
     {
       "id": "dione",
-      "index": 22,
+      "index": 26,
       "kind": "satellite",
       "parent": "saturn",
       "displayName": {
@@ -1895,7 +2187,7 @@
     },
     {
       "id": "rhea",
-      "index": 23,
+      "index": 27,
       "kind": "satellite",
       "parent": "saturn",
       "displayName": {
@@ -1965,7 +2257,7 @@
     },
     {
       "id": "titan",
-      "index": 24,
+      "index": 28,
       "kind": "satellite",
       "parent": "saturn",
       "displayName": {
@@ -2062,7 +2354,7 @@
     },
     {
       "id": "iapetus",
-      "index": 25,
+      "index": 29,
       "kind": "satellite",
       "parent": "saturn",
       "displayName": {
@@ -2132,7 +2424,7 @@
     },
     {
       "id": "miranda",
-      "index": 26,
+      "index": 30,
       "kind": "satellite",
       "parent": "uranus",
       "displayName": {
@@ -2202,7 +2494,7 @@
     },
     {
       "id": "ariel",
-      "index": 27,
+      "index": 31,
       "kind": "satellite",
       "parent": "uranus",
       "displayName": {
@@ -2272,7 +2564,7 @@
     },
     {
       "id": "umbriel",
-      "index": 28,
+      "index": 32,
       "kind": "satellite",
       "parent": "uranus",
       "displayName": {
@@ -2342,7 +2634,7 @@
     },
     {
       "id": "titania",
-      "index": 29,
+      "index": 33,
       "kind": "satellite",
       "parent": "uranus",
       "displayName": {
@@ -2412,7 +2704,7 @@
     },
     {
       "id": "oberon",
-      "index": 30,
+      "index": 34,
       "kind": "satellite",
       "parent": "uranus",
       "displayName": {
@@ -2482,7 +2774,7 @@
     },
     {
       "id": "triton",
-      "index": 31,
+      "index": 35,
       "kind": "satellite",
       "parent": "neptune",
       "displayName": {
@@ -2553,7 +2845,7 @@
     },
     {
       "id": "charon",
-      "index": 32,
+      "index": 36,
       "kind": "satellite",
       "parent": "pluto",
       "displayName": {

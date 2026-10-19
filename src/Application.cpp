@@ -212,6 +212,9 @@ void Application::InitSceneObjects() {
         const auto asteroidQuality = GetQualitySettings(gSimState->qualityPreset, gSimState->isMobileWeb);
         _asteroidField = make_unique<AsteroidField>(AsteroidField::kDefaultSeed,
                                                     asteroidQuality.asteroidInstanceCount);
+        _kuiperField = make_unique<AsteroidField>(AsteroidField::kKuiperSeed,
+                                                  asteroidQuality.kuiperInstanceCount,
+                                                  AsteroidField::Population::Kuiper);
     }
 
     InitSongList();

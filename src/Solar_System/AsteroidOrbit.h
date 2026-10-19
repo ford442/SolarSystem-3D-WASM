@@ -24,6 +24,9 @@ struct OrbitalElements {
     float spinPhaseRad = 0.0f;
     float spinRateRadPerSec = 0.2f;
     glm::vec3 color{0.55f, 0.50f, 0.45f};
+    // OrbitLayout::Body whose ephemeris places this object (-1 = the elements above). Set
+    // for comets that are also catalog focus bodies, so the tail follows the nucleus.
+    int ephemerisBody = -1;
 };
 
 struct CometDef {
@@ -37,16 +40,20 @@ struct CometDef {
     float periodYears;
     float nucleusRadius;
     glm::vec3 color;
+    int ephemerisBody; // see OrbitalElements::ephemerisBody
 };
 
 const CometDef* GetCometDefs();
 
 std::vector<OrbitalElements> GenerateBelt(uint32_t seed, int count);
 std::vector<OrbitalElements> GenerateComets();
+/** Sparse classical Kuiper disk: a in [kKuiperBeltInnerAu, kKuiperBeltOuterAu], plutinos near 39.4 AU. */
+std::vector<OrbitalElements> GenerateKuiperDisk(uint32_t seed, int count);
 
 float SolveKepler(float meanAnomaly, float eccentricity);
 glm::vec3 OrbitalToCartesian(float radius, float trueAnomaly,
                              float inclination, float argPeriapsis, float longAscNode);
+/** Scene position; uses OrbitLayout::GetOffset when el.ephemerisBody is set. */
 glm::vec3 HeliocentricPosition(const OrbitalElements& el);
 float CurrentRadiusAu(const OrbitalElements& el);
 

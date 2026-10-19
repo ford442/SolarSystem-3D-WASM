@@ -21,6 +21,10 @@ const BODY_NAMES = [
     'Pluto',
     'Ceres',
     'Vesta',
+    'Eris',
+    'Haumea',
+    'Makemake',
+    '1P/Halley',
 ] as const;
 
 export function bodyDisplayName(index: number): string {

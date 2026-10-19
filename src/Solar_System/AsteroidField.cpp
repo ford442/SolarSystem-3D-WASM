@@ -39,12 +39,16 @@ private:
 
 } // namespace
 
-AsteroidField::AsteroidField(uint32_t seed, int instanceCount)
-    : _seed(seed)
+AsteroidField::AsteroidField(uint32_t seed, int instanceCount, Population population)
+    : _seed(seed), _population(population)
 {
     // Always generate the full pool so quality presets can raise the draw count later.
-    _asteroids = AsteroidOrbit::GenerateBelt(seed, kMaxInstances);
-    _comets = AsteroidOrbit::GenerateComets();
+    if (population == Population::Kuiper) {
+        _asteroids = AsteroidOrbit::GenerateKuiperDisk(seed, kMaxInstances);
+    } else {
+        _asteroids = AsteroidOrbit::GenerateBelt(seed, kMaxInstances);
+        _comets = AsteroidOrbit::GenerateComets();
+    }
     _activeCount = std::clamp(instanceCount, 0, static_cast<int>(_asteroids.size()));
     _instanceData.resize(static_cast<size_t>(kMaxInstances));
 
@@ -55,7 +59,8 @@ AsteroidField::AsteroidField(uint32_t seed, int instanceCount)
     RebuildInstanceBuffer();
     UploadInstances();
 
-    std::cout << "[AsteroidField] seed=0x" << std::hex << seed << std::dec
+    std::cout << (population == Population::Kuiper ? "[KuiperField]" : "[AsteroidField]")
+              << " seed=0x" << std::hex << seed << std::dec
               << " asteroids=" << _activeCount << "/" << _asteroids.size()
               << " comets=" << _comets.size() << std::endl;
 }
@@ -262,6 +267,9 @@ void AsteroidField::Render(const glm::mat4& projection, const glm::mat4& view,
     if (!_asteroidShader || _rockVao == 0) {
         return;
     }
+    if (_population == Population::Kuiper && OrbitLayout::GetScaleMode() != OrbitLayout::ScaleMode::Realistic) {
+        return;
+    }
 
     glEnable(GL_DEPTH_TEST);
     glDepthMask(GL_TRUE);
@@ -284,6 +292,9 @@ void AsteroidField::Render(const glm::mat4& projection, const glm::mat4& view,
     }
 
     for (const auto& comet : _comets) {
+        if (comet.ephemerisBody >= 0) {
+            continue; // nucleus is a catalog focus body (e.g. 1P/Halley); only the tail is ours
+        }
         const glm::vec3 pos = AsteroidOrbit::HeliocentricPosition(comet);
         glm::mat4 model(1.0f);
         model = glm::translate(model, pos);

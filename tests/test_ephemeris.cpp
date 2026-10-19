@@ -201,8 +201,49 @@ TEST(EphemerisTest, BeltDwarfsStayUsableDecadesFromEpoch) {
     EXPECT_LT(AngularErrorDeg(kVesta, Ephemeris::kJ2000, vestaJ2000), 2.0);
 }
 
+// Outer system: no Horizons literals checked in yet, so these pin the geometry instead —
+// perihelion/aphelion distances and Halley's documented 1986 and 2061 returns.
+TEST(EphemerisTest, HalleyReachesPerihelionOnItsDocumentedDates) {
+    constexpr int kHalley = 15;
+    const double t1986 = Ephemeris::JulianDateFromYmd(1986, 2, 9) + 0.46;
+    EXPECT_NEAR(Ephemeris::Position(kHalley, t1986).rAu, 0.586, 0.002);
+    // Perturbations move real returns by months; the unperturbed ellipse must still put
+    // 2061 within a year of the predicted 2061-07-28 perihelion.
+    const double t2061 = Ephemeris::JulianDateFromYmd(2061, 7, 28);
+    double bestJd = t2061;
+    double bestR = 1e9;
+    for (double jd = t2061 - 365.0; jd <= t2061 + 365.0; jd += 1.0) {
+        const double r = Ephemeris::Position(kHalley, jd).rAu;
+        if (r < bestR) {
+            bestR = r;
+            bestJd = jd;
+        }
+    }
+    EXPECT_NEAR(bestR, 0.586, 0.002);
+    EXPECT_LT(std::fabs(bestJd - t2061), 365.0);
+    // Aphelion ~35 AU, reached December 2023.
+    EXPECT_NEAR(Ephemeris::Position(kHalley, Ephemeris::JulianDateFromYmd(2023, 12, 9)).rAu, 35.1, 0.3);
+}
+
+TEST(EphemerisTest, OuterDwarfsStayInsideTheirPerihelionAphelionBand) {
+    struct Band {
+        int index;
+        double qAu, QAu;
+    };
+    const Band bands[] = {{12, 38.2, 97.5}, {13, 34.6, 51.6}, {14, 38.2, 52.9}};
+    for (const Band& band : bands) {
+        for (int year = 1950; year <= 2100; year += 10) {
+            const double r = Ephemeris::Position(band.index, Ephemeris::JulianDateFromYmd(year, 1, 1)).rAu;
+            EXPECT_GE(r, band.qAu) << band.index << " in " << year;
+            EXPECT_LE(r, band.QAu) << band.index << " in " << year;
+        }
+    }
+    // Eris is near aphelion this century (~96 AU in the 2020s).
+    EXPECT_GT(Ephemeris::Position(12, Ephemeris::JulianDateFromYmd(2026, 1, 1)).rAu, 94.0);
+}
+
 TEST(EphemerisTest, IndicesPastTheCatalogReturnZeros) {
-    const auto beyond = Ephemeris::Position(12, Ephemeris::kJ2000);
+    const auto beyond = Ephemeris::Position(16, Ephemeris::kJ2000); // Moon: a satellite, not heliocentric
     EXPECT_DOUBLE_EQ(beyond.rAu, 0.0);
     EXPECT_DOUBLE_EQ(Ephemeris::Position(-1, Ephemeris::kJ2000).rAu, 0.0);
 }
@@ -254,13 +295,13 @@ double SatelliteRadiusErrorPercent(int satelliteId, double jd, const double trut
     return 100.0 * (modelLength - truthLength) / truthLength;
 }
 
-constexpr int kMoonId = 12;
-constexpr int kIoId = 15;
-constexpr int kEuropaId = 16;
-constexpr int kGanymedeId = 17;
-constexpr int kCallistoId = 18;
-constexpr int kTitanId = 24;
-constexpr int kTritonId = 31;
+constexpr int kMoonId = 16;
+constexpr int kIoId = 19;
+constexpr int kEuropaId = 20;
+constexpr int kGanymedeId = 21;
+constexpr int kCallistoId = 22;
+constexpr int kTitanId = 28;
+constexpr int kTritonId = 35;
 
 constexpr SatelliteReference kSatelliteReferences[] = {
     {kMoonId, 2451545.0, {-1.949281649687e-03, -1.838126040073e-03, 2.424579738821e-04}, 0.03, 0.01},
@@ -306,7 +347,7 @@ TEST(EphemerisTest, SatelliteOrbitsAreInclinedNotFlat) {
     double moon[3] = {0.0, 0.0, 0.0};
     double maxAbsZ = 0.0;
     for (double day = 0.0; day < 30.0; day += 0.25) {
-        ASSERT_TRUE(Ephemeris::SatellitePosition(12, Ephemeris::kJ2000 + day, moon));
+        ASSERT_TRUE(Ephemeris::SatellitePosition(kMoonId, Ephemeris::kJ2000 + day, moon));
         maxAbsZ = std::max(maxAbsZ, std::fabs(moon[2]));
     }
     // 5.15 deg of inclination over ~0.00257 AU is ~0.00023 AU out of plane at the extremes.
@@ -317,10 +358,10 @@ TEST(EphemerisTest, SatellitesWithoutMeasuredElementsHaveNoSolution) {
     // Rows still carrying placeholder node/periapsis angles must stay on the circular
     // SatelliteOrbit path rather than being placed in a confidently wrong plane.
     double xyz[3] = {1.0, 1.0, 1.0};
-    EXPECT_FALSE(Ephemeris::SatellitePosition(13, Ephemeris::kJ2000, xyz)); // Phobos
+    EXPECT_FALSE(Ephemeris::SatellitePosition(17, Ephemeris::kJ2000, xyz)); // Phobos
     EXPECT_DOUBLE_EQ(xyz[0], 0.0);
-    EXPECT_FALSE(Ephemeris::SatellitePosition(19, Ephemeris::kJ2000, xyz)); // Mimas
-    EXPECT_FALSE(Ephemeris::SatellitePosition(32, Ephemeris::kJ2000, xyz)); // Charon
+    EXPECT_FALSE(Ephemeris::SatellitePosition(23, Ephemeris::kJ2000, xyz)); // Mimas
+    EXPECT_FALSE(Ephemeris::SatellitePosition(36, Ephemeris::kJ2000, xyz)); // Charon
     EXPECT_FALSE(Ephemeris::SatellitePosition(3, Ephemeris::kJ2000, xyz));  // Earth is not a moon
     EXPECT_FALSE(Ephemeris::SatellitePosition(-1, Ephemeris::kJ2000, xyz));
 }
