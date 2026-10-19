@@ -1,3 +1,4 @@
+import type { MusicPlayer } from './music';
 import { copyShareableLink, type DeepLinkViewState } from './deepLink';
 import { eventVisibilitySuffix } from './observe';
 import { bindSkyEventChip } from './skyEvents';
@@ -57,6 +58,8 @@ export interface SettingsPanelElements {
 export interface SettingsPanelInitOptions {
     elements: SettingsPanelElements;
     runtime: SolarSystemRuntime;
+    /** Owns music volume/mute; nothing here crosses the WASM boundary. */
+    music: MusicPlayer;
     deepLink: DeepLinkViewState;
     isMobileDevice: boolean;
     onSettingsChanged?: (field: SettingsChangeField) => void;
@@ -110,7 +113,7 @@ function formatTimeScale(scale: number): string {
 }
 
 export function initSettingsPanel(options: SettingsPanelInitOptions): void {
-    const { elements, runtime, deepLink, isMobileDevice, getObserveTimeOfDayDays } = options;
+    const { elements, runtime, music, deepLink, isMobileDevice, getObserveTimeOfDayDays } = options;
     const {
         settingsPanel,
         settingsToggle,
@@ -170,7 +173,7 @@ export function initSettingsPanel(options: SettingsPanelInitOptions): void {
         const clamped = Math.min(100, Math.max(0, percent));
         musicVolumeInput.value = String(clamped);
         updateMusicVolumeDisplay(clamped);
-        runtime.setMusicVolume(clamped / 100);
+        music.setVolume(clamped / 100);
     }
 
     function updateTimeScaleDisplay(scale: number): void {
@@ -223,14 +226,6 @@ export function initSettingsPanel(options: SettingsPanelInitOptions): void {
             case 'shadowQuality':
                 shadowsInput.checked = runtime.getShadowQuality() > 0;
                 break;
-            case 'musicVolume':
-                if (document.activeElement !== musicVolumeInput) {
-                    applyMusicVolumePercent(Math.round(runtime.getMusicVolume() * 100));
-                }
-                break;
-            case 'musicMuted':
-                musicMutedInput.checked = runtime.getMusicMuted();
-                break;
             case 'simulationEpoch':
                 syncSimulationDateFromRuntime();
                 break;
@@ -266,8 +261,8 @@ export function initSettingsPanel(options: SettingsPanelInitOptions): void {
     const shadows = deepLink.shadows ?? saved.shadows ?? true;
     const orbitLines = deepLink.orbitLines ?? saved.orbitLines ?? true;
     const magneticFields = deepLink.magneticFields ?? saved.magneticFields ?? false;
-    const musicVolumePercent = saved.musicVolume ?? Math.round(runtime.getMusicVolume() * 100);
-    const musicMuted = saved.musicMuted ?? runtime.getMusicMuted();
+    const musicVolumePercent = saved.musicVolume ?? Math.round(music.getVolume() * 100);
+    const musicMuted = saved.musicMuted ?? music.getMuted();
     const simulationDate = deepLink.julianDate !== undefined
         ? isoDateFromJulianDate(deepLink.julianDate)
         : deepLink.simulationDate
@@ -303,9 +298,9 @@ export function initSettingsPanel(options: SettingsPanelInitOptions): void {
     runtime.setShadowQuality(shadowQualityForPreset(quality, shadows));
     runtime.setOrbitLines(orbitLines);
     runtime.setMagneticFields(magneticFields);
-    runtime.setMusicMuted(musicMuted);
+    music.setMuted(musicMuted);
     if (!musicMuted) {
-        runtime.setMusicVolume(musicVolumePercent / 100);
+        music.setVolume(musicVolumePercent / 100);
     }
 
     if (deepLink.mode === 'observe') {
@@ -397,16 +392,22 @@ export function initSettingsPanel(options: SettingsPanelInitOptions): void {
         const percent = Number(musicVolumeInput.value);
         updateMusicVolumeDisplay(percent);
         if (!musicMutedInput.checked) {
-            runtime.setMusicVolume(percent / 100);
+            music.setVolume(percent / 100);
         }
         settingsStatus.textContent = `Music volume ${percent}%`;
         persistPanelSettings();
     });
 
+    music.onVolumeKey((volume) => {
+        applyMusicVolumePercent(Math.round(volume * 100));
+        settingsStatus.textContent = `Music volume ${Math.round(volume * 100)}%`;
+        persistPanelSettings();
+    });
+
     musicMutedInput.addEventListener('change', () => {
-        runtime.setMusicMuted(musicMutedInput.checked);
+        music.setMuted(musicMutedInput.checked);
         if (!musicMutedInput.checked) {
-            runtime.setMusicVolume(Number(musicVolumeInput.value) / 100);
+            music.setVolume(Number(musicVolumeInput.value) / 100);
         }
         settingsStatus.textContent = musicMutedInput.checked ? 'Music muted' : 'Music unmuted';
         persistPanelSettings();
@@ -455,8 +456,8 @@ export function initSettingsPanel(options: SettingsPanelInitOptions): void {
         runtime.setShadowQuality(resetShadowQuality);
         runtime.setOrbitLines(true);
         runtime.setMagneticFields(false);
-        runtime.setMusicMuted(false);
-        runtime.setMusicVolume(0.3);
+        music.setMuted(false);
+        music.setVolume(0.3);
         const nowIso = isoDateUtcNow();
         simulationDateInput.value = nowIso;
         runtime.setSimulationEpoch(julianDateUtcNow());

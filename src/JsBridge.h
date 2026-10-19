@@ -7,6 +7,7 @@ void NotifySettingsChanged(const char* field);
 void NotifyLoadingProgress(int loaded, int total);
 void NotifyStreamingProgress(int completed, int total, int active, int tierCode);
 void NotifyPlanetFocused(int index);
+void NotifyMusicDuck(float duck);
 
 #else
 
@@ -14,6 +15,7 @@ inline void NotifySettingsChanged(const char*) {}
 inline void NotifyLoadingProgress(int, int) {}
 inline void NotifyStreamingProgress(int, int, int, int) {}
 inline void NotifyPlanetFocused(int) {}
+inline void NotifyMusicDuck(float) {}
 
 #endif
 

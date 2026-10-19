@@ -7,7 +7,6 @@
     #include <GLES3/gl3.h>
     #include <GLFW/glfw3.h>
     #include <SDL2/SDL.h>
-    #include <SDL2/SDL_mixer.h>
 
     // Polyfill for OpenGL 4.5+ Direct State Access (DSA).
     // WebGL 2 (OpenGL ES 3.0) does not support DSA. Use a macro so LTO cannot

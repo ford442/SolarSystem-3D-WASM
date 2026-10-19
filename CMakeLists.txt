@@ -16,13 +16,12 @@ endif()
 # For Emscripten build:
 # 1. Use emcmake cmake -DCMAKE_BUILD_TYPE=Release|Debug ...
 # 2. Port/link flags are applied once via target_compile_options / target_link_options below.
-# 3. irrKlang is NOT supported. Replace with SDL_mixer.
+# 3. irrKlang and SDL_mixer are not used on web: music is an HTMLAudioElement in web/src/music.ts.
 # 4. Exclude unsupported libs (glew32, OpenGL32, mingw32) in if(EMSCRIPTEN) block.
 # See docs/plans/PORTING_GUIDE.md for Wasm exceptions fallback.
 
 if(EMSCRIPTEN)
     add_definitions(-D__EMSCRIPTEN__)
-    add_definitions(-DSOLARSYSTEM_USE_SDL_MIXER)
     set(CMAKE_EXECUTABLE_SUFFIX ".js")
 endif()
 
@@ -147,7 +146,6 @@ if(EMSCRIPTEN)
         "SHELL:-sUSE_SDL=2"
         "SHELL:-sUSE_SDL_IMAGE=2"
         "SHELL:-sSDL2_IMAGE_FORMATS=['png','jpg']"
-        "SHELL:-sUSE_SDL_MIXER=2"
         "SHELL:-sUSE_FREETYPE=1"
         # No ASYNCIFY / JSPI: every download goes through the callback-based
         # emscripten_async_wget2 path in WebResourceFetcher::DownloadFile, and the
@@ -234,7 +232,7 @@ if(EMSCRIPTEN)
         ${SOLAR_EM_LINK_OPT_FLAGS}
     )
 
-    # Emscripten provides GLFW, SDL2, SDL_image, SDL_mixer, and FreeType via ports
+    # Emscripten provides GLFW, SDL2, SDL_image, and FreeType via ports
     target_link_libraries(${PROJECT_NAME}
         ${CMAKE_SOURCE_DIR}/external/assimp/build-wasm/lib/libassimp.a
         z

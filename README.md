@@ -111,7 +111,7 @@ See [docs/plans/PORTING_GUIDE.md](docs/plans/PORTING_GUIDE.md) for Emscripten bu
 - [OpenGL 4.6](https://www.khronos.org/registry/OpenGL/specs/gl/glspec46.core.pdf)
 - [GLFW](https://github.com/glfw/glfw)
 - [GLEW](https://github.com/nigels-com/glew)
-- [SDL2](https://www.libsdl.org/download-2.0.php), [SDL2_image](https://www.libsdl.org/projects/SDL_image/), and [SDL2_mixer](https://www.libsdl.org/projects/SDL_mixer/) (Linux/macOS native and web)
+- [SDL2](https://www.libsdl.org/download-2.0.php), [SDL2_image](https://www.libsdl.org/projects/SDL_image/), and [SDL2_mixer](https://www.libsdl.org/projects/SDL_mixer/) (Linux/macOS native only; SDL2_mixer is not linked on web)
 - [Assimp](https://github.com/assimp/assimp)
 - [FreeType](https://gitlab.freedesktop.org/freetype/freetype)
 - [irrKlang](https://www.ambiera.com/irrklang/) (Windows native only)
@@ -142,7 +142,7 @@ working directory):
 ./build/SolarSystem
 ```
 
-On Linux, background music uses SDL_mixer (same as the web build) instead of irrKlang. MP3 tracks are
+On Linux, background music uses SDL_mixer instead of irrKlang. The web build links no audio library; see below. MP3 tracks are
 optional: place them under `resource/sounds/` if you have the assets locally.
 
 High-resolution textures and the skybox (`resource/textures/`) are not in git; deploy or copy them
@@ -373,14 +373,14 @@ aws s3 cp resource/asset-manifest.json "$ASSET_URI/asset-manifest.json" --cache-
 Background music uses the same origin and `VITE_ASSET_BASE` resolution as textures. The five
 Stellardrone MP3 files live under `resource/sounds/` and are **not** embedded in the WASM
 `.data` bundle (they are stored via Git LFS and may be absent in local checkouts). At runtime
-the web build downloads them asynchronously in parallel with core assets:
+the web build streams them with an `HTMLAudioElement` from `web/src/music.ts` (shuffled
+playlist, 5 s fades, loops); the WASM module opens no audio device:
 
-- `[Audio] Starting optional background music download (5 tracks)...`
-- `[Audio] Loaded track: resource/sounds/...` when a CDN/local file is present
+- `[Audio] Now playing: ...` when a track starts
 - `[Audio] Missing track (skipped): resource/sounds/...` on 404 or offline hosts
 
-Missing tracks do not block the loading screen or crash SDL_mixer; playback starts once at
-least one track is available. Use the settings panel **Music volume** slider or **Mute music**
+Missing tracks do not block the loading screen; playback starts on the first user gesture if
+the browser blocks autoplay. C++ only reports a 0–1 proximity duck via `Module.onMusicDuck`. Use the settings panel **Music volume** slider or **Mute music**
 toggle (persisted in `localStorage`) to control output. Page Up/Page Down still adjust volume
 from the keyboard.
 

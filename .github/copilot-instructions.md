@@ -63,8 +63,8 @@ npm run dev         # Vite dev server
 
 ```cpp
 #ifdef __EMSCRIPTEN__
-  // Web: SDL_mixer audio, no threading
-  Mix_PlayMusic(music, -1);
+  // Web: music plays from web/src/music.ts, no threading
+  NotifyMusicDuck(duck);
 #else
   // Native: irrKlang, std::thread allowed
   engine->play2D(sound);
@@ -72,7 +72,7 @@ npm run dev         # Vite dev server
 ```
 
 **Critical Patterns:**
-- **Audio:** irrKlang (native) ↔ SDL_mixer (web)
+- **Audio:** irrKlang (Windows) / SDL_mixer (Linux) ↔ HTMLAudioElement (web, web/src/music.ts)
 - **Threading:** `std::thread` (native) ↔ Frame-based async (web, use `FPS_Handler`)
 - **Graphics:** OpenGL 4.6 (native) ↔ WebGL 2/ES 3.0 (web)
 
@@ -148,7 +148,7 @@ emscripten_set_main_loop_arg(RunOneFrame, ...);
 ### Add Audio
 ```cpp
 #ifdef __EMSCRIPTEN__
-  SDL_mixer (web)
+  HTMLAudioElement (web, music.ts)
 #else
   irrKlang (native)
 #endif

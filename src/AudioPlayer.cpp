@@ -1,6 +1,7 @@
-// Background music playback and volume control. Two backends live behind the same
-// Application methods: SDL_mixer (web/Emscripten, pumped once per frame from the main
-// loop) and irrKlang (Windows native, driven by its own worker thread).
+// Background music playback and volume control for native builds. Two backends live behind
+// the same Application methods: SDL_mixer (Linux, pumped once per frame from the main loop)
+// and irrKlang (Windows, driven by its own worker thread). The web build opens no audio
+// device at all: web/src/music.ts plays the tracks and C++ only reports MusicDuckAmount().
 #include "Application.h"
 #include <algorithm>
 #include <chrono>
@@ -11,6 +12,7 @@
 
 using namespace std;
 
+#ifndef __EMSCRIPTEN__
 void Application::SetMusicVolume(float volume) {
 #ifdef SOLARSYSTEM_USE_SDL_MIXER
     _musicVolume = glm::clamp(volume, 0.0f, 1.0f);
@@ -55,6 +57,7 @@ bool Application::GetMusicMuted() const {
     return false;
 #endif
 }
+#endif // !__EMSCRIPTEN__
 
 void Application::StartPlayBackgroundMusic() {
     _isBackgroundMusicPlay = true;
@@ -64,7 +67,7 @@ void Application::StartPlayBackgroundMusic() {
     _musicStartTime = 0;
     _musicDuration = 0;
     _currentMusic = nullptr;
-#else
+#elif !defined(__EMSCRIPTEN__)
     auto mapRange = [](float value, float inMin, float inMax, float outMin, float outMax) {
         return outMin + (outMax - outMin) * (value - inMin) / (inMax - inMin);
     };
@@ -175,34 +178,43 @@ void Application::StopPlayBackgroundMusic() {
         Mix_FreeMusic(_currentMusic);
         _currentMusic = nullptr;
     }
-#else
+#elif !defined(__EMSCRIPTEN__)
     _soundEngine->stopAllSounds();
     if (_backgroundMusicThread)
         _backgroundMusicThread->join();
 #endif
 }
 
+float Application::MusicDuckAmount() const {
+    if (_nearestPlanetIndex < 0
+        || static_cast<size_t>(_nearestPlanetIndex) >= _renderableSceneComponents.size()) {
+        return 1.0f;
+    }
+    const Planet* planet = _renderableSceneComponents[static_cast<size_t>(_nearestPlanetIndex)].planet.get();
+    if (!planet) {
+        return 1.0f;
+    }
+    const float dist = CalculateSpaceObjectDistance(planet);
+    constexpr float kDuckStart = 90.0f;
+    constexpr float kDuckEnd = 18.0f;
+    if (dist >= kDuckStart) {
+        return 1.0f;
+    }
+    const float t = glm::clamp((dist - kDuckEnd) / (kDuckStart - kDuckEnd), 0.0f, 1.0f);
+    return glm::mix(0.32f, 1.0f, t);
+}
+
 void Application::UpdateMusicDucking() {
-#ifdef SOLARSYSTEM_USE_SDL_MIXER
+#ifdef __EMSCRIPTEN__
+    const float duck = MusicDuckAmount();
+    if (std::abs(duck - _reportedMusicDuck) > 0.005f) {
+        _reportedMusicDuck = duck;
+        NotifyMusicDuck(duck);
+    }
+#elif defined(SOLARSYSTEM_USE_SDL_MIXER)
     if (!_mixerInitialized || _musicMuted || !Mix_PlayingMusic()) {
         return;
     }
-    float duck = 1.0f;
-    if (_nearestPlanetIndex >= 0
-        && static_cast<size_t>(_nearestPlanetIndex) < _renderableSceneComponents.size()) {
-        const Planet* planet = _renderableSceneComponents[static_cast<size_t>(_nearestPlanetIndex)].planet.get();
-        if (planet) {
-            const float dist = CalculateSpaceObjectDistance(planet);
-            constexpr float kDuckStart = 90.0f;
-            constexpr float kDuckEnd = 18.0f;
-            if (dist < kDuckStart) {
-                const float t = glm::clamp((dist - kDuckEnd) / (kDuckStart - kDuckEnd), 0.0f, 1.0f);
-                duck = glm::mix(0.32f, 1.0f, t);
-            }
-        }
-    }
-    Mix_VolumeMusic(static_cast<int>(MIX_MAX_VOLUME * _musicVolume * duck));
-#else
-    (void)0;
+    Mix_VolumeMusic(static_cast<int>(MIX_MAX_VOLUME * _musicVolume * MusicDuckAmount()));
 #endif
 }

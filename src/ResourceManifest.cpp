@@ -56,6 +56,8 @@ void Application::LoadCoreResources() {
     struct CoreResource {
         std::string url;
         std::string virtualPath;
+        // Tried (into the same virtualPath) when url fails; empty for none.
+        std::string fallbackUrl;
     };
 
     std::vector<CoreResource> coreResources = {
@@ -79,7 +81,11 @@ void Application::LoadCoreResources() {
         // fetch from resource/textures_low/Main_SkyBox/ (not the high-res
         // resource/textures/Main_SkyBox/ which 404s when only placeholder files
         // are deployed).  On native both paths are the high-res path anyway.
-        coreResources.push_back({skyBoxFaces[i], skyBoxFaces[i]});
+        // Deployments have shipped only resource/textures/Main_SkyBox/ (the low-res
+        // folder 404s), so retry the high-res face rather than fall back to black.
+        const std::string highFace = kHighSkyBoxFaces[i];
+        coreResources.push_back({skyBoxFaces[i], skyBoxFaces[i],
+                                 highFace != skyBoxFaces[i] ? highFace : std::string()});
     }
 
     _totalResources = static_cast<int>(coreResources.size());
@@ -89,34 +95,23 @@ void Application::LoadCoreResources() {
     UpdateLoadingProgress();
 
     for (const auto& res : coreResources) {
-        WebResourceFetcher::DownloadFile(res.url, res.virtualPath, [this, virtualPath = res.virtualPath](bool success) {
+        auto finish = [this, virtualPath = res.virtualPath](bool success) {
             _resourcesPending--;
             if (!success) {
                 std::cerr << "[Loading] Failed to download required core resource: " << virtualPath << std::endl;
             }
             UpdateLoadingProgress();
-        });
+        };
+        WebResourceFetcher::DownloadFile(res.url, res.virtualPath,
+            [res, finish](bool success) {
+                if (success || res.fallbackUrl.empty()) {
+                    finish(success);
+                    return;
+                }
+                std::cerr << "[Loading] " << res.url << " unavailable; trying " << res.fallbackUrl << std::endl;
+                WebResourceFetcher::DownloadFile(res.fallbackUrl, res.virtualPath, finish);
+            });
     }
-}
-
-void Application::LoadOptionalSounds() {
-#ifdef __EMSCRIPTEN__
-    const auto& songPaths = GetBackgroundSongPaths();
-    std::cout << "[Audio] Starting optional background music download ("
-              << songPaths.size() << " tracks)..." << std::endl;
-
-    for (const auto& path : songPaths) {
-        WebResourceFetcher::DownloadFile(path, path, [this, path](bool success) {
-            if (success && WebResourceFetcher::ResourceExists(path)) {
-                _availableSongPaths.insert(path);
-                std::cout << "[Audio] Loaded track: " << path << std::endl;
-                return;
-            }
-
-            std::cerr << "[Audio] Missing track (skipped): " << path << std::endl;
-        });
-    }
-#endif
 }
 
 void Application::InitSongList() {

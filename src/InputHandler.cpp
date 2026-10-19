@@ -54,6 +54,7 @@ void Application::ProcessInput(GLFWwindow* window) {
         _camera.ProcessKeyboard(CameraVector::WORLD_DOWN, _deltaTime * shiftIncrease);
     }
 
+#ifndef __EMSCRIPTEN__ // web: PageUp/PageDown are handled by web/src/music.ts
     if (glfwGetKey(window, GLFW_KEY_PAGE_UP) == GLFW_PRESS) {
 #ifdef SOLARSYSTEM_USE_SDL_MIXER
         SetMusicVolume(GetMusicVolume() + 0.05f);
@@ -70,6 +71,7 @@ void Application::ProcessInput(GLFWwindow* window) {
 #endif
         NotifySettingsChanged("musicVolume");
     }
+#endif
     if (glfwGetKey(window, GLFW_KEY_1) == GLFW_PRESS) {
         movementSpeed = glm::clamp(movementSpeed + 0.01f, 0.0f, 150.f);
         _camera.SetMovementSpeed(movementSpeed);
