@@ -81,6 +81,44 @@ export const ECLIPSE_2017 = {
     fovDeg: 10,
 } as const;
 
+/** At or below this vertical field of view Observe is "through a telescope": the eyepiece shows. */
+export const TELESCOPE_MAX_FOV_DEG = 2;
+
+/** Field Observe opens with, and what "Naked eye" returns to (ObserveState::kDefaultFovDeg). */
+export const NAKED_EYE_FOV_DEG = 60;
+
+/**
+ * Eyepiece choices, as the vertical field of view in degrees (0 = naked eye). No optics are
+ * simulated: a narrower field is just a narrower camera, so what changes is what fits in it.
+ */
+export const TELESCOPE_EYEPIECES: readonly { fovDeg: number; label: string }[] = [
+    { fovDeg: 0, label: 'Naked eye' },
+    { fovDeg: 2, label: '2° finder' },
+    { fovDeg: 1, label: '1° (twice the Moon)' },
+    { fovDeg: 0.5, label: '0.5° (the Moon fills it)' },
+    { fovDeg: 0.25, label: '0.25° (planets show discs)' },
+];
+
+const CUSTOM_EYEPIECE = 'custom';
+
+/** "0.25", "1.50", "45": two decimals below 10°, where they mean something. */
+export function formatFov(fovDeg: number): string {
+    return fovDeg < 10 ? fovDeg.toFixed(2) : String(Math.round(fovDeg));
+}
+
+export function isTelescopeFov(fovDeg: number): boolean {
+    return fovDeg <= TELESCOPE_MAX_FOV_DEG + 1e-3;
+}
+
+/**
+ * Field across the eyepiece circle: the circle spans the viewport's short side, and the camera FOV
+ * is vertical, so a landscape window sees the vertical field and a portrait one a share of it.
+ */
+export function eyepieceFieldDeg(fovDeg: number, viewportWidth: number, viewportHeight: number): number {
+    if (viewportHeight <= 0) return fovDeg;
+    return fovDeg * Math.min(1, viewportWidth / viewportHeight);
+}
+
 export const OBSERVE_DISCLAIMER =
     'Visualization, not an almanac: planets ~arcminute, Sun and Moon a few arcseconds, no refraction, times are UTC.';
 
@@ -217,6 +255,9 @@ export interface ObservePanelElements {
     lookSunButton: HTMLButtonElement;
     lookMoonButton: HTMLButtonElement;
     eclipseButton: HTMLButtonElement;
+    eyepieceSelect: HTMLSelectElement;
+    telescopeOverlay: HTMLElement;
+    telescopeLabel: HTMLElement;
     readout: HTMLElement;
     dateInput: HTMLInputElement;
     status: HTMLElement;
@@ -302,6 +343,9 @@ export function initObservePanel(options: ObservePanelOptions): ObservePanelCont
         lookSunButton,
         lookMoonButton,
         eclipseButton,
+        eyepieceSelect,
+        telescopeOverlay,
+        telescopeLabel,
         readout,
         dateInput,
         status,
@@ -314,6 +358,13 @@ export function initObservePanel(options: ObservePanelOptions): ObservePanelCont
     for (const rate of OBSERVE_RATES) {
         rateSelect.add(new Option(rate.label, String(rate.value)));
     }
+    for (const eyepiece of TELESCOPE_EYEPIECES) {
+        eyepieceSelect.add(new Option(eyepiece.label, String(eyepiece.fovDeg)));
+    }
+    // Shown only when scroll/pinch leaves the field between two eyepieces.
+    const customEyepiece = new Option('', CUSTOM_EYEPIECE);
+    customEyepiece.hidden = true;
+    eyepieceSelect.add(customEyepiece);
 
     const saved = readPersisted();
     const link = options.deepLink ?? {};
@@ -407,6 +458,36 @@ export function initObservePanel(options: ObservePanelOptions): ObservePanelCont
         runtime.setObserveView(azDeg, Math.max(-10, elDeg));
     }
 
+    // The wide field to go back to from the eyepiece: whatever it was when the telescope came out.
+    let nakedEyeFov = NAKED_EYE_FOV_DEG;
+
+    function showEyepiece(state: ObserveState): void {
+        const telescope = state.active && isTelescopeFov(state.fovDeg);
+        telescopeOverlay.hidden = !telescope;
+        if (state.active && !isTelescopeFov(state.fovDeg)) {
+            nakedEyeFov = state.fovDeg;
+        }
+        if (telescope) {
+            const field = eyepieceFieldDeg(state.fovDeg, window.innerWidth, window.innerHeight);
+            telescopeLabel.textContent =
+                `Telescope · ${formatFov(field)}° field (the Moon is ~0.5°) · no optics simulated`;
+        }
+        if (document.activeElement === eyepieceSelect) {
+            return;
+        }
+        const match = TELESCOPE_EYEPIECES.find(
+            (eyepiece) => eyepiece.fovDeg > 0 && Math.abs(eyepiece.fovDeg - state.fovDeg) < 0.005,
+        );
+        if (match) {
+            eyepieceSelect.value = String(match.fovDeg);
+        } else if (!isTelescopeFov(state.fovDeg)) {
+            eyepieceSelect.value = '0';
+        } else {
+            customEyepiece.text = `${formatFov(state.fovDeg)}°`;
+            eyepieceSelect.value = CUSTOM_EYEPIECE;
+        }
+    }
+
     let lastActive = false;
 
     function renderMode(active: boolean): void {
@@ -423,6 +504,7 @@ export function initObservePanel(options: ObservePanelOptions): ObservePanelCont
     function refresh(): void {
         const state = runtime.getObserveState();
         renderMode(state.active);
+        showEyepiece(state);
         if (!state.active) {
             return;
         }
@@ -434,7 +516,7 @@ export function initObservePanel(options: ObservePanelOptions): ObservePanelCont
         }
         const sunState = state.sunAltDeg > 0 ? 'day' : state.sunAltDeg > -6 ? 'civil twilight' : state.sunAltDeg > -18 ? 'twilight' : 'night';
         readout.textContent =
-            `Az ${Math.round(state.azDeg)}° Alt ${Math.round(state.elDeg)}° FOV ${Math.round(state.fovDeg)}° · ` +
+            `Az ${Math.round(state.azDeg)}° Alt ${Math.round(state.elDeg)}° FOV ${formatFov(state.fovDeg)}° · ` +
             `Sun ${state.sunAltDeg.toFixed(1)}° (${sunState}) · ` +
             `Moon ${state.moonAltDeg.toFixed(1)}°, ${Math.round(state.moonIllum * 100)}% lit · ` +
             `${state.starCount} stars` +
@@ -552,6 +634,18 @@ export function initObservePanel(options: ObservePanelOptions): ObservePanelCont
     });
 
     rateSelect.addEventListener('change', () => applyRate(Number(rateSelect.value)));
+
+    eyepieceSelect.addEventListener('change', () => {
+        const fov = Number(eyepieceSelect.value);
+        if (!Number.isFinite(fov)) {
+            return; // the "custom" placeholder
+        }
+        runtime.setObserveFov(fov > 0 ? fov : nakedEyeFov);
+        refresh();
+        status.textContent = fov > 0
+            ? `Telescope: ${formatFov(fov)}° field — scroll or pinch to zoom between eyepieces`
+            : `Naked eye: ${formatFov(nakedEyeFov)}° field`;
+    });
 
     lookSunButton.addEventListener('click', () => {
         const state = runtime.getObserveState();

@@ -41,12 +41,14 @@ void Application::SetObserveMode(bool active) {
         _camera.SetMovementLocked(true);
         _camera.SetZoomRange(ObserveState::kMinFovDeg, ObserveState::kMaxFovDeg);
         _camera.SetZoom(ObserveState::kDefaultFovDeg);
+        _camera.SetSkyZoom(ObserveState::kDefaultFovDeg);
         _observe.active = true;
         SetObserveView(ObserveState::kDefaultAzimuthDeg, ObserveState::kDefaultElevationDeg);
         _observeSkyValid = false;
     } else {
         _observe.active = false;
         _camera.SetMovementLocked(_observe.savedMovementLocked);
+        _camera.SetSkyZoom(0.0f);
         _camera.SetZoomRange(_observe.savedZoomMin, _observe.savedZoomMax);
         _camera.SetZoom(_observe.savedZoom);
         _camera.CancelTransition();

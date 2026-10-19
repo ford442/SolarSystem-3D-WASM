@@ -21,6 +21,10 @@ constexpr const char* kStarCatalogPath = "resource/sky/bright_stars.json";
 // The Sun's quad reaches this many solar radii so the halo has room to fade out.
 constexpr float kSunQuadRadii = 6.0f;
 constexpr float kMoonQuadMargin = 1.03f;
+constexpr float kPlanetQuadMargin = 1.03f;
+// A planet's true disc replaces its point sprite once it is this many pixels in radius (and at
+// least half the sprite): only a telescope field gets there (Jupiter needs FOV < ~10 deg).
+constexpr float kPlanetDiscMinPixels = 2.0f;
 
 glm::vec3 planetColor(int slot) {
     switch (slot) {
@@ -31,6 +35,13 @@ glm::vec3 planetColor(int slot) {
         case Observer::kSkySaturn: return {1.00f, 0.90f, 0.70f};
         default: return {1.0f, 1.0f, 1.0f};
     }
+}
+
+/** The tangent basis observeSprite.vs builds for a direction; keep the two in step. */
+void tangentBasis(const glm::vec3& d, glm::vec3& right, glm::vec3& up) {
+    const glm::vec3 helper = std::abs(d.y) > 0.99f ? glm::vec3(0.0f, 0.0f, -1.0f) : glm::vec3(0.0f, 1.0f, 0.0f);
+    right = glm::normalize(glm::cross(d, helper));
+    up = glm::cross(right, d);
 }
 
 } // namespace
@@ -197,6 +208,8 @@ void ObserveSky::Render(const Observer::Sky& sky, const Frame& frame, unsigned i
     const float limit = EffectiveLimitingMagnitude(sky);
     EnsureStarsLoaded();
     _scratch.clear();
+    // projection[1][1] is 1 / tan(half the vertical FOV), for an XR eye's off-axis frustum too.
+    const float pixelsPerTan = 0.5f * frame.projection[1][1] * static_cast<float>(frame.viewportHeight);
     for (int slot = Observer::kSkyMercury; slot < Observer::kSkyBodyCount; ++slot) {
         const Observer::SkyBody& body = sky.bodies[slot];
         const float margin = limit - static_cast<float>(body.magnitude);
@@ -205,11 +218,25 @@ void ObserveSky::Render(const Observer::Sky& sky, const Frame& frame, unsigned i
         }
         const float brightness = glm::clamp(0.4f + 0.09f * margin, 0.0f, 1.0f);
         const float pixels = 2.4f + 0.45f * glm::clamp(margin, 0.0f, 10.0f);
+        const glm::vec3 dir(static_cast<float>(body.dir[0]), static_cast<float>(body.dir[1]),
+                            static_cast<float>(body.dir[2]));
+        const float tanRadius = static_cast<float>(std::tan(body.angRadiusDeg * kDegToRad));
         SpriteInstance sprite;
-        sprite.posSize = glm::vec4(static_cast<float>(body.dir[0]), static_cast<float>(body.dir[1]),
-                                   static_cast<float>(body.dir[2]), pixels); // half-size in pixels: planets are points
         sprite.color = glm::vec4(planetColor(slot), brightness);
-        sprite.params = glm::vec4(kKindPoint, 1.0f, 0.0f, 0.0f);
+        if (tanRadius * pixelsPerTan >= std::max(kPlanetDiscMinPixels, 0.5f * pixels)) {
+            // Resolved: a tangent-plane disc lit from the Sun's side, so Venus shows its phase.
+            glm::vec3 right, up;
+            tangentBasis(dir, right, up);
+            const glm::vec3 limb(static_cast<float>(body.brightLimbDir[0]), static_cast<float>(body.brightLimbDir[1]),
+                                 static_cast<float>(body.brightLimbDir[2]));
+            sprite.posSize = glm::vec4(dir, tanRadius * kPlanetQuadMargin);
+            sprite.params = glm::vec4(kKindPoint, 1.0f / kPlanetQuadMargin,
+                                      static_cast<float>(body.phaseAngleDeg) * kDegToRad,
+                                      std::atan2(glm::dot(limb, up), glm::dot(limb, right)));
+        } else {
+            sprite.posSize = glm::vec4(dir, pixels); // half-size in pixels: an unresolved point
+            sprite.params = glm::vec4(kKindPoint, 0.0f, 0.0f, 0.0f);
+        }
         _scratch.push_back(sprite);
     }
     {

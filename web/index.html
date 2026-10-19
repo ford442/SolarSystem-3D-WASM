@@ -132,6 +132,10 @@
                 <button id="observe-look-sun" class="settings-date-btn" type="button">Look at Sun</button>
                 <button id="observe-look-moon" class="settings-date-btn" type="button">Look at Moon</button>
               </div>
+              <label class="settings-row" for="observe-eyepiece">
+                <span>Telescope</span>
+                <select id="observe-eyepiece"></select>
+              </label>
               <button id="observe-eclipse" class="settings-share" type="button">2017 total eclipse (Casper, WY)</button>
               <p id="observe-readout" class="observe-readout" aria-live="off"></p>
               <small class="observe-disclaimer">Visualization, not an almanac: planets ~arcminute, Sun and Moon a few arcseconds, no refraction, times in UTC. Drag to look, scroll to zoom.</small>
@@ -224,6 +228,10 @@
       </div>
     </aside>
     <div id="tour-caption" class="tour-caption" hidden></div>
+    <div id="telescope-overlay" class="telescope-overlay" hidden>
+      <div class="telescope-field" aria-hidden="true"></div>
+      <p id="telescope-label" class="telescope-label"></p>
+    </div>
     <div id="xr-hud" class="xr-hud" hidden>
       <p id="xr-tooltip" class="xr-tooltip"></p>
       <div id="xr-controllers" class="xr-controllers" hidden>

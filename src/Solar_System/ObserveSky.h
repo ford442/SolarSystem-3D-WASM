@@ -58,9 +58,10 @@ public:
 
 private:
     struct SpriteInstance {
-        glm::vec4 posSize;  // direction xyz, half-extent in tan-plane units
+        glm::vec4 posSize;  // direction xyz, half-extent (tan-plane units for discs, pixels for points)
         glm::vec4 color;    // rgb, alpha / intensity
-        glm::vec4 params;   // x = kind, y = disc radius / extent, zw unused
+        glm::vec4 params;   // x = kind, y = disc radius / extent (0: a planet point), z/w = a resolved
+                            // planet's phase angle and bright-limb angle in the tangent basis, radians
     };
 
     /** One instanced draw's worth of sprites with its own VAO/VBO. */

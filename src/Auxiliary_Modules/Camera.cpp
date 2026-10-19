@@ -1,5 +1,7 @@
 #include "Camera.h"
 
+#include <cmath>
+
 Camera::Camera(float near, float far, float movementSpeed, float mouseSensitivity, glm::vec3 position, glm::vec3 up, float yaw, float pitch, float zoom)
     : _frontVector(glm::vec3(0.0f, 0.0f, 0.0f)), _movementSpeed(movementSpeed), _mouseSensitivity(mouseSensitivity), _zoom(zoom)
 {
@@ -98,8 +100,9 @@ void Camera::ProcessKeyboard(CameraVector direction, float deltaTime) {
 
 // processes input received from a mouse input system. Expects the offset value in both the x and y direction.
 void Camera::ProcessMouseMovement(float xoffset, float yoffset, bool constrainPitch) {
-    xoffset *= _mouseSensitivity;
-    yoffset *= _mouseSensitivity;
+    const float lookScale = _skyZoomReferenceFov > 0.0f ? _zoom / _skyZoomReferenceFov : 1.0f;
+    xoffset *= _mouseSensitivity * lookScale;
+    yoffset *= _mouseSensitivity * lookScale;
 
     _yaw   += xoffset;
     _pitch += yoffset;
@@ -119,6 +122,11 @@ void Camera::ProcessMouseMovement(float xoffset, float yoffset, bool constrainPi
 
 // processes input received from a mouse scroll-wheel event. Only requires input on the vertical wheel-axis
 void Camera::ProcessMouseScroll(float yoffset) {
+    if (_skyZoomReferenceFov > 0.0f) {
+        // ~16% per notch: 60 deg to the 0.25 deg telescope floor in about 35 notches.
+        _zoom = glm::clamp(_zoom * std::exp(-0.15f * yoffset), _zoomMin, _zoomMax);
+        return;
+    }
     _zoom = glm::clamp(_zoom - yoffset, _zoomMin, _zoomMax);
 }
 

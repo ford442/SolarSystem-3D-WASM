@@ -111,6 +111,18 @@ double angleBetweenDeg(const double a[3], const double b[3]) {
     return std::acos(std::clamp(dot3(a, b) / denom, -1.0, 1.0)) * kRadToDeg;
 }
 
+/** IAU equatorial radii (km) of the naked-eye planets; 0 for anything else. */
+double planetEquatorialRadiusKm(int ephemerisIndex) {
+    switch (ephemerisIndex) {
+        case 1: return 2439.7;
+        case 2: return 6051.8;
+        case 4: return 3396.19;
+        case 5: return 71492.0;
+        case 6: return 60268.0;
+        default: return 0.0;
+    }
+}
+
 /** Astronomical Almanac visual magnitudes; the Saturn value leaves out the ring term. */
 double planetMagnitude(int ephemerisIndex, double sunDistAu, double earthDistAu,
                        double phaseDeg) {
@@ -396,6 +408,8 @@ Sky ComputeSky(double julianDateUtc, const Site& site) {
             body.illuminatedFraction = 0.5 * (1.0 + std::cos(body.phaseAngleDeg * kDegToRad));
             body.magnitude = planetMagnitude(entry.ephemerisIndex, length3(helio) / kKmPerAu,
                                              geoDistKm / kKmPerAu, body.phaseAngleDeg);
+            body.angRadiusDeg =
+                std::asin(std::min(1.0, planetEquatorialRadiusKm(entry.ephemerisIndex) / geoDistKm)) * kRadToDeg;
         }
     }
 

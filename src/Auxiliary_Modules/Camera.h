@@ -47,6 +47,12 @@ public:
     float GetZoomMin() const { return _zoomMin; }
     float GetZoomMax() const { return _zoomMax; }
 
+    // Sky-style zoom (Observe): a scroll notch scales the FOV by a fixed ratio instead of stepping
+    // it by a degree, and look sensitivity scales with FOV / referenceFovDeg, so a 0.25 deg
+    // telescope field handles like the naked-eye view. 0 (the default) is the Explore behaviour.
+    void SetSkyZoom(float referenceFovDeg) { _skyZoomReferenceFov = referenceFovDeg; }
+    float GetSkyZoom() const { return _skyZoomReferenceFov; }
+
     // While locked, ProcessKeyboard (WASD, Space/C, touch joystick, XR stick) is a no-op; look
     // and zoom still work. Observe mode uses this so the viewer cannot leave the ground.
     void SetMovementLocked(bool locked) { _movementLocked = locked; }
@@ -85,6 +91,7 @@ private:
     float _mouseSensitivity;
     float _zoom;
     float _zoomMin = 1.0f, _zoomMax = 45.0f;
+    float _skyZoomReferenceFov = 0.0f;
     bool _movementLocked = false;
     float _nearPlane, _farPlane, _aspect;
 

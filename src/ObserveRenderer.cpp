@@ -112,7 +112,12 @@ void Renderer::RenderObserveLabels(float width, float height, float textScale) {
                             static_cast<float>(body.dir[2]));
         if (ObserveSky::ProjectToPixels(dir, _observeFrame, px) && px.x > 0.0f && px.x < width &&
             px.y > 0.0f && px.y < height) {
-            textRenderer->Render(*mainTextShader, widen(body.name), px.x + 12.0f * textScale, px.y + 12.0f * textScale, 0.35f * textScale, labelColor);
+            // Clear of the disc when a narrow field makes it big (the Moon at a few degrees, planets
+            // in a telescope field): the label sits off its upper-right edge.
+            const float discPx = static_cast<float>(std::tan(body.angRadiusDeg * kDegToRad)) * 0.5f *
+                                 _observeFrame.projection[1][1] * static_cast<float>(_observeFrame.viewportHeight);
+            const float offset = std::max(12.0f * textScale, 0.71f * discPx + 4.0f * textScale);
+            textRenderer->Render(*mainTextShader, widen(body.name), px.x + offset, px.y + offset, 0.35f * textScale, labelColor);
         }
     }
 
@@ -185,7 +190,8 @@ void Renderer::RenderObserveHud() {
         const Observer::SkyBody& moon = sky.bodies[Observer::kSkyMoon];
         std::wostringstream line;
         line << std::fixed << std::setprecision(0) << L"Az " << std::fmod(_app._camera.GetYaw() + 450.0f, 360.0f)
-             << L"  Alt " << _app._camera.GetPitch() << L"  FOV " << _app._camera.GetZoom()
+             << L"  Alt " << _app._camera.GetPitch() << L"  FOV "
+             << std::setprecision(_app._camera.GetZoom() < 10.0f ? 2 : 0) << _app._camera.GetZoom()
              << L"   Sun " << std::setprecision(1) << sun.altDeg << L"  Moon " << moon.altDeg << L" ("
              << std::setprecision(0) << moon.illuminatedFraction * 100.0 << L"% lit)";
         if (sky.sunCoverage > 0.001) {

@@ -175,7 +175,7 @@ function parseObserver(params: URLSearchParams): DeepLinkObserver | undefined {
         lon: lon !== undefined && lon >= -360 && lon <= 360 ? lon : undefined,
         az,
         el: el !== undefined && el >= -90 && el <= 90 ? el : undefined,
-        fov: fov !== undefined && fov >= 1 && fov <= 120 ? fov : undefined,
+        fov: fov !== undefined && fov >= 0.25 && fov <= 120 ? fov : undefined,
         rate: rate !== undefined && rate >= 0 && rate <= 1e7 ? rate : undefined,
     };
     return Object.values(observer).some((value) => value !== undefined) ? observer : undefined;
@@ -187,6 +187,11 @@ function roundCoord(value: number): number {
 
 function roundAngle(value: number): number {
     return Math.round(value * 10) / 10;
+}
+
+/** Observe angles keep 0.01°: a 0.25° telescope field would lose its target at 0.1°. */
+function roundSkyAngle(value: number): number {
+    return Math.round(value * 100) / 100;
 }
 
 /** Parse shareable view state from the current page URL. */
@@ -302,9 +307,9 @@ export function buildShareableUrl(
         url.searchParams.set('mode', 'observe');
         url.searchParams.set('lat', String(Math.round(observe.latDeg * 10000) / 10000));
         url.searchParams.set('lon', String(Math.round(observe.lonDeg * 10000) / 10000));
-        url.searchParams.set('az', String(roundAngle(observe.azDeg)));
-        url.searchParams.set('el', String(roundAngle(observe.elDeg)));
-        url.searchParams.set('fov', String(roundAngle(observe.fovDeg)));
+        url.searchParams.set('az', String(roundSkyAngle(observe.azDeg)));
+        url.searchParams.set('el', String(roundSkyAngle(observe.elDeg)));
+        url.searchParams.set('fov', String(roundSkyAngle(observe.fovDeg)));
         url.searchParams.set('rate', String(observe.timeRate));
         return url.toString();
     }

@@ -95,7 +95,7 @@ struct SkyBody {
     double altDeg = 0.0;
     double azDeg = 0.0;
     double distanceKm = 0.0;           // topocentric for the Moon, geocentric otherwise
-    double angRadiusDeg = 0.0;         // 0 for planets (drawn as points)
+    double angRadiusDeg = 0.0;         // planets: equatorial radius (Saturn without rings)
     double magnitude = 0.0;
     double phaseAngleDeg = 0.0;        // Sun–body–Earth angle
     double illuminatedFraction = 1.0;  // [0, 1]
