@@ -1,4 +1,5 @@
 #include "CatalogClouds.h"
+#include "BodyShape.h"
 #include "TexturePaths.h"
 #include "SatelliteOrbit.h"
 
@@ -23,6 +24,9 @@ void CatalogClouds::AdjustToParent(float /*timeScale*/) {
     Rotate(_parentEntry.axialTiltDegrees, glm::vec3(0.0f, 0.0f, 1.0f));
     if (_parentEntry.artTiltXDegrees != 0.0f) {
         Rotate(_parentEntry.artTiltXDegrees, glm::vec3(1.0f, 0.0f, 0.0f));
+    }
+    if (BodyShape::IsOblate(_parentEntry)) {
+        Scale(BodyShape::PolarScale(_parentEntry));
     }
     Rotate(spinDegrees, glm::vec3(0.0f, 1.0f, 0.0f));
 }

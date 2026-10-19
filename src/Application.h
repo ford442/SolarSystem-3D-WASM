@@ -224,6 +224,7 @@ private:
     const char* ObserveEventVisibility() const; // "above" / "below" / "unknown" / "none" for the next sky event
     void UpdateObserveFrame();          // Observe: park the camera above Earth so loading/LOD follow it
     void ApplyObserveEnvOverride();     // SOLARSYSTEM_OBSERVE=lat,lon[,jd[,az,el,fov]] for headless captures
+    void ApplyCameraPoseEnvOverride();  // SOLARSYSTEM_CAMERA_POSE=x,y,z,yaw,pitch[,jd]: web setCameraPose, natively
     void StopMissionFollow();
     bool SampleMissionScenePosition(int idx, glm::vec3& outScene) const;
     /** 1 = full volume, down to 0.32 when the camera is close to the nearest planet. */

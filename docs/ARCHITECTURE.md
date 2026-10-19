@@ -104,7 +104,7 @@ value. This replaced the previous split where C++ used `Rotate(81.2°, X)` for U
 vs catalog `−97.8°`, `+28.3°` vs `−28.3°` for Neptune, and no tilt at all for Pluto.
 
 Atmospheres are catalog data too: `render.atmosphere` carries the O'Neil shell numbers
-(`oneil`) and, for Earth/Venus/Mars/Titan, the physical coefficients (`physical`) that
+(`oneil`) and, for Earth/Venus/Mars/Titan and the four giants, the physical coefficients (`physical`) that
 `tools/atmosphere_lut_baker` turns into `resource/atmosphere/*.ktx2` (§9.2). The flow is
 catalog → `generate-planet-metadata.mjs` → `BodyCatalog::kAtmospheres` → baker → LUTs
 preloaded into `.data`. The Sun and Saturn/Uranus *ring geometry* remain hand-maintained
@@ -531,13 +531,14 @@ Special cases that stay outside the catalog material path:
 
 **Two atmosphere paths, one catalog row.** `render.atmosphere.oneil` drives the O'Neil
 single-scattering shell (`atmosphere.fs`), which every preset can afford and which is the
-only path for the gas giants and Pluto. Bodies whose row also has `physical`
-(Earth, Venus, Mars, Titan) switch to `atmospherePbr.fs` on Medium/Full:
+only path for Pluto. Bodies whose row also has `physical`
+(Earth, Venus, Mars, Titan, Jupiter, Saturn, Uranus, Neptune) switch to `atmospherePbr.fs`
+on Medium/Full:
 
 | Step | Where | What |
 |------|-------|------|
 | Bake (offline) | `tools/atmosphere_lut_baker` + `AtmosphereModel` | Transmittance LUT 256×64 (Bruneton 2017 mapping) and multi-scattering LUT 32×32 (Hillaire 2020), double precision → RGBA16F KTX2 with a parameter hash in the key/value data |
-| Ship | `resource/atmosphere/<id>_{transmittance,multiscatter}.ktx2` | Preloaded into `.data` (~140 KB per body) |
+| Ship | `resource/atmosphere/<id>_{transmittance,multiscatter}.ktx2` | Preloaded into `.data` (~140 KB per body, ~1.1 MB for all eight; `CommittedLutsFitSizeBudget` caps it at 1.2 MB) |
 | Load | `LoadAtmosphereLuts` (`StarSystemFactory.cpp`) → `FloatLutTexture` | Always loaded, so preset changes need no reload; any failure leaves the body on O'Neil |
 | Draw | `Renderer::RenderPbrAtmosphere` | One view ray per shell fragment, `uSteps` samples (8 Medium / 16 Full / 12 mobile Full) warped toward the limb; sun transmittance and Ψ_ms from the LUTs |
 
@@ -551,6 +552,50 @@ this path because it also contains the planet itself. There is no separate
 aerial-perspective pass: surfaces are spheres without displacement, so the shell's view ray,
 clipped at the ground sphere, already carries the in-scatter and attenuation for the
 terrain behind it — from orbit and from inside the shell alike.
+
+**Giant planets.** The giants use the same model and baker; only their numbers differ.
+The "ground" is the cloud deck at the 1-bar *equatorial* radius (the radius the mesh is
+drawn at), with a Lambert albedo in the deck's colour for the multiple-scattering bounce.
+Rayleigh is H₂ scattering for the column above the visible cloud tops, which on Jupiter and
+Saturn is a fraction of the 1-bar column, so it reads as a faint blue limb rather than a blue
+sky over the disc. The Mie layer is the haze: Jupiter's and Saturn's chromophore haze
+absorbs blue (single-scattering albedo falls from red to blue), and Uranus's and Neptune's
+haze scatters green and blue alike while the absorption layer — a tent centred on the deck,
+i.e. CH₄ thinning with height — takes out red, which gives the pale ice-giant limb instead
+of a λ⁻⁴ Rayleigh blue (pinned by `test_giant_atmospheres.cpp`). `thicknessScale` (2–6)
+widens each shell to 2–3 % of the radius.
+
+**Oblateness.** `render.oblateness` (flattening, 1 − polar/equatorial: Jupiter 0.065,
+Saturn 0.098, Uranus 0.023, Neptune 0.017) squashes the surface (`CatalogBody`), the cloud
+shell (`CatalogClouds`) and the atmosphere shell (`Atmosphere`) along the pole with one
+helper, `BodyShape.h`, after the tilt and before the spin. Both atmosphere shaders take
+`bodyToSphere` (and the LUT shader `sphereToBody`), the linear map from scene offsets to the
+frame where the figure is a sphere of the equatorial radius, and trace the view ray, the
+Sun direction and the camera there, where the LUT parameterisation holds. Ring and eclipse
+tests map samples back to scene space. Optical depth is stretched by up to 1/(1 − f) toward
+the poles; the limb follows the deck, which is what is visible. Spherical bodies get the
+identity, and `Atmosphere::Contains` makes the camera-inside test oblate-aware.
+
+**Ring shadows on a giant's air.** A moon's atmosphere (Titan) tests the ring once per
+fragment: the ring is far larger than the air. On the ringed planet itself
+(`isRingShadowPerSample`, Saturn and Uranus) the shadow is a band across the disc, so each
+view-ray sample tests its own sun ray against the ring annulus. The ring normal is fixed in
+the scene and the Sun direction comes from the planet's position on its orbit, so the
+opening angle follows the date. In the scene's geometry (catalog tilt plus Saturn's art
+tilt, not the real pole), Saturn's rings are open on **2008‑01‑01** (B ≈ +29°) and edge-on in
+April 2030; Uranus's are open on **2024‑01‑01** (B ≈ −38°) and edge-on in February 2033.
+`GiantRingShadow.*` checks that at those epochs the band falls on the hemisphere facing away
+from the Sun and collapses when the rings are edge-on.
+
+**Cloud shells under the air.** Jupiter and Saturn have no separate cloud shell: the
+diffuse map is the deck. Uranus's and Neptune's shells sit 0.3 % inside the mesh radius,
+under the LUT ground sphere, so the view ray stops at the surface above them; drawn first
+(as for Earth), they are attenuated with the planet.
+
+**Comparing captures.** Native `SOLARSYSTEM_CAMERA_POSE=x,y,z,yaw,pitch[,jd]` applies the same
+pose as the web's `window.setCameraPose(x, y, z, yaw, pitch)`; the optional Julian date pins
+and pauses the clock so planet positions match. `exposure` is a display uniform, not part of
+the bake, so a native and a web capture at one pose differ only by the display.
 
 `thicknessScale` stretches a shell while keeping vertical optical depth, for bodies whose
 real atmosphere would be a sub-pixel line; `exposure` is a display setting applied in the

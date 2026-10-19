@@ -238,6 +238,17 @@ function validateCatalog(catalog) {
     if (body.render?.atmosphere) {
       validateAtmosphere(body);
     }
+    // render.oblateness flattens the surface, cloud and atmosphere meshes along the pole
+    // (CatalogBody / CatalogClouds / Atmosphere via BodyShape.h); satellites stay spheres.
+    const oblateness = body.render?.oblateness;
+    if (oblateness !== undefined) {
+      if (!Number.isFinite(oblateness) || oblateness < 0 || oblateness >= 0.5) {
+        throw new Error(`Body ${body.id} render.oblateness must be a flattening in [0, 0.5)`);
+      }
+      if (body.kind === 'satellite') {
+        throw new Error(`Satellite ${body.id} cannot set render.oblateness`);
+      }
+    }
   }
 
   // Focusable primary bodies (star/planet/dwarf_planet) must form a contiguous 0..N-1 range.
@@ -509,7 +520,7 @@ function buildBodyCatalogHeader(catalog) {
       `${cppWideString(body.displayName?.ru ?? body.displayName?.en ?? body.id)}, ` +
       `${cppFloat(o.distanceAu)}, ${cppFloat(o.orbitalPeriodDays)}, ` +
       `${cppFloat(o.earthRadiusScale ?? 1)}, ${cppFloat(o.axialTiltDegrees)}, ` +
-      `${cppFloat(r.artTiltXDegrees)}, ${cppFloat(o.yawOffsetDegrees)}, ` +
+      `${cppFloat(r.artTiltXDegrees)}, ${cppFloat(r.oblateness)}, ${cppFloat(o.yawOffsetDegrees)}, ` +
       `${cppFloat(o.artRollDegrees)}, ` +
       `{${!!flags.hasNightTexture}, ${!!flags.hasSpecularMap}, ${!!flags.hasClouds}}, ` +
       `${!!(r.useSphereIntersect ?? body.kind === 'satellite')}, ` +
@@ -614,6 +625,7 @@ function buildBodyCatalogHeader(catalog) {
     '    float earthRadiusScale;',
     '    float axialTiltDegrees; // catalog SSOT; Rotate(Z) in CatalogBody.',
     '    float artTiltXDegrees;  // Saturn ring-presentation overlay; else 0.',
+    '    float oblateness;       // flattening 1 - polar/equatorial; the mesh radius is equatorial.',
     '    float yawOffsetDegrees;',
     '    float artRollDegrees;',
     '    ShaderFlags shaderFlags;',

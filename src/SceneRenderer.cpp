@@ -235,8 +235,7 @@ void Renderer::RenderAtmospheres(const RenderableSceneComponent& component) cons
 
     for (const auto& renderableAtmosphere : component.atmospheres) {
         // Inside the shell, draw its far side (the near side is behind the camera).
-        const bool inside = glm::distance(CameraWorldPosition(), renderableAtmosphere.atmosphere->GetPosition()) <=
-                            renderableAtmosphere.atmosphere->GetAtmosphereOuterBoundary();
+        const bool inside = renderableAtmosphere.atmosphere->Contains(CameraWorldPosition());
         if (inside) {
             glFrontFace(GL_CW);
         }
@@ -272,6 +271,7 @@ void Renderer::RenderOneilAtmosphere(const RenderableAtmosphere& renderableAtmos
     mainAtmosphereShader->SetFloat("SCALE_L_FACTOR", 1.0f);
     mainAtmosphereShader->SetFloat("earthSizeCoefficient", renderableAtmosphere.parentEarthSizeCoefficient);
     mainAtmosphereShader->SetBool("isUseToneMapping", atmosphere.GetRow().oneil.toneMapping);
+    mainAtmosphereShader->SetMat3("bodyToSphere", atmosphere.GetBodyToSphere());
     mainAtmosphereShader->SetBool("isNearbyPlanetaryRing", ring != nullptr);
 
     if (ring) {
@@ -308,7 +308,10 @@ void Renderer::RenderPbrAtmosphere(const RenderableAtmosphere& renderableAtmosph
     shader.SetVec3("camPosition", camera - center);
     shader.SetVec3("lightPos", _app._sun->GetPosition() - center);
     shader.SetFloat("kmPerSceneUnit", atmosphere.GetKmPerSceneUnit());
-    shader.SetBool("isCameraInsideShell", glm::length(camera - center) <= atmosphere.GetAtmosphereOuterBoundary());
+    shader.SetBool("isCameraInsideShell", atmosphere.Contains(camera));
+    // Oblate giants: the ray is traced where the cloud deck is a sphere (BodyShape.h).
+    shader.SetMat3("bodyToSphere", atmosphere.GetBodyToSphere());
+    shader.SetMat3("sphereToBody", atmosphere.GetSphereToBody());
     shader.SetInt("uSteps", pbrAtmosphereSteps);
     shader.SetFloat("uExposure", row.physical.exposure);
 
@@ -334,6 +337,9 @@ void Renderer::RenderPbrAtmosphere(const RenderableAtmosphere& renderableAtmosph
         shader.SetVec3("ringParentPlanetCenter", ring->GetParent()->GetPosition());
         shader.SetFloat("ringParentPlanetRadiusSquared", ring->GetParent()->GetRadius() * ring->GetParent()->GetRadius());
         shader.SetBool("isUseSphereIntersect", ring->GetParent() != atmosphere.GetParent());
+        // The ring's own planet (Saturn, Uranus): its ring shadow is a band across the disc,
+        // so it is tested per view-ray sample. A moon (Titan) tests once per fragment.
+        shader.SetBool("isRingShadowPerSample", ring->GetParent() == atmosphere.GetParent());
         shader.SetVec3("ringCenter", ring->GetPosition());
         shader.SetVec3("ringNormal", ring->GetRingNormal());
         shader.SetVec2("ringInnerOuterRadiuses", glm::vec2(ring->GetInnerRadius(), ring->GetOuterRadius()));

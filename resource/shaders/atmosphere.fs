@@ -35,6 +35,10 @@ uniform vec3 C_R; // Main atmosphere color from front side [Основной ц�
 uniform vec3 mieTint; // mie tint (backlit tint)
 uniform float innerRadius;
 uniform float outerRadius;
+// Offsets from the centre to the frame in which an oblate body is a sphere (BodyShape.h);
+// the shell mesh is flattened with the body and the scattering runs in the sphere frame.
+// Identity for a spherical body.
+uniform mat3 bodyToSphere;
 
 const float PI = 3.14159265359;
 const float MAX = 10000.;
@@ -62,7 +66,7 @@ out vec4 fragColor;
 #include "common/tonemap.glsl"
 
 vec3 rayDirection(vec3 camPos) {
-    vec3 ray = normalize(modelMat3 * fPosition - camPos);
+    vec3 ray = normalize(bodyToSphere * (modelMat3 * fPosition) - camPos);
     return ray;
 }
 
@@ -176,7 +180,7 @@ void main() {
     if (shadow > 0.0)
         discard;
 
-    vec3 eye = camPosition;
+    vec3 eye = bodyToSphere * camPosition;
     float eyeLength = length(eye);
     float eyeCriticalLengthFactor = criticalLengthFactor();
 
@@ -186,7 +190,7 @@ void main() {
     }
 
     vec3 dir = rayDirection(eye);
-    vec3 l = normalize(lightPos);
+    vec3 l = normalize(bodyToSphere * lightPos);
     vec2 e = rayIntersection(eye, dir, outerRadius);
 
     if (e.x > e.y)

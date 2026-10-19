@@ -32,6 +32,16 @@ public:
     float GetParentRadius() const { return _parentRadius; }
     /** Distance from the centre inside which the camera is "in" the shell being drawn. */
     float GetAtmosphereOuterBoundary() const;
+    /** Whether a scene-space point is inside the shell being drawn (oblate-aware). */
+    bool Contains(const glm::vec3& point) const;
+
+    /**
+     * Scene-space offsets from the centre to the frame in which the body's oblate figure
+     * (render.oblateness) is a sphere of the equatorial radius, and back. Identity for a
+     * spherical body. Both shaders trace their rays in that frame (BodyShape.h).
+     */
+    const glm::mat3& GetBodyToSphere() const { return _bodyToSphere; }
+    const glm::mat3& GetSphereToBody() const { return _sphereToBody; }
 
     /** Takes ownership of both LUT textures (0 = not loaded). */
     void SetLuts(unsigned int transmittance, unsigned int multiScattering);
@@ -50,6 +60,8 @@ public:
 
 private:
     const BodyCatalog::AtmosphereRow* _row;
+    const BodyCatalog::Entry* _body; // the row's body; nullptr only for a malformed catalog
+    glm::mat3 _bodyToSphere{1.0f}, _sphereToBody{1.0f};
     float _parentRadius, _innerRadius;
     unsigned int _transmittanceLut = 0, _multiScatteringLut = 0;
     bool _physicalPathActive = false;

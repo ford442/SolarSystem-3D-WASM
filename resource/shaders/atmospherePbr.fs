@@ -40,11 +40,19 @@ uniform int uSteps;            // view-ray samples (quality tier)
 uniform float uExposure;
 uniform float uSurfaceDim;
 
+// Offsets from the atmosphere centre (scene units) to the frame in which an oblate body's
+// cloud deck is a sphere of its equatorial radius, and back (BodyShape.h). The shell mesh
+// is flattened with the body; the ray is traced in the sphere frame, where the LUTs apply.
+// Identity for a spherical body.
+uniform mat3 bodyToSphere;
+uniform mat3 sphereToBody;
+
 // Other bodies' shadows. The planet's own shadow is exact per sample (a sun ray that hits
 // the ground gets no direct light), so the shared shadow map is not used here: it also
 // contains this planet, and would black out the lit half of every limb ray.
 uniform bool isNearbyPlanetaryRing;
 uniform bool isUseSphereIntersect;
+uniform bool isRingShadowPerSample;    // this atmosphere's own planet carries the ring
 uniform vec3 ringParentPlanetCenter;   // world space
 uniform float ringParentPlanetRadiusSquared;
 uniform vec3 ringCenter;               // world space
@@ -59,19 +67,17 @@ uniform float eclipseStarRadius;
 
 const int MAX_STEPS = 32;
 
-// Direct sunlight reaching the shell fragment past the ring and (for a moon) its ringed
-// parent. Evaluated once per fragment: rings are far larger than an atmosphere's depth.
-float RingVisibility() {
-    if (!isNearbyPlanetaryRing)
-        return 1.0;
-    vec3 atmosphereCenter = fWorldPosition - modelMat3 * fPosition;
-    vec3 sunWorld = atmosphereCenter + lightPos;
-    vec3 toSun = normalize(sunWorld - fWorldPosition);
-    if (isUseSphereIntersect && intersectSphereAhead(fWorldPosition, toSun, ringParentPlanetCenter, ringParentPlanetRadiusSquared))
+// Direct sunlight reaching `worldPoint` past the ring and (for a moon) its ringed parent.
+// The sun direction is taken from the point itself, so the ring's opening angle toward the
+// Sun follows the date through the planet's orbital position. Called inside the view-ray
+// loop under non-uniform control flow, so the ring texture is read at an explicit LOD.
+float RingVisibilityAt(vec3 worldPoint, vec3 sunWorld) {
+    vec3 toSun = normalize(sunWorld - worldPoint);
+    if (isUseSphereIntersect && intersectSphereAhead(worldPoint, toSun, ringParentPlanetCenter, ringParentPlanetRadiusSquared))
         return 0.0;
     float u;
-    if (RingCrossing(fWorldPosition, toSun, toSun, ringCenter, ringNormal, ringInnerOuterRadiuses, u))
-        return clamp(1.0 - RingOpacity(texture(ringDiffuse, vec2(u, 0.0))), 0.0, 1.0);
+    if (RingCrossing(worldPoint, toSun, toSun, ringCenter, ringNormal, ringInnerOuterRadiuses, u))
+        return clamp(1.0 - RingOpacity(textureLod(ringDiffuse, vec2(u, 0.0), 0.0)), 0.0, 1.0);
     return 1.0;
 }
 
@@ -79,13 +85,16 @@ void main() {
     float bottom = uAtmosphere.bottomRadius;
     float top = uAtmosphere.topRadius;
 
-    // Planet-centred km. From outside, start at the shell fragment rather than the camera:
-    // both lie on the ray, and the fragment is close to the sphere, which keeps the
-    // intersection precise when the camera is thousands of radii away.
-    vec3 fragmentOffset = modelMat3 * fPosition;
-    vec3 viewDir = normalize(fragmentOffset - camPosition);
-    vec3 origin = (isCameraInsideShell ? camPosition : fragmentOffset) * kmPerSceneUnit;
-    vec3 sunDir = normalize(lightPos);
+    // Planet-centred km in the sphere frame. From outside, start at the shell fragment
+    // rather than the camera: both lie on the ray, and the fragment is close to the sphere,
+    // which keeps the intersection precise when the camera is thousands of radii away.
+    // The map is linear, so the mapped view ray is still a straight line.
+    vec3 worldOffset = modelMat3 * fPosition;
+    vec3 fragmentOffset = bodyToSphere * worldOffset;
+    vec3 camera = bodyToSphere * camPosition;
+    vec3 viewDir = normalize(fragmentOffset - camera);
+    vec3 origin = (isCameraInsideShell ? camera : fragmentOffset) * kmPerSceneUnit;
+    vec3 sunDir = normalize(bodyToSphere * lightPos);
 
     vec2 topHit = raySphere(origin, viewDir, top);
     if (topHit.x > topHit.y || topHit.y <= 0.0)
@@ -109,7 +118,15 @@ void main() {
     float nu = dot(viewDir, sunDir);
     float rayleighPhase = RayleighPhaseNormalized(nu);
     float miePhase = CornetteShanksPhase(uAtmosphere.miePhaseG, nu);
-    float ringVisibility = RingVisibility();
+
+    // Ring shadow. On a moon's air (Titan) the ring is far larger than the atmosphere, so
+    // one test at the shell fragment serves the whole ray. On the ringed planet itself the
+    // shadow is a band across the disc, and a ray entering the shell above it can reach the
+    // cloud deck inside it, so each sample is tested where it is.
+    vec3 atmosphereCenter = fWorldPosition - worldOffset;
+    vec3 sunWorld = atmosphereCenter + lightPos;
+    bool ringPerSample = isNearbyPlanetaryRing && isRingShadowPerSample;
+    float ringVisibility = isNearbyPlanetaryRing && !ringPerSample ? RingVisibilityAt(fWorldPosition, sunWorld) : 1.0;
 
     vec3 luminance = vec3(0.0);
     vec3 throughput = vec3(1.0);
@@ -142,9 +159,12 @@ void main() {
         vec3 sunTransmittance = RayIntersectsGround(uAtmosphere, r, muS)
             ? vec3(0.0)
             : texture(transmittanceLut, TransmittanceLutUv(uAtmosphere, r, muS)).rgb;
+        vec3 sampleOffset = sphereToBody * (position / kmPerSceneUnit);  // back to scene units
         float sunVisibility = ringVisibility;
+        if (ringPerSample)
+            sunVisibility *= RingVisibilityAt(atmosphereCenter + sampleOffset, sunWorld);
         if (hasEclipseCaster)
-            sunVisibility *= EclipseVisibilityAt(position / kmPerSceneUnit, lightPos, eclipseCasterCenter,
+            sunVisibility *= EclipseVisibilityAt(sampleOffset, lightPos, eclipseCasterCenter,
                                                  eclipseCasterRadius, eclipseStarRadius);
         vec3 multipleScattering = texture(multiScatteringLut, MultiScatteringLutUv(uAtmosphere, r, muS)).rgb;
 
