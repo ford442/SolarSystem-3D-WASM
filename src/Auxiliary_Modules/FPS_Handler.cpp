@@ -1,6 +1,8 @@
 #include "FPS_Handler.h"
+#include <thread>
 
-FPS_Handler::FPS_Handler(uint16_t maxFps) : _frameTime(1.0 / maxFps)
+FPS_Handler::FPS_Handler(uint16_t maxFps)
+    : _frameTime(duration_cast<steady_clock::duration>(duration<double>(1.0 / maxFps)))
 {
 }
 
@@ -9,9 +11,12 @@ void FPS_Handler::RunFrameTimer() {
     _frameStartPoint = steady_clock::now();
 }
 
-void FPS_Handler::WaitForFrameTimer() {
+void FPS_Handler::EndFrame() {
     _tempFps++;
-    while (duration<double>(steady_clock::now() - _frameStartPoint).count() < _frameTime);
+}
+
+void FPS_Handler::WaitForFrameTimer() const {
+    std::this_thread::sleep_until(_frameStartPoint + _frameTime);
 }
 
 uint16_t FPS_Handler::GetCurrentFps() const {

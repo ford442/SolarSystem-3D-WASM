@@ -32,6 +32,9 @@ struct QualityTierSettings {
     // How many of the brightest catalog stars Observe mode draws (the list is sorted by
     // magnitude, so this is a prefix). Planets, Sun and Moon are always drawn.
     int observeStarCount;
+    // Web staged loading: how many planet systems nearest the start pose load right away
+    // instead of waiting for the camera to approach them (see ActivateNearestPlanetSystems).
+    int eagerPlanetSystems;
     const char* name;
 };
 

@@ -143,11 +143,12 @@ private:
     enum class AppState { LOADING, RUNNING };
     AppState _appState = AppState::LOADING;
     std::atomic<int> _resourcesPending{0};
+    int _resourcesFailed = 0; // Finished core resources that did not arrive (subset of the finished ones)
     int _totalResources = 0;
 
     GLFWwindow* _mainWindow = nullptr;
     uint16_t _displayWidth = 0, _displayHeight = 0;
-    ssize_t _nearestPlanetIndex = -1;  // -1 when no planets are loaded yet
+    int _nearestPlanetIndex = -1;      // Into _renderableSceneComponents; -1 when no planets are loaded yet
     int _focusedPlanetIndex = -1;      // FocusPlanet index (0=sun … 9=pluto); -1 = none
     FPS_Handler _fpsHandler;
     FT_Library _ft = nullptr;
@@ -162,12 +163,6 @@ private:
     float _musicVolume = 0.3f;
     bool _musicMuted = false;
     std::unordered_set<std::string> _availableSongPaths;
-#endif
-#ifndef __EMSCRIPTEN__
-    std::unique_ptr<std::thread> _searchNearestPlanetThread;
-#endif
-#ifdef __EMSCRIPTEN__
-    int _nearestPlanetSearchFrameCounter = 0;
 #endif
 #if !defined(SOLARSYSTEM_USE_SDL_MIXER) && !defined(__EMSCRIPTEN__)
     ISoundEngine* _soundEngine = nullptr;
@@ -215,12 +210,16 @@ private:
     void InitStarSystem();
     void LoadPlanetSystemManifests(); // WASM: parse resource/planet_manifest.json
     std::function<void()> MakePlanetInitFunc(const std::string& initTag);
+    void ActivateNearestPlanetSystems(int count);  // WASM: load the `count` systems nearest the camera now
+    void ActivatePlanetSystem(OrbitLayout::Body body); // WASM: load one system now (focus / deep link)
+    void StartPlanetSystemDownload(PlanetSystemManifest& manifest, const char* reason);
     /** Build a catalog system (planet + moons + atmosphere/clouds/rings flags) from an initTag. */
     void InitCatalogSystem(const MeshHolder& sphereModel, const std::string& initTag);
     /** Focus-index wrapper around InitCatalogSystem (Ceres, Vesta, or any catalog primary). */
     void InitCatalogBody(const MeshHolder& sphereModel, OrbitLayout::Body body);
     void InitSongList();
     void Dispose();
+    void ReleaseGpuResources(); // Scene + renderer GL objects; called before the context goes
     void UpdateLoadingProgress(); // Update JavaScript loading progress bar
     void UpdatePlanetSystemLoading(); // Staged download + init of planet systems (WASM)
     void RefreshPlanetProxyPositions(); // Keep WASM proxy markers aligned with orbit scale
@@ -249,14 +248,14 @@ private:
     float _reportedMusicDuck = 1.0f;
 #endif
     void RenderFrameContent(); // Sky → planets → effects (one eye / mono)
+    void EndFrame();           // Count the frame for the FPS HUD; native: apply the frame limiter
 #ifdef __EMSCRIPTEN__
     void RenderXrStereoFrame();
 #endif
     void StartSearchNearestPlanet();
-    void UpdateSearchNearestPlanet(); // For Emscripten frame-based search
+    void UpdateSearchNearestPlanet(); // Once per frame, on the main thread
     void StartPlayBackgroundMusic();
     void UpdateBackgroundMusic(); // For Emscripten frame-based music
-    void StopSearchNearestPlanet();
     void StopPlayBackgroundMusic();
     void LoadWindowIcon() const;
     void DisplaySystemInformation() const;

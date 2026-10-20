@@ -18,12 +18,14 @@ void NotifySettingsChanged(const char* field) {
     }, field);
 }
 
-void NotifyLoadingProgress(int loaded, int total) {
+// `failed` is already counted in `loaded`: it says how many of the finished resources
+// fell back instead of arriving.
+void NotifyLoadingProgress(int loaded, int total, int failed) {
     EM_ASM({
         if (typeof Module['updateLoadingProgress'] === 'function') {
-            Module['updateLoadingProgress']($0, $1);
+            Module['updateLoadingProgress']($0, $1, $2);
         }
-    }, loaded, total);
+    }, loaded, total, failed);
 }
 
 void NotifyStreamingProgress(int completed, int total, int active, int tierCode) {
@@ -50,6 +52,24 @@ void NotifyPlanetFocused(int index) {
     EM_ASM({
         if (typeof Module['onPlanetFocused'] === 'function') {
             Module['onPlanetFocused']($0);
+        }
+    }, index);
+}
+
+// Same numbering as GetNearestPlanetIndexForJs(); fired only when it changes.
+void NotifyNearestPlanetChanged(int jsIndex) {
+    EM_ASM({
+        if (typeof Module['onNearestPlanetChanged'] === 'function') {
+            Module['onNearestPlanetChanged']($0);
+        }
+    }, jsIndex);
+}
+
+// -1 when the mission follow stops.
+void NotifyMissionFocused(int index) {
+    EM_ASM({
+        if (typeof Module['onMissionFocused'] === 'function') {
+            Module['onMissionFocused']($0);
         }
     }, index);
 }

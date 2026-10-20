@@ -19,15 +19,18 @@ export function createProgressCallbacks(elements: ProgressOverlayElements): Wasm
         streamingBar,
     } = elements;
 
-    function updateProgress(loaded: number, total: number): void {
+    // `failed` is only passed by the core-resource loader; those resources are already
+    // counted in `loaded`, so the bar still completes and the overlay still hides.
+    function updateProgress(loaded: number, total: number, failed = 0): void {
         const percentage = total > 0 ? Math.round((loaded / total) * 100) : 0;
+        const failedSuffix = failed > 0 ? ` (${failed} failed)` : '';
 
         if (progressBar && progressText) {
             progressBar.style.width = `${percentage}%`;
-            progressText.textContent = `${percentage}%`;
+            progressText.textContent = failed > 0 ? `${loaded}/${total}${failedSuffix}` : `${percentage}%`;
         }
 
-        console.log(`Loading progress: ${loaded}/${total} (${percentage}%)`);
+        console.log(`Loading progress: ${loaded}/${total}${failedSuffix} (${percentage}%)`);
 
         if (loaded >= total && total > 0) {
             setTimeout(() => {

@@ -2,6 +2,7 @@ import { copyShareableLink, type DeepLinkViewState } from './deepLink.js';
 import { isoDateFromJulianDate } from './ephemeris.js';
 import { createTourPlayer, loadTour, type TourPlayer } from './tourPlayer.js';
 import type { SolarSystemRuntime } from './wasmBridge.js';
+import { registerWasmCallbacks } from './wasmCallbacks.js';
 
 export function initEducationalLayer(options: {
     runtime: SolarSystemRuntime;
@@ -40,10 +41,6 @@ export function initEducationalLayer(options: {
         if (catalog.length === 0) {
             return;
         }
-        if (missionList.childElementCount === catalog.length) {
-            highlightMission(runtime.getFocusedMissionIndex());
-            return;
-        }
         missionList.replaceChildren();
         for (const mission of catalog) {
             const button = document.createElement('button');
@@ -70,10 +67,14 @@ export function initEducationalLayer(options: {
         }
     };
 
+    // The catalog is parsed from the .data preload before main() returns (Application::InitScene),
+    // so one render is enough; afterwards only the highlight moves, on focus events. Focusing a
+    // planet ends mission follow, hence the onPlanetFocused re-read.
     renderMissionList();
-    window.setInterval(() => {
-        renderMissionList();
-    }, 750);
+    registerWasmCallbacks({
+        onMissionFocused: (index: number) => highlightMission(index),
+        onPlanetFocused: () => highlightMission(runtime.getFocusedMissionIndex()),
+    });
 
     const player = createTourPlayer({
         runtime,

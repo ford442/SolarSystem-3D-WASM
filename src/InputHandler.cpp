@@ -12,8 +12,6 @@
 using namespace std;
 
 void Application::ProcessInput(GLFWwindow* window) {
-    static float movementSpeed = _camera.GetMovementSpeed();
-
     if (_isFirstMouse) {
         _lastX = 0;
         _lastY = 0;
@@ -73,12 +71,10 @@ void Application::ProcessInput(GLFWwindow* window) {
     }
 #endif
     if (glfwGetKey(window, GLFW_KEY_1) == GLFW_PRESS) {
-        movementSpeed = glm::clamp(movementSpeed + 0.01f, 0.0f, 150.f);
-        _camera.SetMovementSpeed(movementSpeed);
+        _camera.SetMovementSpeed(glm::clamp(_camera.GetMovementSpeed() + 0.01f, 0.0f, 150.f));
     }
     if (glfwGetKey(window, GLFW_KEY_2) == GLFW_PRESS) {
-        movementSpeed = glm::clamp(movementSpeed - 0.01f, 0.0f, 150.f);
-        _camera.SetMovementSpeed(movementSpeed);
+        _camera.SetMovementSpeed(glm::clamp(_camera.GetMovementSpeed() - 0.01f, 0.0f, 150.f));
     }
     if (glfwGetKey(window, GLFW_KEY_3) == GLFW_PRESS) {
         _renderer.starExposure = glm::clamp(_renderer.starExposure + 0.1f, 0.0f, 20.f);

@@ -44,6 +44,7 @@ add_executable(SolarSystemTests
     test_planet_manifest_loader.cpp
     test_texture_loading_queue.cpp
     test_texture_lod_controller.cpp
+    test_web_resource_fetcher.cpp
     test_asteroid_field.cpp
     test_magnetic_field.cpp
     test_sky_events.cpp

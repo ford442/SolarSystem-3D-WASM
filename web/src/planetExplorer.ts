@@ -230,12 +230,7 @@ export class PlanetExplorer {
         this.syncScaleFromRuntime();
         this.bindConjunction();
         this.elements.status.textContent = 'Explorer ready';
-        this.startPolling();
-        registerWasmCallbacks({
-            onPlanetFocused: (index: number) => {
-                this.onExternalFocus(index as PlanetIndex);
-            },
-        });
+        this.subscribeRuntimeEvents();
     }
 
     applyDeepLinkPlanet(index: PlanetIndex, options: { focusCamera: boolean }): void {
@@ -256,15 +251,38 @@ export class PlanetExplorer {
         this.elements.card.classList.remove('is-focused');
     }
 
-    private startPolling(): void {
+    private onNearestChanged(nearest: number): void {
+        if (nearest >= 0 && this.selectedIndex === null) {
+            this.highlightNearest(nearest as PlanetIndex);
+        }
+    }
+
+    // Focus, nearest-body and scale changes arrive as events from C++ (JsBridge.cpp) or the
+    // runtime wrapper. Only the conjunction chip still needs a clock: it goes stale as
+    // simulated time runs past the event, and nothing signals that, so it re-reads the
+    // (C++-cached) next conjunction every couple of seconds while the tab is visible.
+    private subscribeRuntimeEvents(): void {
+        registerWasmCallbacks({
+            onPlanetFocused: (index: number) => {
+                this.onExternalFocus(index as PlanetIndex);
+            },
+            onNearestPlanetChanged: (index: number) => {
+                this.onNearestChanged(index);
+            },
+            onSettingsChanged: (field: string) => {
+                if (field === 'orbitScaleMode') {
+                    this.syncScaleFromRuntime();
+                } else if (field === 'simulationEpoch') {
+                    this.conjunctionRefresh?.();
+                }
+            },
+        });
+        this.onNearestChanged(this.bindings.getNearestPlanetIndex?.() ?? -1);
         window.setInterval(() => {
-            const nearest = this.bindings.getNearestPlanetIndex?.() ?? -1;
-            if (nearest >= 0 && this.selectedIndex === null) {
-                this.highlightNearest(nearest as PlanetIndex);
+            if (!document.hidden) {
+                this.conjunctionRefresh?.();
             }
-            this.syncScaleFromRuntime();
-            this.conjunctionRefresh?.();
-        }, 750);
+        }, 2000);
     }
 
     private syncScaleFromRuntime(): void {

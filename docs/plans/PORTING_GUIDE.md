@@ -80,8 +80,8 @@ Audio is a browser media concern on web:
 Threads have been converted to frame-based logic for web compatibility:
 
 **Nearest Planet Search:**
-- Native: Uses `std::thread` running continuously
-- Web: Runs every 60 frames (~1 second at 60fps) in `UpdateSearchNearestPlanet()`
+- Both: `UpdateSearchNearestPlanet()` once per frame on the main thread (the native thread raced
+  the planet list and camera); web reports changes through `Module['onNearestPlanetChanged']`
 
 **Background Music:**
 - Native: Uses `std::thread` with volume fading logic
@@ -209,9 +209,10 @@ The historical blocker was Closure's property renaming mangling the `Module.foo`
 with **bracket notation**, which Closure never renames:
 
 * `JsBridge.cpp` — `Module['onSettingsChanged']`, `Module['updateLoadingProgress']`,
-  `Module['updateStreamingProgress']`, `Module['onPlanetFocused']`. The TypeScript side
-  (`web/src/wasmCallbacks.ts`) already assigns these through string keys, so the two
-  halves agree by construction.
+  `Module['updateStreamingProgress']`, `Module['onPlanetFocused']`,
+  `Module['onNearestPlanetChanged']`, `Module['onMissionFocused']`. The TypeScript side
+  (`web/src/wasmCallbacks.ts`) assigns these through string keys on the module instance
+  (`setModuleInstance`, called from `bootstrap.ts`), so the two halves agree by construction.
 * `QualitySettings.cpp` — `window['__solarSystemInit']` and its
   `['isMobileWeb']` / `['qualityPreset']` / `['backingStoreScale']` fields.
 * `WebResourceFetcher.cpp` — `window['__solarSystemAssetBase']`.

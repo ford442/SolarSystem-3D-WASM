@@ -13,6 +13,7 @@
 #include "Auxiliary_Modules/Ephemeris.h"
 #include "Auxiliary_Modules/TextureLoadingQueue.h"
 #include <algorithm>
+#include <array>
 #include <deque>
 #include <iomanip>
 #include <optional>
@@ -29,6 +30,7 @@ void Renderer::Init() {
     hdrEnabled = qualitySettings.enableHdr;
     hdrShader = make_unique<Shader>("resource/shaders/passThrough.vs", "resource/shaders/hdr.fs");
     hdr = make_unique<HDR>(*hdrShader, app._displayWidth, app._displayHeight, hdrEnabled);
+    hudProjection = glm::ortho(0.0f, static_cast<float>(app._displayWidth), 0.0f, static_cast<float>(app._displayHeight));
     // HDR turns itself off when the GPU cannot give it a complete float FBO; follow it,
     // otherwise the composite path would keep sampling an empty buffer.
     hdrEnabled = hdr->IsEnabled();
@@ -91,6 +93,38 @@ void Renderer::Init() {
         magneticFieldBloom = make_unique<MagneticFieldBloom>(app._displayWidth, app._displayHeight,
                                                               fieldQuality.enableMagneticBloom);
         ApplyEffectQuality(fieldQuality);
+    }
+}
+
+void Renderer::Resize(uint16_t width, uint16_t height) {
+    hudProjection = glm::ortho(0.0f, static_cast<float>(width), 0.0f, static_cast<float>(height));
+    if (hdr) {
+        hdr->Resize(width, height);
+    }
+    if (magneticFieldBloom) {
+        magneticFieldBloom->Resize(width, height);
+    }
+}
+
+void Renderer::Release() {
+    // Users before the shaders they hold by reference (LensFlare, HDR).
+    missionPathMeshes.clear();
+    magneticFieldBloom.reset();
+    magneticFieldRenderer.reset();
+    magneticFieldsBuilt = false;
+    xrPointerRenderer.reset();
+    orbitPathRenderer.reset();
+    observeSky.reset();
+    lensFlare.reset();
+    skyBox.reset();
+    hdr.reset();
+    textRenderer.reset();
+    shadowMapFBO.reset();
+    for (auto* shader : {&shadowMapShader, &mainSkyBoxShader, &mainTextShader, &mainStarShader,
+                         &mainCoronaStarShader, &mainPlanetShader, &mainAtmosphereShader,
+                         &mainCloudsShader, &mainRingShader, &hdrShader, &lensFlareShader,
+                         &starGlowShader, &pbrAtmosphereShader, &coronaVolumeShader}) {
+        shader->reset();
     }
 }
 
@@ -652,7 +686,6 @@ void Renderer::RenderSpaceObjectDistance(const SpaceObject* spaceObject) const {
 }
 
 void Renderer::RenderHints() const {
-    static const glm::mat4 textProjection = glm::ortho(0.0f, static_cast<float>(_app._displayWidth), 0.0f, static_cast<float>(_app._displayHeight));
     static const string gpuHintString = string(reinterpret_cast<const char *>(glGetString(GL_RENDERER)));
     static constexpr glm::vec3 textColor = glm::vec3(0.98431, 0.80784, 0.69412);
 
@@ -661,7 +694,7 @@ void Renderer::RenderHints() const {
     glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
 
     mainTextShader->Use();
-    mainTextShader->SetMat4("projection", textProjection);
+    mainTextShader->SetMat4("projection", hudProjection);
     mainTextShader->SetBool("is3D", false);
 
     // Reuse pre-allocated containers to eliminate per-frame heap allocations
@@ -822,27 +855,18 @@ void Renderer::RenderTextureLoadingProgress() const {
     glEnable(GL_BLEND);
     glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
 
-    static const glm::mat4 textProjection = glm::ortho(0.0f, static_cast<float>(_app._displayWidth), 0.0f, static_cast<float>(_app._displayHeight));
     static constexpr glm::vec3 textColor = glm::vec3(0.3f, 0.8f, 1.0f);
 
     mainTextShader->Use();
-    mainTextShader->SetMat4("projection", textProjection);
+    mainTextShader->SetMat4("projection", hudProjection);
     mainTextShader->SetBool("is3D", false);
 
-    // Build hint string with progress counters, e.g. "Mid-res upgrade (2/5)"
-    // Throttled render (via static) to avoid per-frame spam; visual is brief.
-    static int lastCompleted = -1;
-    static int lastTotal = -1;
-    static int lastActive = -1;
-    static int lastTier = -1;
-    static int frameCounter = 0;
-    frameCounter = (frameCounter + 1) % 10;
-    if (frameCounter == 0 || completed != lastCompleted || total != lastTotal || active != lastActive ||
-        tierCode != lastTier) {
-        lastCompleted = completed;
-        lastTotal = total;
-        lastActive = active;
-        lastTier = tierCode;
+    // Hint string with progress counters, e.g. "Mid-res upgrade (2/5)". Rebuilt only when a
+    // counter changes, but drawn every frame: the frame is cleared, so a hint drawn one frame
+    // in ten (as the old throttle did) flickers.
+    const std::array<int, 4> counters = {completed, total, active, tierCode};
+    if (loadingHintCache.empty() || counters != loadingHintCounters) {
+        loadingHintCounters = counters;
         const wchar_t* tierLabel = L"Texture upgrade";
         if (tierCode == 1) {
             tierLabel = L"Mid-res upgrade";
@@ -854,17 +878,17 @@ void Renderer::RenderTextureLoadingProgress() const {
         if (active > 0) {
             hint += L" [" + std::to_wstring(active) + L" active]";
         }
-        deque<wstring> loadingHint;
-        loadingHint.emplace_back(hint);
-        textRenderer->Render(*mainTextShader, loadingHint, 0.5f * _app._displayWidth - 150, 0.1f * _app._displayHeight, 0.25, textColor);
+        loadingHintCache.clear();
+        loadingHintCache.emplace_back(std::move(hint));
     }
+    textRenderer->Render(*mainTextShader, loadingHintCache, 0.5f * _app._displayWidth - 150, 0.1f * _app._displayHeight, 0.25, textColor);
 
     glDisable(GL_BLEND);
     glEnable(GL_DEPTH_TEST);
 }
 
 void Renderer::ConfigureMainShaders() {
-    static const double zCoef = 2.0 / glm::log2(_app._camera.GetFar() + 1.0);
+    const double zCoef = 2.0 / glm::log2(_app._camera.GetFar() + 1.0);
 
 #ifdef __EMSCRIPTEN__
     if (_app._xr.active && _app._xr.currentEye >= 0 && _app._xr.currentEye < _app._xr.eyeCount) {

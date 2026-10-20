@@ -10,7 +10,7 @@ import type { NextConjunction } from './conjunction.js';
 import { parseObserveStateJson, type ObserveState } from './observe.js';
 import { parseSkyEventJson, type NextSkyEvent } from './skyEvents.js';
 import { createCachedCwrapExports } from './wasmBridge.exports.js';
-import { clearWasmCallback, registerWasmCallbacks } from './wasmCallbacks.js';
+import { clearWasmCallback, emitWasmCallback, registerWasmCallbacks } from './wasmCallbacks.js';
 
 /**
  * Planet index conventions (FocusPlanet / GetFocusedPlanetIndex):
@@ -216,7 +216,11 @@ export function createSolarSystemRuntime(instance: SolarSystemModule): SolarSyst
         addTouchZoom: exports.addTouchZoom,
         isMobileWeb: () => exports.isMobileWeb() !== 0,
         focusPlanet: (index) => exports.focusPlanet(index),
-        setOrbitScaleMode: (mode) => exports.setOrbitScaleMode(mode),
+        setOrbitScaleMode: (mode) => {
+            exports.setOrbitScaleMode(mode);
+            // Only JS ever changes the scale mode, so the event is raised here rather than in C++.
+            emitWasmCallback('onSettingsChanged', 'orbitScaleMode');
+        },
         getOrbitScaleMode: () => exports.getOrbitScaleMode() as OrbitScaleMode,
         getNearestPlanetIndex: exports.getNearestPlanetIndex,
         getFocusedPlanetIndex: exports.getFocusedPlanetIndex,
@@ -242,7 +246,10 @@ export function createSolarSystemRuntime(instance: SolarSystemModule): SolarSyst
         setObserveFov: (fovDeg) => exports.setObserveFov(fovDeg),
         setObserveTimeRate: (rate) => exports.setObserveTimeRate(rate),
         getObserveState: () => parseObserveStateJson(exports.getObserveStateJson()),
-        focusMission: (index) => exports.focusMission(index),
+        focusMission: (index) => {
+            exports.focusMission(index);
+            emitWasmCallback('onMissionFocused', exports.getFocusedMissionIndex());
+        },
         getFocusedMissionIndex: exports.getFocusedMissionIndex,
         getMissionCount: exports.getMissionCount,
         getMissionCatalog: () => parseMissionCatalogJson(exports.getMissionCatalogJson()),

@@ -398,7 +398,8 @@ export type SettingsChangeField =
   | 'magneticFieldMode'
   | 'observeMode'
   | 'observeSite'
-  | 'observeTimeRate';
+  | 'observeTimeRate'
+  | 'orbitScaleMode';
 
 export interface SolarSystemModuleConfig {
   canvas: HTMLCanvasElement;
@@ -407,12 +408,15 @@ export interface SolarSystemModuleConfig {
   printErr?: (text: string) => void;
   onRuntimeInitialized?: () => void;
   /** C++ → JS callbacks registered on Module before runtime init. */
-  updateLoadingProgress?: (loaded: number, total: number) => void;
+  /** `failed` (core resources that failed, already counted in `loaded`) is omitted by streaming progress. */
+  updateLoadingProgress?: (loaded: number, total: number, failed?: number) => void;
   updateStreamingProgress?: (completed: number, total: number, active?: number, tierCode?: number) => void;
   onPlanetFocused?: (index: number) => void;
   /** 0–1 music gain for scene proximity; web/src/music.ts applies it. */
   onMusicDuck?: (duck: number) => void;
   onSettingsChanged?: (field: SettingsChangeField | string) => void;
+  onNearestPlanetChanged?: (index: number) => void;
+  onMissionFocused?: (index: number) => void;
   /**
    * A WebGL2 context created by the caller (see web/src/webglContext.ts), reused as-is by
    * Emscripten's GLFW port. This is the ONLY way to control powerPreference / xrCompatible /
@@ -441,6 +445,9 @@ export interface SolarSystemModule {
   HEAPF32: Float32Array;
   HEAP8: Int8Array;
   GL?: EmscriptenGL;
+  /** Emscripten main-loop controls (library_browser.js); used on WebGL context loss. */
+  pauseMainLoop?: () => void;
+  resumeMainLoop?: () => void;
   _main: (argc: number, argv: number) => number;
   // BEGIN GENERATED MODULE EXPORTS
   _SetCameraPose: (...args: number[]) => void;
@@ -550,7 +557,4 @@ declare global {
       backingStoreScale: number;
     };
   }
-
-  /** Incoming Module config (callbacks live on SolarSystemModuleConfig). */
-  const Module: SolarSystemModuleConfig;
 }

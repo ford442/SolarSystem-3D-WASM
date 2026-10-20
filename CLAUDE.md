@@ -123,7 +123,7 @@ The CMakeLists.txt has separate configurations for EMSCRIPTEN vs native builds, 
 ### Key Integration Points
 
 **Progress Tracking (C++ ↔ Web)**
-- C++ calls `Module['updateLoadingProgress'](loaded, total)` from an `EM_ASM` block in `JsBridge.cpp` (same for `onSettingsChanged` / `updateStreamingProgress` / `onPlanetFocused`); `web/src/wasmCallbacks.ts` installs them on `Module`
+- C++ calls `Module['updateLoadingProgress'](loaded, total, failed)` from an `EM_ASM` block in `JsBridge.cpp` (same for `onSettingsChanged` / `updateStreamingProgress` / `onPlanetFocused` / `onNearestPlanetChanged` / `onMissionFocused`); `web/src/wasmCallbacks.ts` installs them on the module instance (`setModuleInstance`). The build is `MODULARIZE`, so there is no global `Module` — writing to `globalThis.Module` reaches nothing
 - Bracket notation is load-bearing: Release links with `--closure 1`, which renames dotted property reads. A new bridge written as `Module.foo` is silently renamed and never fires in Release while working in Debug
 - Web receives `WebResourceFetcher` events and updates progress bar
 

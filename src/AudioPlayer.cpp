@@ -3,6 +3,7 @@
 // and irrKlang (Windows, driven by its own worker thread). The web build opens no audio
 // device at all: web/src/music.ts plays the tracks and C++ only reports MusicDuckAmount().
 #include "Application.h"
+#include "JsBridge.h"
 #include <algorithm>
 #include <chrono>
 #include <cmath>
@@ -73,7 +74,7 @@ void Application::StartPlayBackgroundMusic() {
     };
 
     _backgroundMusicThread = make_unique<thread>([=]() {
-        for (ssize_t i = 0; i < _backgroundSongPaths.size() && _isBackgroundMusicPlay; i++) {
+        for (size_t i = 0; i < _backgroundSongPaths.size() && _isBackgroundMusicPlay; i++) {
             this_thread::sleep_for(1s);
 
             auto song = _soundEngine->play2D(_backgroundSongPaths[i].c_str(), false, true, true);

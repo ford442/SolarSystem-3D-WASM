@@ -18,7 +18,6 @@
 #include <cstdlib>
 #include <iostream>
 #include <sstream>
-#include <thread>
 
 using namespace std;
 
@@ -40,9 +39,13 @@ Application::~Application() {
 
 void Application::Exec() {
 #ifdef __EMSCRIPTEN__
+    // No simulated infinite loop: main() heap-allocates the Application, so returning is
+    // safe, and it lets the swap interval be applied now that a main loop exists to time
+    // (emscripten_set_main_loop_timing is a no-op before this call).
     emscripten_set_main_loop_arg([](void* arg) {
         static_cast<Application*>(arg)->RunOneFrame();
-    }, this, 0, 1);
+    }, this, 0, 0);
+    VertSync(_isVertSyncEnabled);
 #else
     while (!glfwWindowShouldClose(_mainWindow)) {
         RunOneFrame();
@@ -79,9 +82,7 @@ void Application::RunOneFrame() {
             glfwSwapBuffers(_mainWindow);
         }
         glfwPollEvents();
-#ifndef __EMSCRIPTEN__
-        _fpsHandler.WaitForFrameTimer();
-#endif
+        EndFrame();
         return;
     }
 
@@ -124,6 +125,7 @@ void Application::RunOneFrame() {
 #endif
         UpdateSearchNearestPlanet();
         glfwPollEvents();
+        EndFrame();
         return;
     }
 #endif
@@ -144,18 +146,23 @@ void Application::RunOneFrame() {
     TextureLoadingQueue::GetInstance().ProcessQueue();
     _renderer.RenderTextureLoadingProgress();
 
-#ifdef __EMSCRIPTEN__
     UpdateSearchNearestPlanet();
-#endif
 #ifdef SOLARSYSTEM_USE_SDL_MIXER
     UpdateBackgroundMusic();
 #endif
 
     glfwSwapBuffers(_mainWindow);
     glfwPollEvents();
+    EndFrame();
+}
 
+void Application::EndFrame() {
+    _fpsHandler.EndFrame();
 #ifndef __EMSCRIPTEN__
-    _fpsHandler.WaitForFrameTimer();
+    // With vsync on, the swap already paces the loop; the limiter only caps an unsynced one.
+    if (!_isVertSyncEnabled) {
+        _fpsHandler.WaitForFrameTimer();
+    }
 #endif
 }
 
@@ -201,7 +208,7 @@ void Application::InitScene() {
 void Application::UpdateLoadingProgress() {
 #ifdef __EMSCRIPTEN__
     const int loaded = _totalResources - _resourcesPending;
-    NotifyLoadingProgress(loaded, _totalResources);
+    NotifyLoadingProgress(loaded, _totalResources, _resourcesFailed);
 #endif
 }
 
@@ -294,9 +301,11 @@ void Application::FocusPlanetByIndex(int idx) {
             target = found->GetPosition();
             focusRadius = std::max(found->GetRadius() * 4.0f, 2.0f);
         } else {
-            // Not loaded yet (web staged loading): fly to where the ephemeris says it is.
+            // Not loaded yet (web staged loading): fly to where the ephemeris says it is, and
+            // start its download now rather than when the camera arrives.
             target = OrbitLayout::GetRenderPosition(body);
             focusRadius = 20.0f;
+            ActivatePlanetSystem(body);
         }
     }
 
@@ -317,8 +326,12 @@ int Application::GetFocusedPlanetIndex() const {
 }
 
 void Application::StopMissionFollow() {
+    const bool wasFocused = _focusedMissionIndex >= 0;
     _missionFollowActive = false;
     _focusedMissionIndex = -1;
+    if (wasFocused) {
+        NotifyMissionFocused(-1);
+    }
 }
 
 bool Application::SampleMissionHeliocentricPosition(int idx, glm::dvec3& outScene) const {
@@ -405,6 +418,7 @@ void Application::FocusMissionByIndex(int idx) {
     _focusedPlanetIndex = -1;
     _focusedMissionIndex = idx;
     _missionFollowActive = true;
+    NotifyMissionFocused(idx);
 
     glm::vec3 target(0.0f);
     if (!SampleMissionScenePosition(idx, target)) {
@@ -550,64 +564,34 @@ int Application::GetNearestPlanetIndexForJs() const {
     if (_nearestPlanetIndex < 0) {
         return -1;
     }
-    return static_cast<int>(_nearestPlanetIndex) + 1;
+    return _nearestPlanetIndex + 1;
 }
 
 void Application::StartSearchNearestPlanet() {
     _isSearchNearestPlanet = true;
-
-#ifdef __EMSCRIPTEN__
-    _nearestPlanetSearchFrameCounter = 0;
-#else
-    auto searchNearestPlanet = [=]() {
-        return min_element(_renderableSceneComponents.begin(), _renderableSceneComponents.end(),
-                           [=](const RenderableSceneComponent& left, const RenderableSceneComponent& right)
-        {
-            return CalculateSpaceObjectDistance(left.planet.get()) < CalculateSpaceObjectDistance(right.planet.get());
-        });
-    };
-
-    _searchNearestPlanetThread = make_unique<thread>([=]() {
-        while (_isSearchNearestPlanet) {
-            auto nearestPlanetIt = searchNearestPlanet();
-            if (nearestPlanetIt != _renderableSceneComponents.end()) {
-                _nearestPlanetIndex = distance(_renderableSceneComponents.begin(), nearestPlanetIt);
-            } else {
-                _nearestPlanetIndex = -1;
-            }
-
-            this_thread::sleep_for(25ms);
-        }
-    });
-#endif
 }
 
 void Application::UpdateSearchNearestPlanet() {
-#ifdef __EMSCRIPTEN__
-    if (_isSearchNearestPlanet && ++_nearestPlanetSearchFrameCounter >= 60) {
-        _nearestPlanetSearchFrameCounter = 0;
-
-        auto nearestPlanetIt = min_element(_renderableSceneComponents.begin(), _renderableSceneComponents.end(),
-                           [this](const RenderableSceneComponent& left, const RenderableSceneComponent& right)
-        {
-            return CalculateSpaceObjectDistance(left.planet.get()) < CalculateSpaceObjectDistance(right.planet.get());
-        });
-
-        if (nearestPlanetIt != _renderableSceneComponents.end()) {
-            _nearestPlanetIndex = distance(_renderableSceneComponents.begin(), nearestPlanetIt);
-        } else {
-            _nearestPlanetIndex = -1;
-        }
+    // A min over a few dozen distances: cheap enough for every frame, and on the main thread
+    // it never races the planet list or the camera (it used to run on its own thread natively).
+    if (!_isSearchNearestPlanet) {
+        return;
     }
-#endif
-}
+    auto nearestPlanetIt = min_element(_renderableSceneComponents.begin(), _renderableSceneComponents.end(),
+                       [this](const RenderableSceneComponent& left, const RenderableSceneComponent& right)
+    {
+        return CalculateSpaceObjectDistance(left.planet.get()) < CalculateSpaceObjectDistance(right.planet.get());
+    });
 
-void Application::StopSearchNearestPlanet() {
-    _isSearchNearestPlanet = false;
-#ifndef __EMSCRIPTEN__
-    if (_searchNearestPlanetThread)
-        _searchNearestPlanetThread->join();
-#endif
+    const int previous = _nearestPlanetIndex;
+    if (nearestPlanetIt != _renderableSceneComponents.end()) {
+        _nearestPlanetIndex = static_cast<int>(distance(_renderableSceneComponents.begin(), nearestPlanetIt));
+    } else {
+        _nearestPlanetIndex = -1;
+    }
+    if (_nearestPlanetIndex != previous) {
+        NotifyNearestPlanetChanged(GetNearestPlanetIndexForJs());
+    }
 }
 
 float Application::CalculateSpaceObjectDistance(const SpaceObject* spaceObject) const {

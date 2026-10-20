@@ -90,26 +90,26 @@ void Application::LoadCoreResources() {
 
     _totalResources = static_cast<int>(coreResources.size());
     _resourcesPending = _totalResources;
+    _resourcesFailed = 0;
 
     std::cout << "Loading " << _totalResources << " core resources..." << std::endl;
     UpdateLoadingProgress();
 
     for (const auto& res : coreResources) {
-        auto finish = [this, virtualPath = res.virtualPath](bool success) {
-            _resourcesPending--;
-            if (!success) {
-                std::cerr << "[Loading] Failed to download required core resource: " << virtualPath << std::endl;
-            }
-            UpdateLoadingProgress();
-        };
-        WebResourceFetcher::DownloadFile(res.url, res.virtualPath,
-            [res, finish](bool success) {
-                if (success || res.fallbackUrl.empty()) {
-                    finish(success);
-                    return;
+        std::vector<std::string> urls{res.url};
+        if (!res.fallbackUrl.empty()) {
+            urls.push_back(res.fallbackUrl);
+        }
+        // A face the deployment lacks keeps its preloaded placeholder (KeptResident); only a
+        // resource with no copy anywhere counts as failed.
+        WebResourceFetcher::DownloadWithFallback(std::move(urls), res.virtualPath,
+            [this, virtualPath = res.virtualPath](WebResourceFetcher::FetchOutcome outcome) {
+                _resourcesPending--;
+                if (outcome == WebResourceFetcher::FetchOutcome::Failed) {
+                    _resourcesFailed++;
+                    std::cerr << "[Loading] Failed to download required core resource: " << virtualPath << std::endl;
                 }
-                std::cerr << "[Loading] " << res.url << " unavailable; trying " << res.fallbackUrl << std::endl;
-                WebResourceFetcher::DownloadFile(res.fallbackUrl, res.virtualPath, finish);
+                UpdateLoadingProgress();
             });
     }
 }

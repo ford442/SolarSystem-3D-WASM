@@ -35,15 +35,15 @@ QualityTierSettings GetQualitySettings(int preset, bool mobile) {
     // rather than shader cost decides.
     if (mobile) {
         switch (preset) {
-            case 0: return {1024, 0, 0, false, false, 0, 400, 0, TextureLodTier::Low, false, 0, false, 0, 500, "low"};
-            case 1: return {2048, 2, 0, true, true, 1, 900, 400, TextureLodTier::Mid, true, 8, false, 0, 1500, "medium"};
-            default: return {3000, 2, 0, true, true, 1, 1400, 800, TextureLodTier::High, true, 12, true, 16, 2500, "full"};
+            case 0: return {1024, 0, 0, false, false, 0, 400, 0, TextureLodTier::Low, false, 0, false, 0, 500, 3, "low"};
+            case 1: return {2048, 2, 0, true, true, 1, 900, 400, TextureLodTier::Mid, true, 8, false, 0, 1500, 3, "medium"};
+            default: return {3000, 2, 0, true, true, 1, 1400, 800, TextureLodTier::High, true, 12, true, 16, 2500, 4, "full"};
         }
     }
     switch (preset) {
-        case 0: return {1024, 0, 0, false, false, 0, 600, 0, TextureLodTier::Low, false, 0, false, 0, 500, "low"};
-        case 1: return {2048, 2, 0, true, true, 1, 1800, 800, TextureLodTier::Mid, true, 8, true, 16, 2000, "medium"};
-        default: return {3000, 4, 4, true, true, 2, 4000, 2000, TextureLodTier::High, true, 16, true, 32, 5000, "full"};
+        case 0: return {1024, 0, 0, false, false, 0, 600, 0, TextureLodTier::Low, false, 0, false, 0, 500, 3, "low"};
+        case 1: return {2048, 2, 0, true, true, 1, 1800, 800, TextureLodTier::Mid, true, 8, true, 16, 2000, 4, "medium"};
+        default: return {3000, 4, 4, true, true, 2, 4000, 2000, TextureLodTier::High, true, 16, true, 32, 5000, 5, "full"};
     }
 }
 

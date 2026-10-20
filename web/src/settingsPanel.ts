@@ -481,9 +481,15 @@ export function initSettingsPanel(options: SettingsPanelInitOptions): void {
     });
     subscribeSettingsChanges((field) => {
         syncFieldFromRuntime(field);
-        if (field === 'simulationEpoch') {
+        if (field === 'simulationEpoch' || field === 'observeMode' || field === 'observeSite') {
             skyEvent.refresh();
         }
     });
-    window.setInterval(() => skyEvent.refresh(), 2000);
+    // Settings arrive as events; this tick is only for the chip, which goes stale as simulated
+    // time runs past the event (nothing signals that). The C++ side caches the search.
+    window.setInterval(() => {
+        if (!document.hidden) {
+            skyEvent.refresh();
+        }
+    }, 2000);
 }

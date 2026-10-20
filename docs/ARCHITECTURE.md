@@ -207,9 +207,19 @@ Every frame, `UpdatePlanetSystemLoading()` checks camera distance:
 
 ```
 NOT_LOADED + dist < activationRadius
-    → DOWNLOADING (async WebResourceFetcher::DownloadFile per asset)
+    → DOWNLOADING (async WebResourceFetcher::DownloadWithFallback per asset)
     → pendingDownloads == 0 → initFunc() (e.g. InitEarthSystem()) → READY
 ```
+
+Two paths skip the distance test: `ActivateNearestPlanetSystems()` starts the
+`eagerPlanetSystems` systems nearest the start pose (3 on Low; see `QualityTierSettings`) as
+soon as the manifest loads, and `FocusPlanetByIndex()` (UI focus, deep links) starts the focused
+body's system immediately instead of when the camera arrives.
+
+`DownloadFile` reports the transfer's own result; a second request for a path already in flight
+joins it. `DownloadWithFallback` tries each URL in turn and, when all fail but the path is
+resident (the `--preload-file` placeholder tier), reports `KeptResident` instead of `Failed` —
+the fetch is still made, because the deployed copy is what replaces the 4×4 placeholder.
 
 While `NOT_LOADED` or `DOWNLOADING`, `RenderPlanetProxyMarkers()` draws 3D labels such as `Earth (approach to load)` or `Earth [downloading 42%]`.
 
@@ -638,7 +648,7 @@ the `XRWebGLLayer`'s framebuffer.
 | Task | Native | Web |
 |------|--------|-----|
 | Background music | `std::thread` | `UpdateBackgroundMusic()` per frame |
-| Nearest-planet search | `std::thread` | `UpdateSearchNearestPlanet()` every 60 frames |
+| Nearest-planet search | `UpdateSearchNearestPlanet()` every frame, main thread | same |
 
 ### 9.4 Texture path helper
 

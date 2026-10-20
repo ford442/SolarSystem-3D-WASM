@@ -48,6 +48,14 @@ TEST(QualitySettingsTest, ObserveStarCountGrowsWithTier) {
     }
 }
 
+TEST(QualitySettingsTest, EveryTierLoadsTheNearestThreeSystemsEagerly) {
+    for (const bool mobile : {false, true}) {
+        EXPECT_EQ(GetQualitySettings(0, mobile).eagerPlanetSystems, 3);
+        EXPECT_LE(GetQualitySettings(0, mobile).eagerPlanetSystems, GetQualitySettings(1, mobile).eagerPlanetSystems);
+        EXPECT_LE(GetQualitySettings(1, mobile).eagerPlanetSystems, GetQualitySettings(2, mobile).eagerPlanetSystems);
+    }
+}
+
 TEST(QualitySettingsTest, DesktopPresetMapping) {
     ExpectTier(GetQualitySettings(0, false), 1024, 0, 0, false, false, 0, 600, TextureLodTier::Low, "low");
     ExpectTier(GetQualitySettings(1, false), 2048, 2, 0, true, true, 1, 1800, TextureLodTier::Mid, "medium");

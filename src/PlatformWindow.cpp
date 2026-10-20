@@ -65,6 +65,24 @@ void glfwErrorCallback(int error, const char* description) {
     std::cerr << "GLFW Error (" << error << "): " << description << std::endl;
 }
 
+#ifndef __EMSCRIPTEN__
+namespace {
+bool GlDebugRequested() {
+    const char* value = std::getenv("SOLARSYSTEM_GL_DEBUG");
+    return value && *value && std::string(value) != "0";
+}
+
+void GLAPIENTRY GlDebugCallback(GLenum /*source*/, GLenum type, GLuint id, GLenum severity, GLsizei /*length*/,
+                                const GLchar* message, const void* /*userParam*/) {
+    if (severity == GL_DEBUG_SEVERITY_NOTIFICATION) {
+        return;
+    }
+    std::cerr << "[GL debug] " << (type == GL_DEBUG_TYPE_ERROR ? "error" : "message") << " 0x" << std::hex << id
+              << std::dec << ": " << message << std::endl;
+}
+} // namespace
+#endif
+
 void Application::InitSystems() {
     ios_base::sync_with_stdio(false);
     cin.tie(nullptr);
@@ -103,6 +121,8 @@ void Application::InitSystems() {
     glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 6);
     glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
     glfwWindowHint(GLFW_SAMPLES, qualitySettings.requestedMsaaSamples);
+    // SOLARSYSTEM_GL_DEBUG=1: KHR_debug context; every non-notification message goes to stderr.
+    glfwWindowHint(GLFW_OPENGL_DEBUG_CONTEXT, GlDebugRequested() ? GLFW_TRUE : GLFW_FALSE);
 #endif
 
     glfwWindowHint(GLFW_VISIBLE, GLFW_FALSE);
@@ -173,8 +193,11 @@ void Application::InitSystems() {
 
     // The UI reports _isVertSyncEnabled from startup, but only the F-key toggle used to
     // call through to the driver — so the reported state could disagree with reality
-    // until the user pressed it. Apply the initial state here instead.
+    // until the user pressed it. Apply the initial state here instead. Web applies it in
+    // Exec(): there the swap interval is main-loop timing, which needs the loop to exist.
+#ifndef __EMSCRIPTEN__
     VertSync(_isVertSyncEnabled);
+#endif
 
     GetGlCapabilities(); // Probed once here (context is current); logs its findings.
     SelectTexturePack();  // Decide which texture pack every later asset path resolves to.
@@ -193,6 +216,13 @@ void Application::InitSystems() {
 #ifndef __EMSCRIPTEN__
     glewExperimental = true;
     glewInit();
+
+    if (GlDebugRequested() && glDebugMessageCallback) {
+        glEnable(GL_DEBUG_OUTPUT);
+        glEnable(GL_DEBUG_OUTPUT_SYNCHRONOUS);
+        glDebugMessageCallback(GlDebugCallback, nullptr);
+        std::cout << "[GL debug] KHR_debug output enabled" << std::endl;
+    }
 
     if (const char* selfTest = std::getenv("SOLARSYSTEM_SHADER_SELFTEST"); selfTest && *selfTest && std::string(selfTest) != "0") {
         const int failures = Shader::SelfTestDirectory("resource/shaders");
@@ -257,6 +287,12 @@ void Application::InitSystems() {
 }
 
 void Application::Dispose() {
+    // Order matters: every destructor below issues glDelete*, so the scene and renderer go
+    // while the context is still current; then the worker threads; only then the window
+    // system and the context with it.
+    ReleaseGpuResources();
+    StopPlayBackgroundMusic();
+
     glfwTerminate();
 
 #ifndef __EMSCRIPTEN__
@@ -264,14 +300,22 @@ void Application::Dispose() {
 #endif
 
     IMG_Quit();
-    StopSearchNearestPlanet();
-    StopPlayBackgroundMusic();
 
 #ifdef SOLARSYSTEM_USE_SDL_MIXER
     Mix_CloseAudio();
 #elif !defined(__EMSCRIPTEN__)
     _soundEngine->drop();
 #endif
+}
+
+void Application::ReleaseGpuResources() {
+    _renderableSceneComponents.clear();
+    _planetSystemManifests.clear();
+    _sun.reset();
+    _asteroidField.reset();
+    _kuiperField.reset();
+    _sphereModel.reset();
+    _renderer.Release();
 }
 
 void Application::DisplaySystemInformation() const {
@@ -333,12 +377,7 @@ void Application::HandleResize(int width, int height) {
     _displayWidth = static_cast<uint16_t>(width);
     _displayHeight = static_cast<uint16_t>(height);
     _camera.SetAspect(static_cast<float>(width) / static_cast<float>(height));
-    if (_renderer.hdr) {
-        _renderer.hdr->Resize(_displayWidth, _displayHeight);
-    }
-    if (_renderer.magneticFieldBloom) {
-        _renderer.magneticFieldBloom->Resize(_displayWidth, _displayHeight);
-    }
+    _renderer.Resize(_displayWidth, _displayHeight);
     glViewport(0, 0, width, height);
 }
 

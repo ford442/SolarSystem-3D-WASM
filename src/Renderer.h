@@ -3,6 +3,7 @@
 #include "ApplicationTypes.h"
 #include "SystemModules.h"
 #include "Solar_System/ObserveSky.h"
+#include <array>
 #include <deque>
 #include <functional>
 #include <string>
@@ -29,6 +30,10 @@ public:
 
     /** Build shaders + GPU resources sized to the current display/quality settings. */
     void Init();
+    /** Follow a framebuffer resize: HUD projection and the screen-sized render targets. */
+    void Resize(uint16_t width, uint16_t height);
+    /** Delete every GPU resource Init() built. Needs the GL context still current. */
+    void Release();
     /** Atmosphere/corona effect levels from a quality tier (preset changes call this too). */
     void ApplyEffectQuality(const QualityTierSettings& settings);
 
@@ -117,6 +122,8 @@ public:
     // by PlanetSystemLoader.cpp's proxy-marker text pass, which draws after these are set.
     glm::mat4 cameraProjection = glm::mat4();
     glm::mat4 cameraView = glm::mat4();
+    // Screen-space text (hints, texture-upgrade progress); follows the framebuffer via Resize().
+    glm::mat4 hudProjection = glm::mat4(1.0f);
 
 private:
     void ShadowMapPass(const RenderableSceneComponent& component);
@@ -155,6 +162,9 @@ private:
     mutable std::deque<std::wstring> gpuHintCache;
     mutable std::deque<std::wstring> soundVolumeHintCache;
     mutable std::deque<std::wstring> tmpStringCache;
+    // RenderTextureLoadingProgress: the hint and the counters it was built from.
+    mutable std::deque<std::wstring> loadingHintCache;
+    mutable std::array<int, 4> loadingHintCounters{};
 
     Application& _app;
 };
