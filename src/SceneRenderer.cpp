@@ -143,47 +143,50 @@ glm::vec3 Renderer::CameraWorldPosition() const {
     return glm::vec3(glm::inverse(cameraView)[3]);
 }
 
-void Renderer::PlaceSceneComponents() {
-    const float timeScale = gSimState->timePaused ? 0.0f : gSimState->timeScale;
+void Renderer::BeginFrame() {
+    _configuredView = -1;
+    stats = FramePasses::Stats{};
+}
 
-    for (auto& component : _app._renderableSceneComponents) {
-        component.planet->AdjustToParent(timeScale);
-        for (const auto& satellite : component.satellites) {
-            satellite->AdjustToParent(timeScale);
-        }
-        if (component.clouds) {
-            component.clouds->AdjustToParent(timeScale);
-        }
-        for (const auto& renderableAtmosphere : component.atmospheres) {
-            // Before AdjustToParent: the two paths draw different shell sizes.
-            renderableAtmosphere.atmosphere->SetPhysicalPathActive(pbrAtmosphereSteps > 0 && pbrAtmosphereShader);
-            renderableAtmosphere.atmosphere->AdjustToParent();
-        }
-        if (component.planetaryRing) {
-            component.planetaryRing->AdjustToParent();
-        }
+void Renderer::BeginView(int view) {
+#ifdef __EMSCRIPTEN__
+    if (_app._xr.active) {
+        _app._xr.currentEye = view;
+        const auto& eye = _app._xr.eyes[view];
+        glViewport(eye.viewportX, eye.viewportY, eye.viewportWidth, eye.viewportHeight);
+    } else
+#endif
+    {
+        glViewport(0, 0, _app._displayWidth, _app._displayHeight);
+    }
+    // The per-view uniforms only change with the view; a shadow pass in between leaves them.
+    if (view != _configuredView) {
+        ConfigureMainShaders();
+        _configuredView = view;
+        ++stats.viewBinds;
     }
 }
 
-void Renderer::ProcessSceneComponentsRendering() {
-    // Place bodies once per frame (shadow + color passes only render).
-    PlaceSceneComponents();
-
-    for (auto& component : _app._renderableSceneComponents) {
-        // Shadow frustum tracks the planet's current heliocentric position.
-        const float extent = component.planet->GetRadius() * 3.0f;
-        const glm::mat4 lightProjection = glm::ortho(-extent, extent, -extent, extent, _app._camera.GetNear(), _app._camera.GetFar());
-        // Built in double: the eye is the Sun, tens of thousands of units from the render
-        // origin on realistic scale, and a float lookAt folds that into the light-space x/y
-        // the shadow lookup reads. In double those reduce to the planet's own small offset.
-        const glm::mat4 lightView(glm::lookAt(glm::dvec3(_app._sun->GetPosition()),
-                                              glm::dvec3(component.planet->GetPosition()),
-                                              glm::dvec3(0.0, 1.0, 0.0)));
-        component.lightSpaceMatrix = lightProjection * lightView;
-
-        ShadowMapPass(component);
-        RenderPass(component);
+void Renderer::RenderBackground() {
+    if (_app._observe.active) {
+        // Ground-level sky pass only: no scene meshes, orbit lines, glow or lens flare.
+        RenderObserveSky();
+        return;
     }
+    skyBox->Render(*mainSkyBoxShader);
+    RenderOrbitPaths();
+    RenderMissionPaths();
+    RenderXrPointers();
+    RenderStarCorona();
+}
+
+void Renderer::RenderForeground() {
+    if (_app._observe.active) {
+        return;
+    }
+    RenderStarCoronaVolume();
+    RenderAsteroidField();
+    RenderMagneticFields();
 }
 
 void Renderer::ShadowMapPass(const RenderableSceneComponent& component) {
@@ -211,6 +214,7 @@ void Renderer::ShadowMapPass(const RenderableSceneComponent& component) {
         return;
     }
 
+    ++stats.shadowPasses;
     shadowMapShader->Use();
     shadowMapShader->SetMat4("lightSpaceMatrix", component.lightSpaceMatrix);
 
@@ -227,15 +231,8 @@ void Renderer::ShadowMapPass(const RenderableSceneComponent& component) {
 }
 
 void Renderer::RenderPass(const RenderableSceneComponent& component) {
-#ifdef __EMSCRIPTEN__
-    if (_app._xr.active && _app._xr.currentEye >= 0 && _app._xr.currentEye < 2) {
-        const auto& eye = _app._xr.eyes[_app._xr.currentEye];
-        glViewport(eye.viewportX, eye.viewportY, eye.viewportWidth, eye.viewportHeight);
-    } else
-#endif
-    {
-        glViewport(0, 0, _app._displayWidth, _app._displayHeight);
-    }
+    // BeginView set this view's viewport after the shadow pass changed it.
+    ++stats.componentDraws;
     mainPlanetShader->Use();
 
     ConfigureMainPlanetShader(component);

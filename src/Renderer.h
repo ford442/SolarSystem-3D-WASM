@@ -2,6 +2,7 @@
 #define SOLARSYSTEM_RENDERER_H
 #include "ApplicationTypes.h"
 #include "SystemModules.h"
+#include "FramePasses.h"
 #include "Solar_System/ObserveSky.h"
 #include <array>
 #include <deque>
@@ -38,9 +39,21 @@ public:
     void ApplyEffectQuality(const QualityTierSettings& settings);
 
     void ConfigureMainShaders();
-    /** Re-derive every body's render-frame placement from the ephemeris (no drawing). */
-    void PlaceSceneComponents();
-    void ProcessSceneComponentsRendering();
+
+    // One frame, as FramePasses::Run orders it. The passes only read scene state: everything
+    // that moves (placement, light matrices, belts, LOD) happened in Application::UpdateScene.
+    void BeginFrame();
+    /** Bind view `view` (0 = mono / left eye): its viewport, and its matrices on first use. */
+    void BeginView(int view);
+    void RenderBackground();
+    void ShadowMapPass(const RenderableSceneComponent& component);
+    void RenderPass(const RenderableSceneComponent& component);
+    void RenderForeground();
+    /** Whether atmospheres with LUTs should take the physical path this frame. */
+    bool PhysicalAtmosphereAvailable() const { return pbrAtmosphereSteps > 0 && pbrAtmosphereShader != nullptr; }
+    /** This frame's pass counts (reset by BeginFrame). */
+    FramePasses::Stats stats;
+
     void ProcessStarRendering();
     /** Flat corona billboard (Low, or coronaSlices == 0); drawn before the planets. */
     void RenderStarCorona() const;
@@ -126,8 +139,6 @@ public:
     glm::mat4 hudProjection = glm::mat4(1.0f);
 
 private:
-    void ShadowMapPass(const RenderableSceneComponent& component);
-    void RenderPass(const RenderableSceneComponent& component);
     void RenderAtmospheres(const RenderableSceneComponent& component) const;
     /** Compass points and body/star names projected onto `_observeFrame`; `textScale` grows them for a headset. */
     void RenderObserveLabels(float width, float height, float textScale);
@@ -166,6 +177,7 @@ private:
     mutable std::deque<std::wstring> loadingHintCache;
     mutable std::array<int, 4> loadingHintCounters{};
 
+    int _configuredView = -1; // view whose matrices ConfigureMainShaders last uploaded
     Application& _app;
 };
 

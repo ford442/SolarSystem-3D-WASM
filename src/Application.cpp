@@ -102,10 +102,6 @@ void Application::RunOneFrame() {
         gSimState->simDeltaSeconds = gSimState->timePaused ? 0.0f : static_cast<float>(_deltaTime) * gSimState->timeScale;
         OrbitLayout::Advance(gSimState->simDeltaSeconds);
     }
-#ifdef __EMSCRIPTEN__
-    RefreshPlanetProxyPositions();
-#endif
-
     _camera.UpdateTransition(_deltaTime);
     UpdateMissionFollow();
 
@@ -113,7 +109,6 @@ void Application::RunOneFrame() {
     // After everything that moves the camera this frame, before anything reads positions.
     UpdateRenderOrigin();
     UpdatePlanetSystemLoading();
-    UpdateLOD();
     UpdateMusicDucking();
 
 #ifdef __EMSCRIPTEN__
@@ -123,7 +118,6 @@ void Application::RunOneFrame() {
 #ifdef SOLARSYSTEM_USE_SDL_MIXER
         UpdateBackgroundMusic();
 #endif
-        UpdateSearchNearestPlanet();
         glfwPollEvents();
         EndFrame();
         return;
@@ -132,7 +126,7 @@ void Application::RunOneFrame() {
 
     glBindFramebuffer(GL_FRAMEBUFFER, DefaultFramebuffer());
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-    RenderFrameContent();
+    RenderFrame(1);
 
     if (_observe.active) {
         _renderer.RenderObserveHud();
@@ -146,7 +140,6 @@ void Application::RunOneFrame() {
     TextureLoadingQueue::GetInstance().ProcessQueue();
     _renderer.RenderTextureLoadingProgress();
 
-    UpdateSearchNearestPlanet();
 #ifdef SOLARSYSTEM_USE_SDL_MIXER
     UpdateBackgroundMusic();
 #endif
@@ -166,30 +159,87 @@ void Application::EndFrame() {
 #endif
 }
 
-void Application::RenderFrameContent() {
+void Application::UpdateScene(double julianDate) {
+    ++_renderer.stats.sceneUpdates;
+    RefreshPlanetProxyPositions();
+    if (_sun) {
+        _sun->TakeStarSystemCenter();
+    }
+    PlaceSceneComponents();
+
+    for (auto& component : _renderableSceneComponents) {
+        // Shadow frustum tracks the planet's current heliocentric position.
+        const float extent = component.planet->GetRadius() * 3.0f;
+        const glm::mat4 lightProjection = glm::ortho(-extent, extent, -extent, extent, _camera.GetNear(), _camera.GetFar());
+        // Built in double: the eye is the Sun, tens of thousands of units from the render
+        // origin on realistic scale, and a float lookAt folds that into the light-space x/y
+        // the shadow lookup reads. In double those reduce to the planet's own small offset.
+        const glm::mat4 lightView(glm::lookAt(glm::dvec3(_sun->GetPosition()),
+                                              glm::dvec3(component.planet->GetPosition()),
+                                              glm::dvec3(0.0, 1.0, 0.0)));
+        component.lightSpaceMatrix = lightProjection * lightView;
+    }
+
+    if (_asteroidField) {
+        _asteroidField->Update(julianDate);
+    }
+    if (_kuiperField) {
+        _kuiperField->Update(julianDate);
+    }
+    UpdateLOD();
+    UpdateSearchNearestPlanet();
+    // Warm the lazily searched caches here so no pass is the one that pays for a search.
+    GetNextSkyEvent();
     if (_observe.active) {
-        // Ground-level sky pass only: no scene meshes, orbit lines, glow or lens flare.
-        _renderer.RenderObserveSky();
-        return;
+        CurrentObserveSky();
     }
-    _renderer.ConfigureMainShaders();
-    _renderer.skyBox->Render(*_renderer.mainSkyBoxShader);
-    _renderer.RenderOrbitPaths();
-    _renderer.RenderMissionPaths();
-    _renderer.RenderXrPointers();
-    _renderer.RenderStarCorona();
-    _renderer.ProcessSceneComponentsRendering();
-    _renderer.RenderStarCoronaVolume();
-    _renderer.RenderAsteroidField();
-    _renderer.RenderMagneticFields();
+}
+
+void Application::PlaceSceneComponents() {
+    const bool physicalAtmosphere = _renderer.PhysicalAtmosphereAvailable();
+    for (auto& component : _renderableSceneComponents) {
+        component.planet->AdjustToParent();
+        for (const auto& satellite : component.satellites) {
+            satellite->AdjustToParent();
+        }
+        if (component.clouds) {
+            component.clouds->AdjustToParent();
+        }
+        for (const auto& renderableAtmosphere : component.atmospheres) {
+            // Before AdjustToParent: the two paths draw different shell sizes.
+            renderableAtmosphere.atmosphere->SetPhysicalPathActive(physicalAtmosphere);
+            renderableAtmosphere.atmosphere->AdjustToParent();
+        }
+        if (component.planetaryRing) {
+            component.planetaryRing->AdjustToParent();
+        }
+    }
+}
+
+void Application::RenderFrame(int viewCount) {
 #ifdef __EMSCRIPTEN__
-    if (!_xr.active) {
-        RenderPlanetProxyMarkers();
-        _renderer.RenderStarEffects();
-    }
+    const bool mono = !_xr.active;
 #else
-    _renderer.RenderStarEffects();
+    const bool mono = true;
 #endif
+    FramePasses::Hooks hooks;
+    hooks.updateScene = [this]() -> std::size_t {
+        _renderer.BeginFrame();
+        UpdateScene(OrbitLayout::GetJulianDate());
+        return _observe.active ? 0 : _renderableSceneComponents.size();
+    };
+    hooks.beginView = [this](int view) { _renderer.BeginView(view); };
+    hooks.background = [this](int) { _renderer.RenderBackground(); };
+    hooks.shadowPass = [this](std::size_t component) { _renderer.ShadowMapPass(_renderableSceneComponents[component]); };
+    hooks.drawComponent = [this](int, std::size_t component) { _renderer.RenderPass(_renderableSceneComponents[component]); };
+    hooks.foreground = [this, mono](int) {
+        _renderer.RenderForeground();
+        if (mono && !_observe.active) {
+            RenderPlanetProxyMarkers();
+            _renderer.RenderStarEffects();
+        }
+    };
+    FramePasses::Run(viewCount, hooks);
 }
 
 
@@ -399,9 +449,9 @@ void Application::MoveRenderOrigin(const glm::dvec3& origin) {
     if (_sun) {
         _sun->TakeStarSystemCenter();
     }
-    // Re-place the bodies now rather than at draw time: the LOD manager and staged loading
-    // compare them with the (already shifted) camera before this frame draws.
-    _renderer.PlaceSceneComponents();
+    // Re-place the bodies now rather than in UpdateScene: staged loading compares them with
+    // the (already shifted) camera before this frame's UpdateScene runs.
+    PlaceSceneComponents();
     RefreshPlanetProxyPositions();
     _renderer.RebuildMissionPaths();
 }

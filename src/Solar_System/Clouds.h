@@ -17,7 +17,7 @@ struct CloudsInfo {
 class Clouds : public OuterShell {
 public:
     explicit Clouds(CloudsInfo&& cloudsInfo, std::shared_ptr<SpaceObject> parent);
-    void AdjustToParent(float timeScale) = 0;
+    void AdjustToParent() = 0;
     void LoadHighResIfClose(const glm::vec3& cameraPosition);
 
 protected:

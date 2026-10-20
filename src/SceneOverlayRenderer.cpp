@@ -265,16 +265,14 @@ void Renderer::RenderAsteroidField() {
         return;
     }
 
-    _app._asteroidField->Update(gSimState->simDeltaSeconds);
-
-    static const float zCoef = static_cast<float>(2.0 / glm::log2(_app._camera.GetFar() + 1.0));
+    // Advanced once per frame by Application::UpdateScene; this pass only draws.
+    const float zCoef = static_cast<float>(2.0 / glm::log2(_app._camera.GetFar() + 1.0));
     _app._asteroidField->Render(cameraProjection, cameraView,
                            _app._sun->GetPosition(), _app._camera.GetPosition(),
                            _app._camera.GetRightVector(), _app._camera.GetUpVector(),
                            zCoef);
 
     if (_app._kuiperField) {
-        _app._kuiperField->Update(gSimState->simDeltaSeconds);
         _app._kuiperField->Render(cameraProjection, cameraView,
                                   _app._sun->GetPosition(), _app._camera.GetPosition(),
                                   _app._camera.GetRightVector(), _app._camera.GetUpVector(),

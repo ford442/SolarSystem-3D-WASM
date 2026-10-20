@@ -31,7 +31,7 @@ struct PlanetInfo {
 class Planet : public SpaceObject {
 public:
     explicit Planet(const PlanetInfo& planetInfo, std::shared_ptr<Star> parentStar);
-    virtual void AdjustToParent(float timeScale = 0.0f) = 0;
+    virtual void AdjustToParent() = 0;
     float GetRadius() const;
     float GetEarthSizeCoefficient() const;
     virtual void LoadHighResIfClose(const glm::vec3& /*cameraPos*/) { } // Default: no-op

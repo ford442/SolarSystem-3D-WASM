@@ -18,7 +18,7 @@ public:
     CatalogSatellite(SatelliteInfo&& satelliteInfo, std::shared_ptr<SpaceObject> parent,
                      const BodyCatalog::Entry& entry);
 
-    void AdjustToParent(float timeScale) override;
+    void AdjustToParent() override;
     void Render() const override;
 
     bool IsEphemerisPlaced() const override { return _ephemerisPlaced; }

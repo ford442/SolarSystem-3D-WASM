@@ -71,15 +71,14 @@ void Application::RenderXrStereoFrame() {
     }
     const int eyes = std::clamp(_xr.eyeCount, 0, 2);
     for (int eye = 0; eye < eyes; ++eye) {
-        _xr.currentEye = eye;
         const auto& e = _xr.eyes[eye];
-        glViewport(e.viewportX, e.viewportY, e.viewportWidth, e.viewportHeight);
         glEnable(GL_SCISSOR_TEST);
         glScissor(e.viewportX, e.viewportY, e.viewportWidth, e.viewportHeight);
         glClear(GL_DEPTH_BUFFER_BIT);
         glDisable(GL_SCISSOR_TEST);
-        RenderFrameContent();
     }
+    // One simulation step, then both eyes per pass (each shadow map rendered once).
+    RenderFrame(eyes);
     _xr.currentEye = 0;
 }
 #endif

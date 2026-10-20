@@ -2,6 +2,7 @@
 #define SOLARSYSTEM_APPLICATION_H
 #include "ApplicationTypes.h"
 #include "ObserveState.h"
+#include "FramePasses.h"
 #include "Renderer.h"
 #include "SimState.h"
 #include "Auxiliary_Modules/AuxiliaryModules.h"
@@ -247,7 +248,17 @@ private:
 #ifdef __EMSCRIPTEN__
     float _reportedMusicDuck = 1.0f;
 #endif
-    void RenderFrameContent(); // Sky → planets → effects (one eye / mono)
+    /**
+     * Everything that moves this frame, once, before any pass: body placement and light
+     * matrices, the belts, proxy markers, LOD, the nearest-planet search and the sky-event
+     * caches. The render passes after it only read scene state (so an XR frame, which draws
+     * twice, still simulates once).
+     */
+    void UpdateScene(double julianDate);
+    /** Re-derive every body's render-frame placement from the ephemeris (no drawing). */
+    void PlaceSceneComponents();
+    /** Simulate once, then draw the scene into `viewCount` views (1 mono, 2 XR) — see FramePasses.h. */
+    void RenderFrame(int viewCount);
     void EndFrame();           // Count the frame for the FPS HUD; native: apply the frame limiter
 #ifdef __EMSCRIPTEN__
     void RenderXrStereoFrame();

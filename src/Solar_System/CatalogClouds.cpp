@@ -12,7 +12,7 @@ CatalogClouds::CatalogClouds(CloudsInfo&& cloudsInfo, std::shared_ptr<SpaceObjec
                         parentEntry.cloudLayer.diffuse ? parentEntry.cloudLayer.diffuse : "Clouds");
 }
 
-void CatalogClouds::AdjustToParent(float /*timeScale*/) {
+void CatalogClouds::AdjustToParent() {
     // A function of the date, like the parent's spin, so a date jump doesn't leave the
     // cloud deck where the previous date had it.
     const float spinDegrees = SatelliteOrbit::SpinDegreesAt(_parentEntry.cloudLayer.spinDegPerSimSecond,

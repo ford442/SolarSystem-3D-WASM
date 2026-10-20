@@ -19,7 +19,6 @@ struct BodyData {
     float siderealRotationDays; // negative => retrograde
 };
 
-constexpr float kEarthYearDays = 365.25f;
 
 /** Art offset aligning the Earth diffuse map's prime meridian with GMST zero. */
 constexpr float kEarthPrimeMeridianOffsetDeg = 0.0f;

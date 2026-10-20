@@ -35,8 +35,12 @@ public:
     int GetActiveInstanceCount() const { return _activeCount; }
     int GetGeneratedCount() const { return static_cast<int>(_asteroids.size()); }
 
-    /** Advance mean anomalies / spin; rebuild instance matrices. */
-    void Update(float simDeltaSeconds);
+    /**
+     * Pose every rock and comet for `julianDate` and rebuild the instance matrices. A
+     * function of the date, not an accumulator: scrubbing the date jumps the belt with the
+     * planets, and calling it twice for one date (an XR frame, a scale change) moves nothing.
+     */
+    void Update(double julianDate);
 
     /**
      * Draw belt (one instanced call) then comet nuclei + tails.
@@ -68,6 +72,14 @@ private:
     int _activeCount = 0;
     std::vector<OrbitalElements> _asteroids;
     std::vector<OrbitalElements> _comets;
+    // Mean anomaly and spin phase of each body at _epochJd; Update() advances from these.
+    struct Phase {
+        float meanAnomalyRad;
+        float spinPhaseRad;
+    };
+    std::vector<Phase> _asteroidEpoch;
+    std::vector<Phase> _cometEpoch;
+    double _epochJd = 0.0;
     std::vector<InstanceGPU> _instanceData;
 
     GlVertexArray _rockVao;

@@ -36,7 +36,7 @@ CatalogBody::CatalogBody(PlanetInfo&& planetInfo, std::shared_ptr<Star> parentSt
 #endif
 }
 
-void CatalogBody::AdjustToParent(float /*timeScale*/) {
+void CatalogBody::AdjustToParent() {
     LoadIdentityModelMatrix();
     // Not _parentStar->GetPosition() + GetOffset(): that sum is two large floats on
     // realistic scale. The Sun is the simulation origin, so the render-frame position is

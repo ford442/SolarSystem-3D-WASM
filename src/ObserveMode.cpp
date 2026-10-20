@@ -153,22 +153,6 @@ void Application::UpdateObserveFrame() {
     // LOD manager, the nearest-planet search) behaving as if the viewer were there.
     const glm::vec3 earth = OrbitLayout::GetRenderPosition(OrbitLayout::Body::Earth);
     _camera.SetPosition(earth + glm::vec3(0.0f, ObserveState::kEarthSurfaceSceneUnits, 0.0f));
-
-    // Scene components are not drawn (so not re-placed) in Observe; keep Earth and its moons at
-    // today's ephemeris position so the LOD manager and the Moon's texture follow the viewer.
-    for (auto& component : _renderableSceneComponents) {
-        if (!component.planet) {
-            continue;
-        }
-        const std::wstring& wideName = component.planet->GetEngName();
-        if (OrbitLayout::BodyFromName(std::string(wideName.begin(), wideName.end())) != OrbitLayout::Body::Earth) {
-            continue;
-        }
-        component.planet->AdjustToParent(0.0f);
-        for (const auto& satellite : component.satellites) {
-            satellite->AdjustToParent(0.0f);
-        }
-    }
 }
 
 std::string Application::GetObserveStateJson() const {

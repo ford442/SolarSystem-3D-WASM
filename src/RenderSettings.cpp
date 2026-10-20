@@ -74,12 +74,7 @@ void Application::ApplyOrbitScaleMode(int mode) {
     // Compressed pins the render origin back to the Sun; realistic may need to rebase.
     UpdateRenderOrigin();
     RefreshPlanetProxyPositions();
-    if (_asteroidField) {
-        _asteroidField->Update(0.0f); // rebuild instance matrices for new AU→scene mapping
-    }
-    if (_kuiperField) {
-        _kuiperField->Update(0.0f);
-    }
+    // Belt instance matrices follow the new AU→scene mapping at the next UpdateScene.
     _renderer.RebuildMissionPaths();
     std::cout << "[OrbitScale] " << (scaleMode == OrbitLayout::ScaleMode::Realistic ? "realistic" : "compressed")
               << " distances active" << std::endl;

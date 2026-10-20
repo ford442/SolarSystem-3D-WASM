@@ -38,7 +38,7 @@ float Atmosphere::ShellScale() const {
     return _row->oneil.shellScale;
 }
 
-void Atmosphere::AdjustToParent(float /*timeScale*/) {
+void Atmosphere::AdjustToParent() {
     LoadIdentityModelMatrix();
     Translate(_parent->GetPosition());
     Scale(glm::vec3(ShellScale()));

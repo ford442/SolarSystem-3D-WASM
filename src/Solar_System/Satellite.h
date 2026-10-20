@@ -32,7 +32,7 @@ public:
     float GetRadius() const;
     float GetEarthSizeCoefficient() const;
     void LoadHighResIfClose(const glm::vec3& cameraPosition);
-    virtual void AdjustToParent(float timeScale) = 0;
+    virtual void AdjustToParent() = 0;
 
     /**
      * Whether this moon is currently placed from the ephemeris rather than from a circular

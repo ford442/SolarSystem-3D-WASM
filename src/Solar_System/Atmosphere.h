@@ -22,7 +22,7 @@ public:
     Atmosphere(const Atmosphere&) = delete;
     Atmosphere& operator=(const Atmosphere&) = delete;
 
-    void AdjustToParent(float timeScale = 0.0f) override;
+    void AdjustToParent() override;
 
     const BodyCatalog::AtmosphereRow& GetRow() const { return *_row; }
     glm::vec3 GetAtmosphereColor() const;

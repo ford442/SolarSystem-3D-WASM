@@ -22,7 +22,7 @@ public:
     CatalogBody(PlanetInfo&& planetInfo, std::shared_ptr<Star> parentStar,
                 const BodyCatalog::Entry& entry);
 
-    void AdjustToParent(float timeScale) override;
+    void AdjustToParent() override;
     void Render() const override;
     void LoadHighResIfClose(const glm::vec3& cameraPos) override;
     void UnloadHighResIfFar(const glm::vec3& cameraPos) override;

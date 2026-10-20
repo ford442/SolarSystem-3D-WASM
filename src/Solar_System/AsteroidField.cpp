@@ -51,6 +51,14 @@ AsteroidField::AsteroidField(uint32_t seed, int instanceCount, Population popula
     }
     _activeCount = std::clamp(instanceCount, 0, static_cast<int>(_asteroids.size()));
     _instanceData.resize(static_cast<size_t>(kMaxInstances));
+    // The generated phases are an arbitrary starting sky; pin them to today's date.
+    _epochJd = OrbitLayout::GetJulianDate();
+    for (const auto& el : _asteroids) {
+        _asteroidEpoch.push_back({el.meanAnomalyRad, el.spinPhaseRad});
+    }
+    for (const auto& el : _comets) {
+        _cometEpoch.push_back({el.meanAnomalyRad, el.spinPhaseRad});
+    }
 
     InitRockMesh();
     InitInstanceBuffer();
@@ -225,16 +233,28 @@ void AsteroidField::UploadInstances() const {
     glBindBuffer(GL_ARRAY_BUFFER, 0);
 }
 
-void AsteroidField::Update(float simDeltaSeconds) {
-    if (simDeltaSeconds != 0.0f) {
-        for (auto& el : _asteroids) {
-            el.meanAnomalyRad = std::fmod(el.meanAnomalyRad + el.meanMotionRadPerSec * simDeltaSeconds, kTwoPi);
-            el.spinPhaseRad = std::fmod(el.spinPhaseRad + el.spinRateRadPerSec * simDeltaSeconds, kTwoPi);
+void AsteroidField::Update(double julianDate) {
+    // Rates are per orrery second (OrbitLayout's 1x clock: one Earth orbit in
+    // kEarthOrbitSecondsAt1x), so convert the date offset into those seconds. In double:
+    // decades of scrubbing are tens of thousands of seconds times a rate.
+    const double simSeconds = (julianDate - _epochJd) *
+                              (static_cast<double>(OrbitLayout::kEarthOrbitSecondsAt1x) /
+                               static_cast<double>(OrbitLayout::kEarthYearDays));
+    const auto advance = [simSeconds](float base, float ratePerSec) {
+        double phase = std::fmod(static_cast<double>(base) + static_cast<double>(ratePerSec) * simSeconds,
+                                 static_cast<double>(kTwoPi));
+        if (phase < 0.0) {
+            phase += kTwoPi;
         }
-        for (auto& el : _comets) {
-            el.meanAnomalyRad = std::fmod(el.meanAnomalyRad + el.meanMotionRadPerSec * simDeltaSeconds, kTwoPi);
-            el.spinPhaseRad = std::fmod(el.spinPhaseRad + el.spinRateRadPerSec * simDeltaSeconds, kTwoPi);
-        }
+        return static_cast<float>(phase);
+    };
+    for (size_t i = 0; i < _asteroids.size(); ++i) {
+        _asteroids[i].meanAnomalyRad = advance(_asteroidEpoch[i].meanAnomalyRad, _asteroids[i].meanMotionRadPerSec);
+        _asteroids[i].spinPhaseRad = advance(_asteroidEpoch[i].spinPhaseRad, _asteroids[i].spinRateRadPerSec);
+    }
+    for (size_t i = 0; i < _comets.size(); ++i) {
+        _comets[i].meanAnomalyRad = advance(_cometEpoch[i].meanAnomalyRad, _comets[i].meanMotionRadPerSec);
+        _comets[i].spinPhaseRad = advance(_cometEpoch[i].spinPhaseRad, _comets[i].spinRateRadPerSec);
     }
 
     RebuildInstanceBuffer();

@@ -12,7 +12,7 @@ public:
     CatalogClouds(CloudsInfo&& cloudsInfo, std::shared_ptr<SpaceObject> parent,
                   const BodyCatalog::Entry& parentEntry);
 
-    void AdjustToParent(float timeScale) override;
+    void AdjustToParent() override;
     void Render() const override;
 
 private:

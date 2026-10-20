@@ -14,7 +14,7 @@ CatalogSatellite::CatalogSatellite(SatelliteInfo&& satelliteInfo,
     ConfigureDiffuseLOD(_diffuses.at(0), diffuse.low, diffuse.mid, diffuse.high, entry.lod.diffuse);
 }
 
-void CatalogSatellite::AdjustToParent(float /*timeScale*/) {
+void CatalogSatellite::AdjustToParent() {
     // Pose is a function of the simulation date only, so SetSimulationEpoch jumps and
     // reverse scrubbing are exact. Keplerian placement where the backend has a solution
     // (Moon, Galileans, Titan, Triton); otherwise the circular mean-anomaly offset.

@@ -60,6 +60,7 @@ add_executable(SolarSystemTests
     test_shader_source.cpp
     test_atmosphere_model.cpp
     test_giant_atmospheres.cpp
+    test_frame_passes.cpp
     stub_texture_image2d.cpp
     ${SOLARSYSTEM_TEST_SOURCES}
 )
