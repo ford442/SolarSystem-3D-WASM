@@ -1,5 +1,5 @@
 #include "ShadowMapFBO.h"
-#include <iostream>
+#include "../core/Log.h"
 
 ShadowMapFBO::ShadowMapFBO(uint16_t shadowMapWidth, uint16_t shadowMapHeight) : _shadowMapWidth(shadowMapWidth), _shadowMapHeight(shadowMapHeight) {
     InitFBO();
@@ -76,7 +76,6 @@ void ShadowMapFBO::InitFBO() {
     // XRWebGLLayer framebuffer and a resize can happen mid-session.
     glBindFramebuffer(GL_FRAMEBUFFER, static_cast<GLuint>(previousFbo));
     if (status != GL_FRAMEBUFFER_COMPLETE) {
-        std::cerr << "[Shadows] Shadow map framebuffer incomplete (0x" << std::hex << status
-                  << std::dec << ")" << std::endl;
+        LOG_ERROR("Shadows", "Shadow map framebuffer incomplete (0x%x)", status);
     }
 }

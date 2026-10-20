@@ -6,8 +6,8 @@
 #include "QualitySettings.h"
 #include "Solar_System/AsteroidField.h"
 #include "Solar_System/OrbitLayout.h"
+#include "core/Log.h"
 #include <algorithm>
-#include <iostream>
 #include <optional>
 #include <string>
 
@@ -53,7 +53,7 @@ void Renderer::EnsureMagneticFieldsBuilt(int qualityPreset) {
     }
     _magneticFieldsBuilt = true;
     _magneticFieldsQuality = qualityPreset;
-    std::cout << "[MagneticField] Built field-line ribbons for quality preset " << qualityPreset << std::endl;
+    LOG_INFO("MagneticField", "Built field-line ribbons for quality preset %d", qualityPreset);
 }
 
 void Renderer::RenderMagneticFields(const FrameContext& ctx) {

@@ -481,8 +481,29 @@ divided by that range, which keeps the comparisons the shaders always made. (The
 used to borrow the camera's 0.001–20000, which also clipped every body more than 20000
 units from the Sun — Uranus and beyond on realistic scale.)
 
-`SOLARSYSTEM_FRAME_STATS=N` prints, every N frames, the previous frame's simulate count,
-view binds, shadow passes, component and body draws, culled components and `glUniform*` calls.
+At debug level (§7.6) the `[FrameStats]` line logs, every N frames (`SOLARSYSTEM_FRAME_STATS=N`,
+120 by default), the previous frame's simulate count, view binds, shadow passes, component and
+body draws, culled components and `glUniform*` calls.
+
+### 7.6 Logging
+
+All diagnostics go through `src/core/Log.h`: `LOG_DEBUG/INFO/WARN/ERROR(category, fmt, ...)`
+with a printf-style format, which is not evaluated when the level is off. A line reads
+`[Category] message`, so the smoke test's and CI's greps (`[StagedLoading] Loaded manifest`,
+`[ShaderSelfTest] … OK`) match on both targets.
+
+| | Native | Web |
+|---|---|---|
+| Sink | stderr, `HH:MM:SS.mmm LEVEL [Category] …` | `emscripten_log` → `console.debug/info/warn/error` |
+| Level (default `info`) | `SOLARSYSTEM_LOG=debug\|info\|warn\|error\|off` | `?log=debug` (same names) |
+| GL driver messages | KHR_debug context in Debug builds (`SOLARSYSTEM_GL_DEBUG=1/0` forces it on/off); `glDebugMessageCallback` maps severity to level as `[GL] 0x<id>: …`, at most 5 lines per id | — |
+
+Per-file chatter (each texture loaded, each download started or finished, LOD queueing) is
+`debug`. A failure the app recovers from (fallback texture, missing optional asset) is `warn`,
+and only a broken invariant (a required asset that is missing, an incomplete framebuffer, a
+shader that fails to compile) is `error`. That keeps `console.error` meaningful for the smoke
+test's error filter. Use `LOG_*` rather than `std::cout`/`std::cerr`. The parsers that used to
+`catch (...)` around `std::stod` now use `strtod` and report a malformed number as a parse error.
 
 ## 8. Web frontend (`web/`)
 
@@ -622,7 +643,7 @@ sorted name → slot table, so `Set*(std::string_view)` costs a binary search an
 or allocation; a name the program does not have is a silent no-op. Each slot keeps the last
 value set, and an unchanged value skips the `glUniform*` call. A setter on a program that
 is not current binds it for the call and restores the current one, so the cache stays true.
-`SOLARSYSTEM_FRAME_STATS=N` prints the `glUniform*` count every N frames.
+The debug-level `[FrameStats]` line (§7.5) includes the `glUniform*` count.
 
 ### 9.2 Atmospheres and the Sun
 

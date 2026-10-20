@@ -1,6 +1,6 @@
 #include "GlCapabilities.h"
 #include <GL/glew.h>
-#include <iostream>
+#include "../core/Log.h"
 
 #ifdef __EMSCRIPTEN__
 #include <emscripten.h>
@@ -78,16 +78,14 @@ GlCapabilities ProbeGlCapabilities() {
 const GlCapabilities& GetGlCapabilities() {
     static const GlCapabilities caps = [] {
         GlCapabilities c = ProbeGlCapabilities();
-        std::cout << "[GlCapabilities] anisotropy=" << (c.anisotropicFiltering ? "yes" : "no")
-                  << " (max " << c.maxAnisotropy << "x)"
-                  << " | S3TC=" << (c.s3tcCompressedTextures ? "yes" : "no")
-                  << " | BPTC=" << (c.bptcCompressedTextures ? "yes" : "no")
-                  << " | ETC2=" << (c.etc2CompressedTextures ? "yes" : "no")
-                  << " | ASTC=" << (c.astcCompressedTextures ? "yes" : "no")
-                  << " | preferredPack=" << c.PreferredTexturePack()
-                  << " | colorBufferFloat=" << (c.colorBufferFloat ? "yes" : "no")
-                  << " | parallelShaderCompile=" << (c.parallelShaderCompile ? "yes" : "no")
-                  << " | maxTextureSize=" << c.maxTextureSize << std::endl;
+        const auto yesNo = [](bool value) { return value ? "yes" : "no"; };
+        LOG_INFO("GlCapabilities",
+                 "anisotropy=%s (max %gx) | S3TC=%s | BPTC=%s | ETC2=%s | ASTC=%s | preferredPack=%s"
+                 " | colorBufferFloat=%s | parallelShaderCompile=%s | maxTextureSize=%d",
+                 yesNo(c.anisotropicFiltering), c.maxAnisotropy, yesNo(c.s3tcCompressedTextures),
+                 yesNo(c.bptcCompressedTextures), yesNo(c.etc2CompressedTextures), yesNo(c.astcCompressedTextures),
+                 c.PreferredTexturePack(), yesNo(c.colorBufferFloat), yesNo(c.parallelShaderCompile),
+                 c.maxTextureSize);
         return c;
     }();
     return caps;

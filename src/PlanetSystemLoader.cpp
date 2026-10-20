@@ -3,10 +3,10 @@
 #include "Auxiliary_Modules/WebResourceFetcher.h"
 #include "Solar_System/OrbitLayout.h"
 #include "QualitySettings.h"
+#include "core/Log.h"
 #include <algorithm>
 #include <deque>
 #include <functional>
-#include <iostream>
 #include <string>
 
 void Application::LoadPlanetSystemManifests() {
@@ -26,15 +26,14 @@ void Application::LoadPlanetSystemManifests() {
         error);
 
     if (manifests.empty()) {
-        std::cerr << "[StagedLoading] Failed to load planet manifest: " << error << std::endl;
+        LOG_ERROR("StagedLoading", "Failed to load planet manifest: %s", error.c_str());
         return;
     }
 
     _planetSystemManifests = std::move(manifests);
     RefreshPlanetProxyPositions();
-    std::cout << "[StagedLoading] Loaded manifest v" << manifestVersion
-              << " with " << _planetSystemManifests.size()
-              << " planet systems deferred until camera approaches." << std::endl;
+    LOG_INFO("StagedLoading", "Loaded manifest v%d with %zu planet systems deferred until camera approaches.",
+             manifestVersion, _planetSystemManifests.size());
     ActivateNearestPlanetSystems(
         GetQualitySettings(_simState.qualityPreset, _simState.isMobileWeb).eagerPlanetSystems);
 #endif
@@ -78,7 +77,7 @@ void Application::StartPlanetSystemDownload(PlanetSystemManifest& manifest, cons
     if (manifest.state != PlanetSystemManifest::State::NOT_LOADED) {
         return;
     }
-    std::cout << "[StagedLoading] " << reason << " — starting download for " << manifest.name << std::endl;
+    LOG_INFO("StagedLoading", "%s — starting download for %s", reason, manifest.name.c_str());
     manifest.state = PlanetSystemManifest::State::DOWNLOADING;
     manifest.totalDownloads = static_cast<int>(manifest.assetPaths.size());
     manifest.pendingDownloads = manifest.totalDownloads;
@@ -89,8 +88,8 @@ void Application::StartPlanetSystemDownload(PlanetSystemManifest& manifest, cons
             [&manifest, path](WebResourceFetcher::FetchOutcome outcome) {
                 manifest.pendingDownloads--;
                 if (outcome == WebResourceFetcher::FetchOutcome::Failed) {
-                    std::cerr << "[StagedLoading] Required asset " << path << " failed for "
-                              << manifest.name << std::endl;
+                    LOG_ERROR("StagedLoading", "Required asset %s failed for %s", path.c_str(),
+                              manifest.name.c_str());
                 }
             });
     }
@@ -101,8 +100,8 @@ void Application::StartPlanetSystemDownload(PlanetSystemManifest& manifest, cons
         WebResourceFetcher::DownloadWithFallback({path}, path,
             [name = manifest.name](WebResourceFetcher::FetchOutcome outcome) {
                 if (outcome == WebResourceFetcher::FetchOutcome::Failed) {
-                    std::cout << "[StagedLoading] Optional asset unavailable for "
-                              << name << " — fallback texture will be used." << std::endl;
+                    LOG_INFO("StagedLoading", "Optional asset unavailable for %s — fallback texture will be used.",
+                             name.c_str());
                 }
             });
     }
@@ -129,8 +128,8 @@ void Application::UpdatePlanetSystemLoading() {
 
         if (manifest.state == PlanetSystemManifest::State::DOWNLOADING) {
             if (manifest.pendingDownloads <= 0) {
-                std::cout << "[StagedLoading] Required assets ready for " << manifest.name
-                          << " — initializing system." << std::endl;
+                LOG_INFO("StagedLoading", "Required assets ready for %s — initializing system.",
+                         manifest.name.c_str());
                 manifest.initFunc();
                 manifest.state = PlanetSystemManifest::State::READY;
             }

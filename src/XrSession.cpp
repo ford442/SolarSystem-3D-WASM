@@ -3,16 +3,16 @@
 // state layout and WasmExports.cpp for the JS-facing entry points.
 #ifdef __EMSCRIPTEN__
 #include "Application.h"
+#include "core/Log.h"
 #include <algorithm>
 #include <cstring>
-#include <iostream>
 #include <glm/gtc/type_ptr.hpp>
 
 void Application::SetXrBaseLayerFramebuffer(unsigned int framebuffer) {
     // JS registers the XRWebGLLayer's opaque WebGLFramebuffer in Emscripten's GL table
     // and hands the name over here; see registerXrFramebuffer() in web/src/webxr.ts.
     _xr.baseLayerFramebuffer = framebuffer;
-    std::cout << "[WebXR] base layer framebuffer = " << framebuffer << std::endl;
+    LOG_INFO("WebXR", "base layer framebuffer = %u", static_cast<unsigned>(framebuffer));
 }
 
 void Application::SetXrActive(bool active) {
@@ -24,7 +24,7 @@ void Application::SetXrActive(bool active) {
         glViewport(0, 0, _displayWidth, _displayHeight);
         glDisable(GL_SCISSOR_TEST);
     }
-    std::cout << "[WebXR] session " << (active ? "active" : "inactive") << std::endl;
+    LOG_INFO("WebXR", "session %s", active ? "active" : "inactive");
 }
 
 void Application::SetXrEyeCount(int count) {
@@ -63,9 +63,9 @@ void Application::RenderXrStereoFrame() {
         static bool warned = false;
         if (!warned) {
             warned = true;
-            std::cerr << "[WebXR] No base layer framebuffer registered; off-screen passes "
-                         "would composite into FBO 0 and lose the stereo image. "
-                         "Skipping shadow maps this session." << std::endl;
+            LOG_WARN("WebXR", "No base layer framebuffer registered; off-screen passes "
+                              "would composite into FBO 0 and lose the stereo image. "
+                              "Skipping shadow maps this session.");
         }
     }
     const int eyes = std::clamp(_xr.eyeCount, 0, 2);

@@ -1,6 +1,6 @@
 #include "HDR.h"
 #include "GlCapabilities.h"
-#include <iostream>
+#include "../core/Log.h"
 
 HDR::HDR(const Shader& shader, uint16_t width, uint16_t height, bool enabled)
     : _hdrShader(&shader), _enabled(enabled), _width(width), _height(height) {
@@ -96,8 +96,8 @@ void HDR::InitFBO(uint16_t width, uint16_t height) {
     // (EXT_color_buffer_float). Without it the RGBA16F attachment below silently
     // yields an incomplete FBO and every subsequent draw into it is dropped.
     if (!GetGlCapabilities().colorBufferFloat) {
-        std::cerr << "[HDR] Renderable float color buffers unsupported "
-                     "(no EXT_color_buffer_float); disabling HDR" << std::endl;
+        LOG_WARN("HDR", "Renderable float color buffers unsupported "
+                        "(no EXT_color_buffer_float); disabling HDR");
         _enabled = false;
         return;
     }
@@ -134,8 +134,7 @@ void HDR::InitFBO(uint16_t width, uint16_t height) {
     const GLenum status = glCheckFramebufferStatus(GL_FRAMEBUFFER);
     glBindFramebuffer(GL_FRAMEBUFFER, static_cast<GLuint>(previousFbo));
     if (status != GL_FRAMEBUFFER_COMPLETE) {
-        std::cerr << "[HDR] Framebuffer incomplete (0x" << std::hex << status << std::dec
-                  << "); disabling HDR" << std::endl;
+        LOG_ERROR("HDR", "Framebuffer incomplete (0x%x); disabling HDR", status);
         DestroyFBO();
         _enabled = false;
     }

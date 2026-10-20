@@ -2,7 +2,7 @@
 #include "GlCapabilities.h"
 
 #include <algorithm>
-#include <iostream>
+#include "../core/Log.h"
 
 namespace {
 
@@ -139,8 +139,8 @@ void MagneticFieldBloom::InitTargets(uint16_t width, uint16_t height) {
     // Same RGBA16F requirement as HDR: without EXT_color_buffer_float on WebGL 2 the
     // targets below can only ever come back incomplete, so refuse up front.
     if (!GetGlCapabilities().colorBufferFloat) {
-        std::cout << "[MagneticField] Renderable float color buffers unsupported "
-                     "(no EXT_color_buffer_float); disabling bloom" << std::endl;
+        LOG_INFO("MagneticField", "Renderable float color buffers unsupported "
+                                  "(no EXT_color_buffer_float); disabling bloom");
         _enabled = false;
         return;
     }
@@ -151,7 +151,7 @@ void MagneticFieldBloom::InitTargets(uint16_t width, uint16_t height) {
     CreateColorTarget(_pong, _width, _height, false);
 
     if (_capture.fbo.get() == 0 || _ping.fbo.get() == 0 || _pong.fbo.get() == 0) {
-        std::cout << "[MagneticField] Bloom FBOs incomplete; disabling bloom" << std::endl;
+        LOG_WARN("MagneticField", "Bloom FBOs incomplete; disabling bloom");
         DestroyTargets();
         _enabled = false;
     }

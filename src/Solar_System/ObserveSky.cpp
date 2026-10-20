@@ -3,7 +3,7 @@
 
 #include <algorithm>
 #include <cmath>
-#include <iostream>
+#include "../core/Log.h"
 
 namespace {
 
@@ -118,7 +118,7 @@ void ObserveSky::EnsureStarsLoaded() {
     std::string error;
     if (!StarCatalog::LoadFromFile(kStarCatalogPath, _stars, error)) {
         // Observe still works without stars (planets, Sun and Moon), so this is not fatal.
-        std::cerr << "[Observe] star catalog unavailable (" << error << "); drawing no stars" << std::endl;
+        LOG_WARN("Observe", "star catalog unavailable (%s); drawing no stars", error.c_str());
         return;
     }
 
@@ -138,7 +138,7 @@ void ObserveSky::EnsureStarsLoaded() {
     InitBatch(_starBatch, static_cast<int>(instances.size()));
     UploadBatch(_starBatch, instances);
     _starsLoaded = _starBatch.count > 0;
-    std::cout << "[Observe] Loaded " << _stars.stars.size() << " stars from " << kStarCatalogPath << std::endl;
+    LOG_INFO("Observe", "Loaded %zu stars from %s", _stars.stars.size(), kStarCatalogPath);
 }
 
 float ObserveSky::LimitingMagnitude(double sunAltDeg) {

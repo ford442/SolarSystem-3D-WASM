@@ -6,7 +6,7 @@
 
 #include <cstdlib>
 #include <fstream>
-#include <iostream>
+#include "../core/Log.h"
 #include <iterator>
 #include <vector>
 
@@ -15,7 +15,7 @@ namespace {
 constexpr std::uint32_t kVkFormatRgba16f = 97;
 
 std::optional<FloatLut> Reject(const std::string& path, const std::string& why) {
-    std::cout << "[FloatLut] " << path << ": " << why << "; using the fallback path" << std::endl;
+    LOG_INFO("FloatLut", "%s: %s; using the fallback path", path.c_str(), why.c_str());
     return std::nullopt;
 }
 
@@ -23,7 +23,7 @@ std::optional<FloatLut> Reject(const std::string& path, const std::string& why) 
 
 std::optional<FloatLut> LoadRgba16fLut(const std::string& path, int expectedWidth, int expectedHeight) {
     // ResourceExists, not RequireResident: a missing LUT is an expected, quiet fallback,
-    // and RequireResident reports through std::cerr (console.error on web).
+    // and RequireResident reports through LOG_ERROR (console.error on web).
     if (!WebResourceFetcher::ResourceExists(path)) {
         return Reject(path, "not present");
     }

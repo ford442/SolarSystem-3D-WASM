@@ -6,7 +6,7 @@
 #include <array>
 #include <chrono>
 #include <fstream>
-#include <iostream>
+#include "core/Log.h"
 #include <random>
 #include <vector>
 
@@ -92,7 +92,7 @@ void Application::LoadCoreResources() {
     _resourcesPending = _totalResources;
     _resourcesFailed = 0;
 
-    std::cout << "Loading " << _totalResources << " core resources..." << std::endl;
+    LOG_INFO("Loading", "Loading %d core resources...", _totalResources);
     UpdateLoadingProgress();
 
     for (const auto& res : coreResources) {
@@ -107,7 +107,7 @@ void Application::LoadCoreResources() {
                 _resourcesPending--;
                 if (outcome == WebResourceFetcher::FetchOutcome::Failed) {
                     _resourcesFailed++;
-                    std::cerr << "[Loading] Failed to download required core resource: " << virtualPath << std::endl;
+                    LOG_ERROR("Loading", "Failed to download required core resource: %s", virtualPath.c_str());
                 }
                 UpdateLoadingProgress();
             });

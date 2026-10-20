@@ -5,7 +5,7 @@
 #include "Solar_System/SystemVisuals.h"
 #include "Solar_System/AtmosphereModel.h"
 #include "Auxiliary_Modules/FloatLutTexture.h"
-#include <iostream>
+#include "core/Log.h"
 #include <unordered_set>
 
 using namespace std;
@@ -55,8 +55,8 @@ void LoadAtmosphereLuts(Atmosphere& atmosphere) {
                                           AtmosphereModel::kMultiScatteringSize, AtmosphereModel::kMultiScatteringSize);
     for (auto* lut : {&transmittance, &multiScattering}) {
         if (*lut && (*lut)->mappingVersion != AtmosphereModel::kLutMappingVersion) {
-            std::cout << "[Atmosphere] " << row.bodyId << ": LUT mapping version " << (*lut)->mappingVersion
-                      << " != " << AtmosphereModel::kLutMappingVersion << " (rebake); using the O'Neil shell" << std::endl;
+            LOG_WARN("Atmosphere", "%s: LUT mapping version %d != %d (rebake); using the O'Neil shell", row.bodyId,
+                     (*lut)->mappingVersion, AtmosphereModel::kLutMappingVersion);
             lut->reset();
         }
     }
@@ -67,9 +67,8 @@ void LoadAtmosphereLuts(Atmosphere& atmosphere) {
     if (transmittance->paramsHash != expected) {
         // Still usable (same mapping), just baked from other numbers; CI's
         // AtmosphereLutsFresh test is what keeps this from shipping.
-        std::cout << "[Atmosphere] " << row.bodyId << ": LUTs were baked from parameters "
-                  << transmittance->paramsHash << ", the catalog is " << expected
-                  << " — rerun atmosphere_lut_baker" << std::endl;
+        LOG_WARN("Atmosphere", "%s: LUTs were baked from parameters %s, the catalog is %s — rerun atmosphere_lut_baker",
+                 row.bodyId, transmittance->paramsHash.c_str(), expected.c_str());
     }
     atmosphere.SetLuts(std::move(transmittance->texture), std::move(multiScattering->texture));
 }
@@ -114,8 +113,8 @@ void Application::InitStarSystem() {
 void Application::InitCatalogBody(const MeshHolder& sphereModel, OrbitLayout::Body body) {
     const BodyCatalog::Entry* entry = BodyCatalog::FindByIndex(static_cast<int>(body));
     if (!entry) {
-        std::cerr << "[CatalogBody] No render descriptor for focus index "
-                  << static_cast<int>(body) << " — check planets.catalog.json" << std::endl;
+        LOG_ERROR("CatalogBody", "No render descriptor for focus index %d — check planets.catalog.json",
+                  static_cast<int>(body));
         return;
     }
     InitCatalogSystem(sphereModel, entry->initTag);
@@ -124,8 +123,7 @@ void Application::InitCatalogBody(const MeshHolder& sphereModel, OrbitLayout::Bo
 void Application::InitCatalogSystem(const MeshHolder& sphereModel, const std::string& initTag) {
     const BodyCatalog::Entry* primary = BodyCatalog::FindPrimaryByInitTag(initTag.c_str());
     if (!primary) {
-        std::cerr << "[CatalogBody] No primary body for initTag \"" << initTag
-                  << "\" — check planets.catalog.json" << std::endl;
+        LOG_ERROR("CatalogBody", "No primary body for initTag \"%s\" — check planets.catalog.json", initTag.c_str());
         return;
     }
 

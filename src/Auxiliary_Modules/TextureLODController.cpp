@@ -1,7 +1,7 @@
 #include "TextureLODController.h"
 #include "TextureImage2D.h"
+#include "../core/Log.h"
 #include <glm/geometric.hpp>
-#include <iostream>
 #include <utility>
 
 #if defined(__EMSCRIPTEN__) || defined(SOLARSYSTEM_BUILD_TESTS)
@@ -88,8 +88,7 @@ void TextureLODController::CancelInFlight() {
     if (!_inFlightPath.empty()) {
         TextureLoadingQueue::GetInstance().CancelLoad(_inFlightPath);
     }
-    std::cout << "[LOD][" << _label << "] Cancelled " << TextureLodTierName(_inFlightTier)
-              << " upgrade" << std::endl;
+    LOG_DEBUG("LOD", "[%s] Cancelled %s upgrade", _label.c_str(), TextureLodTierName(_inFlightTier));
     _inFlightTier = TextureLodTier::Low;
     _inFlightPath.clear();
 }
@@ -111,12 +110,10 @@ void TextureLODController::QueueTier(TextureLodTier tier) {
             _inFlightPath.clear();
             if (success) {
                 _residentTier = tier;
-                std::cout << "[LOD][" << _label << "] Resident tier now "
-                          << TextureLodTierName(tier) << std::endl;
+                LOG_INFO("LOD", "[%s] Resident tier now %s", _label.c_str(), TextureLodTierName(tier));
             } else {
-                std::cout << "[LOD][" << _label << "] Failed " << TextureLodTierName(tier)
-                          << " upgrade (keeping " << TextureLodTierName(_residentTier) << ")"
-                          << std::endl;
+                LOG_WARN("LOD", "[%s] Failed %s upgrade (keeping %s)", _label.c_str(), TextureLodTierName(tier),
+                         TextureLodTierName(_residentTier));
             }
         },
         _category);
@@ -124,8 +121,7 @@ void TextureLODController::QueueTier(TextureLodTier tier) {
     if (queued) {
         _inFlightTier = tier;
         _inFlightPath = path;
-        std::cout << "[LOD][" << _label << "] Queueing " << TextureLodTierName(tier)
-                  << " texture" << std::endl;
+        LOG_DEBUG("LOD", "[%s] Queueing %s texture", _label.c_str(), TextureLodTierName(tier));
     }
 }
 
@@ -151,8 +147,7 @@ void TextureLODController::Update(const glm::vec3& cameraPosition, const glm::ve
             target = static_cast<TextureLodTier>(static_cast<uint8_t>(target) - 1);
         }
         ApplyTier(target);
-        std::cout << "[LOD][" << _label << "] Capped to " << TextureLodTierName(target)
-                  << " by quality preset" << std::endl;
+        LOG_INFO("LOD", "[%s] Capped to %s by quality preset", _label.c_str(), TextureLodTierName(target));
         return;
     }
 
@@ -172,10 +167,10 @@ void TextureLODController::Update(const glm::vec3& cameraPosition, const glm::ve
         (distance > threshold || allowedMax < TextureLodTier::High)) {
         if (HasPath(TextureLodTier::Mid) && allowedMax >= TextureLodTier::Mid) {
             ApplyTier(TextureLodTier::Mid);
-            std::cout << "[LOD][" << _label << "] Downgraded high → mid" << std::endl;
+            LOG_INFO("LOD", "[%s] Downgraded high → mid", _label.c_str());
         } else {
             ApplyTier(TextureLodTier::Low);
-            std::cout << "[LOD][" << _label << "] Downgraded high → low" << std::endl;
+            LOG_INFO("LOD", "[%s] Downgraded high → low", _label.c_str());
         }
         return;
     }
@@ -183,7 +178,7 @@ void TextureLODController::Update(const glm::vec3& cameraPosition, const glm::ve
     if (_residentTier == TextureLodTier::Mid &&
         (distance > threshold * 2.0f || allowedMax < TextureLodTier::Mid)) {
         ApplyTier(TextureLodTier::Low);
-        std::cout << "[LOD][" << _label << "] Downgraded mid → low" << std::endl;
+        LOG_INFO("LOD", "[%s] Downgraded mid → low", _label.c_str());
         return;
     }
 

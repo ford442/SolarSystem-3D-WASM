@@ -13,6 +13,7 @@
 #include "Solar_System/OrbitLayout.h"
 #include "Auxiliary_Modules/Ephemeris.h"
 #include "Auxiliary_Modules/TextureLoadingQueue.h"
+#include "core/Log.h"
 #include <algorithm>
 #include <array>
 #include <deque>
@@ -108,7 +109,7 @@ void Renderer::Init(const SimState& sim, FT_Library ft, glm::ivec2 display) {
     // still draws every atmosphere.
     _pbrAtmosphereShader = _shaders.TryGet(pbrAtmosphereSpec);
     if (!_pbrAtmosphereShader) {
-        std::cerr << "[Atmosphere] LUT atmosphere shader unavailable; using the O'Neil shell" << std::endl;
+        LOG_WARN("Atmosphere", "LUT atmosphere shader unavailable; using the O'Neil shell");
     }
     _mainCloudsShader = &_shaders.Get(cloudsSpec);
     _mainRingShader = &_shaders.Get(ringSpec);
@@ -116,7 +117,7 @@ void Renderer::Init(const SimState& sim, FT_Library ft, glm::ivec2 display) {
     _starGlowShader = &_shaders.Get(starGlowSpec);
     _coronaVolumeShader = _shaders.TryGet(coronaVolumeSpec);
     if (!_coronaVolumeShader) {
-        std::cerr << "[Corona] volumetric corona shader unavailable; using the flat corona" << std::endl;
+        LOG_WARN("Corona", "volumetric corona shader unavailable; using the flat corona");
     }
     // The base variant must build; the others fall back to it in PlanetProgram if their own
     // compile failed.
@@ -144,8 +145,8 @@ void Renderer::Init(const SimState& sim, FT_Library ft, glm::ivec2 display) {
             }});
     try {
         _observeSky = make_unique<ObserveSky>();
-    } catch (const std::exception&) {
-        std::cerr << "[Observe] sky shaders unavailable; Observe mode will draw an empty sky" << std::endl;
+    } catch (const std::exception& error) {
+        LOG_WARN("Observe", "sky shaders unavailable (%s); Observe mode will draw an empty sky", error.what());
         _observeSky.reset();
     }
     _orbitPathRenderer = make_unique<OrbitPathRenderer>();

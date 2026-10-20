@@ -4,6 +4,7 @@
 #include "BlockCompression.h"
 #include "TextureFormatSupport.h"
 #include "../3rdparty/ktx2_reader.h"
+#include "../core/Log.h"
 #include <cstdint>
 #include <algorithm>
 #include <fstream>
@@ -284,8 +285,7 @@ void TextureImage2D::LoadTextureFromFile(const std::string& path, GLint wrapPara
         // On web, many moon/ring/high-res textures are intentionally omitted from the
         // repository and deployment. Use a visible fallback so planets/moons never
         // appear solid black and the scene remains stable.
-        std::cerr << "[Texture] Warning: Failed to load " << path << " (" << error.what()
-                  << "). Creating fallback texture." << std::endl;
+        LOG_WARN("Texture", "Warning: Failed to load %s (%s). Creating fallback texture.", path.c_str(), error.what());
         CreateFallbackTexture(wrapParam, minFilter, magFilter);
         return;
 #else
@@ -303,8 +303,7 @@ void TextureImage2D::LoadTextureFromFile(const std::string& path, GLint wrapPara
         glGenerateMipmap(GL_TEXTURE_2D);
         GLenum err = glGetError();
         if (err != GL_NO_ERROR) {
-            std::cerr << "Warning: glGenerateMipmap failed for " << path
-                      << " (error 0x" << std::hex << err << std::dec << ")" << std::endl;
+            LOG_WARN("Texture", "Warning: glGenerateMipmap failed for %s (error 0x%x)", path.c_str(), err);
         } else {
             hasEmbeddedMipmaps = true;
 #ifdef __EMSCRIPTEN__
@@ -335,8 +334,7 @@ void TextureImage2D::LoadTextureFromFile(const std::string& path, GLint wrapPara
         if (minFilterUsesMipmaps) {
             // Mute this expected fallback warning for web builds to clean up the console
 #ifndef __EMSCRIPTEN__
-            std::cerr << "Warning: No mipmaps for " << path
-                      << " -- falling back min filter to GL_LINEAR" << std::endl;
+            LOG_WARN("Texture", "Warning: No mipmaps for %s -- falling back min filter to GL_LINEAR", path.c_str());
 #endif
             minFilter = GL_LINEAR;
         }
@@ -369,9 +367,8 @@ void TextureImage2D::LoadTextureFromFile(const std::string& path, GLint wrapPara
             GLint maxLevel = 0;
             glGetTexParameteriv(GL_TEXTURE_2D, GL_TEXTURE_MAX_LEVEL, &maxLevel);
             if (maxLevel == 0) {
-                std::cerr << "[Texture] WARNING: " << path
-                          << " uses a mip filter but GL_TEXTURE_MAX_LEVEL=0 — "
-                             "texture will be incomplete (black) in WebGL 2!" << std::endl;
+                LOG_WARN("Texture", "Warning: %s uses a mip filter but GL_TEXTURE_MAX_LEVEL=0 — "
+                                    "texture will be incomplete (black) in WebGL 2!", path.c_str());
             }
         }
     }
@@ -382,13 +379,12 @@ void TextureImage2D::LoadTextureFromFile(const std::string& path, GLint wrapPara
         if (!allowFallback) {
             throw std::runtime_error("GPU upload produced an incomplete texture (check GL errors / MAX_TEXTURE_SIZE)");
         }
-        std::cerr << "[Texture] Warning: GPU upload incomplete for " << path
-                  << ". Creating fallback texture." << std::endl;
+        LOG_WARN("Texture", "Warning: GPU upload incomplete for %s. Creating fallback texture.", path.c_str());
         CreateFallbackTexture(wrapParam, minFilter, magFilter);
         return;
     }
 
-    std::cout << path << " Loaded" << std::endl;
+    LOG_DEBUG("Texture", "%s Loaded", path.c_str());
 }
 
 GLuint TextureImage2D::GetTexture() const {
@@ -410,8 +406,10 @@ void TextureImage2D::ReloadTexture(const std::string& path, GLint wrapParam, GLi
 
     try {
         LoadTextureFromFile(path, wrapParam, minFilter, magFilter, false);
-    } catch (...) {
+    } catch (const std::exception& error) {
         // On any failure during reload (rare on web now that Load catches), restore old texture
+        LOG_WARN("Texture", "Warning: Reloading %s failed (%s); keeping the previous texture", path.c_str(),
+                 error.what());
         _texture = std::move(previous);
         _width = previousWidth;
         _height = previousHeight;
@@ -459,5 +457,5 @@ void TextureImage2D::CreateFallbackTexture(GLint wrapParam, GLint minFilter, GLi
 
     _width = 4;
     _height = 4;
-    std::cout << "Created 4x4 fallback texture" << std::endl;
+    LOG_WARN("Texture", "Created 4x4 fallback texture");
 }

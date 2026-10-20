@@ -10,7 +10,7 @@
 #include <cmath>
 #include <cstdio>
 #include <cstdlib>
-#include <iostream>
+#include "core/Log.h"
 #include <sstream>
 
 namespace {
@@ -192,7 +192,7 @@ void Application::ApplyObserveEnvOverride() {
         values[parsed++] = std::atof(token.c_str());
     }
     if (parsed < 2) {
-        std::cerr << "[Observe] SOLARSYSTEM_OBSERVE needs lat,lon[,jd[,az,el,fov]]" << std::endl;
+        LOG_WARN("Observe", "SOLARSYSTEM_OBSERVE needs lat,lon[,jd[,az,el,fov]]");
         return;
     }
     SetObserverSite(values[0], values[1], 0.0);
@@ -207,6 +207,6 @@ void Application::ApplyObserveEnvOverride() {
     if (parsed >= 6 && values[5] > 0.0) {
         SetObserveFov(static_cast<float>(values[5]));
     }
-    std::cout << "[Observe] lat " << values[0] << " lon " << values[1] << " at "
-              << Observer::FormatUtc(OrbitLayout::GetJulianDate()) << " UTC" << std::endl;
+    LOG_INFO("Observe", "lat %g lon %g at %s UTC", values[0], values[1],
+             Observer::FormatUtc(OrbitLayout::GetJulianDate()).c_str());
 }

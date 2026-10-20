@@ -1,7 +1,7 @@
 #include "WebResourceFetcher.h"
+#include "../core/Log.h"
 #include <cstdlib>
 #include <fstream>
-#include <iostream>
 #include <memory>
 #include <sys/stat.h>
 #include <unordered_map>
@@ -118,7 +118,8 @@ void EnsureDirectoryExists(const std::string& path) {
 // Callback wrappers for emscripten_async_wget2
 void OnLoad2(unsigned int /*handle*/, void* arg, const char* /*file*/) {
     auto* context = static_cast<DownloadContext*>(arg);
-    std::cout << "Successfully downloaded: " << context->resolvedUrl << " -> " << context->virtualPath << std::endl;
+    LOG_DEBUG("WebResourceFetcher", "Successfully downloaded: %s -> %s", context->resolvedUrl.c_str(),
+              context->virtualPath.c_str());
     const std::string virtualPath = context->virtualPath;
     delete context;
     CompleteTransfer(virtualPath, true);
@@ -126,7 +127,8 @@ void OnLoad2(unsigned int /*handle*/, void* arg, const char* /*file*/) {
 
 void OnError2(unsigned int /*handle*/, void* arg, int status) {
     auto* context = static_cast<DownloadContext*>(arg);
-    std::cerr << "Failed to download " << context->resolvedUrl << " -> " << context->virtualPath << ". Status: " << status << std::endl;
+    LOG_WARN("WebResourceFetcher", "Failed to download %s -> %s. Status: %d", context->resolvedUrl.c_str(),
+             context->virtualPath.c_str(), status);
     const std::string virtualPath = context->virtualPath;
     delete context;
     CompleteTransfer(virtualPath, false);
@@ -143,7 +145,7 @@ namespace {
 void StartTransfer(const std::string& url, const std::string& virtualPath) {
     EnsureDirectoryExists(virtualPath);
     const std::string resolvedUrl = ResolveResourceUrl(url);
-    std::cout << "Starting download: " << resolvedUrl << " to " << virtualPath << std::endl;
+    LOG_DEBUG("WebResourceFetcher", "Starting download: %s to %s", resolvedUrl.c_str(), virtualPath.c_str());
 
     auto* context = new DownloadContext{resolvedUrl, virtualPath};
 
@@ -186,7 +188,7 @@ void StartTransfer(const std::string& url, const std::string& virtualPath) {
         return;
     }
 #endif
-    std::cout << "Downloading (native stub): " << url << std::endl;
+    LOG_DEBUG("WebResourceFetcher", "Downloading (native stub): %s", url.c_str());
     CompleteTransfer(virtualPath, true);
 }
 } // namespace
@@ -206,15 +208,14 @@ void TryUrlsFrom(std::shared_ptr<const std::vector<std::string>> urls, size_t in
         // the preloaded copy intact.
         const bool resident = WebResourceFetcher::ResourceExists(virtualPath);
         if (resident) {
-            std::cout << "[WebResourceFetcher] No deployed copy of " << virtualPath
-                      << "; keeping the preloaded one." << std::endl;
+            LOG_INFO("WebResourceFetcher", "No deployed copy of %s; keeping the preloaded one.", virtualPath.c_str());
         }
         callback(resident ? Outcome::KeptResident : Outcome::Failed);
         return;
     }
     if (index > 0) {
-        std::cerr << "[WebResourceFetcher] " << (*urls)[index - 1] << " unavailable; trying " << (*urls)[index]
-                  << std::endl;
+        LOG_INFO("WebResourceFetcher", "%s unavailable; trying %s", (*urls)[index - 1].c_str(),
+                 (*urls)[index].c_str());
     }
     WebResourceFetcher::DownloadFile((*urls)[index], virtualPath,
         [urls, index, virtualPath, callback = std::move(callback)](bool success) mutable {
@@ -243,10 +244,10 @@ bool WebResourceFetcher::RequireResident(const std::string& virtualPath, const c
     // reload attempt would otherwise spam the console with the same line.
     static std::unordered_set<std::string> s_warnedPaths;
     if (s_warnedPaths.insert(virtualPath).second) {
-        std::cerr << "[WebResourceFetcher] " << (context ? context : "?") << ": '" << virtualPath
-                  << "' is not resident. It must be downloaded via DownloadFile() before use "
-                     "(core resources, a staged planet manifest, or TextureLoadingQueue); "
-                     "falling back." << std::endl;
+        LOG_ERROR("WebResourceFetcher",
+                  "%s: '%s' is not resident. It must be downloaded via DownloadFile() before use "
+                  "(core resources, a staged planet manifest, or TextureLoadingQueue); falling back.",
+                  context ? context : "?", virtualPath.c_str());
     }
     return false;
 }

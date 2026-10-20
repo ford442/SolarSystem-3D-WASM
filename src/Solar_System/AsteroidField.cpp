@@ -5,7 +5,7 @@
 #include <algorithm>
 #include <cmath>
 #include <cstddef>
-#include <iostream>
+#include "../core/Log.h"
 #include <glm/gtc/matrix_transform.hpp>
 
 #ifndef M_PI
@@ -67,10 +67,8 @@ AsteroidField::AsteroidField(uint32_t seed, int instanceCount, Population popula
     RebuildInstanceBuffer();
     UploadInstances();
 
-    std::cout << (population == Population::Kuiper ? "[KuiperField]" : "[AsteroidField]")
-              << " seed=0x" << std::hex << seed << std::dec
-              << " asteroids=" << _activeCount << "/" << _asteroids.size()
-              << " comets=" << _comets.size() << std::endl;
+    LOG_INFO(population == Population::Kuiper ? "KuiperField" : "AsteroidField", "seed=0x%x asteroids=%d/%zu comets=%zu",
+             static_cast<unsigned>(seed), _activeCount, _asteroids.size(), _comets.size());
 }
 
 void AsteroidField::SetInstanceCount(int count) {

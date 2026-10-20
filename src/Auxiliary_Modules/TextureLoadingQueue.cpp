@@ -1,8 +1,8 @@
 #include "TextureLoadingQueue.h"
 #include "TextureImage2D.h"
 #include "WebResourceFetcher.h"
+#include "../core/Log.h"
 #include <algorithm>
-#include <iostream>
 #include <chrono>
 #include <cmath>
 
@@ -45,17 +45,15 @@ int TextureLoadingQueue::GetEffectiveMaxConcurrentLoads() {
     const size_t heapBytes = GetWasmHeapBytes();
     if (heapBytes >= kMemoryPressureBytes) {
         if (!_memoryBackpressureActive) {
-            std::cout << "[TextureLoadingQueue] Memory backpressure active (heap "
-                      << (heapBytes / (1024 * 1024)) << " MiB); limiting concurrency to 1"
-                      << std::endl;
+            LOG_INFO("TextureLoadingQueue", "Memory backpressure active (heap %zu MiB); limiting concurrency to 1",
+                     heapBytes / (1024 * 1024));
         }
         _memoryBackpressureActive = true;
         return 1;
     }
 
     if (_memoryBackpressureActive) {
-        std::cout << "[TextureLoadingQueue] Memory backpressure released (heap "
-                  << (heapBytes / (1024 * 1024)) << " MiB)" << std::endl;
+        LOG_INFO("TextureLoadingQueue", "Memory backpressure released (heap %zu MiB)", heapBytes / (1024 * 1024));
     }
     _memoryBackpressureActive = false;
 #endif
@@ -78,7 +76,7 @@ bool TextureLoadingQueue::QueueTextureLoad(const std::string& path, const std::s
 
 void TextureLoadingQueue::SetMaxConcurrentLoads(int maxConcurrentLoads) {
     _maxConcurrentLoads = std::max(0, maxConcurrentLoads);
-    std::cout << "[TextureLoadingQueue] Concurrency limit set to " << _maxConcurrentLoads << std::endl;
+    LOG_INFO("TextureLoadingQueue", "Concurrency limit set to %d", _maxConcurrentLoads);
 
     if (_maxConcurrentLoads == 0) {
         _cancelledPaths.insert(_pendingPaths.begin(), _pendingPaths.end());
@@ -116,7 +114,7 @@ void TextureLoadingQueue::HandleDownloadResult(TextureLoadJob job, bool success)
         try {
             if (job.targetTexture) {
                 job.targetTexture->ReloadTexture(job.path);
-                std::cout << "[TextureLoadingQueue] Successfully loaded: " << job.textureId << std::endl;
+                LOG_DEBUG("TextureLoadingQueue", "Successfully loaded: %s", job.textureId.c_str());
                 _totalCompleted++;
                 _categoryCompleted.at(static_cast<size_t>(job.category))++;
                 if (job.callback) job.callback(true);
@@ -124,13 +122,12 @@ void TextureLoadingQueue::HandleDownloadResult(TextureLoadJob job, bool success)
                 return;
             }
         } catch (const std::exception& e) {
-            std::cerr << "[TextureLoadingQueue] Failed to load texture " << job.textureId << ": " << e.what() << std::endl;
+            LOG_WARN("TextureLoadingQueue", "Failed to load texture %s: %s", job.textureId.c_str(), e.what());
             success = false;
         }
     }
 
-    std::cerr << "[TextureLoadingQueue] Failed to download " << job.textureId
-              << " (will keep previous texture)" << std::endl;
+    LOG_WARN("TextureLoadingQueue", "Failed to download %s (will keep previous texture)", job.textureId.c_str());
 
     bool didRetry = false;
     if (job.retries < job.maxRetries) {
@@ -138,8 +135,8 @@ void TextureLoadingQueue::HandleDownloadResult(TextureLoadJob job, bool success)
         const auto delay = std::chrono::milliseconds(250 * (1 << std::min(job.retries - 1, 3)));
         job.nextAttemptTime = std::chrono::steady_clock::now() + delay;
         _queue.push(job);
-        std::cout << "[TextureLoadingQueue] Queued retry " << job.retries << "/" << job.maxRetries
-                  << " for " << job.textureId << std::endl;
+        LOG_INFO("TextureLoadingQueue", "Queued retry %d/%d for %s", job.retries, job.maxRetries,
+                 job.textureId.c_str());
         didRetry = true;
     } else {
         _totalFailed++;
@@ -184,8 +181,8 @@ void TextureLoadingQueue::ProcessQueue() {
         ++_activeLoads;
         _currentPath = job.path;
 
-        std::cout << "[TextureLoadingQueue][" << CategoryName(job.category) << "] Loading texture: " << job.textureId
-                  << " from " << job.path << " (active " << _activeLoads << "/" << effectiveMax << ")" << std::endl;
+        LOG_DEBUG("TextureLoadingQueue", "[%s] Loading texture: %s from %s (active %d/%d)", CategoryName(job.category),
+                  job.textureId.c_str(), job.path.c_str(), _activeLoads, effectiveMax);
 
         WebResourceFetcher::DownloadFile(job.path, job.path, [this, job](bool success) mutable {
             --_activeLoads;
@@ -206,7 +203,7 @@ int TextureLoadingQueue::GetCategoryCompleted(TextureLoadCategory category) cons
 void TextureLoadingQueue::CancelLoad(const std::string& path) {
     if (_pendingPaths.count(path)) {
         _cancelledPaths.insert(path);
-        std::cout << "[TextureLoadingQueue] Cancel requested for " << path << std::endl;
+        LOG_DEBUG("TextureLoadingQueue", "Cancel requested for %s", path.c_str());
     }
 }
 

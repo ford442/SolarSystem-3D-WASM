@@ -31,6 +31,7 @@ set(SOLARSYSTEM_TEST_SOURCES
     ${CMAKE_SOURCE_DIR}/src/Auxiliary_Modules/BlockCompression.cpp
     ${CMAKE_SOURCE_DIR}/src/3rdparty/ktx2_reader.cpp
     ${CMAKE_SOURCE_DIR}/src/Auxiliary_Modules/ShaderSource.cpp
+    ${CMAKE_SOURCE_DIR}/src/core/Log.cpp
     ${CMAKE_SOURCE_DIR}/src/Solar_System/CatalogMaterialVariants.cpp
     ${CMAKE_SOURCE_DIR}/src/Solar_System/AtmosphereModel.cpp
     ${CMAKE_SOURCE_DIR}/src/3rdparty/ktx2_writer.cpp
@@ -62,6 +63,7 @@ add_executable(SolarSystemTests
     test_giant_atmospheres.cpp
     test_frame_passes.cpp
     test_frustum.cpp
+    test_log.cpp
     stub_texture_image2d.cpp
     ${SOLARSYSTEM_TEST_SOURCES}
 )

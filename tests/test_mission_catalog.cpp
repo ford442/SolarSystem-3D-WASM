@@ -73,6 +73,15 @@ TEST(MissionCatalogTest, DownsampleKeepsEndpoints) {
     EXPECT_EQ(full.size(), 5u);
 }
 
+TEST(MissionCatalogTest, RejectsOutOfRangeNumbers) {
+    MissionCatalog::Catalog catalog;
+    std::string error;
+    std::string text = kCatalog;
+    text.replace(text.find("2440000.0"), 9, "1e999");
+    EXPECT_FALSE(MissionCatalog::LoadFromString(text, catalog, error));
+    EXPECT_FALSE(error.empty());
+}
+
 TEST(MissionCatalogTest, RejectsInvalidRoot) {
     MissionCatalog::Catalog catalog;
     std::string error;

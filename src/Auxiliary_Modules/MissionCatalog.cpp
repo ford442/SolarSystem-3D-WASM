@@ -2,7 +2,9 @@
 
 #include <algorithm>
 #include <cctype>
+#include <cerrno>
 #include <cmath>
+#include <cstdlib>
 #include <fstream>
 #include <sstream>
 #include <utility>
@@ -128,12 +130,12 @@ private:
         if (start == _pos) {
             return false;
         }
-        try {
-            out = std::stod(_source.substr(start, _pos - start));
-            return true;
-        } catch (...) {
-            return false;
-        }
+        // strtod, not stod: a malformed or out-of-range number is a parse error, not an exception.
+        const std::string token = _source.substr(start, _pos - start);
+        char* end = nullptr;
+        errno = 0;
+        out = std::strtod(token.c_str(), &end);
+        return end == token.c_str() + token.size() && errno != ERANGE;
     }
 
     bool parseColor(glm::vec3& out) {

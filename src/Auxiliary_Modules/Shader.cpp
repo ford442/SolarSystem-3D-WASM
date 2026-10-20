@@ -1,6 +1,7 @@
 #include "Shader.h"
 #include "GlCapabilities.h"
 #include "../gfx/FrameUniforms.h"
+#include "../core/Log.h"
 #include <algorithm>
 #include <cstring>
 #include <set>
@@ -25,7 +26,7 @@ ShaderSource::Result AssembleShader(const std::string& path, ShaderSource::Stage
     ShaderSource::Result result =
         ShaderSource::Preprocess(path, stage, dialect, ShaderSource::ReadFileFromDisk, defines);
     if (!result.ok) {
-        std::cerr << "ERROR::SHADER::PREPROCESS_FAILED: " << result.error << std::endl;
+        LOG_ERROR("Shader", "PREPROCESS_FAILED: %s", result.error.c_str());
         throw std::runtime_error("ERROR::SHADER::PREPROCESS_FAILED: " + result.error);
     }
     return result;
@@ -387,8 +388,7 @@ bool Shader::Reload() {
     } catch (const std::exception&) {
         // Already printed. Remember these mtimes, so the next poll waits for another save.
         RefreshSourceTimes();
-        std::cerr << "[Shader] hot reload of " << _spec.Describe() << " failed; keeping the previous program"
-                  << std::endl;
+        LOG_WARN("Shader", "hot reload of %s failed; keeping the previous program", _spec.Describe().c_str());
         return false;
     }
     // Uniforms that were set once (at init, or on a toggle) would otherwise read 0 until the
@@ -425,7 +425,7 @@ int Shader::ReloadChanged() {
     for (Shader* shader : changed) { // Reload() registers a temporary, so not over Registry()
         if (shader->Reload()) {
             ++reloaded;
-            std::cout << "[Shader] reloaded " << shader->_spec.Describe() << std::endl;
+            LOG_INFO("Shader", "reloaded %s", shader->_spec.Describe().c_str());
         }
     }
     return reloaded;
@@ -489,8 +489,8 @@ int Shader::SelfTestDirectory(const std::string& directory) {
             }
         }
     }
-    std::cout << "[ShaderSelfTest] " << compiled << "/" << (compiled + static_cast<size_t>(failures))
-              << " shader stages compiled (460 core + 300 es, every declared permutation)" << (failures == 0 ? " OK" : " - FAILURES") << std::endl;
+    LOG_INFO("ShaderSelfTest", "%zu/%zu shader stages compiled (460 core + 300 es, every declared permutation)%s",
+             compiled, compiled + static_cast<size_t>(failures), failures == 0 ? " OK" : " - FAILURES");
     return failures;
 }
 #endif
@@ -503,15 +503,15 @@ void Shader::CheckCompileErrors(size_t shader, ShaderType type, const std::strin
         glGetShaderiv(shader, GL_COMPILE_STATUS, &success);
         if (!success) {
             glGetShaderInfoLog(shader, 1024, nullptr, infoLog);
-            std::cerr << "ERROR::SHADER::COMPILATION_FAILED\nType: " << ShaderTypeToString(type)
-                      << "\nPath: " << path << "\n" << infoLog;
+            LOG_ERROR("Shader", "COMPILATION_FAILED\nType: %s\nPath: %s\n%s", ShaderTypeToString(type).c_str(),
+                      path.c_str(), infoLog);
             if (source) {
                 // Errors are reported as <source string>:<line>; map the numbers back to
                 // files, and dump the assembled text in case a driver numbers #line oddly.
-                std::cerr << "Source strings:\n" << ShaderSource::DescribeSources(*source)
-                          << "Assembled source:\n" << ShaderSource::NumberedListing(source->code);
+                LOG_ERROR("Shader", "Source strings:\n%sAssembled source:\n%s",
+                          ShaderSource::DescribeSources(*source).c_str(),
+                          ShaderSource::NumberedListing(source->code).c_str());
             }
-            std::cerr << "\n -- --------------------------------------------------- -- " << std::endl;
             throw std::runtime_error("ERROR::SHADER_COMPILATION_ERROR of type: " + ShaderTypeToString(type) + " " + path + "\n" + std::string(infoLog) + "\n -- --------------------------------------------------- -- ");
         }
     }
@@ -519,8 +519,8 @@ void Shader::CheckCompileErrors(size_t shader, ShaderType type, const std::strin
         glGetProgramiv(shader, GL_LINK_STATUS, &success);
         if (!success) {
             glGetProgramInfoLog(shader, 1024, nullptr, infoLog);
-            std::cerr << "ERROR::SHADER::PROGRAM_LINKING_FAILED\nType: " << ShaderTypeToString(type)
-                      << "\nPath: " << path << "\n" << infoLog << "\n -- --------------------------------------------------- -- " << std::endl;
+            LOG_ERROR("Shader", "PROGRAM_LINKING_FAILED\nType: %s\nPath: %s\n%s", ShaderTypeToString(type).c_str(),
+                      path.c_str(), infoLog);
             throw std::runtime_error("ERROR::PROGRAM_LINKING_ERROR of type: " + ShaderTypeToString(type) + "\n" + std::string(infoLog) + path + "\n -- --------------------------------------------------- --");
         }
     }

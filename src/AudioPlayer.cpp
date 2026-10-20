@@ -7,7 +7,7 @@
 #include <algorithm>
 #include <chrono>
 #include <cmath>
-#include <iostream>
+#include "core/Log.h"
 #include <string>
 #include <thread>
 
@@ -139,8 +139,7 @@ void Application::UpdateBackgroundMusic() {
 
             _currentMusic = Mix_LoadMUS(path.c_str());
             if (!_currentMusic) {
-                std::cerr << "[Audio] Failed to decode track (skipped): " << path
-                          << " (" << Mix_GetError() << ")" << std::endl;
+                LOG_WARN("Audio", "Failed to decode track (skipped): %s (%s)", path.c_str(), Mix_GetError());
                 _availableSongPaths.erase(path);
                 continue;
             }
@@ -150,11 +149,11 @@ void Application::UpdateBackgroundMusic() {
             applyMusicVolume(0.0f);
             _musicStartTime = SDL_GetTicks();
             _musicDuration = 180000;
-            std::cout << "[Audio] Now playing: " << _currentMusicTrack << std::endl;
+            LOG_INFO("Audio", "Now playing: %s", _currentMusicTrack.c_str());
             return;
         }
 
-        std::cerr << "[Audio] No playable tracks available yet; waiting for downloads" << std::endl;
+        LOG_INFO("Audio", "No playable tracks available yet; waiting for downloads");
         return;
     }
 

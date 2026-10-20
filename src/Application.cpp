@@ -11,12 +11,12 @@
 #include "WasmExports.h"
 #include "Auxiliary_Modules/TextureLoadingQueue.h"
 #include "Solar_System/OrbitLayout.h"
+#include "core/Log.h"
 #include <algorithm>
 #include <chrono>
 #include <cmath>
 #include <cstdio>
 #include <cstdlib>
-#include <iostream>
 #include <sstream>
 
 using namespace std;
@@ -68,7 +68,7 @@ void Application::RunOneFrame() {
         UpdateLoadingProgress();
 
         if (_resourcesPending <= 0) {
-             std::cout << "All resources downloaded. Initializing scene..." << std::endl;
+             LOG_INFO("Loading", "All resources downloaded. Initializing scene...");
              InitSceneObjects();
              _appState = AppState::RUNNING;
         }
@@ -226,20 +226,21 @@ void Application::PlaceSceneComponents() {
 }
 
 void Application::ReportFrameStats() {
-    // SOLARSYSTEM_FRAME_STATS=N: print the previous frame's pass counts every N frames.
+    // At debug level (SOLARSYSTEM_LOG=debug / ?log=debug), log the previous frame's pass
+    // counts every N frames: SOLARSYSTEM_FRAME_STATS=N, 120 by default.
     static const int every = [] {
         const char* value = std::getenv("SOLARSYSTEM_FRAME_STATS");
-        return value ? std::max(0, std::atoi(value)) : 0;
+        return value ? std::max(0, std::atoi(value)) : 120;
     }();
     static unsigned long long frame = 0;
     const unsigned long long uniformCalls = Shader::UniformCallCount();
     Shader::ResetUniformCallCount();
     if (every > 0 && frame++ % static_cast<unsigned long long>(every) == 0) {
         const FramePasses::Stats& stats = _renderer.Stats();
-        std::cerr << "[FrameStats] updates=" << stats.sceneUpdates << " viewBinds=" << stats.viewBinds
-                  << " shadowPasses=" << stats.shadowPasses << " componentDraws=" << stats.componentDraws
-                  << " bodyDraws=" << stats.bodyDraws << " culled=" << stats.culledComponents
-                  << " uniformCalls=" << uniformCalls << std::endl;
+        LOG_DEBUG("FrameStats",
+                  "updates=%d viewBinds=%d shadowPasses=%d componentDraws=%d bodyDraws=%d culled=%d uniformCalls=%llu",
+                  stats.sceneUpdates, stats.viewBinds, stats.shadowPasses, stats.componentDraws, stats.bodyDraws,
+                  stats.culledComponents, uniformCalls);
     }
 }
 
@@ -463,7 +464,7 @@ void Application::ApplyCameraPoseEnvOverride() {
         values[parsed++] = std::atof(token.c_str());
     }
     if (parsed < 5) {
-        std::cerr << "[Camera] SOLARSYSTEM_CAMERA_POSE needs x,y,z,yaw,pitch[,jd]" << std::endl;
+        LOG_WARN("Camera", "SOLARSYSTEM_CAMERA_POSE needs x,y,z,yaw,pitch[,jd]");
         return;
     }
     if (parsed >= 6 && values[5] > 0.0) {
@@ -714,12 +715,11 @@ bool Application::GetMagneticFieldsEnabled() const { return _renderer.GetMagneti
 void Application::LoadMissionCatalog() {
     std::string error;
     if (!MissionCatalog::LoadFromFile("resource/missions/catalog.json", _missionCatalog, error)) {
-        std::cout << "[Missions] " << error << std::endl;
+        LOG_WARN("Missions", "%s", error.c_str());
         _missionCatalog = {};
         return;
     }
-    std::cout << "[Missions] Loaded " << _missionCatalog.missions.size()
-              << " trajectory path(s) from catalog.json" << std::endl;
+    LOG_INFO("Missions", "Loaded %zu trajectory path(s) from catalog.json", _missionCatalog.missions.size());
 }
 
 void Application::LoadMissions() {

@@ -1,5 +1,6 @@
 #include "SkyBox.h"
 #include "../Auxiliary_Modules/WebResourceFetcher.h"
+#include "../core/Log.h"
 
 SkyBox::SkyBox(const std::vector<std::string>& faces) {
     InitBuffers();
@@ -47,11 +48,11 @@ void SkyBox::LoadCubeMap(const std::vector<std::string>& faces) {
             CDDSImage image;
             image.load(faces[i], false);
             image.upload_texture2D(0, target);
-            std::cout << faces[i] << " Loaded" << std::endl;
+            LOG_DEBUG("SkyBox", "%s Loaded", faces[i].c_str());
         }
         catch (const std::runtime_error& error) {
-            std::cerr << "[SkyBox] Warning: failed to load face " << faces[i]
-                      << " (" << error.what() << "). Using fallback cubemap." << std::endl;
+            LOG_WARN("SkyBox", "Warning: failed to load face %s (%s). Using fallback cubemap.", faces[i].c_str(),
+                     error.what());
             anyFailed = true;
             break;
         }
@@ -78,7 +79,7 @@ void SkyBox::LoadCubeMap(const std::vector<std::string>& faces) {
             GLenum target = GL_TEXTURE_CUBE_MAP_POSITIVE_X + static_cast<GLenum>(i);
             image.load(faces[i], false);
             image.upload_texture2D(0, target);
-            std::cout << faces[i] << " Loaded" << std::endl;
+            LOG_DEBUG("SkyBox", "%s Loaded", faces[i].c_str());
         }
         catch (const std::runtime_error& error) {
             throw std::runtime_error("Image " + faces[i] + " cannot be loaded");

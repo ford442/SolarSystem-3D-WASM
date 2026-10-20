@@ -8,12 +8,13 @@
 #include "Auxiliary_Modules/GlCapabilities.h"
 #include "Auxiliary_Modules/TextureFormatSupport.h"
 #include "Solar_System/OrbitLayout.h"
+#include "core/Log.h"
 #include <SDL_image.h>
 #include <algorithm>
 #include <cmath>
 #include <cstdlib>
 #include <cstring>
-#include <iostream>
+#include <unordered_map>
 
 #ifdef __EMSCRIPTEN__
 #include <emscripten.h>
@@ -50,43 +51,66 @@ void SelectTexturePack() {
 
     if (published) {
         TextureFormats::SetTexturePack(preferred);
-        std::cout << "[Texture] Using the '" << preferred << "' KTX2 pack" << std::endl;
+        LOG_INFO("Texture", "Using the '%s' KTX2 pack", preferred);
         return;
     }
-    std::cout << "[Texture] No '" << preferred << "' KTX2 pack published; using .dds"
-              << (GetGlCapabilities().s3tcCompressedTextures ? "" : " with software BC decode")
-              << std::endl;
+    LOG_INFO("Texture", "No '%s' KTX2 pack published; using .dds%s", preferred,
+             GetGlCapabilities().s3tcCompressedTextures ? "" : " with software BC decode");
 #endif
 }
 } // namespace
 
 // Error Callback
 void glfwErrorCallback(int error, const char* description) {
-    std::cerr << "GLFW Error (" << error << "): " << description << std::endl;
+    LOG_ERROR("GLFW", "error %d: %s", error, description);
 }
 
 #ifndef __EMSCRIPTEN__
 namespace {
+// A KHR_debug context in Debug builds; SOLARSYSTEM_GL_DEBUG=1/0 forces it on/off in any build.
 bool GlDebugRequested() {
-    const char* value = std::getenv("SOLARSYSTEM_GL_DEBUG");
-    return value && *value && std::string(value) != "0";
+    if (const char* value = std::getenv("SOLARSYSTEM_GL_DEBUG"); value && *value) {
+        return std::string(value) != "0";
+    }
+#ifdef NDEBUG
+    return false;
+#else
+    return true;
+#endif
+}
+
+Log::Level GlDebugLevel(GLenum type, GLenum severity) {
+    if (type == GL_DEBUG_TYPE_ERROR || severity == GL_DEBUG_SEVERITY_HIGH) {
+        return Log::Level::Error;
+    }
+    switch (severity) {
+        case GL_DEBUG_SEVERITY_MEDIUM: return Log::Level::Warn;
+        case GL_DEBUG_SEVERITY_LOW: return Log::Level::Info;
+        default: return Log::Level::Debug; // GL_DEBUG_SEVERITY_NOTIFICATION
+    }
 }
 
 void GLAPIENTRY GlDebugCallback(GLenum /*source*/, GLenum type, GLuint id, GLenum severity, GLsizei /*length*/,
                                 const GLchar* message, const void* /*userParam*/) {
-    if (severity == GL_DEBUG_SEVERITY_NOTIFICATION) {
+    const Log::Level level = GlDebugLevel(type, severity);
+    if (!Log::Enabled(level)) {
         return;
     }
-    std::cerr << "[GL debug] " << (type == GL_DEBUG_TYPE_ERROR ? "error" : "message") << " 0x" << std::hex << id
-              << std::dec << ": " << message << std::endl;
+    // A driver repeats the same message every draw (e.g. an incomplete placeholder texture);
+    // print each id a few times, then say once that it is being dropped.
+    constexpr int kRepeatsPerId = 5;
+    static std::unordered_map<GLuint, int> seen;
+    const int count = ++seen[id];
+    if (count > kRepeatsPerId) {
+        return;
+    }
+    Log::Write(level, "GL", "0x%x: %s%s", id, message,
+               count == kRepeatsPerId ? " (further messages with this id suppressed)" : "");
 }
 } // namespace
 #endif
 
 void Application::InitSystems() {
-    ios_base::sync_with_stdio(false);
-    cin.tie(nullptr);
-
     OrbitLayout::SetJulianDate(Ephemeris::JulianDateNowUtc());
 
     glfwSetErrorCallback(glfwErrorCallback);
@@ -121,7 +145,7 @@ void Application::InitSystems() {
     glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 6);
     glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
     glfwWindowHint(GLFW_SAMPLES, qualitySettings.requestedMsaaSamples);
-    // SOLARSYSTEM_GL_DEBUG=1: KHR_debug context; every non-notification message goes to stderr.
+    // Debug builds (or SOLARSYSTEM_GL_DEBUG=1): KHR_debug context, messages routed into Log.
     glfwWindowHint(GLFW_OPENGL_DEBUG_CONTEXT, GlDebugRequested() ? GLFW_TRUE : GLFW_FALSE);
 #endif
 
@@ -188,8 +212,8 @@ void Application::InitSystems() {
 
     GLint actualSamples = 0;
     glGetIntegerv(GL_SAMPLES, &actualSamples);
-    std::cout << "[Quality] Requested " << qualitySettings.requestedMsaaSamples
-              << "x MSAA, context provides " << actualSamples << " samples" << std::endl;
+    LOG_INFO("Quality", "Requested %dx MSAA, context provides %d samples", qualitySettings.requestedMsaaSamples,
+             actualSamples);
 
     // The UI reports _isVertSyncEnabled from startup, but only the F-key toggle used to
     // call through to the driver — so the reported state could disagree with reality
@@ -221,7 +245,7 @@ void Application::InitSystems() {
         glEnable(GL_DEBUG_OUTPUT);
         glEnable(GL_DEBUG_OUTPUT_SYNCHRONOUS);
         glDebugMessageCallback(GlDebugCallback, nullptr);
-        std::cout << "[GL debug] KHR_debug output enabled" << std::endl;
+        LOG_INFO("GL", "KHR_debug output enabled");
     }
 
     if (const char* selfTest = std::getenv("SOLARSYSTEM_SHADER_SELFTEST"); selfTest && *selfTest && std::string(selfTest) != "0") {
@@ -250,12 +274,12 @@ void Application::InitSystems() {
 
 #ifdef SOLARSYSTEM_USE_SDL_MIXER
     if (Mix_OpenAudio(44100, MIX_DEFAULT_FORMAT, 2, 2048) < 0) {
-        std::cerr << "[Audio] Failed to init SDL_mixer: " << Mix_GetError() << std::endl;
+        LOG_WARN("Audio", "Failed to init SDL_mixer: %s", Mix_GetError());
         _mixerInitialized = false;
     } else {
         Mix_AllocateChannels(16);
         _mixerInitialized = true;
-        std::cout << "[Audio] SDL_mixer initialized" << std::endl;
+        LOG_INFO("Audio", "SDL_mixer initialized");
     }
 #elif !defined(__EMSCRIPTEN__)
     _soundEngine = createIrrKlangDevice(ESOD_AUTO_DETECT, ESEO_MULTI_THREADED | ESEO_LOAD_PLUGINS);
@@ -323,13 +347,17 @@ void Application::ReleaseGpuResources() {
 }
 
 void Application::DisplaySystemInformation() const {
-    cout << "GPU Supplier: " << glGetString(GL_VENDOR) << endl;
-    cout << "GPU: " << glGetString(GL_RENDERER) << endl;
+    const auto glString = [](GLenum name) {
+        const GLubyte* value = glGetString(name);
+        return value ? reinterpret_cast<const char*>(value) : "?";
+    };
+    LOG_INFO("GPU", "Supplier: %s", glString(GL_VENDOR));
+    LOG_INFO("GPU", "Renderer: %s", glString(GL_RENDERER));
 
     GLint majorVersion, minorVersion;
     glGetIntegerv(GL_MAJOR_VERSION, &majorVersion);
     glGetIntegerv(GL_MINOR_VERSION, &minorVersion);
-    cout << "OpenGL version: " << majorVersion << '.' << minorVersion << endl;
+    LOG_INFO("GPU", "OpenGL version: %d.%d", majorVersion, minorVersion);
 
 #ifndef __EMSCRIPTEN__
     // GL_GPU_MEMORY_INFO_*_NVX comes from NV_NVX_gpu_memory_info; querying it on AMD or
@@ -340,27 +368,25 @@ void Application::DisplaySystemInformation() const {
 
         GLint currentMemoryKb = 0;
         glGetIntegerv(GL_GPU_MEMORY_INFO_CURRENT_AVAILABLE_VIDMEM_NVX, &currentMemoryKb);
-        cout << "Total GPU Memory: " << totalMemoryKb << " kb\nFree GPU Memory: " << currentMemoryKb << " kb" << endl;
+        LOG_INFO("GPU", "Total memory: %d kb, free: %d kb", totalMemoryKb, currentMemoryKb);
     }
 #endif
 
     GLint maxTextureSize;
     glGetIntegerv(GL_MAX_TEXTURE_SIZE, &maxTextureSize);
-    cout << "Max texture size in the system: "<< maxTextureSize << "x" << maxTextureSize << endl;
-    cout << "Driver: " << glGetString(GL_VERSION) << endl;
+    LOG_INFO("GPU", "Max texture size: %dx%d", maxTextureSize, maxTextureSize);
+    LOG_INFO("GPU", "Driver: %s", glString(GL_VERSION));
 }
 
 void Application::LoadWindowIcon() const {
     constexpr auto execIconPath = "resource/icons/solarsystem-logo.png";
     SDL_Surface* windowIcon = IMG_Load(execIconPath);
     if (windowIcon == nullptr) {
-        std::cerr << "WARNING: Cannot load window icon " << execIconPath
-                  << " (" << IMG_GetError() << ")" << std::endl;
+        LOG_WARN("Window", "Cannot load window icon %s (%s)", execIconPath, IMG_GetError());
         return;
     }
     if (windowIcon->w > 256 || windowIcon->h > 256) {
-        std::cerr << "WARNING: Skipping oversized window icon ("
-                  << windowIcon->w << "x" << windowIcon->h << ")" << std::endl;
+        LOG_WARN("Window", "Skipping oversized window icon (%dx%d)", windowIcon->w, windowIcon->h);
         SDL_FreeSurface(windowIcon);
         return;
     }

@@ -5,8 +5,8 @@
 #include "QualitySettings.h"
 #include "Auxiliary_Modules/TextureLoadingQueue.h"
 #include "Solar_System/OrbitLayout.h"
+#include "core/Log.h"
 #include <algorithm>
-#include <iostream>
 
 void Application::ApplyQualityPreset(int preset) {
     _simState.qualityPreset = std::clamp(preset, 0, 2);
@@ -34,7 +34,7 @@ void Application::ApplyQualityPreset(int preset) {
 void Application::ApplyShadowQuality(int quality) {
     _simState.shadowQuality = std::clamp(quality, 0, 3);
     if (_simState.shadowQuality == 0) {
-        std::cout << "[Shadows] disabled" << std::endl;
+        LOG_INFO("Shadows", "disabled");
         return;
     }
 
@@ -52,8 +52,8 @@ void Application::ApplyOrbitScaleMode(int mode) {
     RefreshPlanetProxyPositions();
     // Belt instance matrices follow the new AU→scene mapping at the next UpdateScene.
     _renderer.RebuildMissionPaths(_missionCatalog, _simState.qualityPreset);
-    std::cout << "[OrbitScale] " << (scaleMode == OrbitLayout::ScaleMode::Realistic ? "realistic" : "compressed")
-              << " distances active" << std::endl;
+    LOG_INFO("OrbitScale", "%s distances active",
+             scaleMode == OrbitLayout::ScaleMode::Realistic ? "realistic" : "compressed");
 }
 
 void Application::UpdateLOD() {
