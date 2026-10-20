@@ -6,14 +6,17 @@
 #include "FramePasses.h"
 #include "Renderer.h"
 #include "SimState.h"
-#include "Auxiliary_Modules/AuxiliaryModules.h"
-#include "Auxiliary_Modules/Observer.h"
-#include "Auxiliary_Modules/SkyEvents.h"
+#include "astro/MissionCatalog.h"
+#include "astro/Observer.h"
+#include "astro/SkyEvents.h"
 #include "PlanetSystemManifest.h"
 #include "Solar_System/AsteroidField.h"
 #include "Solar_System/SolarSystem.h"
 #include "SystemModules.h"
 #include "XrState.h"
+#include "core/Camera.h"
+#include "core/FrameTimer.h"
+#include "gfx/MeshHolder.h"
 #include <array>
 #include <atomic>
 #include <functional>
@@ -32,7 +35,6 @@
 #include <SDL_mixer.h>
 #elif !defined(__EMSCRIPTEN__)
 #include <irrKlang.h>
-using namespace irrklang;
 #endif
 
 class Application {
@@ -151,7 +153,7 @@ private:
     uint16_t _displayWidth = 0, _displayHeight = 0;
     int _nearestPlanetIndex = -1;      // Into _renderableSceneComponents; -1 when no planets are loaded yet
     int _focusedPlanetIndex = -1;      // FocusPlanet index (0=sun … 9=pluto); -1 = none
-    FPS_Handler _fpsHandler;
+    FrameTimer _frameTimer;
     FT_Library _ft = nullptr;
     bool _isBackgroundMusicPlay = false, _isSearchNearestPlanet = false;
 
@@ -166,7 +168,7 @@ private:
     std::unordered_set<std::string> _availableSongPaths;
 #endif
 #if !defined(SOLARSYSTEM_USE_SDL_MIXER) && !defined(__EMSCRIPTEN__)
-    ISoundEngine* _soundEngine = nullptr;
+    irrklang::ISoundEngine* _soundEngine = nullptr;
     std::unique_ptr<std::thread> _backgroundMusicThread;
 #endif
 

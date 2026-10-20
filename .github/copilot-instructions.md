@@ -44,7 +44,7 @@ npm run dev         # Vite dev server
 ### Directory Structure
 - **`/src`**
   - `Solar_System/`: Planet/satellite logic, physics, rendering (SpaceObject.h hierarchy)
-  - `Auxiliary_Modules/`: Shaders, Camera, Mesh, Texture, FPS handling
+  - `core/` (Log, Camera, FrameTimer), `gfx/` (GL objects, shaders, meshes, textures), `render/` (overlays, post effects), `assets/` (downloads, texture streaming), `astro/` (GL-free ephemerides and catalogs)
   - `main.cpp, Application.cpp`: Entry point and main loop
 - **`/resource`**: Shaders (GLSL), Textures (DDS), Models (OBJ), Fonts (TTF)
 - **`/web`**: Frontend (HTML/CSS/TypeScript), Vite build config
@@ -73,7 +73,7 @@ npm run dev         # Vite dev server
 
 **Critical Patterns:**
 - **Audio:** irrKlang (Windows) / SDL_mixer (Linux) ↔ HTMLAudioElement (web, web/src/music.ts)
-- **Threading:** `std::thread` (native) ↔ Frame-based async (web, use `FPS_Handler`)
+- **Threading:** `std::thread` (native) ↔ Frame-based async (web, per-frame work in the main loop)
 - **Graphics:** OpenGL 4.6 (native) ↔ WebGL 2/ES 3.0 (web)
 
 ### Main Loop
@@ -128,7 +128,7 @@ emscripten_set_main_loop_arg(RunOneFrame, ...);
 ### ✅ Do
 1. Always gate platform-specific code with `#ifdef __EMSCRIPTEN__`
 2. Add `precision highp float;` to all web fragment shaders
-3. Use `FPS_Handler` to simulate background tasks on web
+3. Run background work per frame on web (there are no threads), as `UpdateBackgroundMusic()` does
 4. Test both builds regularly to ensure feature parity
 
 ## Reference Docs

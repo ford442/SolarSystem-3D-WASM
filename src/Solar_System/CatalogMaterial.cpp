@@ -1,6 +1,6 @@
 #include "CatalogMaterial.h"
 #include "../gfx/TextureUnits.h"
-#include "../Auxiliary_Modules/Shader.h"
+#include "../gfx/Shader.h"
 
 namespace CatalogMaterial {
 

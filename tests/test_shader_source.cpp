@@ -3,7 +3,7 @@
 // errors pointing at the right file and line; and CatalogMaterial's variant masks. The last
 // tests run every real shader in resource/shaders through the preprocessor.
 
-#include "Auxiliary_Modules/ShaderSource.h"
+#include "gfx/ShaderSource.h"
 #include "Solar_System/CatalogMaterial.h"
 #include "gfx/TextureUnits.h"
 

@@ -1,5 +1,5 @@
 #include "ShaderSource.h"
-#include "../gfx/TextureUnits.h"
+#include "TextureUnits.h"
 
 #include <algorithm>
 #include <cctype>

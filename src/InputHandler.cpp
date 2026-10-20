@@ -4,7 +4,7 @@
 #include "JsBridge.h"
 #include "SimState.h"
 #include "WasmExports.h"
-#include "Auxiliary_Modules/Ephemeris.h"
+#include "astro/Ephemeris.h"
 #include "Solar_System/OrbitLayout.h"
 #include <algorithm>
 #include <cmath>

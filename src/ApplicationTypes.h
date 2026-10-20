@@ -1,8 +1,11 @@
 #ifndef SOLARSYSTEM_APPLICATION_TYPES_H
 #define SOLARSYSTEM_APPLICATION_TYPES_H
 
-#include "Auxiliary_Modules/AuxiliaryModules.h"
-#include "Solar_System/SolarSystem.h"
+#include "Solar_System/Atmosphere.h"
+#include "Solar_System/Clouds.h"
+#include "Solar_System/Planet.h"
+#include "Solar_System/PlanetaryRing.h"
+#include "Solar_System/Satellite.h"
 #include <memory>
 #include <vector>
 

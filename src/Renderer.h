@@ -5,16 +5,30 @@
 #include "FramePasses.h"
 #include "SystemModules.h"
 #include "gfx/FrameUniforms.h"
-#include "Auxiliary_Modules/MissionCatalog.h"
-#include "Auxiliary_Modules/ShaderLibrary.h"
+#include "astro/MissionCatalog.h"
+#include "gfx/ShaderLibrary.h"
 #include "Solar_System/CatalogMaterial.h"
 #include "Solar_System/ObserveSky.h"
 #include <array>
 #include <deque>
+#include <memory>
 #include <string>
+#include <vector>
 
 class SpaceObject;
 struct QualityTierSettings;
+// GPU helpers held by unique_ptr: complete in the Renderer TUs only, which keeps their
+// headers out of everything that includes Application.h.
+class HDR;
+class LensFlare;
+class MagneticFieldBloom;
+class MagneticFieldLineRenderer;
+class MissionPathRenderer;
+class OrbitPathRenderer;
+class ShadowMapFBO;
+class SkyBox;
+class TextRenderer;
+class XrPointerRenderer;
 
 /**
  * Shadow/color/overlay/HDR draw passes, the GPU resources they own (shaders, shadow FBO,
@@ -28,6 +42,11 @@ struct QualityTierSettings;
  */
 class Renderer {
 public:
+    Renderer();
+    ~Renderer(); // out of line: the unique_ptr members above are incomplete here
+    Renderer(const Renderer&) = delete;
+    Renderer& operator=(const Renderer&) = delete;
+
     /** Hand-tuned star look (keys 3–8): HDR exposure/gamma and the glow's temperature. */
     struct StarTuning {
         float exposure = 8.0f;

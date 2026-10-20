@@ -4,7 +4,7 @@
 #include "QualitySettings.h"
 #include "SimState.h"
 #include "Solar_System/OrbitLayout.h"
-#include "Auxiliary_Modules/Shader.h"
+#include "gfx/Shader.h"
 #include <algorithm>
 #include <cmath>
 #include <cstdio>

@@ -1,6 +1,6 @@
 #ifndef SOLARSYSTEM_TRANSFORMABLE_H
 #define SOLARSYSTEM_TRANSFORMABLE_H
-#include "../Auxiliary_Modules/Shader.h"
+#include "../gfx/Shader.h"
 #include <glm/glm.hpp>
 #include <glm/gtc/matrix_transform.hpp>
 

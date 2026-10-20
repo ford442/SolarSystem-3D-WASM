@@ -3,7 +3,7 @@
 #include <algorithm>
 #include <cmath>
 
-#include "Auxiliary_Modules/Ephemeris.h"
+#include "astro/Ephemeris.h"
 
 namespace {
 

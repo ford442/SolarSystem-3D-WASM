@@ -1,8 +1,8 @@
 #include <gtest/gtest.h>
 
-#include "Auxiliary_Modules/MagneticFieldLineMesh.h"
-#include "Auxiliary_Modules/MagneticFieldModel.h"
-#include "Auxiliary_Modules/MagneticFieldTracer.h"
+#include "render/MagneticFieldLineMesh.h"
+#include "astro/MagneticFieldModel.h"
+#include "astro/MagneticFieldTracer.h"
 
 #include <cmath>
 #include <glm/geometric.hpp>

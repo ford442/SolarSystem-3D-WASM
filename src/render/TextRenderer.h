@@ -1,6 +1,6 @@
 #ifndef SOLARSYSTEM_TEXTRENDERER_H
 #define SOLARSYSTEM_TEXTRENDERER_H
-#include "Shader.h"
+#include "../gfx/Shader.h"
 #include "../gfx/GlHandle.h"
 #include <ft2build.h>
 #include FT_FREETYPE_H

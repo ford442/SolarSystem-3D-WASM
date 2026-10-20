@@ -1,7 +1,7 @@
 #ifndef SOLARSYSTEM_MISSIONPATHRENDERER_H
 #define SOLARSYSTEM_MISSIONPATHRENDERER_H
 
-#include "Shader.h"
+#include "../gfx/Shader.h"
 #include "../gfx/LineStripBatch.h"
 #include <glm/glm.hpp>
 #include <memory>

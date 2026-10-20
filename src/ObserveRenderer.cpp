@@ -1,8 +1,9 @@
 // Observe-mode drawing on the Renderer side: view setup for the ObserveSky pass and the
 // text overlay (compass, body names, readout). The sky itself is Solar_System/ObserveSky.cpp.
 #include "Renderer.h"
-#include "Auxiliary_Modules/SeatedView.h"
-#include "Auxiliary_Modules/Observer.h"
+#include "astro/SeatedView.h"
+#include "astro/Observer.h"
+#include "render/TextRenderer.h"
 #include "Solar_System/OrbitLayout.h"
 #include <algorithm>
 #include <cmath>

@@ -4,9 +4,9 @@
 #include "Application.h"
 #include "QualitySettings.h"
 #include "SimState.h"
-#include "Auxiliary_Modules/Ephemeris.h"
-#include "Auxiliary_Modules/GlCapabilities.h"
-#include "Auxiliary_Modules/TextureFormatSupport.h"
+#include "astro/Ephemeris.h"
+#include "gfx/GlCapabilities.h"
+#include "assets/TextureFormatSupport.h"
 #include "Solar_System/OrbitLayout.h"
 #include "core/Log.h"
 #include <SDL_image.h>
@@ -282,7 +282,8 @@ void Application::InitSystems() {
         LOG_INFO("Audio", "SDL_mixer initialized");
     }
 #elif !defined(__EMSCRIPTEN__)
-    _soundEngine = createIrrKlangDevice(ESOD_AUTO_DETECT, ESEO_MULTI_THREADED | ESEO_LOAD_PLUGINS);
+    _soundEngine = irrklang::createIrrKlangDevice(irrklang::ESOD_AUTO_DETECT,
+                                                  irrklang::ESEO_MULTI_THREADED | irrklang::ESEO_LOAD_PLUGINS);
     if (!_soundEngine) {
         throw runtime_error("Failed to init sound engine");
     }

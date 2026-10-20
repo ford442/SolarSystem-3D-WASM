@@ -2,7 +2,7 @@
 
 #include "../3rdparty/ktx2_reader.h"
 #include "../Solar_System/AtmosphereModel.h"
-#include "WebResourceFetcher.h"
+#include "../assets/WebResourceFetcher.h"
 
 #include <cstdlib>
 #include <fstream>

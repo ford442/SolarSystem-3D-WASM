@@ -24,9 +24,14 @@ The web build adds async resource loading, staged planet initialization, and dis
 ```
 SolarSystem-3D-WASM/
 ├── src/                        # C++ application
-│   ├── Application.h/.cpp      # Main loop, loading, rendering
-│   ├── Auxiliary_Modules/      # Engine subsystems (Shader, Camera, LOD queue, …)
-│   └── Solar_System/           # Celestial bodies by system (Earth_System/, …)
+│   ├── Application.h/.cpp      # Main loop, loading, simulation (+ PlatformWindow, InputHandler, …)
+│   ├── Renderer.h, Scene*Renderer.cpp  # Draw passes over a FrameContext
+│   ├── core/                   # Log, Camera, FrameTimer
+│   ├── gfx/                    # GL objects: GlHandle, Shader/ShaderLibrary, Mesh, textures, FBOs
+│   ├── render/                 # Overlays and post effects built on gfx/ (lens flare, text, paths, field lines)
+│   ├── assets/                 # Downloads, texture streaming/LOD, manifests, texture formats
+│   ├── astro/                  # GL-free ephemerides, sky events, observer maths, catalogs, field models
+│   └── Solar_System/           # Scene objects: catalog bodies, Sun/, ring meshes, shells, OrbitLayout
 ├── resource/                   # Runtime assets
 │   ├── planets.catalog.json    # **Canonical** body metadata (edit this)
 │   ├── planets.catalog.schema.json
@@ -394,36 +399,57 @@ See [README.md § Runtime asset hosting](../README.md#runtime-asset-hosting) for
 |--------|------|
 | `Application` | Scene graph, simulation (`UpdateScene`, once per frame), culling, loading orchestration, quality presets |
 | `Renderer` / `FrameContext` / `FramePasses` | Draw passes and the GPU resources they own; each pass reads only its `FrameContext`; `FramePasses` is the GL-free frame order (§7.5) |
-| `SystemModules.h` | Platform-conditional OpenGL/audio includes; `glBindTextureUnit` polyfill on WASM |
-| `Shader` / `ShaderLibrary` | Deferred compile/link (`KHR_parallel_shader_compile`), link-time uniform table with a value cache, hot reload; programs keyed by `ShaderSpec` (files + permutation defines) (§9.1) |
-| `ShaderSource` | GL-free source assembly: `#version` rewrite, `common/preamble.glsl`, permutation `#define`s, `#include`, sampler bindings, `#line` bookkeeping (§9.1) |
+| `SystemModules.h` | Platform-conditional GLFW/SDL/audio/FreeType includes; the GL header and the WASM `glBindTextureUnit` polyfill come from `gfx/GlPlatform.h` |
 
-### 7.2 Auxiliary
+### 7.2 Subsystems by folder
 
-| Module | Role |
-|--------|------|
-| `Camera`, `FPS_Handler` | First-person navigation |
-| `ShadowMapFBO` | PCF / ray-traced shadows |
-| `HDR`, `LensFlare` | Post-processing (star glow only) |
-| `FloatLutTexture` | Loads a baked RGBA16F LUT (atmosphere); quiet `nullopt` instead of a checkerboard |
-| `MagneticFieldBloom` | Half-res field-line bloom (not the star HDR FBO) |
-| `TextureImage2D` | DDS load, reload, mip level management |
-| `WebResourceFetcher` | `DownloadFile` (async, callback-based) + `RequireResident` (residency probe) — WASM only |
-| `TextureLoadingQueue` | Serialized high-res LOD downloads |
-| `OrbitPathRenderer` | Faint heliocentric `GL_LINE_LOOP` guides |
-| `MissionCatalog` / `MissionPathRenderer` | Sampled probe ribbons (Voyager); quality downsample; AU→scene via `HelioAuToScene` |
-| `XrPointerRenderer` | WebXR controller rays (skipped on Low) |
-| `Ephemeris` | `IEphemeris` backend: Standish planets, Keplerian Pluto/belt bodies, Keplerian moons, GMST |
-| `SkyEvents` | Conjunction, eclipse, transit, and shadow-transit searches over the active backend; `GeocentricEclipticKm` exposes the geocentric vectors it searches with |
-| `StarCatalog` | GL-free parser for `resource/sky/bright_stars.json` (columnar, J2000, sorted brightest first) and the B−V → colour fit; see §7.4 |
-| `Observer` | GL-free ground-observer maths: sidereal time, precession, ecliptic→equatorial→horizon frames (X=East, Y=Up, Z=−North), Moon parallax, `ComputeSky` for the Sun, Moon and naked-eye planets, `DiscOverlapFraction` (§7.4) |
-| `MagneticFieldTracer` / `MagneticFieldLineRenderer` / `MagneticFieldBloom` | Optional dipole+toroidal ribbons (static VBO, GPU flow, half-res bloom on Medium+) |
+The old `Auxiliary_Modules/` grab-bag is split by what a file depends on. `astro/` and most
+of `assets/` are GL-free and compile into the unit tests; `gfx/` owns every GL object
+(`scripts/check-gl-handles.sh`); `render/` composes `gfx/` into drawable features.
+`scripts/check-source-rules.sh` (CI) keeps `using namespace` out of headers and iostream
+logging out of `src/`.
+
+| Folder | Module | Role |
+|--------|--------|------|
+| `core/` | `Log` | `LOG_*` macros, level from `SOLARSYSTEM_LOG` / `?log=` (§7.6) |
+| | `Camera`, `FrameTimer` | First-person navigation; native frame pacing and the FPS count |
+| `gfx/` | `GlHandle`, `GlPlatform.h` | Move-only RAII GL objects (the only `glGen*`/`glDelete*`); the GL header and web polyfills |
+| | `Shader` / `ShaderLibrary` | Deferred compile/link (`KHR_parallel_shader_compile`), link-time uniform table with a value cache, hot reload; programs keyed by `ShaderSpec` (files + permutation defines) (§9.1) |
+| | `ShaderSource` | GL-free source assembly: `#version` rewrite, `common/preamble.glsl`, permutation `#define`s, `#include`, sampler bindings, `#line` bookkeeping (§9.1) |
+| | `FrameUniforms`, `TextureUnits.h` | The per-view `FrameUBO` and the shared texture-unit list (§9.1) |
+| | `Mesh`, `MeshHolder`, `LineStripBatch` | Model meshes (with bounding radius) and the one ribbon VAO layout |
+| | `TextureImage2D`, `FloatLutTexture` | DDS/KTX2 load, reload, mip level management; baked RGBA16F LUTs (quiet `nullopt` instead of a checkerboard) |
+| | `ShadowMapFBO`, `HDR`, `Frustum.h` | Shadow map target; star HDR target; frustum test and fitted depth range (§7.5) |
+| | `GlCapabilities` | One probe of extensions and limits (compressed formats, float FBOs, parallel compile) |
+| `render/` | `LensFlare`, `TextRenderer` | Star lens flare; FreeType HUD text |
+| | `OrbitPathRenderer` | Faint heliocentric `GL_LINE_LOOP` guides |
+| | `MissionPathRenderer` | Sampled probe ribbons (Voyager); quality downsample; AU→scene via `HelioAuToScene` |
+| | `XrPointerRenderer` | WebXR controller rays (skipped on Low) |
+| | `MagneticFieldLineMesh` / `MagneticFieldLineRenderer` / `MagneticFieldBloom` | Optional dipole+toroidal ribbons (static VBO, GPU flow, half-res bloom on Medium+, separate from the star HDR FBO) |
+| `assets/` | `WebResourceFetcher` | `DownloadFile` (async, callback-based) + `RequireResident` (residency probe) — WASM only |
+| | `TextureLoadingQueue`, `TextureLODController` | Serialized high-res LOD downloads; per-texture tier state machine (§4.3) |
+| | `PlanetManifestLoader` | Parses `planet_manifest.json` for staged loading (§4.2) |
+| | `TextureFormatSupport`, `BlockCompression` | Texture-pack choice; CPU BC decode when S3TC is missing (§4.4) |
+| `astro/` | `Ephemeris` | `IEphemeris` backend: Standish planets, Keplerian Pluto/belt bodies, Keplerian moons, GMST |
+| | `SkyEvents` | Conjunction, eclipse, transit, and shadow-transit searches over the active backend; `GeocentricEclipticKm` exposes the geocentric vectors it searches with |
+| | `StarCatalog` | Parser for `resource/sky/bright_stars.json` (columnar, J2000, sorted brightest first) and the B−V → colour fit; see §7.4 |
+| | `Observer`, `LunarTheory`, `SeatedView.h` | Ground-observer maths: sidereal time, precession, ecliptic→equatorial→horizon frames (X=East, Y=Up, Z=−North), Moon parallax, `ComputeSky` for the Sun, Moon and naked-eye planets, `DiscOverlapFraction`; the XR seated-sky rotation (§7.4) |
+| | `MissionCatalog` | Probe trajectory samples (`resource/missions/catalog.json`) |
+| | `MagneticFieldParams` / `MagneticFieldModel` / `MagneticFieldTracer` | Per-body field parameters, the dipole+toroidal model and the line tracer behind the ribbons |
+
+**Tests.** `SolarSystemTests` is GL-free (it links GL only for the inline `GlHandle`
+destructors, which never run on an empty handle). `SolarSystemGlTests` (`tests/gl/`) opens a
+hidden GLFW window with a real GL 4.6 core context and checks handles, that every
+planetLighting permutation links and reads `FrameUBO` at its binding, sampler units, the
+uniform cache, the shadow/HDR framebuffers, one `LineStripBatch` draw read back with
+`glReadPixels`, and a DDS upload that must not fall back. CI runs it under Xvfb/llvmpipe; with no display it skips
+(`MESA_GL_VERSION_OVERRIDE=4.6 MESA_GLSL_VERSION_OVERRIDE=460 xvfb-run -a <build>/tests/SolarSystemGlTests`).
 
 ### 7.3 Scene objects
 
 Inheritance: `SpaceObject` → `Transformable` → `Planet` / `Satellite` / `Star`.
 
-Each planet system lives in `src/Solar_System/<Name>_System/`. `SolarSystem.h` aggregates includes. Atmospheres, clouds, and rings are separate render components. `Atmosphere` is configured from its catalog row and owns its LUTs; `AtmosphereModel` is the GL-free physics behind them, shared with the baker and the tests (§9.2).
+Planets and moons are catalog rows (`CatalogBody`, `CatalogSatellite`, `CatalogClouds`), so there is no per-planet folder any more: the only subfolders left are `Sun/` and the two ring meshes, `Saturn_System/SaturnRing` and `Uranus_System/UranusRing`. `SolarSystem.h` aggregates the scene-object includes. Atmospheres, clouds, and rings are separate render components. `Atmosphere` is configured from its catalog row and owns its LUTs; `AtmosphereModel` is the GL-free physics behind them, shared with the baker and the tests (§9.2).
 
 **Drawing.** A scene object holds no program: a pass `Use()`s one, sets its own uniforms
 and calls `SpaceObject::Draw(shader)`, which adds `model` and the object's material maps.
@@ -440,7 +466,7 @@ Observe puts the camera on Earth at a lat/lon and a UTC instant (`?mode=observe&
 
 | Piece | Role |
 |-------|------|
-| `Auxiliary_Modules/Observer.*` | Pure maths. Never reads the Earth model's matrix (its pole and prime meridian are art); goes ecliptic J2000 → equatorial J2000 → equatorial of date (precession) → horizon (local sidereal time, geodetic latitude). Moon parallax uses the WGS84 observer vector; Sun and planets are geocentric. |
+| `astro/Observer.*` | Pure maths. Never reads the Earth model's matrix (its pole and prime meridian are art); goes ecliptic J2000 → equatorial J2000 → equatorial of date (precession) → horizon (local sidereal time, geodetic latitude). Moon parallax uses the WGS84 observer vector; Sun and planets are geocentric. |
 | Moon orientation | `Observer::MoonBodyAxesEquatorialJ2000` is the IAU 2009 WGCCRE lunar orientation (pole α0/δ0 and prime-meridian angle W with the E1–E13 terms), as right-handed body axes (X lon 0, Y lon +90 east, Z north). `ComputeSky` carries them into the horizon frame as `moonBodyToHorizon` and reports the sub-Earth point (libration). The fragment shader turns each disc point's topocentric surface normal into selenographic lon/lat with the transpose, so parallax and libration are already in it. Tests pin the frame by behaviour: right-handedness, a pole near (270°, 66.5°), longitude libration following the orbit's equation of centre (corr > 0.9, within ~10°), and latitude libration opposite the Moon's ecliptic latitude. The map is sampled as equirectangular, centre lon 0, north at the top (`MOON_MAP_CENTRE_LON` in `observeSprite.fs` if a deployed texture differs); DDS textures are loaded unflipped here, so t = 0.5 − lat/π. The texture comes from the loaded Moon `CatalogSatellite` (`GetDiffuseTexture()`, which changes on LOD reloads), falling back to the plain lit disc until its system has loaded; Observe keeps Earth's component re-placed each frame so the LOD manager sees the Moon as near. |
 | `ObserveState.h`, `ObserveMode.cpp` | State on `Application` (not `SimState`, which the tests link): site, time rate, saved Explore camera. `SetObserveMode` locks camera movement (`Camera::SetMovementLocked`, which also covers touch and the XR stick), widens the zoom range to 0.25–90° with sky-style zoom (`Camera::SetSkyZoom`: a scroll notch scales the FOV by a ratio, and look sensitivity scales with FOV / 60°, so a telescope field handles like the naked eye), and restores the Explore pose on exit. Focus keys, `FocusPlanetByIndex`/`FocusMissionByIndex` and `SetCameraPose` are ignored while active. `GetObserveStateJson` is the JS-facing snapshot. |
 | `Solar_System/ObserveSky.*`, `shaders/observe*.{vs,fs}` | The sky pass: an analytic sky/ground gradient from the Sun's altitude, additive point sprites for planets, an additive Sun disc with limb darkening and halo, and an alpha-blended lit Moon disc. Stars are one static instance buffer of J2000 unit vectors, rotated into the horizon frame by a single matrix uniform (`Observer::HorizonFromEquatorialJ2000`); their size and brightness come from `LimitingMagnitude(sunAlt)` in the vertex shader, so they fade in through twilight. Stars and planets are fixed-size screen-space points (round out to the edge of a wide FOV); the Sun and Moon are true angular discs on the tangent plane. A planet becomes a tangent-plane disc too once its true radius (`SkyBody::angRadiusDeg`, IAU equatorial radius over geocentric distance; Saturn without rings) reaches 2 px and half its point sprite — in practice only in a telescope field — lit from the Sun's side using the phase angle and bright-limb angle packed into the instance (`params.zw`), so Venus shows its crescent. `tangentBasis` in `ObserveSky.cpp` must match the vertex shader's basis for that angle to land. Camera at the origin, no depth buffer, drawn back to front. Per-instance varyings are `flat` — an interpolated float `kind` will occasionally round to the wrong branch. |
@@ -539,7 +565,7 @@ Rebuild WASM after C++ changes: `./build-web.sh` then refresh the browser.
 ES 3.00, because that is the only dialect WebGL 2 accepts. The native build runs an
 OpenGL 4.6 **core** context, which accepts `#version 300 es` only through
 `ARB_ES3_compatibility` — widely implemented, but not guaranteed. So `ShaderSource`
-(`src/Auxiliary_Modules/ShaderSource.cpp`, called by `Shader.cpp`) rewrites the leading
+(`src/gfx/ShaderSource.cpp`, called by `Shader.cpp`) rewrites the leading
 `#version 300 es` directive to `#version 460 core` on native builds only (GLSL ES 3.00 is a
 subset of desktop GLSL 4.60, precision qualifiers included).
 
@@ -574,7 +600,7 @@ and exits; the native CI job runs it under Xvfb with `MESA_GLSL_VERSION_OVERRIDE
 of a `uniform bool`, and names its switches on a `// permutations: A B …` line
 (`planetLighting.fs`: `HAS_NIGHT_TEXTURE HAS_SPECULAR_MAP HAS_CLOUDS USE_SPHERE_INTERSECT`).
 A program is identified by its `ShaderSpec` — stage files plus sorted defines — and
-`ShaderLibrary` (`src/Auxiliary_Modules/ShaderLibrary.h`) builds each spec once.
+`ShaderLibrary` (`src/gfx/ShaderLibrary.h`) builds each spec once.
 `tests/test_shader_source.cpp` checks that the declared list matches
 `CatalogMaterial::Defines()`, that each switch is tested, and that every subset preprocesses.
 
@@ -772,6 +798,17 @@ std::string GetTexturePath(const std::string& lowRes, const std::string& highRes
 
 ---
 
+
+### 9.5 Diagnostics
+
+| Aspect | Native | Web |
+|--------|--------|-----|
+| Log sink | stderr with `HH:MM:SS.mmm LEVEL` | `console.debug/info/warn/error` via `emscripten_log` |
+| Log level | `SOLARSYSTEM_LOG=debug` | `?log=debug` |
+| GL driver messages | KHR_debug in Debug builds (`SOLARSYSTEM_GL_DEBUG=1/0`) → `[GL]` log lines | Browser console (WebGL warnings) |
+| Frame counters | `[FrameStats]` at debug level (§7.5) | same |
+| Uncompressed DDS upload | Sized internal format (`GL_R8`/`GL_RGB8`/`GL_RGBA8`); core profile rejects the legacy component count | `GL_R8`/`GL_RGBA8` (RGB expanded to RGBA for mipmapping) |
+
 ## 10. Adding a new planet
 
 **Catalog-only bodies first:** if the world needs nothing but a diffuse/normal (optional
@@ -941,6 +978,17 @@ window.setQualityPreset(0);                     // 0=low, 1=medium, 2=full
 ```
 
 Expect proxy labels → staged download → low-res planet → LOD streaming overlay when close. With placeholders only, visual quality change is minimal; console logs and UI prove the code paths.
+
+Native, under Xvfb (`export MESA_GL_VERSION_OVERRIDE=4.6 MESA_GLSL_VERSION_OVERRIDE=460`):
+
+```bash
+cmake -B build-check -DSOLARSYSTEM_BUILD_TESTS=ON && cmake --build build-check -j
+ctest --test-dir build-check --exclude-regex '^gl\.'          # GL-free unit tests
+xvfb-run -a build-check/tests/SolarSystemGlTests              # GL tests (§7.2)
+SOLARSYSTEM_SHADER_SELFTEST=1 xvfb-run -a build-check/SolarSystem   # every permutation, both dialects
+SOLARSYSTEM_LOG=debug xvfb-run -a build-check/SolarSystem 2>&1 | grep FrameStats
+scripts/check-gl-handles.sh && scripts/check-source-rules.sh
+```
 
 Full scenarios: [docs/plans/TESTING_GUIDE.md](plans/TESTING_GUIDE.md).
 

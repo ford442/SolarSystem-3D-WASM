@@ -1,6 +1,6 @@
 #pragma once
 
-#include "MagneticFieldTracer.h"
+#include "../astro/MagneticFieldTracer.h"
 #include "../gfx/LineStripBatch.h"
 #include <glm/geometric.hpp>
 #include <glm/vec3.hpp>

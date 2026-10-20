@@ -4,9 +4,9 @@
 #include "ObserveState.h"
 #include "PlanetSystemManifest.h"
 #include "SimState.h"
-#include "Auxiliary_Modules/MissionCatalog.h"
-#include "Auxiliary_Modules/Observer.h"
-#include "Auxiliary_Modules/SkyEvents.h"
+#include "astro/MissionCatalog.h"
+#include "astro/Observer.h"
+#include "astro/SkyEvents.h"
 #include <glm/glm.hpp>
 #include <optional>
 #include <string>

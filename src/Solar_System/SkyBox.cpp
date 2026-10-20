@@ -1,5 +1,6 @@
 #include "SkyBox.h"
-#include "../Auxiliary_Modules/WebResourceFetcher.h"
+#include "../3rdparty/nv_dds.h"
+#include "../assets/WebResourceFetcher.h"
 #include "../core/Log.h"
 
 SkyBox::SkyBox(const std::vector<std::string>& faces) {
@@ -45,7 +46,7 @@ void SkyBox::LoadCubeMap(const std::vector<std::string>& faces) {
     for (size_t i = 0; i < faces.size(); i++) {
         GLenum target = GL_TEXTURE_CUBE_MAP_POSITIVE_X + static_cast<GLenum>(i);
         try {
-            CDDSImage image;
+            nv_dds::CDDSImage image;
             image.load(faces[i], false);
             image.upload_texture2D(0, target);
             LOG_DEBUG("SkyBox", "%s Loaded", faces[i].c_str());
@@ -75,7 +76,7 @@ void SkyBox::LoadCubeMap(const std::vector<std::string>& faces) {
 #else
     for (size_t i = 0; i < faces.size(); i++) {
         try {
-            CDDSImage image;
+            nv_dds::CDDSImage image;
             GLenum target = GL_TEXTURE_CUBE_MAP_POSITIVE_X + static_cast<GLenum>(i);
             image.load(faces[i], false);
             image.upload_texture2D(0, target);

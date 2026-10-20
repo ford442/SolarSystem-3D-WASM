@@ -1,9 +1,10 @@
 #include "TextureImage2D.h"
-#include "WebResourceFetcher.h"
+#include "../assets/WebResourceFetcher.h"
 #include "GlCapabilities.h"
-#include "BlockCompression.h"
-#include "TextureFormatSupport.h"
+#include "../assets/BlockCompression.h"
+#include "../assets/TextureFormatSupport.h"
 #include "../3rdparty/ktx2_reader.h"
+#include "../3rdparty/nv_dds.h"
 #include "../core/Log.h"
 #include <cstdint>
 #include <algorithm>
@@ -156,7 +157,7 @@ namespace {
      * no WEBGL_compressed_texture_s3tc takes for the DDS content still in the tree; see
      * BlockCompression.h for why it is a stopgap rather than the shipping answer.
      */
-    UploadResult UploadDdsSoftwareDecoded(CDDSImage& image, const std::string& path) {
+    UploadResult UploadDdsSoftwareDecoded(nv_dds::CDDSImage& image, const std::string& path) {
         const std::uint32_t format = image.get_format();
         if (!BlockCompression::IsDecodableS3tcFormat(format)) {
             throw std::runtime_error(
@@ -178,7 +179,7 @@ namespace {
                 levelHeight = image.get_height();
                 levelBytes = image.get_size();
             } else {
-                const CSurface& surface = image.get_mipmap(level - 1);
+                const nv_dds::CSurface& surface = image.get_mipmap(level - 1);
                 blocks = static_cast<std::uint8_t*>(surface);
                 levelWidth = surface.get_width();
                 levelHeight = surface.get_height();
@@ -248,7 +249,7 @@ void TextureImage2D::LoadTextureFromFile(const std::string& path, GLint wrapPara
             hasEmbeddedMipmaps = upload.hasMipmaps;
             canGenerateMipmaps = upload.allowGenerateMipmap;
         } else {
-            CDDSImage image;
+            nv_dds::CDDSImage image;
             image.load(path, false);
             const bool isCompressed = image.is_compressed();
             _width = image.get_width();

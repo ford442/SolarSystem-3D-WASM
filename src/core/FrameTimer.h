@@ -1,13 +1,12 @@
-#ifndef SOLARSYSTEM_FPS_LIMITER_H
-#define SOLARSYSTEM_FPS_LIMITER_H
+#ifndef SOLARSYSTEM_CORE_FRAMETIMER_H
+#define SOLARSYSTEM_CORE_FRAMETIMER_H
 #include <chrono>
 #include <cstdint>
 
-using namespace std::chrono;
-
-class FPS_Handler {
+/** Frame pacing (native) and the once-a-second FPS count both targets show. */
+class FrameTimer {
 public:
-    explicit FPS_Handler(uint16_t maxFps);
+    explicit FrameTimer(uint16_t maxFps);
     void RunFrameTimer();
     // Counts the frame toward GetCurrentFps(). Both targets call it once per presented frame.
     void EndFrame();
@@ -17,12 +16,14 @@ public:
     uint16_t GetCurrentFps() const;
 
 private:
-    steady_clock::duration _frameTime;
+    using Clock = std::chrono::steady_clock;
+
+    Clock::duration _frameTime;
     uint16_t _currentFps = 0; // Updated once per second
     uint16_t _tempFps = 0;
-    steady_clock::time_point _frameStartPoint, _tempStartPoint; // _tempStartPoint is needed to check if a second has passed
+    Clock::time_point _frameStartPoint, _tempStartPoint; // _tempStartPoint is needed to check if a second has passed
 
     void TryUpdateFps();
 };
 
-#endif //SOLARSYSTEM_FPS_LIMITER_H
+#endif // SOLARSYSTEM_CORE_FRAMETIMER_H

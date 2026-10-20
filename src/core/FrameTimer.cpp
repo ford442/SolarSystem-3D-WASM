@@ -1,32 +1,32 @@
-#include "FPS_Handler.h"
+#include "FrameTimer.h"
 #include <thread>
 
-FPS_Handler::FPS_Handler(uint16_t maxFps)
-    : _frameTime(duration_cast<steady_clock::duration>(duration<double>(1.0 / maxFps)))
+FrameTimer::FrameTimer(uint16_t maxFps)
+    : _frameTime(std::chrono::duration_cast<Clock::duration>(std::chrono::duration<double>(1.0 / maxFps)))
 {
 }
 
-void FPS_Handler::RunFrameTimer() {
+void FrameTimer::RunFrameTimer() {
     TryUpdateFps();
-    _frameStartPoint = steady_clock::now();
+    _frameStartPoint = Clock::now();
 }
 
-void FPS_Handler::EndFrame() {
+void FrameTimer::EndFrame() {
     _tempFps++;
 }
 
-void FPS_Handler::WaitForFrameTimer() const {
+void FrameTimer::WaitForFrameTimer() const {
     std::this_thread::sleep_until(_frameStartPoint + _frameTime);
 }
 
-uint16_t FPS_Handler::GetCurrentFps() const {
+uint16_t FrameTimer::GetCurrentFps() const {
     return _currentFps;
 }
 
-void FPS_Handler::TryUpdateFps() {
-    if (duration<double>((steady_clock::now() - _tempStartPoint)).count() >= 1.0) {
+void FrameTimer::TryUpdateFps() {
+    if (std::chrono::duration<double>(Clock::now() - _tempStartPoint).count() >= 1.0) {
         _currentFps = _tempFps;
         _tempFps = 0;
-        _tempStartPoint = steady_clock::now();
+        _tempStartPoint = Clock::now();
     }
 }

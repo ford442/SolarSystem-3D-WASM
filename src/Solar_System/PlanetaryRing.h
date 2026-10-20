@@ -1,7 +1,7 @@
 #ifndef SOLARSYSTEM_PLANETARYRING_H
 #define SOLARSYSTEM_PLANETARYRING_H
 #include "Planet.h"
-#include "../Auxiliary_Modules/TextureLODController.h"
+#include "../assets/TextureLODController.h"
 
 struct PlanetaryRingInfo {
     MeshHolder ringModel;

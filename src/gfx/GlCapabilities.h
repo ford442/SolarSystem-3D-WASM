@@ -10,7 +10,7 @@
 #define GL_MAX_TEXTURE_MAX_ANISOTROPY_EXT 0x84FF
 #endif
 
-#include "TextureFormatSupport.h"
+#include "../assets/TextureFormatSupport.h"
 
 /**
  * GPU/driver capabilities probed once against the current GL context. Must be called

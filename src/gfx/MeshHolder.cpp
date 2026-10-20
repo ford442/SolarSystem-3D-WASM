@@ -1,6 +1,6 @@
 #include "MeshHolder.h"
 #include <algorithm>
-#include "WebResourceFetcher.h"
+#include "../assets/WebResourceFetcher.h"
 
 MeshHolder::MeshHolder(const std::string& path) {
     // Models are downloaded by Application::LoadCoreResources() before the scene is

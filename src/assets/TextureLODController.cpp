@@ -1,5 +1,5 @@
 #include "TextureLODController.h"
-#include "TextureImage2D.h"
+#include "../gfx/TextureImage2D.h"
 #include "../core/Log.h"
 #include <glm/geometric.hpp>
 #include <utility>

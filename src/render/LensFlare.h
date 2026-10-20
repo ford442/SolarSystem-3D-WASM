@@ -1,7 +1,7 @@
 #ifndef SOLARSYSTEM_LENSFLARE_H
 #define SOLARSYSTEM_LENSFLARE_H
-#include "Shader.h"
-#include "TextureImage2D.h"
+#include "../gfx/Shader.h"
+#include "../gfx/TextureImage2D.h"
 #include "../gfx/GlHandle.h"
 #include "../Solar_System/Star.h"
 #include <vector>

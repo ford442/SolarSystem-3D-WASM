@@ -1,10 +1,10 @@
 #ifndef SOLARSYSTEM_OBSERVESKY_H
 #define SOLARSYSTEM_OBSERVESKY_H
 
-#include "../Auxiliary_Modules/Observer.h"
-#include "../Auxiliary_Modules/Shader.h"
+#include "../astro/Observer.h"
+#include "../gfx/Shader.h"
 #include "../gfx/GlHandle.h"
-#include "../Auxiliary_Modules/StarCatalog.h"
+#include "../astro/StarCatalog.h"
 #include <glm/glm.hpp>
 #include <algorithm>
 #include <memory>

@@ -1,11 +1,9 @@
 #ifndef SOLARSYSTEM_SKYBOX_H
 #define SOLARSYSTEM_SKYBOX_H
-#include "../Auxiliary_Modules/Shader.h"
-#include "../3rdparty/nv_dds.h"
+#include "../gfx/Shader.h"
 #include "../gfx/GlHandle.h"
+#include <string>
 #include <vector>
-
-using namespace nv_dds;
 
 class SkyBox {
 public:

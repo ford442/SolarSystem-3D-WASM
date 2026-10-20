@@ -1,5 +1,5 @@
 #include "TextureLoadingQueue.h"
-#include "TextureImage2D.h"
+#include "../gfx/TextureImage2D.h"
 #include "WebResourceFetcher.h"
 #include "../core/Log.h"
 #include <algorithm>

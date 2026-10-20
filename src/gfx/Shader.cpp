@@ -1,6 +1,6 @@
 #include "Shader.h"
 #include "GlCapabilities.h"
-#include "../gfx/FrameUniforms.h"
+#include "FrameUniforms.h"
 #include "../core/Log.h"
 #include <algorithm>
 #include <cstring>

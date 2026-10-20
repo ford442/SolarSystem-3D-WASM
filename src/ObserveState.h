@@ -1,7 +1,7 @@
 #ifndef SOLARSYSTEM_OBSERVESTATE_H
 #define SOLARSYSTEM_OBSERVESTATE_H
 
-#include "Auxiliary_Modules/Observer.h"
+#include "astro/Observer.h"
 #include <glm/glm.hpp>
 
 /**

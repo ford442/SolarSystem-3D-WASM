@@ -6,7 +6,7 @@
 #include <glm/glm.hpp>
 
 #include "PlanetSystemManifest.h"
-#include "Auxiliary_Modules/PlanetManifestLoader.h"
+#include "assets/PlanetManifestLoader.h"
 
 namespace fs = std::filesystem;
 

@@ -1,6 +1,6 @@
 #ifndef SOLARSYSTEM_SHADER_H
 #define SOLARSYSTEM_SHADER_H
-#include "../gfx/GlHandle.h"
+#include "GlHandle.h"
 #include "ShaderSource.h"
 #include <glm/glm.hpp>
 #include <iostream>

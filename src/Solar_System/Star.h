@@ -1,7 +1,7 @@
 #ifndef SOLARSYSTEM_STAR_H
 #define SOLARSYSTEM_STAR_H
 #include "SpaceObject.h"
-#include "../Auxiliary_Modules/TextureImage2D.h"
+#include "../gfx/TextureImage2D.h"
 #include "../gfx/GlHandle.h"
 #include <array>
 #include <optional>

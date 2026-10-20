@@ -1,7 +1,7 @@
 #ifndef SOLARSYSTEM_MESH_H
 #define SOLARSYSTEM_MESH_H
 #include "Shader.h"
-#include "../gfx/GlHandle.h"
+#include "GlHandle.h"
 #include <glm/glm.hpp>
 #include <glm/gtc/matrix_transform.hpp>
 #include <assimp/types.h>

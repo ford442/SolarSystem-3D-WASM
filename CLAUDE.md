@@ -78,13 +78,15 @@ The CMakeLists.txt has separate configurations for EMSCRIPTEN vs native builds, 
   - Scene objects hold no shader: a pass calls `SpaceObject::Draw(shader)` with the program it bound
   - `SceneRenderer.cpp` — shadow/color passes for planets, atmospheres, rings, clouds, text overlays
   - `SceneOverlayRenderer.cpp` — magnetic field ribbons, orbit paths, mission paths, asteroid belt
-- `SystemModules.h` — Convenience headers bundling system includes
+- `SystemModules.h` — Convenience headers bundling system includes (GL itself comes from `gfx/GlPlatform.h`)
 
-**Auxiliary Modules** (`Auxiliary_Modules/`)
-- Graphics: `Shader`, `Mesh`, `MeshHolder`, `TextureImage2D`
-- Camera system: `Camera` with acceleration/zoom, `FPS_Handler`
-- Rendering: `ShadowMapFBO` (PCF/ray-traced shadows), `LensFlare`, `HDR`, `TextRenderer`
-- Async loading: `WebResourceFetcher` (Emscripten-specific async file loading via callback-based `emscripten_async_wget2`; the blocking `emscripten_wget_data` path is gone — see "No blocking fetches" below)
+**Subsystem folders** (ARCHITECTURE §7.2; there is no `Auxiliary_Modules/` any more)
+- `core/` — `Log` (`LOG_*`), `Camera` with acceleration/zoom, `FrameTimer`
+- `gfx/` — every GL object: `GlHandle` (the only `glGen*`/`glDelete*`), `Shader`/`ShaderLibrary`/`ShaderSource`, `Mesh`/`MeshHolder`, `LineStripBatch`, `TextureImage2D`, `FloatLutTexture`, `ShadowMapFBO`, `HDR`, `FrameUniforms`, `TextureUnits.h`, `Frustum.h`, `GlCapabilities`
+- `render/` — features built on `gfx/`: `LensFlare`, `TextRenderer`, orbit/mission/XR-pointer/magnetic-field renderers, field-line bloom
+- `assets/` — `WebResourceFetcher` (callback-based `emscripten_async_wget2`; the blocking `emscripten_wget_data` path is gone — see "No blocking fetches" below), `TextureLoadingQueue`, `TextureLODController`, `PlanetManifestLoader`, `TextureFormatSupport`, `BlockCompression`
+- `astro/` — GL-free: `Ephemeris`, `SkyEvents`, `Observer`, `LunarTheory`, `StarCatalog`, `MissionCatalog`, `MagneticField*` models, `SeatedView.h`
+- Headers carry no `using namespace`, and `Renderer.h` forward-declares the GPU helpers it holds by `unique_ptr` — include their headers in the `.cpp` that uses them. `scripts/check-source-rules.sh` and `scripts/check-gl-handles.sh` (CI) enforce both rules plus "no `std::cout`/`std::cerr` in `src/`"
 
 **Solar System** (`Solar_System/`)
 - Base classes:

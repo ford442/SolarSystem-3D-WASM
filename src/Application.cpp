@@ -9,9 +9,10 @@
 #include "ResourceManifest.h"
 #include "SimState.h"
 #include "WasmExports.h"
-#include "Auxiliary_Modules/TextureLoadingQueue.h"
+#include "assets/TextureLoadingQueue.h"
 #include "Solar_System/OrbitLayout.h"
 #include "core/Log.h"
+#include "render/XrPointerRenderer.h"
 #include <algorithm>
 #include <chrono>
 #include <cmath>
@@ -21,7 +22,7 @@
 
 using namespace std;
 
-Application::Application() : _fpsHandler(240) {
+Application::Application() : _frameTimer(240) {
     SetActiveApplication(this);
     InitSystems();
     ApplyQualityPreset(_simState.qualityPreset);
@@ -52,7 +53,7 @@ void Application::Exec() {
 }
 
 void Application::RunOneFrame() {
-    _fpsHandler.RunFrameTimer();
+    _frameTimer.RunFrameTimer();
 
     if (_appState == AppState::LOADING) {
 #ifdef __EMSCRIPTEN__
@@ -143,11 +144,11 @@ void Application::RunOneFrame() {
 }
 
 void Application::EndFrame() {
-    _fpsHandler.EndFrame();
+    _frameTimer.EndFrame();
 #ifndef __EMSCRIPTEN__
     // With vsync on, the swap already paces the loop; the limiter only caps an unsynced one.
     if (!_isVertSyncEnabled) {
-        _fpsHandler.WaitForFrameTimer();
+        _frameTimer.WaitForFrameTimer();
     }
 #endif
 }
@@ -375,7 +376,7 @@ void Application::BuildFrameSnapshot(int viewCount) {
     }
 
     HudState& hud = _frameHud;
-    hud.fps = _fpsHandler.GetCurrentFps();
+    hud.fps = _frameTimer.GetCurrentFps();
     hud.fpsColor = CurrentFpsColor();
     hud.vsync = _isVertSyncEnabled;
     hud.cameraSpeed = _camera.GetMovementSpeed();
@@ -804,7 +805,7 @@ float Application::CalculateSpaceObjectDistance(const SpaceObject* spaceObject) 
 }
 
 glm::vec3 Application::CurrentFpsColor() const {
-    const uint16_t fps = _fpsHandler.GetCurrentFps();
+    const uint16_t fps = _frameTimer.GetCurrentFps();
 
     if (fps < 30)
         return {0.949, 0.239, 0.325};

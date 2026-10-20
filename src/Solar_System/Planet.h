@@ -2,7 +2,7 @@
 #define SOLARSYSTEM_PLANET_H
 #include "SpaceObject.h"
 #include "Star.h"
-#include "../Auxiliary_Modules/TextureImage2D.h"
+#include "../gfx/TextureImage2D.h"
 #include "TexturePaths.h"
 #include <vector>
 #include <memory>

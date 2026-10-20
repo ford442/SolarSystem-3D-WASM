@@ -3,7 +3,7 @@
 // high-res textures in and out as the camera moves.
 #include "Application.h"
 #include "QualitySettings.h"
-#include "Auxiliary_Modules/TextureLoadingQueue.h"
+#include "assets/TextureLoadingQueue.h"
 #include "Solar_System/OrbitLayout.h"
 #include "core/Log.h"
 #include <algorithm>

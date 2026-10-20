@@ -2,9 +2,9 @@
 
 #include <vector>
 
-#include "Auxiliary_Modules/TextureLODController.h"
-#include "Auxiliary_Modules/TextureImage2D.h"
-#include "Auxiliary_Modules/WebResourceFetcher.h"
+#include "assets/TextureLODController.h"
+#include "gfx/TextureImage2D.h"
+#include "assets/WebResourceFetcher.h"
 #include "QualitySettings.h"
 
 namespace {

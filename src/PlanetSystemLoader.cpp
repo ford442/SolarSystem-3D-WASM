@@ -1,6 +1,6 @@
 #include "Application.h"
-#include "Auxiliary_Modules/PlanetManifestLoader.h"
-#include "Auxiliary_Modules/WebResourceFetcher.h"
+#include "assets/PlanetManifestLoader.h"
+#include "assets/WebResourceFetcher.h"
 #include "Solar_System/OrbitLayout.h"
 #include "QualitySettings.h"
 #include "core/Log.h"

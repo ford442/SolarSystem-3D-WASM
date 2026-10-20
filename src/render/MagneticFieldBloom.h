@@ -1,6 +1,6 @@
 #pragma once
 
-#include "Shader.h"
+#include "../gfx/Shader.h"
 #include "../gfx/GlHandle.h"
 #include <cstdint>
 #include <memory>

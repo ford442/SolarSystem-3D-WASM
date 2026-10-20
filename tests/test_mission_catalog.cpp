@@ -5,7 +5,7 @@
 
 #include <glm/glm.hpp>
 
-#include "Auxiliary_Modules/MissionCatalog.h"
+#include "astro/MissionCatalog.h"
 
 namespace {
 

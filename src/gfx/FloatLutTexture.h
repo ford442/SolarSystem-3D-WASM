@@ -1,7 +1,7 @@
 #ifndef SOLARSYSTEM_FLOAT_LUT_TEXTURE_H
 #define SOLARSYSTEM_FLOAT_LUT_TEXTURE_H
 
-#include "../gfx/GlHandle.h"
+#include "GlHandle.h"
 
 #include <optional>
 #include <string>

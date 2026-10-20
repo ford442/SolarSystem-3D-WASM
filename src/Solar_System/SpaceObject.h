@@ -1,7 +1,7 @@
 #ifndef SOLARSYSTEM_SPACEOBJECT_H
 #define SOLARSYSTEM_SPACEOBJECT_H
-#include "../Auxiliary_Modules/MagneticFieldParams.h"
-#include "../Auxiliary_Modules/MeshHolder.h"
+#include "../astro/MagneticFieldParams.h"
+#include "../gfx/MeshHolder.h"
 #include "Transformable.h"
 #include "../gfx/Frustum.h"
 

@@ -1,8 +1,8 @@
 #pragma once
 
 #include "MagneticFieldLineMesh.h"
-#include "MagneticFieldParams.h"
-#include "Shader.h"
+#include "../astro/MagneticFieldParams.h"
+#include "../gfx/Shader.h"
 #include <glm/glm.hpp>
 #include <memory>
 #include <vector>

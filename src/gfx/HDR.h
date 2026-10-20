@@ -1,7 +1,7 @@
 #ifndef SOLARSYSTEM_HDR_H
 #define SOLARSYSTEM_HDR_H
 #include "Shader.h"
-#include "../gfx/GlHandle.h"
+#include "GlHandle.h"
 
 class HDR {
 public:

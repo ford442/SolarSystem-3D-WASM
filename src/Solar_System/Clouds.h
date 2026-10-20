@@ -1,8 +1,8 @@
 #ifndef SOLARSYSTEM_CLOUDS_H
 #define SOLARSYSTEM_CLOUDS_H
 #include "OuterShell.h"
-#include "../Auxiliary_Modules/TextureImage2D.h"
-#include "../Auxiliary_Modules/TextureLODController.h"
+#include "../gfx/TextureImage2D.h"
+#include "../assets/TextureLODController.h"
 
 struct CloudsInfo {
     MeshHolder cloudsModel;

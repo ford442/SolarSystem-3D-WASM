@@ -4,7 +4,7 @@
 #include "Solar_System/CatalogSatellite.h"
 #include "Solar_System/SystemVisuals.h"
 #include "Solar_System/AtmosphereModel.h"
-#include "Auxiliary_Modules/FloatLutTexture.h"
+#include "gfx/FloatLutTexture.h"
 #include "core/Log.h"
 #include <unordered_set>
 

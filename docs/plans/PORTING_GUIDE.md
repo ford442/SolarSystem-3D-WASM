@@ -401,7 +401,7 @@ are now three layers:
 
 3. **Software BC decode (the compatibility path).** With no pack published — the default,
    and every native build — a GPU without S3TC now CPU-decodes the DXT blocks to RGBA8
-   (`src/Auxiliary_Modules/BlockCompression.cpp`) and uploads that, instead of falling
+   (`src/assets/BlockCompression.cpp`) and uploads that, instead of falling
    back to the checkerboard. It costs 4 bytes per texel of GPU memory and a decode pass
    per mip, so it is a stopgap that keeps the *existing* DDS content usable everywhere;
    publishing an ASTC/ETC2 pack is what turns it back into a real compressed upload.

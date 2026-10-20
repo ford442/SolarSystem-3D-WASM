@@ -4,7 +4,7 @@
 #include "CatalogMaterial.h"
 #include "OrbitLayout.h"
 #include "Planet.h"
-#include "../Auxiliary_Modules/TextureLODController.h"
+#include "../assets/TextureLODController.h"
 
 /**
  * A planet built entirely from a catalog row — no per-body C++ class.

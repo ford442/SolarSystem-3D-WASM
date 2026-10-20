@@ -3,7 +3,7 @@
 // ObserveSky.cpp / Renderer::RenderObserveSky. See docs/ARCHITECTURE.md.
 #include "Application.h"
 #include "JsBridge.h"
-#include "Auxiliary_Modules/Ephemeris.h"
+#include "astro/Ephemeris.h"
 #include "Solar_System/CatalogSatellite.h"
 #include "Solar_System/OrbitLayout.h"
 #include <algorithm>

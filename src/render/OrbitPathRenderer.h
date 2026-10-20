@@ -1,7 +1,7 @@
 #ifndef SOLARSYSTEM_ORBITPATHRENDERER_H
 #define SOLARSYSTEM_ORBITPATHRENDERER_H
 
-#include "Shader.h"
+#include "../gfx/Shader.h"
 #include <glm/glm.hpp>
 #include <memory>
 

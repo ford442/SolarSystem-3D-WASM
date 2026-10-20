@@ -1,5 +1,5 @@
 #include "MagneticFieldBloom.h"
-#include "GlCapabilities.h"
+#include "../gfx/GlCapabilities.h"
 
 #include <algorithm>
 #include "../core/Log.h"

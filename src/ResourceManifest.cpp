@@ -1,7 +1,7 @@
 #include "Application.h"
 #include "ResourceManifest.h"
 #include "QualitySettings.h"
-#include "Auxiliary_Modules/WebResourceFetcher.h"
+#include "assets/WebResourceFetcher.h"
 #include "Solar_System/TexturePaths.h"
 #include <array>
 #include <chrono>

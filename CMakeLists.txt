@@ -49,43 +49,48 @@ set(SOLARSYSTEM_SOURCES_CORE
 )
 
 set(SOLARSYSTEM_SOURCES_AUX
-    src/Auxiliary_Modules/WebResourceFetcher.cpp
-    src/Auxiliary_Modules/Shader.cpp
-    src/Auxiliary_Modules/ShaderLibrary.cpp
-    src/Auxiliary_Modules/ShaderSource.cpp
-    src/Auxiliary_Modules/Mesh.cpp
-    src/Auxiliary_Modules/MeshHolder.cpp
-    src/Auxiliary_Modules/Camera.cpp
-    src/Auxiliary_Modules/FPS_Handler.cpp
-    src/Auxiliary_Modules/TextureImage2D.cpp
-    src/Auxiliary_Modules/TextureFormatSupport.cpp
-    src/Auxiliary_Modules/BlockCompression.cpp
-    src/Auxiliary_Modules/TextureLoadingQueue.cpp
-    src/Auxiliary_Modules/GlCapabilities.cpp
-    src/Auxiliary_Modules/ShadowMapFBO.cpp
-    src/Auxiliary_Modules/LensFlare.cpp
-    src/Auxiliary_Modules/OrbitPathRenderer.cpp
-    src/Auxiliary_Modules/MissionCatalog.cpp
-    src/Auxiliary_Modules/MissionPathRenderer.cpp
-    src/Auxiliary_Modules/XrPointerRenderer.cpp
-    src/Auxiliary_Modules/MagneticFieldParams.cpp
-    src/Auxiliary_Modules/MagneticFieldModel.cpp
-    src/Auxiliary_Modules/MagneticFieldTracer.cpp
+    # core/: logging, camera, frame timing
     src/core/Log.cpp
+    src/core/Camera.cpp
+    src/core/FrameTimer.cpp
+    # gfx/: GL objects and programs
+    src/gfx/Shader.cpp
+    src/gfx/ShaderLibrary.cpp
+    src/gfx/ShaderSource.cpp
+    src/gfx/Mesh.cpp
+    src/gfx/MeshHolder.cpp
+    src/gfx/TextureImage2D.cpp
+    src/gfx/GlCapabilities.cpp
+    src/gfx/ShadowMapFBO.cpp
+    src/gfx/HDR.cpp
+    src/gfx/FloatLutTexture.cpp
     src/gfx/FrameUniforms.cpp
     src/gfx/LineStripBatch.cpp
-    src/Auxiliary_Modules/MagneticFieldLineRenderer.cpp
-    src/Auxiliary_Modules/MagneticFieldBloom.cpp
-    src/Auxiliary_Modules/Ephemeris.cpp
-    src/Auxiliary_Modules/TextRenderer.cpp
-    src/Auxiliary_Modules/HDR.cpp
-    src/Auxiliary_Modules/SkyEvents.cpp
-    src/Auxiliary_Modules/Observer.cpp
-    src/Auxiliary_Modules/LunarTheory.cpp
-    src/Auxiliary_Modules/StarCatalog.cpp
-    src/Auxiliary_Modules/TextureLODController.cpp
-    src/Auxiliary_Modules/PlanetManifestLoader.cpp
-    src/Auxiliary_Modules/FloatLutTexture.cpp
+    # render/: overlays and post effects built on gfx/
+    src/render/LensFlare.cpp
+    src/render/TextRenderer.cpp
+    src/render/OrbitPathRenderer.cpp
+    src/render/MissionPathRenderer.cpp
+    src/render/XrPointerRenderer.cpp
+    src/render/MagneticFieldLineRenderer.cpp
+    src/render/MagneticFieldBloom.cpp
+    # assets/: downloads, texture streaming and formats
+    src/assets/WebResourceFetcher.cpp
+    src/assets/TextureLoadingQueue.cpp
+    src/assets/TextureLODController.cpp
+    src/assets/PlanetManifestLoader.cpp
+    src/assets/TextureFormatSupport.cpp
+    src/assets/BlockCompression.cpp
+    # astro/: ephemerides, sky events, catalogs, field models (GL-free)
+    src/astro/Ephemeris.cpp
+    src/astro/SkyEvents.cpp
+    src/astro/Observer.cpp
+    src/astro/LunarTheory.cpp
+    src/astro/StarCatalog.cpp
+    src/astro/MissionCatalog.cpp
+    src/astro/MagneticFieldParams.cpp
+    src/astro/MagneticFieldModel.cpp
+    src/astro/MagneticFieldTracer.cpp
 )
 
 set(SOLARSYSTEM_SOURCES_SOLAR

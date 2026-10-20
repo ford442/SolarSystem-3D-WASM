@@ -6,6 +6,13 @@
 #include "QualitySettings.h"
 #include "Solar_System/AsteroidField.h"
 #include "Solar_System/OrbitLayout.h"
+#include "astro/MagneticFieldTracer.h"
+#include "render/MagneticFieldBloom.h"
+#include "render/MagneticFieldLineMesh.h"
+#include "render/MagneticFieldLineRenderer.h"
+#include "render/MissionPathRenderer.h"
+#include "render/OrbitPathRenderer.h"
+#include "render/XrPointerRenderer.h"
 #include "core/Log.h"
 #include <algorithm>
 #include <optional>

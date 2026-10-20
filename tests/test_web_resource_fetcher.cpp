@@ -5,7 +5,7 @@
 #include <string>
 #include <vector>
 
-#include "Auxiliary_Modules/WebResourceFetcher.h"
+#include "assets/WebResourceFetcher.h"
 
 namespace {
 

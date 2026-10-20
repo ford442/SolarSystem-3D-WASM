@@ -1,6 +1,6 @@
 #ifndef SOLARSYSTEM_SHADOWMAPFBO_H
 #define SOLARSYSTEM_SHADOWMAPFBO_H
-#include "../gfx/GlHandle.h"
+#include "GlHandle.h"
 #include <cstdint>
 #include <vector>
 

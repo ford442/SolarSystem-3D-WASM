@@ -11,9 +11,19 @@
 #include "Solar_System/AtmosphereModel.h"
 #include "SimState.h"
 #include "Solar_System/OrbitLayout.h"
-#include "Auxiliary_Modules/Ephemeris.h"
-#include "Auxiliary_Modules/TextureLoadingQueue.h"
+#include "astro/Ephemeris.h"
+#include "assets/TextureLoadingQueue.h"
 #include "core/Log.h"
+#include "gfx/HDR.h"
+#include "gfx/ShadowMapFBO.h"
+#include "render/LensFlare.h"
+#include "render/MagneticFieldBloom.h"
+#include "render/MagneticFieldLineRenderer.h"
+#include "render/MissionPathRenderer.h"
+#include "render/OrbitPathRenderer.h"
+#include "render/TextRenderer.h"
+#include "render/XrPointerRenderer.h"
+#include "Solar_System/SkyBox.h"
 #include <algorithm>
 #include <array>
 #include <deque>
@@ -23,6 +33,9 @@
 #include <string>
 
 using namespace std;
+
+Renderer::Renderer() = default;
+Renderer::~Renderer() = default;
 
 namespace {
 

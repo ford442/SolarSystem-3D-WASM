@@ -3,8 +3,8 @@
 #include "SpaceObject.h"
 #include "Star.h"
 #include "TexturePaths.h"
-#include "../Auxiliary_Modules/TextureImage2D.h"
-#include "../Auxiliary_Modules/TextureLODController.h"
+#include "../gfx/TextureImage2D.h"
+#include "../assets/TextureLODController.h"
 #include <vector>
 #include <memory>
 

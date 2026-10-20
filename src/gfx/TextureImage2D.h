@@ -1,14 +1,7 @@
 #ifndef SOLARSYSTEM_TEXTUREIMAGE2D_H
 #define SOLARSYSTEM_TEXTUREIMAGE2D_H
-#include "../../src/3rdparty/nv_dds.h"
-#include "../gfx/GlHandle.h"
-#include <iostream>
+#include "GlHandle.h"
 #include <string>
-#include <mutex>
-#include <memory>
-#include <thread>
-
-using namespace nv_dds;
 
 class TextureImage2D {
 public:
