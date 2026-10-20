@@ -1,11 +1,13 @@
 // Covers ShaderSource: the #version rewrite, the preamble, #include expansion, sampler
-// `binding =` extraction and the #line bookkeeping that keeps compiler errors pointing at
-// the right file and line. The last tests run every real shader in resource/shaders
-// through the preprocessor.
+// `binding =` extraction, permutation defines and the #line bookkeeping that keeps compiler
+// errors pointing at the right file and line; and CatalogMaterial's variant masks. The last
+// tests run every real shader in resource/shaders through the preprocessor.
 
 #include "Auxiliary_Modules/ShaderSource.h"
+#include "Solar_System/CatalogMaterial.h"
 #include "gfx/TextureUnits.h"
 
+#include <algorithm>
 #include <gtest/gtest.h>
 
 #include <filesystem>
@@ -224,6 +226,69 @@ TEST(ShaderSource, StripsSamplerBindingsAndRecordsTheirUnits) {
     EXPECT_EQ(result.samplerBindings[1].unit, 3);
 }
 
+TEST(ShaderSource, InsertsPermutationDefinesAheadOfThePreamble) {
+    MemoryFiles fs = BaseFiles();
+    fs.files["shaders/a.fs"] = "#version 300 es\n#ifdef HAS_X\nout vec4 c;\n#endif\n";
+
+    const auto result =
+        Preprocess("shaders/a.fs", Stage::Fragment, Dialect::GlslEs300, fs.Reader(), {"HAS_X", "USE_Y2"});
+    ASSERT_TRUE(result.ok) << result.error;
+    const size_t x = result.code.find("#define HAS_X 1\n");
+    const size_t y = result.code.find("#define USE_Y2 1\n");
+    const size_t preamble = result.code.find("#line 1 1\n");
+    ASSERT_NE(x, std::string::npos);
+    ASSERT_NE(y, std::string::npos);
+    ASSERT_NE(preamble, std::string::npos);
+    EXPECT_LT(x, y);
+    EXPECT_LT(y, preamble);
+    // The defines do not shift the top file's numbering.
+    EXPECT_NE(result.code.find("#line 2 0\n#ifdef HAS_X"), std::string::npos);
+}
+
+TEST(ShaderSource, RejectsMalformedOrReservedDefines) {
+    MemoryFiles fs = BaseFiles();
+    fs.files["shaders/a.fs"] = "#version 300 es\nvoid main() {}\n";
+    for (const char* bad : {"", "lower", "1ABC", "HAS-X", "A B", "SS_STAGE_VERTEX", "GL_ES"}) {
+        const auto result = Preprocess("shaders/a.fs", Stage::Fragment, Dialect::GlslEs300, fs.Reader(), {bad});
+        EXPECT_FALSE(result.ok) << '"' << bad << '"';
+        EXPECT_NE(result.error.find("invalid shader define"), std::string::npos) << result.error;
+    }
+    EXPECT_TRUE(ShaderSource::IsValidDefine("HAS_CLOUDS"));
+    EXPECT_TRUE(ShaderSource::IsValidDefine("_X1"));
+}
+
+TEST(ShaderSource, ReadsDeclaredPermutations) {
+    EXPECT_EQ(ShaderSource::DeclaredPermutations("#version 300 es\n  // permutations: A B\nx\n// permutations: C\n"),
+              (std::vector<std::string>{"A", "B", "C"}));
+    EXPECT_TRUE(ShaderSource::DeclaredPermutations("// permutation A\nuniform float permutations;\n").empty());
+}
+
+TEST(CatalogMaterial, VariantCountsAMapOnlyWhenItIsResident) {
+    using namespace CatalogMaterial;
+    const Material earth{true, true, true, false, 0.1f};
+    EXPECT_EQ(Variant(earth, Textures{1, 2, 3, 4, 5}), kNightTexture | kSpecularMap | kClouds);
+    EXPECT_EQ(Variant(earth, Textures{1, 2, 0, 4, 0}), kNightTexture); // specular and clouds still loading
+    EXPECT_EQ(Variant(earth, Textures{}), 0u);
+    const Material moon{false, false, false, true, 0.1f};
+    EXPECT_EQ(Variant(moon, Textures{1, 2, 3, 4, 5}), kSphereIntersect); // flags off: maps ignored
+}
+
+TEST(CatalogMaterial, PossibleVariantsAreEverySubsetOfTheRowsMaps) {
+    using namespace CatalogMaterial;
+    const auto sorted = [](std::vector<unsigned> variants) {
+        std::sort(variants.begin(), variants.end());
+        return variants;
+    };
+    EXPECT_EQ(sorted(PossibleVariants({true, true, true, false, 0.1f})),
+              (std::vector<unsigned>{0, 1, 2, 3, 4, 5, 6, 7}));
+    EXPECT_EQ(sorted(PossibleVariants({false, true, false, true, 0.1f})),
+              (std::vector<unsigned>{kSphereIntersect, kSphereIntersect | kSpecularMap}));
+    EXPECT_EQ(PossibleVariants({false, false, false, false, 0.1f}), (std::vector<unsigned>{0}));
+    EXPECT_EQ(Defines(kSpecularMap | kSphereIntersect),
+              (std::vector<std::string>{"HAS_SPECULAR_MAP", "USE_SPHERE_INTERSECT"}));
+    EXPECT_TRUE(Defines(0).empty());
+}
+
 TEST(ShaderSource, RejectsUnknownUnitsAndBindingsOffSamplers) {
     MemoryFiles fs = BaseFiles();
     fs.files["shaders/unknown.fs"] = "#version 300 es\nlayout(binding = TU_NOPE) uniform sampler2D a;\n";
@@ -355,6 +420,51 @@ TEST(ShaderSourceTree, LitProgramsReadTheFrameUniformBlock) {
             EXPECT_EQ(fragment.code.find(stale), std::string::npos) << fs << " still declares " << stale;
         }
     }
+}
+
+// CatalogMaterial::Defines() and planetLighting.fs's `// permutations:` line name the same
+// switches (the self-test compiles every subset of that line), and the old flag uniforms
+// are gone: a flag is a permutation now, not a per-draw bool.
+TEST(ShaderSourceTree, PlanetLightingDeclaresExactlyTheMaterialDefines) {
+    const auto text = ShaderSource::ReadFileFromDisk(kShaderDir + "/planetLighting.fs");
+    ASSERT_TRUE(text.has_value());
+    EXPECT_EQ(ShaderSource::DeclaredPermutations(*text), CatalogMaterial::Defines(CatalogMaterial::kVariantCount - 1));
+    for (const char* stale : {"uniform bool hasNightTexture", "uniform bool hasSpecularMap", "uniform bool hasSpecular;",
+                              "uniform bool hasClouds", "uniform bool isUseSphereIntersect"}) {
+        EXPECT_EQ(text->find(stale), std::string::npos) << "planetLighting.fs still declares " << stale;
+    }
+}
+
+// Every declared switch is a valid define that the stage actually tests, and every subset
+// preprocesses (the GL self-test then compiles them).
+TEST(ShaderSourceTree, EveryDeclaredPermutationIsUsedAndPreprocesses) {
+    size_t declaring = 0;
+    for (const auto& file : TopLevelShaders()) {
+        const auto text = ShaderSource::ReadFileFromDisk(file.string());
+        ASSERT_TRUE(text.has_value()) << file;
+        const std::vector<std::string> permutations = ShaderSource::DeclaredPermutations(*text);
+        if (permutations.empty()) {
+            continue;
+        }
+        ++declaring;
+        for (const std::string& define : permutations) {
+            EXPECT_TRUE(ShaderSource::IsValidDefine(define)) << file << ": " << define;
+            EXPECT_GE(CountOf(*text, define), 2u) << file << " declares " << define << " but never tests it";
+        }
+        const Stage stage = file.extension() == ".vs" ? Stage::Vertex : Stage::Fragment;
+        for (unsigned mask = 0; mask < (1u << permutations.size()); ++mask) {
+            std::vector<std::string> defines;
+            for (size_t bit = 0; bit < permutations.size(); ++bit) {
+                if (mask & (1u << bit)) {
+                    defines.push_back(permutations[bit]);
+                }
+            }
+            const auto result =
+                Preprocess(file.string(), stage, Dialect::GlslEs300, ShaderSource::ReadFileFromDisk, defines);
+            EXPECT_TRUE(result.ok) << file << " mask " << mask << ": " << result.error;
+        }
+    }
+    EXPECT_GE(declaring, 1u);
 }
 #endif
 

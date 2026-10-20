@@ -20,6 +20,7 @@ public:
 
     void AdjustToParent() override;
     void Render() const override;
+    unsigned ShaderVariant() const override { return CatalogMaterial::Variant(_material, CurrentTextures()); }
 
     bool IsEphemerisPlaced() const override { return _ephemerisPlaced; }
     float OrbitSceneUnitsPerKm() const override;
@@ -30,6 +31,9 @@ public:
     unsigned int GetDiffuseTexture() const { return _diffuses.empty() ? 0u : _diffuses.front().GetTexture(); }
 
 private:
+    /** The GL names of this draw's maps (0 where the material has none). */
+    CatalogMaterial::Textures CurrentTextures() const;
+
     const BodyCatalog::Entry& _entry;
     CatalogMaterial::Material _material;
     bool _ephemerisPlaced = false;

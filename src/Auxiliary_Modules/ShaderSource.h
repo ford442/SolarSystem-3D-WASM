@@ -13,6 +13,7 @@
 // Output layout (source-string numbers are what the GLSL compiler prints in errors):
 //   #version …                   <- top file line 1 (rewritten to 460 core on native)
 //   #define SS_STAGE_* / SS_GLSL_*
+//   #define <each permutation define> 1
 //   #line 1 1                    <- source string 1 = common/preamble.glsl
 //   …preamble…
 //   #line 2 0                    <- source string 0 = the top file, on-disk numbering
@@ -52,10 +53,23 @@ Dialect NativeDialect();
 
 // Expands `path` (a top-level .vs/.fs file). Includes resolve relative to the top file's
 // directory; each file is expanded at most once per stage (no include guards needed).
-Result Preprocess(const std::string& path, Stage stage, Dialect dialect, const FileReader& reader);
+// `defines` are permutation switches (HAS_CLOUDS, …): each becomes `#define NAME 1` ahead of
+// the preamble, so the shader tests them with #ifdef. Names are [A-Z_][A-Z0-9_]*.
+Result Preprocess(const std::string& path, Stage stage, Dialect dialect, const FileReader& reader,
+                  const std::vector<std::string>& defines = {});
+
+// Whether `name` is a valid permutation define (upper-case identifier, not SS_*/GL_*).
+bool IsValidDefine(const std::string& name);
 
 // Reads from the (MEM)FS; what Shader.cpp uses.
 std::optional<std::string> ReadFileFromDisk(const std::string& path);
+
+// The file's modification time (opaque units, only compared for change), or nullopt.
+std::optional<long long> FileModificationTime(const std::string& path);
+
+// The defines a top-level stage lists on a `// permutations: A B …` line (anywhere in the
+// file): the switches it tests with #ifdef. The self-test compiles every subset of them.
+std::vector<std::string> DeclaredPermutations(const std::string& text);
 
 // "0: resource/shaders/x.fs, 1: …/preamble.glsl, …" for compile-error reports.
 std::string DescribeSources(const Result& result);

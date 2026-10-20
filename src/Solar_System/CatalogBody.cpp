@@ -54,7 +54,7 @@ void CatalogBody::AdjustToParent() {
     Rotate(OrbitLayout::GetAxialSpinDegrees(_body), glm::vec3(0.0f, 1.0f, 0.0f));
 }
 
-void CatalogBody::Render() const {
+CatalogMaterial::Textures CatalogBody::CurrentTextures() const {
     // PlanetInfo::diffuseTextures is ordered [day, clouds?, night?] (see MakePlanetInfo).
     CatalogMaterial::Textures textures;
     textures.diffuse = _diffuses.at(0).GetTexture();
@@ -69,8 +69,11 @@ void CatalogBody::Render() const {
     if (_material.hasNight && _diffuses.size() > next) {
         textures.night = _diffuses.at(next).GetTexture();
     }
+    return textures;
+}
 
-    CatalogMaterial::BindMaterial(GetShader(), _material, textures);
+void CatalogBody::Render() const {
+    CatalogMaterial::BindMaterial(GetShader(), _material, CurrentTextures());
     SpaceObject::Render();
 }
 

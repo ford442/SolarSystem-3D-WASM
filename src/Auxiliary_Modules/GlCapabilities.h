@@ -28,6 +28,9 @@ struct GlCapabilities {
     bool etc2CompressedTextures = false;   // WEBGL_compressed_texture_etc
     bool astcCompressedTextures = false;   // WEBGL_compressed_texture_astc
     bool colorBufferFloat = false;
+    // KHR_parallel_shader_compile (enabled by the probe): programs compile in the background
+    // and GL_COMPLETION_STATUS_KHR says when one is done (Shader::IsReady).
+    bool parallelShaderCompile = false;
     int maxTextureSize = 2048;
 
     TextureFormats::FormatCapabilities ToFormatCapabilities() const {

@@ -266,6 +266,11 @@ private:
     void RenderFrame(int viewCount);
     /** Debug: the previous frame's FramePasses::Stats and glUniform* count (SOLARSYSTEM_FRAME_STATS=N). */
     void ReportFrameStats();
+#ifndef __EMSCRIPTEN__
+    /** Native shader hot reload: every ~0.5 s, rebuild programs whose files changed (off with SOLARSYSTEM_SHADER_HOT_RELOAD=0). */
+    void PollShaderHotReload(double now);
+    double _lastShaderPoll = 0.0;
+#endif
     /** After UpdateScene: fill _frameScene, _frameViews and _frameHud for this frame's passes. */
     void BuildFrameSnapshot(int viewCount);
     /** The passes' view of frame state for view `view`; valid until the next BuildFrameSnapshot. */

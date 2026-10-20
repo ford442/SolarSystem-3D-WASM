@@ -87,6 +87,9 @@ void Application::RunOneFrame() {
     const double currentFrame = glfwGetTime();
     _deltaTime = currentFrame - _lastFrame;
     _lastFrame = currentFrame;
+#ifndef __EMSCRIPTEN__
+    PollShaderHotReload(currentFrame);
+#endif
 
     if (_observe.active) {
         // Sky watching runs on wall-clock UTC at timeRate, not the orrery's 3 days per second.
@@ -227,6 +230,20 @@ void Application::ReportFrameStats() {
                   << " uniformCalls=" << uniformCalls << std::endl;
     }
 }
+
+#ifndef __EMSCRIPTEN__
+void Application::PollShaderHotReload(double now) {
+    static const bool enabled = [] {
+        const char* value = std::getenv("SOLARSYSTEM_SHADER_HOT_RELOAD");
+        return !(value && std::string(value) == "0");
+    }();
+    if (!enabled || now - _lastShaderPoll < 0.5) {
+        return;
+    }
+    _lastShaderPoll = now;
+    Shader::ReloadChanged();
+}
+#endif
 
 void Application::RenderFrame(int viewCount) {
     FramePasses::Hooks hooks;

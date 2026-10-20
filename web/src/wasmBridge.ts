@@ -177,6 +177,10 @@ export interface SolarSystemRuntime {
     getCameraYaw(): number;
     getCameraPitch(): number;
     setXrControllerRay(hand: number, ox: number, oy: number, oz: number, dx: number, dy: number, dz: number, visible: boolean): void;
+    /** Files the live shader programs were built from (MEMFS paths); dev reload only. */
+    getShaderSourceFiles(): string[];
+    /** Rebuild the programs whose files changed in MEMFS; returns how many. Dev reload only. */
+    reloadChangedShaders(): number;
 }
 
 let activeRuntime: SolarSystemRuntime | null = null;
@@ -294,6 +298,8 @@ export function createSolarSystemRuntime(instance: SolarSystemModule): SolarSyst
         setXrControllerRay: (hand, ox, oy, oz, dx, dy, dz, visible) => {
             exports.setXrControllerRay(hand, ox, oy, oz, dx, dy, dz, visible ? 1 : 0);
         },
+        getShaderSourceFiles: () => exports.getShaderSourceFiles().split('\n').filter((path) => path.length > 0),
+        reloadChangedShaders: exports.reloadShaders,
     };
 
     activeRuntime = runtime;

@@ -476,7 +476,8 @@ Rebuild WASM after C++ changes: `./build-web.sh` then refresh the browser.
 | Precision | Qualifiers accepted and ignored | `common/preamble.glsl` sets `highp` defaults in fragments |
 | `#include "common/x.glsl"` | Expanded by `ShaderSource` | Expanded by `ShaderSource` |
 | Geometry/compute shaders | Geometry allowed | **Not supported** — no 3-arg `Shader` ctor exists |
-| Double uniforms | `glUniform1d` | Cast to float via `Shader` class |
+| Parallel compile | `KHR`/`ARB_parallel_shader_compile` via GLEW, if the driver has it | `KHR_parallel_shader_compile` WebGL extension, if exposed |
+| Hot reload | `resource/shaders/` mtime poll every 0.5 s (`SOLARSYSTEM_SHADER_HOT_RELOAD=0` turns it off) | Dev server only: `await window.__solarSystem.reloadShaders()` |
 
 **One source, two dialects.** Every file in `resource/shaders/` is written once in GLSL
 ES 3.00, because that is the only dialect WebGL 2 accepts. The native build runs an
@@ -491,6 +492,7 @@ subset of desktop GLSL 4.60, precision qualifiers included).
 ```
 #version …                         line 1 of the file (rewritten natively)
 #define SS_STAGE_VERTEX|FRAGMENT 1, SS_GLSL_ES|SS_GLSL_DESKTOP 1
+#define <each permutation define> 1   e.g. HAS_CLOUDS; from the program's ShaderSpec
 #line 1 1   common/preamble.glsl   precision defaults only; no helper macros
 #line 2 0   the file itself        on-disk line numbers
             #include "common/x.glsl" → #line 1 <id> … #line <next> <parent>
@@ -508,24 +510,69 @@ and values as parameters and declare no uniforms; each shader keeps its own
 and fails on a function defined twice.
 
 **Self-test.** `SOLARSYSTEM_SHADER_SELFTEST=1 ./build/SolarSystem` compiles every `.vs`/`.fs`
-in both dialects (Mesa's core context also accepts `300 es`), prints
-`[ShaderSelfTest] N/N … OK` and exits; the native CI job runs it under Xvfb with
-`MESA_GLSL_VERSION_OVERRIDE=460`.
+in both dialects (Mesa's core context also accepts `300 es`), once per subset of the
+defines a stage lists on its `// permutations:` line, prints `[ShaderSelfTest] N/N … OK`
+and exits; the native CI job runs it under Xvfb with `MESA_GLSL_VERSION_OVERRIDE=460`.
+
+**Permutations.** A stage that branches on a per-material switch tests a `#define` instead
+of a `uniform bool`, and names its switches on a `// permutations: A B …` line
+(`planetLighting.fs`: `HAS_NIGHT_TEXTURE HAS_SPECULAR_MAP HAS_CLOUDS USE_SPHERE_INTERSECT`).
+A program is identified by its `ShaderSpec` — stage files plus sorted defines — and
+`ShaderLibrary` (`src/Auxiliary_Modules/ShaderLibrary.h`) builds each spec once.
+`tests/test_shader_source.cpp` checks that the declared list matches
+`CatalogMaterial::Defines()`, that each switch is tested, and that every subset preprocesses.
+
+**Compiling.** `Shader::Submit` preprocesses, compiles and links without asking for any
+status; `Finish()` (or `ShaderLibrary::Get`) checks the logs and builds the uniform table.
+`Renderer::Init` prefetches every program it owns — including every planetLighting variant a
+catalog row can reach (`CatalogMaterial::PossibleVariants`) — before waiting on the first, so
+with `KHR_parallel_shader_compile` (`GlCapabilities::parallelShaderCompile`) the driver
+compiles them side by side. `ShaderLibrary::GetIfReady` returns a program only once
+`GL_COMPLETION_STATUS_KHR` says it is done, so a variant picked mid-frame never stalls it.
+Optional effects use `TryGet` (null when the compile failed); the corona volume and the LUT
+atmosphere fall back that way.
+
+**Hot reload.** Every live `Shader` is in a registry with the files it was assembled from
+(includes and the preamble too) and their mtimes. `Shader::ReloadChanged()` rebuilds the
+ones whose files moved: in place, so references stay valid, and with every uniform value
+it had replayed onto the new program (one-off values set at init survive). A program that
+fails to compile keeps its previous build and the error is printed. Native polls it from
+the frame loop every 0.5 s. On web, `npm run dev` serves `../resource/shaders` at
+`<base>__dev/shaders/` (`vite.config.ts`), and `window.__solarSystem.reloadShaders()`
+(`web/src/shaderReload.ts`, only imported in dev) re-fetches the files, writes the changed
+ones into MEMFS (the module exports `FS` for this) and calls the `ReloadShaders` export.
 
 **No geometry stage on web.** WebGL 2 has no geometry shader, so the `Shader` constructor
 overload taking a `geometryPath` is compiled out under `__EMSCRIPTEN__`: passing one in a
 web build is a compile error, not a shader that silently fails to link.
 
 **Material binding.** `planetLighting` material state for every catalog body goes through
-`CatalogMaterial::BindMaterial` (`src/Solar_System/CatalogMaterial.h`). `CatalogBody` and
+`CatalogMaterial` (`src/Solar_System/CatalogMaterial.h`). `CatalogBody` and
 `CatalogSatellite` build a `CatalogMaterial::Material` from their row's `render.shaderFlags`,
-`useSphereIntersect`, and `ambientFactor`. `BindMaterial` sets the full flag block on every
-draw, so no body inherits the previous draw's `hasClouds`/`hasNightTexture`. It also binds
-samplers to fixed units: diffuse 0, normal 1, specular 2, night 3, clouds 4. `SceneRenderer`
-owns 6 (`shadowMap`) and 7 (`ringDiffuse`); the atmosphere passes use 9 (`ringDiffuse`),
-11 (`shadowMap`, O'Neil) and 12/13 (transmittance / multi-scattering LUTs). `generate-planet-metadata.mjs` rejects a row
-whose `shaderFlags` disagree with its `lod` ids, and a moon row that asks for night or cloud
-maps. **A new rocky body needs only a catalog row, not a `Render()`.**
+`useSphereIntersect`, and `ambientFactor`. The flags are not uniforms: `ShaderVariant()`
+turns them into a variant mask (a map counts only once its texture is resident), the
+Renderer draws the body with that permutation (`Renderer::PlanetProgram`), and
+`BindMaterial` sets `ambientFactor` and binds the maps. So no body can inherit the previous
+draw's clouds or night map, and a body without one never runs that branch.
+`generate-planet-metadata.mjs` rejects a row whose `shaderFlags` disagree with its `lod`
+ids, and a moon row that asks for night or cloud maps. **A new rocky body needs only a
+catalog row, not a `Render()`.**
+
+**Texture units.** Every sampler names its unit in the shader —
+`layout(binding = TU_SHADOW_MAP) uniform sampler2D shadowMap;`. The `TU_*` values are the
+X-list in `src/gfx/TextureUnits.h`; `scripts/generate-texture-units.mjs` writes them to
+`common/texture_units.glsl` (included by the preamble; CI checks it is current). GLSL ES
+3.00 has no sampler `binding`, so `ShaderSource` strips the qualifier and `Shader` sets the
+unit once at link; C++ binds with `glBindTextureUnit(Unit(TextureUnit::X), texture)` and
+never `SetInt`s a sampler. The units are fixed across programs (diffuse 0, normal 1,
+specular 2, night 3, clouds 4, shadow map 5, ring 6, the two atmosphere LUTs 7/8, Observe's
+Moon 9), so the shadow map is bound once per view, not per program.
+
+**Per-frame uniforms.** View/projection matrices, the eye and Sun positions, far plane,
+log-depth `zCoef`, time and exposure are one std140 block, `FrameUBO`
+(`common/frame.glsl`, read as `frame.view` etc.; C++ layout `gfx/FrameUniforms.h`).
+`Renderer::BeginView` uploads it once per view (per eye in XR) to binding 0; `Shader` binds
+the block of every program that declares it at link.
 
 Special cases that stay outside the catalog material path:
 - `Sun`: star, corona, and glow programs.
@@ -535,7 +582,12 @@ Special cases that stay outside the catalog material path:
 - `Atmosphere`: the O'Neil and LUT programs, configured from `render.atmosphere` (§9.2).
 - Asteroid field, comet tails, and the orbit/mission/magnetic-field overlays.
 
-**Uniform locations:** `Shader::Set*` resolves each uniform name with `glGetUniformLocation` on first use and caches the `GLint` (including `-1` for missing names) in a per-program map. Subsequent sets reuse the cache — do not call `glGetUniformLocation` at render call sites. The cache is cleared when the program is deleted (`Release` / destructor). If a re-link path is added later, clear the cache after a successful `glLinkProgram`.
+**Uniform locations:** after linking, `Shader` reads the program's active uniforms into a
+sorted name → slot table, so `Set*(std::string_view)` costs a binary search and no GL query
+or allocation; a name the program does not have is a silent no-op. Each slot keeps the last
+value set, and an unchanged value skips the `glUniform*` call. A setter on a program that
+is not current binds it for the call and restores the current one, so the cache stays true.
+`SOLARSYSTEM_FRAME_STATS=N` prints the `glUniform*` count every N frames.
 
 ### 9.2 Atmospheres and the Sun
 

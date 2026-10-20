@@ -49,7 +49,7 @@ float CatalogSatellite::OrbitSceneUnitsPerKm() const {
     return _entry.sceneOrbitRadius / _entry.keplerian.aKm;
 }
 
-void CatalogSatellite::Render() const {
+CatalogMaterial::Textures CatalogSatellite::CurrentTextures() const {
     CatalogMaterial::Textures textures;
     textures.diffuse = _diffuses.at(0).GetTexture();
     textures.normal = _normalMap.GetTexture();
@@ -57,7 +57,11 @@ void CatalogSatellite::Render() const {
         textures.specular = _specular.GetTexture();
     }
     // SatelliteInfo carries no night/cloud maps; the generator rejects a moon row that asks
-    // for them, and BindMaterial clears both flags when their texture is 0.
-    CatalogMaterial::BindMaterial(GetShader(), _material, textures);
+    // for them, and Variant() drops both flags when their texture is 0.
+    return textures;
+}
+
+void CatalogSatellite::Render() const {
+    CatalogMaterial::BindMaterial(GetShader(), _material, CurrentTextures());
     SpaceObject::Render();
 }

@@ -9,6 +9,8 @@ public:
     explicit SpaceObject(MeshHolder model, const Shader& shader, std::wstring engName = L"", std::wstring otherLangName = L"");
     virtual ~SpaceObject() = default;
     virtual void Render() const;
+    /** The planetLighting permutation this object draws with now (CatalogMaterial::Variant); 0 = none. */
+    virtual unsigned ShaderVariant() const { return 0; }
     const MeshHolder& GetModel() const;
     const std::wstring& GetEngName() const;
     const std::wstring& GetOtherLangName() const;

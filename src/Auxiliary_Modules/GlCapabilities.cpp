@@ -34,6 +34,14 @@ GlCapabilities ProbeGlCapabilities() {
     caps.etc2CompressedTextures = IsWebGlExtensionSupported("WEBGL_compressed_texture_etc");
     caps.astcCompressedTextures = IsWebGlExtensionSupported("WEBGL_compressed_texture_astc");
     caps.colorBufferFloat = IsWebGlExtensionSupported("EXT_color_buffer_float");
+    // WebGL extensions are off until requested; getExtension() is what turns it on.
+    caps.parallelShaderCompile = EM_ASM_INT({
+        try {
+            return GLctx.getExtension('KHR_parallel_shader_compile') ? 1 : 0;
+        } catch (e) {
+            return 0;
+        }
+    }) != 0;
 #else
     // Desktop GL 4.6 core always has these via GLEW; anisotropy is applied unconditionally
     // in TextureImage2D.cpp for native builds, so this cap is web-only for now.
@@ -45,6 +53,14 @@ GlCapabilities ProbeGlCapabilities() {
     caps.etc2CompressedTextures = false;
     caps.astcCompressedTextures = false;
     caps.colorBufferFloat = true;
+    // 0xFFFFFFFF = as many compiler threads as the driver likes.
+    if (GLEW_KHR_parallel_shader_compile) {
+        glMaxShaderCompilerThreadsKHR(0xFFFFFFFFu);
+        caps.parallelShaderCompile = true;
+    } else if (GLEW_ARB_parallel_shader_compile) {
+        glMaxShaderCompilerThreadsARB(0xFFFFFFFFu);
+        caps.parallelShaderCompile = true;
+    }
 #endif
 
     if (caps.anisotropicFiltering) {
@@ -70,6 +86,7 @@ const GlCapabilities& GetGlCapabilities() {
                   << " | ASTC=" << (c.astcCompressedTextures ? "yes" : "no")
                   << " | preferredPack=" << c.PreferredTexturePack()
                   << " | colorBufferFloat=" << (c.colorBufferFloat ? "yes" : "no")
+                  << " | parallelShaderCompile=" << (c.parallelShaderCompile ? "yes" : "no")
                   << " | maxTextureSize=" << c.maxTextureSize << std::endl;
         return c;
     }();

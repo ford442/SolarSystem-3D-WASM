@@ -6,6 +6,8 @@
 #include "SystemModules.h"
 #include "gfx/FrameUniforms.h"
 #include "Auxiliary_Modules/MissionCatalog.h"
+#include "Auxiliary_Modules/ShaderLibrary.h"
+#include "Solar_System/CatalogMaterial.h"
 #include "Solar_System/ObserveSky.h"
 #include <array>
 #include <deque>
@@ -96,7 +98,9 @@ public:
     int ObserveStarsDrawn() const;
 
     // Programs the scene objects draw with. Bodies keep a reference (SetShader), so these
-    // must exist (Init) before StarSystemFactory builds anything.
+    // must exist (Init) before StarSystemFactory builds anything. PlanetShader() is the
+    // planetLighting variant without material defines; each draw switches to the body's own
+    // variant (PlanetProgram).
     Shader& StarShader() { return *_mainStarShader; }
     Shader& StarGlowShader() { return *_starGlowShader; }
     Shader& PlanetShader() { return *_mainPlanetShader; }
@@ -137,9 +141,6 @@ private:
     void RenderStar(const FrameContext& ctx) const;
     void RenderSpaceObjectDistance(const FrameContext& ctx, const SpaceObject* spaceObject) const;
     void UpdateOcclusionQuery(Star& sun);
-    void ConfigureMainPlanetShader(const FrameContext& ctx, const RenderableSceneComponent& renderableComponent);
-    /** Upload (or clear) the one moon currently casting an umbra on this component's planet. */
-    void ConfigureEclipseUmbra(const FrameContext& ctx, const RenderableSceneComponent& renderableComponent);
     struct EclipseUmbra {
         bool active = false;
         glm::vec3 casterCenter{0.0f};
@@ -147,20 +148,37 @@ private:
         float starRadius = 0.0f;
     };
     EclipseUmbra ComputeEclipseUmbra(const FrameContext& ctx, const RenderableSceneComponent& renderableComponent) const;
+    /**
+     * The planetLighting program for a CatalogMaterial variant. A variant that is still
+     * compiling (or failed) draws with the one without its maps rather than stalling the frame.
+     */
+    const Shader& PlanetProgram(unsigned variant);
+    /** Bind `program` and give it this component's shadow, ring and eclipse uniforms. */
+    void ConfigurePlanetProgram(const FrameContext& ctx, const Shader& program,
+                                const RenderableSceneComponent& component, const EclipseUmbra& umbra) const;
+    /** Draw one body (planet or moon) with its own material variant. */
+    void DrawLitBody(const FrameContext& ctx, SpaceObject& body, const RenderableSceneComponent& component,
+                     const EclipseUmbra& umbra);
+
+    // First, so it is destroyed last: everything below may hold a Shader& from it.
+    ShaderLibrary _shaders;
+    std::array<Shader*, CatalogMaterial::kVariantCount> _planetVariants{}; // into _shaders; null = not ready
 
     std::unique_ptr<TextRenderer> _textRenderer;
     std::unique_ptr<ShadowMapFBO> _shadowMapFBO;
     std::unique_ptr<HDR> _hdr;
     bool _hdrEnabled = true;
     std::unique_ptr<SkyBox> _skyBox;
-    std::unique_ptr<Shader> _shadowMapShader;
-    std::unique_ptr<Shader> _mainSkyBoxShader, _mainTextShader, _mainStarShader, _mainCoronaStarShader,
-        _mainPlanetShader, _mainAtmosphereShader, _mainCloudsShader, _mainRingShader;
-    std::unique_ptr<Shader> _hdrShader, _lensFlareShader, _starGlowShader;
+    // Owned by _shaders.
+    Shader* _shadowMapShader = nullptr;
+    Shader *_mainSkyBoxShader = nullptr, *_mainTextShader = nullptr, *_mainStarShader = nullptr,
+           *_mainCoronaStarShader = nullptr, *_mainPlanetShader = nullptr, *_mainAtmosphereShader = nullptr,
+           *_mainCloudsShader = nullptr, *_mainRingShader = nullptr;
+    Shader *_hdrShader = nullptr, *_lensFlareShader = nullptr, *_starGlowShader = nullptr;
     // LUT atmosphere (atmosphere.vs + atmospherePbr.fs). Null if it failed to compile, in
     // which case every shell stays on mainAtmosphereShader.
-    std::unique_ptr<Shader> _pbrAtmosphereShader;
-    std::unique_ptr<Shader> _coronaVolumeShader;
+    Shader* _pbrAtmosphereShader = nullptr;
+    Shader* _coronaVolumeShader = nullptr;
     std::unique_ptr<LensFlare> _lensFlare;
     // Null if its shaders failed to compile; Observe then draws an empty sky.
     std::unique_ptr<ObserveSky> _observeSky;

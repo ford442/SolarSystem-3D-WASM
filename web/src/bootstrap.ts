@@ -236,6 +236,9 @@ void startModule().then((instance) => {
     const runtime = createSolarSystemRuntime(instance);
     runtimeForReload = runtime;
     exposeConsoleHelpers(runtime);
+    if (import.meta.env.DEV) {
+        void import('./shaderReload').then(({ installShaderReload }) => installShaderReload(instance, runtime, deployedBaseUrl));
+    }
 
     const deepLink = parseDeepLinkFromUrl();
     const explorer = new PlanetExplorer(explorerPanel);

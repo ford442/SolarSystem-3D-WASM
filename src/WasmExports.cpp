@@ -4,6 +4,7 @@
 #include "QualitySettings.h"
 #include "SimState.h"
 #include "Solar_System/OrbitLayout.h"
+#include "Auxiliary_Modules/Shader.h"
 #include <algorithm>
 #include <cmath>
 #include <cstdio>
@@ -356,6 +357,21 @@ extern "C" {
     }
     EMSCRIPTEN_KEEPALIVE float GetCameraPitch() {
         return activeApplication ? activeApplication->GetCamera().GetPitch() : 0.0f;
+    }
+    // Dev-only shader hot reload (web/src/shaderReload.ts): the page lists the files every
+    // live program was built from, rewrites them in MEMFS, then asks for a rebuild of the
+    // programs whose files changed. Returns how many were replaced.
+    EMSCRIPTEN_KEEPALIVE const char* GetShaderSourceFiles() {
+        static std::string files;
+        files.clear();
+        for (const std::string& file : Shader::LiveSourceFiles()) {
+            files += file;
+            files += '\n';
+        }
+        return files.c_str();
+    }
+    EMSCRIPTEN_KEEPALIVE int ReloadShaders() {
+        return Shader::ReloadChanged();
     }
 }
 

@@ -3,10 +3,12 @@
 
 #include <algorithm>
 #include <cctype>
+#include <cstring>
 #include <fstream>
 #include <regex>
 #include <sstream>
 #include <unordered_set>
+#include <sys/stat.h>
 
 namespace ShaderSource {
 namespace {
@@ -225,8 +227,28 @@ Dialect NativeDialect() {
 #endif
 }
 
-Result Preprocess(const std::string& path, Stage stage, Dialect dialect, const FileReader& reader) {
+bool IsValidDefine(const std::string& name) {
+    if (name.empty() || std::isdigit(static_cast<unsigned char>(name[0]))) {
+        return false;
+    }
+    // SS_ is ShaderSource's own namespace and GL_ is reserved by GLSL.
+    if (name.rfind("SS_", 0) == 0 || name.rfind("GL_", 0) == 0) {
+        return false;
+    }
+    return std::all_of(name.begin(), name.end(), [](char c) {
+        return (c >= 'A' && c <= 'Z') || (c >= '0' && c <= '9') || c == '_';
+    });
+}
+
+Result Preprocess(const std::string& path, Stage stage, Dialect dialect, const FileReader& reader,
+                  const std::vector<std::string>& defines) {
     Result result;
+    for (const std::string& define : defines) {
+        if (!IsValidDefine(define)) {
+            result.error = "invalid shader define \"" + define + "\" (expected [A-Z_][A-Z0-9_]*, not SS_*/GL_*)";
+            return result;
+        }
+    }
     const std::string top = Normalize(path);
     const std::optional<std::string> text = reader(top);
     if (!text) {
@@ -257,6 +279,9 @@ Result Preprocess(const std::string& path, Stage stage, Dialect dialect, const F
         case Stage::Geometry: ctx.code += "#define SS_STAGE_GEOMETRY 1\n"; break;
     }
     ctx.code += dialect == Dialect::GlslEs300 ? "#define SS_GLSL_ES 1\n" : "#define SS_GLSL_DESKTOP 1\n";
+    for (const std::string& define : defines) {
+        ctx.code += "#define " + define + " 1\n";
+    }
 
     const std::string preamblePath = Normalize(ctx.root.empty() ? kPreambleRelativePath
                                                                 : ctx.root + "/" + kPreambleRelativePath);
@@ -296,6 +321,38 @@ std::optional<std::string> ReadFileFromDisk(const std::string& path) {
     std::ostringstream stream;
     stream << file.rdbuf();
     return stream.str();
+}
+
+std::optional<long long> FileModificationTime(const std::string& path) {
+    struct stat info {};
+    if (stat(path.c_str(), &info) != 0) {
+        return std::nullopt;
+    }
+    // Sub-second where the platform has it: an editor can save twice within a second.
+#if defined(__APPLE__)
+    return static_cast<long long>(info.st_mtimespec.tv_sec) * 1000000000LL + info.st_mtimespec.tv_nsec;
+#elif defined(_WIN32)
+    return static_cast<long long>(info.st_mtime);
+#else
+    return static_cast<long long>(info.st_mtim.tv_sec) * 1000000000LL + info.st_mtim.tv_nsec;
+#endif
+}
+
+std::vector<std::string> DeclaredPermutations(const std::string& text) {
+    static constexpr const char* kMarker = "// permutations:";
+    std::vector<std::string> defines;
+    for (const std::string& line : SplitLines(text)) {
+        const size_t first = line.find_first_not_of(" \t");
+        if (first == std::string::npos || line.compare(first, std::strlen(kMarker), kMarker) != 0) {
+            continue;
+        }
+        std::istringstream words(line.substr(first + std::strlen(kMarker)));
+        std::string word;
+        while (words >> word) {
+            defines.push_back(word);
+        }
+    }
+    return defines;
 }
 
 std::string DescribeSources(const Result& result) {

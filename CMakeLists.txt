@@ -51,6 +51,7 @@ set(SOLARSYSTEM_SOURCES_CORE
 set(SOLARSYSTEM_SOURCES_AUX
     src/Auxiliary_Modules/WebResourceFetcher.cpp
     src/Auxiliary_Modules/Shader.cpp
+    src/Auxiliary_Modules/ShaderLibrary.cpp
     src/Auxiliary_Modules/ShaderSource.cpp
     src/Auxiliary_Modules/Mesh.cpp
     src/Auxiliary_Modules/MeshHolder.cpp
@@ -109,6 +110,7 @@ set(SOLARSYSTEM_SOURCES_SOLAR
     src/Solar_System/CatalogSatellite.cpp
     src/Solar_System/CatalogClouds.cpp
     src/Solar_System/CatalogMaterial.cpp
+    src/Solar_System/CatalogMaterialVariants.cpp
 )
 
 set(SOLARSYSTEM_SOURCES_3RDPARTY
@@ -191,7 +193,7 @@ if(EMSCRIPTEN)
         # 'GL' is needed so web/src/wasmBridge.ts can register the XRWebGLLayer's opaque
         # framebuffer in Emscripten's GL name table; without a name the WASM side cannot
         # rebind it after an off-screen pass (see SceneRenderer.cpp ShadowMapPass).
-        "SHELL:-sEXPORTED_RUNTIME_METHODS=['ccall','cwrap','HEAPF32','GL','UTF8ToString']"
+        "SHELL:-sEXPORTED_RUNTIME_METHODS=['ccall','cwrap','HEAPF32','GL','UTF8ToString','FS']"
         # Default list (see emscripten/src/settings.js INCOMING_MODULE_JS_API) plus
         # 'preinitializedWebGLContext' — web/src/bootstrap.ts creates the WebGL2 context
         # itself (see web/src/webglContext.ts) so GLFW's context creation can reuse it

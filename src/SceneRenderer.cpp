@@ -23,12 +23,62 @@
 
 using namespace std;
 
+namespace {
+
+ShaderSpec Program(const char* vertex, const char* fragment, vector<string> defines = {}) {
+    return ShaderSpec(string("resource/shaders/") + vertex, string("resource/shaders/") + fragment, std::move(defines));
+}
+
+ShaderSpec PlanetSpec(unsigned variant) {
+    return Program("planetLighting.vs", "planetLighting.fs", CatalogMaterial::Defines(variant));
+}
+
+// Every planetLighting variant some catalog row can draw with (CatalogMaterial::PossibleVariants).
+vector<unsigned> CatalogPlanetVariants() {
+    vector<unsigned> variants{0};
+    for (const BodyCatalog::Entry& entry : BodyCatalog::kEntries) {
+        for (const unsigned variant : CatalogMaterial::PossibleVariants(CatalogMaterial::Material::FromEntry(entry))) {
+            if (std::find(variants.begin(), variants.end(), variant) == variants.end()) {
+                variants.push_back(variant);
+            }
+        }
+    }
+    return variants;
+}
+
+} // namespace
+
 void Renderer::Init(const SimState& sim, FT_Library ft, glm::ivec2 display) {
     const auto qualitySettings = GetQualitySettings(
         sim.shadowQuality == 0 ? sim.qualityPreset : sim.shadowQuality - 1, sim.isMobileWeb);
     _shadowMapFBO = make_unique<ShadowMapFBO>(qualitySettings.shadowResolution, qualitySettings.shadowResolution);
+
+    // Submit every program before waiting on any: with KHR_parallel_shader_compile the
+    // driver compiles them side by side, and Get() below only waits for what is left.
+    const ShaderSpec hdrSpec = Program("passThrough.vs", "hdr.fs");
+    const ShaderSpec textSpec = Program("text.vs", "text.fs");
+    const ShaderSpec shadowSpec = Program("shadowMap.vs", "shadowMap.fs");
+    const ShaderSpec skyBoxSpec = Program("skyBox.vs", "skyBox.fs");
+    const ShaderSpec starSpec = Program("star.vs", "star.fs");
+    const ShaderSpec coronaSpec = Program("starCorona.vs", "starCorona.fs");
+    const ShaderSpec atmosphereSpec = Program("atmosphere.vs", "atmosphere.fs");
+    const ShaderSpec pbrAtmosphereSpec = Program("atmosphere.vs", "atmospherePbr.fs");
+    const ShaderSpec cloudsSpec = Program("planetLighting.vs", "cloudsLighting.fs");
+    const ShaderSpec ringSpec = Program("planetaryRingLighting.vs", "planetaryRingLighting.fs");
+    const ShaderSpec lensFlareSpec = Program("lensFlare.vs", "lensFlare.fs");
+    const ShaderSpec starGlowSpec = Program("starGlow.vs", "starGlow.fs");
+    const ShaderSpec coronaVolumeSpec = Program("starCoronaVolume.vs", "starCoronaVolume.fs");
+    const vector<unsigned> planetVariants = CatalogPlanetVariants();
+    for (const ShaderSpec* spec : {&hdrSpec, &textSpec, &shadowSpec, &skyBoxSpec, &starSpec, &coronaSpec,
+                                   &atmosphereSpec, &pbrAtmosphereSpec, &cloudsSpec, &ringSpec, &lensFlareSpec,
+                                   &starGlowSpec, &coronaVolumeSpec}) {
+        _shaders.Prefetch(*spec);
+    }
+    for (const unsigned variant : planetVariants) {
+        _shaders.Prefetch(PlanetSpec(variant));
+    }
     _hdrEnabled = qualitySettings.enableHdr;
-    _hdrShader = make_unique<Shader>("resource/shaders/passThrough.vs", "resource/shaders/hdr.fs");
+    _hdrShader = &_shaders.Get(hdrSpec);
     _hdr = make_unique<HDR>(*_hdrShader, display.x, display.y, _hdrEnabled);
     _hudProjection = glm::ortho(0.0f, static_cast<float>(display.x), 0.0f, static_cast<float>(display.y));
     // HDR turns itself off when the GPU cannot give it a complete float FBO; follow it,
@@ -36,32 +86,34 @@ void Renderer::Init(const SimState& sim, FT_Library ft, glm::ivec2 display) {
     _hdrEnabled = _hdr->IsEnabled();
     LogQualityTier(qualitySettings, _hdrEnabled, sim.shadowQuality);
 
-    _mainTextShader = make_unique<Shader>("resource/shaders/text.vs", "resource/shaders/text.fs");
+    _mainTextShader = &_shaders.Get(textSpec);
     _textRenderer = make_unique<TextRenderer>(ft, "resource/fonts/Arial.ttf");
     FT_Done_FreeType(ft);
-    _shadowMapShader = make_unique<Shader>("resource/shaders/shadowMap.vs", "resource/shaders/shadowMap.fs");
-    _mainSkyBoxShader = make_unique<Shader>("resource/shaders/skyBox.vs", "resource/shaders/skyBox.fs");
-    _mainStarShader = make_unique<Shader>("resource/shaders/star.vs", "resource/shaders/star.fs");
-    _mainCoronaStarShader = make_unique<Shader>("resource/shaders/starCorona.vs", "resource/shaders/starCorona.fs");
-    _mainPlanetShader = make_unique<Shader>("resource/shaders/planetLighting.vs", "resource/shaders/planetLighting.fs");
-    _mainAtmosphereShader = make_unique<Shader>("resource/shaders/atmosphere.vs", "resource/shaders/atmosphere.fs");
-    try {
-        _pbrAtmosphereShader = make_unique<Shader>("resource/shaders/atmosphere.vs", "resource/shaders/atmospherePbr.fs");
-    } catch (const std::exception&) {
-        // Already reported by Shader (and fatal to the CI shader self-test); the O'Neil
-        // shell still draws every atmosphere.
+    _shadowMapShader = &_shaders.Get(shadowSpec);
+    _mainSkyBoxShader = &_shaders.Get(skyBoxSpec);
+    _mainStarShader = &_shaders.Get(starSpec);
+    _mainCoronaStarShader = &_shaders.Get(coronaSpec);
+    _mainAtmosphereShader = &_shaders.Get(atmosphereSpec);
+    // Already reported by Shader (and fatal to the CI shader self-test); the O'Neil shell
+    // still draws every atmosphere.
+    _pbrAtmosphereShader = _shaders.TryGet(pbrAtmosphereSpec);
+    if (!_pbrAtmosphereShader) {
         std::cerr << "[Atmosphere] LUT atmosphere shader unavailable; using the O'Neil shell" << std::endl;
-        _pbrAtmosphereShader.reset();
     }
-    _mainCloudsShader = make_unique<Shader>("resource/shaders/planetLighting.vs", "resource/shaders/cloudsLighting.fs");
-    _mainRingShader = make_unique<Shader>("resource/shaders/planetaryRingLighting.vs", "resource/shaders/planetaryRingLighting.fs");
-    _lensFlareShader = make_unique<Shader>("resource/shaders/lensFlare.vs", "resource/shaders/lensFlare.fs");
-    _starGlowShader = make_unique<Shader>("resource/shaders/starGlow.vs", "resource/shaders/starGlow.fs");
-    try {
-        _coronaVolumeShader = make_unique<Shader>("resource/shaders/starCoronaVolume.vs", "resource/shaders/starCoronaVolume.fs");
-    } catch (const std::exception&) {
+    _mainCloudsShader = &_shaders.Get(cloudsSpec);
+    _mainRingShader = &_shaders.Get(ringSpec);
+    _lensFlareShader = &_shaders.Get(lensFlareSpec);
+    _starGlowShader = &_shaders.Get(starGlowSpec);
+    _coronaVolumeShader = _shaders.TryGet(coronaVolumeSpec);
+    if (!_coronaVolumeShader) {
         std::cerr << "[Corona] volumetric corona shader unavailable; using the flat corona" << std::endl;
-        _coronaVolumeShader.reset();
+    }
+    // The base variant must build (bodies hold it from construction); the others fall back
+    // to it in PlanetProgram if their own compile failed.
+    _planetVariants.fill(nullptr);
+    _mainPlanetShader = &_shaders.Get(PlanetSpec(0));
+    for (const unsigned variant : planetVariants) {
+        _planetVariants[variant] = _shaders.TryGet(PlanetSpec(variant));
     }
 
     // After every program is built: a missing skybox face aborts start-up (native has no
@@ -121,12 +173,14 @@ void Renderer::Release() {
     _hdr.reset();
     _textRenderer.reset();
     _shadowMapFBO.reset();
-    for (auto* shader : {&_shadowMapShader, &_mainSkyBoxShader, &_mainTextShader, &_mainStarShader,
-                         &_mainCoronaStarShader, &_mainPlanetShader, &_mainAtmosphereShader,
-                         &_mainCloudsShader, &_mainRingShader, &_hdrShader, &_lensFlareShader,
-                         &_starGlowShader, &_pbrAtmosphereShader, &_coronaVolumeShader}) {
-        shader->reset();
+    for (Shader** shader : {&_shadowMapShader, &_mainSkyBoxShader, &_mainTextShader, &_mainStarShader,
+                            &_mainCoronaStarShader, &_mainPlanetShader, &_mainAtmosphereShader,
+                            &_mainCloudsShader, &_mainRingShader, &_hdrShader, &_lensFlareShader,
+                            &_starGlowShader, &_pbrAtmosphereShader, &_coronaVolumeShader}) {
+        *shader = nullptr;
     }
+    _planetVariants.fill(nullptr);
+    _shaders.Clear();
 }
 
 void Renderer::ApplyRenderResources(const SimState& sim, uint16_t shadowResolution, bool enableHdr, glm::ivec2 display) {
@@ -283,19 +337,15 @@ void Renderer::ShadowMapPass(const FrameContext& ctx, const RenderableSceneCompo
 void Renderer::RenderPass(const FrameContext& ctx, const RenderableSceneComponent& component) {
     // BeginView set this view's viewport after the shadow pass changed it.
     ++_stats.componentDraws;
-    _mainPlanetShader->Use();
+    if (component.planetaryRing) {
+        glBindTextureUnit(Unit(TextureUnit::Ring), component.planetaryRing->GetRingTexture());
+    }
 
-    ConfigureMainPlanetShader(ctx, component);
-
-    component.planet->SetShader(*_mainPlanetShader);
-    component.planet->Render();
-
-    // The moons share _mainPlanetShader with their primary, so the umbra decal has to come
-    // back off before they draw — otherwise the caster would shadow its own night side.
-    _mainPlanetShader->SetBool("hasEclipseCaster", false);
+    DrawLitBody(ctx, *component.planet, component, ComputeEclipseUmbra(ctx, component));
+    // The umbra decal is the primary's alone: a moon drawn with it would shadow its own
+    // night side with itself as the caster.
     for (const auto& satellite : component.satellites) {
-        satellite->SetShader(*_mainPlanetShader);
-        satellite->Render();
+        DrawLitBody(ctx, *satellite, component, EclipseUmbra{});
     }
 
     if (const RenderableSceneComponent* nearest = ctx.scene.Nearest(); nearest && component.planet == nearest->planet)
@@ -991,10 +1041,8 @@ void Renderer::ConfigureMainShaders(const FrameContext& ctx) {
     const float atmosphereDim = _magneticFieldsEnabled ? 0.40f : 1.0f;
     const float ringDim = _magneticFieldsEnabled ? 0.35f : 1.0f;
 
-    _mainPlanetShader->Use();
-    _mainPlanetShader->SetVec3("starGlowTint", sun.GetGlowTintMult());
-    _mainPlanetShader->SetFloat("bias", 0.0005);
-    _mainPlanetShader->SetFloat("uSurfaceDim", surfaceDim);
+    // planetLighting's per-view values go on in ConfigurePlanetProgram: which of its variants
+    // draw this view is only known per body.
 
     _mainAtmosphereShader->Use();
     _mainAtmosphereShader->SetFloat("bias", 0.001);
@@ -1099,25 +1147,54 @@ Renderer::EclipseUmbra Renderer::ComputeEclipseUmbra(const FrameContext& ctx, co
     return umbra;
 }
 
-void Renderer::ConfigureEclipseUmbra(const FrameContext& ctx, const RenderableSceneComponent& renderableComponent) {
-    const EclipseUmbra umbra = ComputeEclipseUmbra(ctx, renderableComponent);
-    _mainPlanetShader->SetBool("hasEclipseCaster", umbra.active);
+const Shader& Renderer::PlanetProgram(unsigned variant) {
+    Shader*& program = _planetVariants[variant];
+    if (!program) {
+        program = _shaders.GetIfReady(PlanetSpec(variant));
+    }
+    if (program) {
+        return *program;
+    }
+    // Not built yet (or failed): drop the maps, keep the sphere test if that one is there.
+    if (Shader* withoutMaps = _planetVariants[variant & CatalogMaterial::kSphereIntersect]) {
+        return *withoutMaps;
+    }
+    return *_mainPlanetShader;
+}
+
+void Renderer::ConfigurePlanetProgram(const FrameContext& ctx, const Shader& program,
+                                      const RenderableSceneComponent& component, const EclipseUmbra& umbra) const {
+    // Every variant gets the full set; the value cache turns the repeats into lookups.
+    program.Use();
+    program.SetVec3("starGlowTint", ctx.scene.sun->GetGlowTintMult());
+    program.SetFloat("bias", 0.0005f);
+    program.SetFloat("uSurfaceDim", _magneticFieldsEnabled ? 0.28f : 1.0f);
+    program.SetMat4("lightSpaceMatrix", component.lightSpaceMatrix);
+
+    program.SetBool("hasEclipseCaster", umbra.active);
     if (umbra.active) {
-        _mainPlanetShader->SetVec3("eclipseCasterCenter", umbra.casterCenter);
-        _mainPlanetShader->SetFloat("eclipseCasterRadius", umbra.casterRadius);
-        _mainPlanetShader->SetFloat("eclipseStarRadius", umbra.starRadius);
+        program.SetVec3("eclipseCasterCenter", umbra.casterCenter);
+        program.SetFloat("eclipseCasterRadius", umbra.casterRadius);
+        program.SetFloat("eclipseStarRadius", umbra.starRadius);
+    }
+
+    const PlanetaryRing* ring = component.planetaryRing.get();
+    program.SetBool("isNearbyPlanetaryRing", ring != nullptr);
+    if (ring) {
+        program.SetVec3("ringCenter", ring->GetPosition());
+        program.SetVec3("ringNormal", ring->GetRingNormal());
+        program.SetVec2("ringInnerOuterRadiuses", glm::vec2(ring->GetInnerRadius(), ring->GetOuterRadius()));
+        // USE_SPHERE_INTERSECT (the ringed planet's moons): the planet that hides the ring.
+        const auto& parent = ring->GetParent();
+        program.SetVec3("parentPlanetCenter", parent->GetPosition());
+        program.SetFloat("parentPlanetRadiusSquared", parent->GetRadius() * parent->GetRadius());
     }
 }
 
-void Renderer::ConfigureMainPlanetShader(const FrameContext& ctx, const RenderableSceneComponent& renderableComponent) {
-    _mainPlanetShader->SetMat4("lightSpaceMatrix", renderableComponent.lightSpaceMatrix);
-    _mainPlanetShader->SetBool("isNearbyPlanetaryRing", renderableComponent.planetaryRing != nullptr);
-    ConfigureEclipseUmbra(ctx, renderableComponent);
-
-    if (renderableComponent.planetaryRing) {
-        _mainPlanetShader->SetVec3("ringCenter", renderableComponent.planetaryRing->GetPosition());
-        _mainPlanetShader->SetVec3("ringNormal", renderableComponent.planetaryRing->GetRingNormal());
-        _mainPlanetShader->SetVec2("ringInnerOuterRadiuses", glm::vec2(renderableComponent.planetaryRing->GetInnerRadius(), renderableComponent.planetaryRing->GetOuterRadius()));
-        glBindTextureUnit(Unit(TextureUnit::Ring), renderableComponent.planetaryRing->GetRingTexture());
-    }
+void Renderer::DrawLitBody(const FrameContext& ctx, SpaceObject& body, const RenderableSceneComponent& component,
+                           const EclipseUmbra& umbra) {
+    const Shader& program = PlanetProgram(body.ShaderVariant());
+    ConfigurePlanetProgram(ctx, program, component, umbra);
+    body.SetShader(program);
+    body.Render();
 }

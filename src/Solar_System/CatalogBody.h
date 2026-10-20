@@ -24,12 +24,16 @@ public:
 
     void AdjustToParent() override;
     void Render() const override;
+    unsigned ShaderVariant() const override { return CatalogMaterial::Variant(_material, CurrentTextures()); }
     void LoadHighResIfClose(const glm::vec3& cameraPos, const TextureLodPolicy& policy) override;
 
     OrbitLayout::Body GetBody() const { return _body; }
     const BodyCatalog::Entry& GetEntry() const { return _entry; }
 
 private:
+    /** The GL names of this draw's maps (0 where the material has none). */
+    CatalogMaterial::Textures CurrentTextures() const;
+
     const BodyCatalog::Entry& _entry;
     OrbitLayout::Body _body;
     CatalogMaterial::Material _material;

@@ -384,6 +384,16 @@ export interface SolarSystemCwrap {
     returnType: 'number',
     argTypes: [],
   ): (...args: number[]) => number;
+  (
+    ident: 'GetShaderSourceFiles',
+    returnType: 'string',
+    argTypes: [],
+  ): (...args: number[]) => string;
+  (
+    ident: 'ReloadShaders',
+    returnType: 'number',
+    argTypes: [],
+  ): (...args: number[]) => number;
   // END GENERATED CWARP OVERLOADS
 }
 
@@ -439,8 +449,15 @@ export interface EmscriptenGL {
   getNewId: (table: unknown[]) => number;
 }
 
+/** The slice of Emscripten's FS the dev shader reload uses (EXPORTED_RUNTIME_METHODS 'FS'). */
+export interface EmscriptenFS {
+  readFile(path: string, opts: { encoding: 'utf8' }): string;
+  writeFile(path: string, data: string | Uint8Array): void;
+}
+
 export interface SolarSystemModule {
   canvas: HTMLCanvasElement;
+  FS?: EmscriptenFS;
   cwrap: SolarSystemCwrap;
   HEAPF32: Float32Array;
   HEAP8: Int8Array;
@@ -510,6 +527,8 @@ export interface SolarSystemModule {
   _GetCameraHeliocentricZ: () => number;
   _GetCameraYaw: () => number;
   _GetCameraPitch: () => number;
+  _GetShaderSourceFiles: () => number;
+  _ReloadShaders: () => number;
   // END GENERATED MODULE EXPORTS
 }
 
@@ -546,6 +565,10 @@ declare global {
     setObserveMode?: (enabled: boolean) => void;
     setObserverSite?: (latDeg: number, lonDeg: number, altM?: number) => void;
     getObserveState?: () => import('./observe').ObserveState;
+    /** Dev server only (shaderReload.ts): rebuild the programs whose shader files changed. */
+    __solarSystem?: {
+      reloadShaders?: () => Promise<number>;
+    };
     /** Runtime asset base URL for WebResourceFetcher. */
     __solarSystemAssetBase?: string;
     /** KTX2 texture packs published by this deployment — read by PlatformWindow.cpp. */
