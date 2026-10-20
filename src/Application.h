@@ -92,11 +92,14 @@ public:
     void SetObserveView(float azimuthDeg, float elevationDeg);
     void SetObserveFov(float fovDeg);
     void SetObserveTimeRate(double rate);
+    void SetObserveConstellations(bool visible);
     /** Sky for the current epoch and site; recomputed only when either changes. */
     const Observer::Sky& CurrentObserveSky() const;
     std::string GetObserveStateJson() const;
     /** GL name of the Moon's diffuse texture once its system is loaded, else 0 (Observe draws it on the Moon disc). */
     unsigned int ObserveMoonTexture() const;
+    /** Earth's atmosphere shell once its system is loaded and its LUTs are resident, else null (Observe's daytime sky). */
+    const Atmosphere* ObserveEarthAtmosphere() const;
 #ifndef __EMSCRIPTEN__
     // On web, volume/mute live in web/src/music.ts; C++ only reports MusicDuckAmount().
     void SetMusicVolume(float volume);

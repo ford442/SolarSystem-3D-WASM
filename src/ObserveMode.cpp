@@ -4,6 +4,7 @@
 #include "Application.h"
 #include "JsBridge.h"
 #include "Auxiliary_Modules/Ephemeris.h"
+#include "Solar_System/Atmosphere.h"
 #include "Solar_System/CatalogSatellite.h"
 #include "Solar_System/OrbitLayout.h"
 #include <algorithm>
@@ -83,6 +84,11 @@ void Application::SetObserveTimeRate(double rate) {
     NotifySettingsChanged("observeTimeRate");
 }
 
+void Application::SetObserveConstellations(bool visible) {
+    _observe.constellations = visible; // RenderObserveSky hands it to the sky pass
+    NotifySettingsChanged("observeConstellations");
+}
+
 const Observer::Sky& Application::CurrentObserveSky() const {
     const double jd = OrbitLayout::GetJulianDate();
     const Observer::Site& site = _observe.site;
@@ -106,6 +112,25 @@ unsigned int Application::ObserveMoonTexture() const {
         }
     }
     return 0;
+}
+
+const Atmosphere* Application::ObserveEarthAtmosphere() const {
+    for (const auto& component : _renderableSceneComponents) {
+        if (!component.planet) {
+            continue;
+        }
+        const std::wstring& wideName = component.planet->GetEngName();
+        if (OrbitLayout::BodyFromName(std::string(wideName.begin(), wideName.end())) != OrbitLayout::Body::Earth) {
+            continue;
+        }
+        for (const auto& renderable : component.atmospheres) {
+            if (renderable.atmosphere && renderable.atmosphere->GetParent() == component.planet &&
+                renderable.atmosphere->HasLuts()) {
+                return renderable.atmosphere.get();
+            }
+        }
+    }
+    return nullptr;
 }
 
 const char* Application::ObserveEventVisibility() const {
@@ -178,19 +203,22 @@ std::string Application::GetObserveStateJson() const {
     const double jd = OrbitLayout::GetJulianDate();
     const std::string utc = Observer::FormatUtc(jd);
 
-    char buffer[832];
+    char buffer[960];
     std::snprintf(buffer, sizeof(buffer),
                   R"({"active":%s,"latDeg":%.6f,"lonDeg":%.6f,"altM":%.1f,"julianDate":%.6f,"utc":"%s",)"
                   R"("azDeg":%.2f,"elDeg":%.2f,"fovDeg":%.2f,"timeRate":%.4f,"paused":%s,)"
                   R"("lstDeg":%.4f,"sunAltDeg":%.3f,"sunAzDeg":%.3f,"moonAltDeg":%.3f,"moonAzDeg":%.3f,)"
-                  R"("moonIllum":%.4f,"sunCoverage":%.4f,"moonLibLonDeg":%.3f,"moonLibLatDeg":%.3f,"eventVisibility":"%s","starCount":%d})",
+                  R"("moonIllum":%.4f,"sunCoverage":%.4f,"moonLibLonDeg":%.3f,"moonLibLatDeg":%.3f,"eventVisibility":"%s","starCount":%d,)"
+                  R"("constellations":%s,"constellationSegments":%d})",
                   _observe.active ? "true" : "false", _observe.site.latDeg, _observe.site.lonDeg,
                   _observe.site.altM, jd, utc.c_str(),
                   wrapDegrees(_camera.GetYaw() + 90.0f), _camera.GetPitch(), _camera.GetZoom(),
                   _observe.timeRate, gSimState->timePaused ? "true" : "false", sky.lstDeg,
-                  sun.altDeg, sun.azDeg, moon.altDeg, moon.azDeg, moon.illuminatedFraction,
+                  sun.apparentAltDeg, sun.azDeg, moon.apparentAltDeg, moon.azDeg, moon.illuminatedFraction,
                   sky.sunCoverage, sky.moonSubEarthLonDeg, sky.moonSubEarthLatDeg, ObserveEventVisibility(),
-                  _renderer.observeSky ? _renderer.observeSky->DrawnStarCount() : 0);
+                  _renderer.observeSky ? _renderer.observeSky->DrawnStarCount() : 0,
+                  _observe.constellations ? "true" : "false",
+                  _renderer.observeSky ? _renderer.observeSky->ConstellationSegmentCount() : 0);
     return buffer;
 }
 

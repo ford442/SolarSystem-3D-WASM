@@ -219,7 +219,8 @@ extern "C" {
     }
     // Observe mode (camera on Earth at a lat/lon, sky from Observer::ComputeSky). The state is
     // one JSON string for the same reason as GetNextSkyEventJson; the setters stay scalar.
-    // Mode and site changes notify "observeMode" / "observeSite" / "observeTimeRate".
+    // Mode and site changes notify "observeMode" / "observeSite" / "observeTimeRate" /
+    // "observeConstellations".
     EMSCRIPTEN_KEEPALIVE void SetObserveMode(int enabled) {
         if (activeApplication) {
             activeApplication->SetObserveMode(enabled != 0);
@@ -246,6 +247,11 @@ extern "C" {
     EMSCRIPTEN_KEEPALIVE void SetObserveTimeRate(double rate) {
         if (activeApplication) {
             activeApplication->SetObserveTimeRate(rate);
+        }
+    }
+    EMSCRIPTEN_KEEPALIVE void SetObserveConstellations(int visible) {
+        if (activeApplication) {
+            activeApplication->SetObserveConstellations(visible != 0);
         }
     }
     EMSCRIPTEN_KEEPALIVE const char* GetObserveStateJson() {

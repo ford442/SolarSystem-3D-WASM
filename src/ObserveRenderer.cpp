@@ -15,6 +15,10 @@ namespace {
 constexpr float kSkyNear = 0.1f;
 constexpr float kSkyFar = 10.0f;
 constexpr double kDegToRad = 3.14159265358979323846 / 180.0;
+// The catalog exposure is tuned for the limit seen from space, where a grazing ray crosses far
+// more air than a ground observer's zenith ray. From inside the shell the eye adapts to the
+// sky itself, so it is raised by this display factor (no new bake: exposure is not in the LUTs).
+constexpr float kGroundExposureScale = 3.0f;
 
 std::wstring widen(const std::string& ascii) {
     return std::wstring(ascii.begin(), ascii.end());
@@ -54,7 +58,20 @@ void Renderer::RenderObserveSky() {
     }
     _observeFrame = frame;
 
-    observeSky->Render(_app.CurrentObserveSky(), frame, _app.ObserveMoonTexture());
+    // Daytime sky: Earth's LUT atmosphere from inside the shell, on the presets that run the
+    // physical path for the planets too (pbrAtmosphereSteps is 0 on Low); else the gradient.
+    ObserveSky::Air air;
+    const ObserveSky::Air* airPtr = nullptr;
+    if (const Atmosphere* earthAir = _app.ObserveEarthAtmosphere(); earthAir && pbrAtmosphereSteps > 0) {
+        air.transmittanceLut = earthAir->GetTransmittanceLut();
+        air.multiScatteringLut = earthAir->GetMultiScatteringLut();
+        air.params = AtmosphereModel::FromCatalog(earthAir->GetRow().physical);
+        air.exposure = earthAir->GetRow().physical.exposure * kGroundExposureScale;
+        air.steps = pbrAtmosphereSteps;
+        airPtr = &air;
+    }
+    observeSky->SetConstellationsVisible(_app.GetObserveState().constellations);
+    observeSky->Render(_app.CurrentObserveSky(), frame, _app.ObserveMoonTexture(), airPtr);
 
 #ifdef __EMSCRIPTEN__
     if (_app._xr.active) {
@@ -101,15 +118,15 @@ void Renderer::RenderObserveLabels(float width, float height, float textScale) {
     const glm::vec3 labelColor(0.80f, 0.88f, 1.0f);
     for (int slot = 0; slot < Observer::kSkyBodyCount; ++slot) {
         const Observer::SkyBody& body = sky.bodies[slot];
-        if (body.altDeg < -0.5) {
+        if (body.apparentAltDeg < -0.5) {
             continue;
         }
-        if (slot >= Observer::kSkyMercury && static_cast<float>(body.magnitude) > limit + 0.5f) {
+        if (slot >= Observer::kSkyMercury && static_cast<float>(body.magnitude + body.extinctionMag) > limit + 0.5f) {
             continue;
         }
         glm::vec2 px;
-        const glm::vec3 dir(static_cast<float>(body.dir[0]), static_cast<float>(body.dir[1]),
-                            static_cast<float>(body.dir[2]));
+        const glm::vec3 dir(static_cast<float>(body.apparentDir[0]), static_cast<float>(body.apparentDir[1]),
+                            static_cast<float>(body.apparentDir[2]));
         if (ObserveSky::ProjectToPixels(dir, _observeFrame, px) && px.x > 0.0f && px.x < width &&
             px.y > 0.0f && px.y < height) {
             // Clear of the disc when a narrow field makes it big (the Moon at a few degrees, planets
@@ -139,9 +156,14 @@ void Renderer::RenderObserveLabels(float width, float height, float textScale) {
             const double ra = star.raDeg * kDegToRad;
             const double dec = star.decDeg * kDegToRad;
             const double equatorial[3] = {std::cos(dec) * std::cos(ra), std::cos(dec) * std::sin(ra), std::sin(dec)};
-            double horizon[3];
-            toHorizon.Apply(equatorial, horizon);
+            double geometric[3], horizon[3];
+            toHorizon.Apply(equatorial, geometric);
+            Observer::RefractDirection(geometric, horizon); // where observeSprite.vs draws it
             if (horizon[1] < 0.0) {
+                continue;
+            }
+            const double apparentAltDeg = std::asin(std::clamp(horizon[1], -1.0, 1.0)) / kDegToRad;
+            if (star.vmag + Observer::ExtinctionMagnitudes(apparentAltDeg) > limit - 0.5f) {
                 continue;
             }
             glm::vec2 px;
@@ -192,7 +214,7 @@ void Renderer::RenderObserveHud() {
         line << std::fixed << std::setprecision(0) << L"Az " << std::fmod(_app._camera.GetYaw() + 450.0f, 360.0f)
              << L"  Alt " << _app._camera.GetPitch() << L"  FOV "
              << std::setprecision(_app._camera.GetZoom() < 10.0f ? 2 : 0) << _app._camera.GetZoom()
-             << L"   Sun " << std::setprecision(1) << sun.altDeg << L"  Moon " << moon.altDeg << L" ("
+             << L"   Sun " << std::setprecision(1) << sun.apparentAltDeg << L"  Moon " << moon.apparentAltDeg << L" ("
              << std::setprecision(0) << moon.illuminatedFraction * 100.0 << L"% lit)";
         if (sky.sunCoverage > 0.001) {
             line << (sky.sunCoverage >= 0.9999 ? std::wstring(L"   TOTAL ECLIPSE")

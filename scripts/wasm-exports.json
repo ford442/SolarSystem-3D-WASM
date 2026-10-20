@@ -37,6 +37,7 @@
   "_SetObserveView",
   "_SetObserveFov",
   "_SetObserveTimeRate",
+  "_SetObserveConstellations",
   "_GetObserveStateJson",
   "_SetOrbitLines",
   "_GetOrbitLines",

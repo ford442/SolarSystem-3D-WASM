@@ -32,6 +32,9 @@ struct QualityTierSettings {
     // How many of the brightest catalog stars Observe mode draws (the list is sorted by
     // magnitude, so this is a prefix). Planets, Sun and Moon are always drawn.
     int observeStarCount;
+    // Observe's constellation lines: only the 20 `core` figures of constellation_lines.json
+    // (Low), or all of them. Either way a segment is drawn only if both its stars are.
+    bool observeCoreConstellationsOnly;
     const char* name;
 };
 
