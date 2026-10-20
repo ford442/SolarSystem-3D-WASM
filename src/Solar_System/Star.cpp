@@ -1,19 +1,21 @@
 #include "Star.h"
+#include "../gfx/TextureUnits.h"
 
-Star::Star(const StarInfo& starInfo) : SpaceObject(starInfo.starModel, *starInfo.starShader, starInfo.engName, starInfo.otherLangName),
+Star::Star(StarInfo&& starInfo) : SpaceObject(starInfo.starModel, starInfo.engName, starInfo.otherLangName),
     _starTemperature(starInfo.starTemperature), _starRadius(starInfo.starRadius), _glowTintMult(starInfo.glowTintMult),
-    _starSpectrumTexture(starInfo.starSpectrum), _glowShader(starInfo.glowStarShader)
+    _starSpectrumTexture(std::move(starInfo.starSpectrum))
 {
     InitBuffers();
-    _starOcclusion.fill(0);
 #ifndef __EMSCRIPTEN__
-    glGenQueries(static_cast<GLsizei>(_starOcclusion.size()), _starOcclusion.data());
+    for (GlQuery& query : _starOcclusion) {
+        query = GlQuery::Create();
+    }
 #endif
     _starTemperatureColorUCoordinate = glm::clamp((_starTemperature - 800.0f) / 29200.f, 0.0f, 1.0f);
     CalculateShiftColor();
 }
 
-void Star::RenderGlow(const glm::mat4& projection, const glm::mat4& view, const glm::vec3& vs, float aspect, float distance,
+void Star::RenderGlow(const Shader& glowShader, const glm::mat4& projection, const glm::mat4& view, const glm::vec3& vs, float aspect, float distance,
                       const std::optional<RingCameraInfo>& ringCameraInfo, float starTemperature)
 {
     if (starTemperature != _starTemperature) {
@@ -27,28 +29,26 @@ void Star::RenderGlow(const glm::mat4& projection, const glm::mat4& view, const 
     _currentGlowSize = glm::max(0.0001f, _currentGlowSize);
     const glm::vec2 glowDimensions(_currentGlowSize, _currentGlowSize * aspect);
 
-    _glowShader->Use();
-    _glowShader->SetMat4("projection", projection);
-    _glowShader->SetMat4("view", view);
-    _glowShader->SetVec3("center", GetPosition());
-    _glowShader->SetVec3("colorMult", _glowTintMult);
-    _glowShader->SetVec2("dims", glowDimensions * 0.5f);
-    _glowShader->SetFloat("uColorMap", _starTemperatureColorUCoordinate);
-    _glowShader->SetFloat("noiseZ", (vs.x + vs.y - vs.z) * 0.25f);
-    _glowShader->SetInt("colorMap", 0);
-    _glowShader->SetInt("ringDiffuse", 1);
-    glBindTextureUnit(0, _starSpectrumTexture.GetTexture());
+    glowShader.Use();
+    glowShader.SetMat4("projection", projection);
+    glowShader.SetMat4("view", view);
+    glowShader.SetVec3("center", GetPosition());
+    glowShader.SetVec3("colorMult", _glowTintMult);
+    glowShader.SetVec2("dims", glowDimensions * 0.5f);
+    glowShader.SetFloat("uColorMap", _starTemperatureColorUCoordinate);
+    glowShader.SetFloat("noiseZ", (vs.x + vs.y - vs.z) * 0.25f);
+    glBindTextureUnit(Unit(TextureUnit::Diffuse), _starSpectrumTexture.GetTexture());
 
-    _glowShader->SetBool("isPlanetaryRingInView", ringCameraInfo.has_value());
+    glowShader.SetBool("isPlanetaryRingInView", ringCameraInfo.has_value());
     if (ringCameraInfo) {
-        _glowShader->SetVec3("cameraPosition", ringCameraInfo->cameraPosition);
-        _glowShader->SetVec3("ringCenter", ringCameraInfo->ringCenter);
-        _glowShader->SetVec3("ringNormal", ringCameraInfo->ringNormal);
-        _glowShader->SetVec2("ringInnerOuterRadiuses", ringCameraInfo->ringInnerOuterRadiuses);
-        glBindTextureUnit(1, ringCameraInfo->ringDiffuse);
+        glowShader.SetVec3("cameraPosition", ringCameraInfo->cameraPosition);
+        glowShader.SetVec3("ringCenter", ringCameraInfo->ringCenter);
+        glowShader.SetVec3("ringNormal", ringCameraInfo->ringNormal);
+        glowShader.SetVec2("ringInnerOuterRadiuses", ringCameraInfo->ringInnerOuterRadiuses);
+        glBindTextureUnit(Unit(TextureUnit::Ring), ringCameraInfo->ringDiffuse);
     }
 
-    glBindVertexArray(_glowVao);
+    glBindVertexArray(_glowVao.get());
     glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_SHORT, nullptr);
     glBindVertexArray(0);
 }
@@ -89,12 +89,8 @@ glm::vec3 Star::GetGlowTintMult() const {
     return _glowTintMult;
 }
 
-GLuint& Star::GetStarOcclusionValue(size_t index) {
-    return _starOcclusion.at(index);
-}
-
-std::array<GLuint, 2>& Star::GetStarOcclusion() {
-    return _starOcclusion;
+GLuint Star::GetStarOcclusionValue(size_t index) const {
+    return _starOcclusion.at(index).get();
 }
 
 void Star::CalculateShiftColor() {
@@ -117,7 +113,7 @@ void Star::CalculateGlowSize(float distance) {
 }
 
 void Star::DrawCoronaSlices(int count) const {
-    glBindVertexArray(_glowVao);
+    glBindVertexArray(_glowVao.get());
     glDrawElementsInstanced(GL_TRIANGLES, 6, GL_UNSIGNED_SHORT, nullptr, count);
     glBindVertexArray(0);
 }
@@ -132,16 +128,16 @@ void Star::InitBuffers() {
 
     constexpr uint16_t cIndices[6] = {0, 1, 2, 2, 3, 0};
 
-    glGenVertexArrays(1, &_glowVao);
-    glGenBuffers(1, &_glowVbo);
-    glGenBuffers(1, &_glowEbo);
+    _glowVao = GlVertexArray::Create();
+    _glowVbo = GlBuffer::Create();
+    _glowEbo = GlBuffer::Create();
 
-    glBindVertexArray(_glowVao);
-    glBindBuffer(GL_ARRAY_BUFFER, _glowVbo);
+    glBindVertexArray(_glowVao.get());
+    glBindBuffer(GL_ARRAY_BUFFER, _glowVbo.get());
 
     glBufferData(GL_ARRAY_BUFFER, sizeof(cPositions), cPositions, GL_STATIC_DRAW);
 
-    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, _glowEbo);
+    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, _glowEbo.get());
     glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(cIndices), cIndices, GL_STATIC_DRAW);
 
     glEnableVertexAttribArray(0);

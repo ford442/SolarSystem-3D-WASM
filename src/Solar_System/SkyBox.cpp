@@ -1,5 +1,7 @@
 #include "SkyBox.h"
-#include "../Auxiliary_Modules/WebResourceFetcher.h"
+#include "../3rdparty/nv_dds.h"
+#include "../assets/WebResourceFetcher.h"
+#include "../core/Log.h"
 
 SkyBox::SkyBox(const std::vector<std::string>& faces) {
     InitBuffers();
@@ -18,14 +20,13 @@ void SkyBox::Render(const Shader& shader) const {
     glDepthFunc(GL_LEQUAL);
 
     shader.Use();
-    shader.SetInt("skybox", 0);
 #ifndef __EMSCRIPTEN__
-    glBindTextureUnit(0, _textureID);
+    glBindTextureUnit(0, _texture.get());
 #endif
 
-    glBindVertexArray(_vao);
+    glBindVertexArray(_vao.get());
     glActiveTexture(GL_TEXTURE0);
-    glBindTexture(GL_TEXTURE_CUBE_MAP, _textureID);
+    glBindTexture(GL_TEXTURE_CUBE_MAP, _texture.get());
     glDrawArrays(GL_TRIANGLES, 0, 36);
     glBindVertexArray(0);
 
@@ -33,8 +34,8 @@ void SkyBox::Render(const Shader& shader) const {
 }
 
 void SkyBox::LoadCubeMap(const std::vector<std::string>& faces) {
-    glGenTextures(1, &_textureID);
-    glBindTexture(GL_TEXTURE_CUBE_MAP, _textureID);
+    _texture = GlTexture::Create();
+    glBindTexture(GL_TEXTURE_CUBE_MAP, _texture.get());
 
 #ifdef __EMSCRIPTEN__
     // Track whether any face fails so we can fall back to a solid-colour cubemap.
@@ -45,14 +46,14 @@ void SkyBox::LoadCubeMap(const std::vector<std::string>& faces) {
     for (size_t i = 0; i < faces.size(); i++) {
         GLenum target = GL_TEXTURE_CUBE_MAP_POSITIVE_X + static_cast<GLenum>(i);
         try {
-            CDDSImage image;
+            nv_dds::CDDSImage image;
             image.load(faces[i], false);
             image.upload_texture2D(0, target);
-            std::cout << faces[i] << " Loaded" << std::endl;
+            LOG_DEBUG("SkyBox", "%s Loaded", faces[i].c_str());
         }
         catch (const std::runtime_error& error) {
-            std::cerr << "[SkyBox] Warning: failed to load face " << faces[i]
-                      << " (" << error.what() << "). Using fallback cubemap." << std::endl;
+            LOG_WARN("SkyBox", "Warning: failed to load face %s (%s). Using fallback cubemap.", faces[i].c_str(),
+                     error.what());
             anyFailed = true;
             break;
         }
@@ -61,9 +62,8 @@ void SkyBox::LoadCubeMap(const std::vector<std::string>& faces) {
     if (anyFailed) {
         // Rebuild all six faces as a consistent 1×1 black RGBA cubemap so WebGL 2
         // considers the texture complete and the scene continues to render.
-        glDeleteTextures(1, &_textureID);
-        glGenTextures(1, &_textureID);
-        glBindTexture(GL_TEXTURE_CUBE_MAP, _textureID);
+        _texture = GlTexture::Create();
+        glBindTexture(GL_TEXTURE_CUBE_MAP, _texture.get());
         static const uint8_t black[4] = {0u, 0u, 0u, 255u};
         for (unsigned int face = 0; face < 6u; ++face) {
             glTexImage2D(GL_TEXTURE_CUBE_MAP_POSITIVE_X + face, 0, GL_RGBA8,
@@ -76,11 +76,11 @@ void SkyBox::LoadCubeMap(const std::vector<std::string>& faces) {
 #else
     for (size_t i = 0; i < faces.size(); i++) {
         try {
-            CDDSImage image;
+            nv_dds::CDDSImage image;
             GLenum target = GL_TEXTURE_CUBE_MAP_POSITIVE_X + static_cast<GLenum>(i);
             image.load(faces[i], false);
             image.upload_texture2D(0, target);
-            std::cout << faces[i] << " Loaded" << std::endl;
+            LOG_DEBUG("SkyBox", "%s Loaded", faces[i].c_str());
         }
         catch (const std::runtime_error& error) {
             throw std::runtime_error("Image " + faces[i] + " cannot be loaded");
@@ -149,10 +149,10 @@ void SkyBox::InitBuffers() {
              1.0f, -1.0f,  1.0f
     };
 
-    glGenVertexArrays(1, &_vao);
-    glGenBuffers(1, &_vbo);
-    glBindVertexArray(_vao);
-    glBindBuffer(GL_ARRAY_BUFFER, _vbo);
+    _vao = GlVertexArray::Create();
+    _vbo = GlBuffer::Create();
+    glBindVertexArray(_vao.get());
+    glBindBuffer(GL_ARRAY_BUFFER, _vbo.get());
     glBufferData(GL_ARRAY_BUFFER, sizeof(skyboxVertices), &skyboxVertices, GL_STATIC_DRAW);
     glEnableVertexAttribArray(0);
     glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(float), (void*)nullptr);

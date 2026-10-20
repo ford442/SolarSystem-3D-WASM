@@ -1,9 +1,10 @@
 #ifndef SOLARSYSTEM_OBSERVESKY_H
 #define SOLARSYSTEM_OBSERVESKY_H
 
-#include "../Auxiliary_Modules/Observer.h"
-#include "../Auxiliary_Modules/Shader.h"
-#include "../Auxiliary_Modules/StarCatalog.h"
+#include "../astro/Observer.h"
+#include "../gfx/Shader.h"
+#include "../gfx/GlHandle.h"
+#include "../astro/StarCatalog.h"
 #include <glm/glm.hpp>
 #include <algorithm>
 #include <memory>
@@ -30,7 +31,6 @@ public:
     };
 
     ObserveSky();
-    ~ObserveSky();
 
     ObserveSky(const ObserveSky&) = delete;
     ObserveSky& operator=(const ObserveSky&) = delete;
@@ -66,8 +66,8 @@ private:
 
     /** One instanced draw's worth of sprites with its own VAO/VBO. */
     struct SpriteBatch {
-        unsigned int vao = 0;
-        unsigned int vbo = 0;
+        GlVertexArray vao;
+        GlBuffer vbo;
         int capacity = 0;
         int count = 0;
     };
@@ -80,8 +80,8 @@ private:
 
     std::unique_ptr<Shader> _skyShader;
     std::unique_ptr<Shader> _spriteShader;
-    unsigned int _emptyVao = 0;
-    unsigned int _quadVbo = 0;
+    GlVertexArray _emptyVao;
+    GlBuffer _quadVbo;
     SpriteBatch _additiveBatch; // planets plus the Sun
     SpriteBatch _moonBatch;
     SpriteBatch _starBatch;      // static: every catalog star, uploaded once

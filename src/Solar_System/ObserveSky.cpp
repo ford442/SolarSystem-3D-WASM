@@ -1,8 +1,9 @@
 #include "ObserveSky.h"
+#include "../gfx/TextureUnits.h"
 
 #include <algorithm>
 #include <cmath>
-#include <iostream>
+#include "../core/Log.h"
 
 namespace {
 
@@ -14,7 +15,7 @@ constexpr float kKindSun = 1.0f;
 constexpr float kKindMoon = 2.0f;
 constexpr float kKindStar = 3.0f;
 
-constexpr int kMoonTextureUnit = 1;
+constexpr unsigned int kMoonTextureUnit = Unit(TextureUnit::Moon);
 
 constexpr const char* kStarCatalogPath = "resource/sky/bright_stars.json";
 
@@ -51,11 +52,11 @@ ObserveSky::ObserveSky() {
     _spriteShader = std::make_unique<Shader>("resource/shaders/observeSprite.vs", "resource/shaders/observeSprite.fs");
 
     // A core-profile draw needs a bound VAO even when every vertex comes from gl_VertexID.
-    glGenVertexArrays(1, &_emptyVao);
+    _emptyVao = GlVertexArray::Create();
 
     const float quad[] = {-1.0f, -1.0f, 1.0f, -1.0f, -1.0f, 1.0f, 1.0f, 1.0f};
-    glGenBuffers(1, &_quadVbo);
-    glBindBuffer(GL_ARRAY_BUFFER, _quadVbo);
+    _quadVbo = GlBuffer::Create();
+    glBindBuffer(GL_ARRAY_BUFFER, _quadVbo.get());
     glBufferData(GL_ARRAY_BUFFER, sizeof(quad), quad, GL_STATIC_DRAW);
     glBindBuffer(GL_ARRAY_BUFFER, 0);
 
@@ -63,27 +64,18 @@ ObserveSky::ObserveSky() {
     InitBatch(_moonBatch, 1);
 }
 
-ObserveSky::~ObserveSky() {
-    for (SpriteBatch* batch : {&_additiveBatch, &_moonBatch, &_starBatch}) {
-        if (batch->vbo) glDeleteBuffers(1, &batch->vbo);
-        if (batch->vao) glDeleteVertexArrays(1, &batch->vao);
-    }
-    if (_quadVbo) glDeleteBuffers(1, &_quadVbo);
-    if (_emptyVao) glDeleteVertexArrays(1, &_emptyVao);
-}
-
 void ObserveSky::InitBatch(SpriteBatch& batch, int capacity) const {
     batch.capacity = capacity;
     batch.count = 0;
-    glGenVertexArrays(1, &batch.vao);
-    glGenBuffers(1, &batch.vbo);
-    glBindVertexArray(batch.vao);
+    batch.vao = GlVertexArray::Create();
+    batch.vbo = GlBuffer::Create();
+    glBindVertexArray(batch.vao.get());
 
-    glBindBuffer(GL_ARRAY_BUFFER, _quadVbo);
+    glBindBuffer(GL_ARRAY_BUFFER, _quadVbo.get());
     glEnableVertexAttribArray(0);
     glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, 2 * sizeof(float), nullptr);
 
-    glBindBuffer(GL_ARRAY_BUFFER, batch.vbo);
+    glBindBuffer(GL_ARRAY_BUFFER, batch.vbo.get());
     glBufferData(GL_ARRAY_BUFFER, static_cast<GLsizeiptr>(capacity * sizeof(SpriteInstance)), nullptr,
                  GL_DYNAMIC_DRAW);
     const GLsizei stride = static_cast<GLsizei>(sizeof(SpriteInstance));
@@ -102,7 +94,7 @@ void ObserveSky::UploadBatch(SpriteBatch& batch, const std::vector<SpriteInstanc
     if (batch.count == 0) {
         return;
     }
-    glBindBuffer(GL_ARRAY_BUFFER, batch.vbo);
+    glBindBuffer(GL_ARRAY_BUFFER, batch.vbo.get());
     glBufferSubData(GL_ARRAY_BUFFER, 0, static_cast<GLsizeiptr>(batch.count * sizeof(SpriteInstance)),
                     instances.data());
     glBindBuffer(GL_ARRAY_BUFFER, 0);
@@ -112,7 +104,7 @@ void ObserveSky::DrawBatch(const SpriteBatch& batch, int count) const {
     if (count <= 0) {
         return;
     }
-    glBindVertexArray(batch.vao);
+    glBindVertexArray(batch.vao.get());
     glDrawArraysInstanced(GL_TRIANGLE_STRIP, 0, 4, count);
     glBindVertexArray(0);
 }
@@ -126,7 +118,7 @@ void ObserveSky::EnsureStarsLoaded() {
     std::string error;
     if (!StarCatalog::LoadFromFile(kStarCatalogPath, _stars, error)) {
         // Observe still works without stars (planets, Sun and Moon), so this is not fatal.
-        std::cerr << "[Observe] star catalog unavailable (" << error << "); drawing no stars" << std::endl;
+        LOG_WARN("Observe", "star catalog unavailable (%s); drawing no stars", error.c_str());
         return;
     }
 
@@ -146,7 +138,7 @@ void ObserveSky::EnsureStarsLoaded() {
     InitBatch(_starBatch, static_cast<int>(instances.size()));
     UploadBatch(_starBatch, instances);
     _starsLoaded = _starBatch.count > 0;
-    std::cout << "[Observe] Loaded " << _stars.stars.size() << " stars from " << kStarCatalogPath << std::endl;
+    LOG_INFO("Observe", "Loaded %zu stars from %s", _stars.stars.size(), kStarCatalogPath);
 }
 
 float ObserveSky::LimitingMagnitude(double sunAltDeg) {
@@ -199,7 +191,7 @@ void ObserveSky::Render(const Observer::Sky& sky, const Frame& frame, unsigned i
     _skyShader->SetMat4("invProjection", glm::inverse(frame.projection));
     _skyShader->SetVec3("sunDir", sunDir);
     _skyShader->SetFloat("eclipse", static_cast<float>(sky.sunCoverage));
-    glBindVertexArray(_emptyVao);
+    glBindVertexArray(_emptyVao.get());
     glDrawArrays(GL_TRIANGLES, 0, 3);
     glBindVertexArray(0);
 
@@ -297,7 +289,6 @@ void ObserveSky::Render(const Observer::Sky& sky, const Frame& frame, unsigned i
     }
     _spriteShader->SetMat3("moonBodyFromHorizon", moonBodyFromHorizon);
     _spriteShader->SetBool("hasMoonTexture", moonTexture != 0);
-    _spriteShader->SetInt("moonTexture", kMoonTextureUnit);
     if (moonTexture != 0) {
         glActiveTexture(GL_TEXTURE0 + kMoonTextureUnit);
         glBindTexture(GL_TEXTURE_2D, moonTexture);

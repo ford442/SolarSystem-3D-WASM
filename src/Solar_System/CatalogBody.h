@@ -4,7 +4,7 @@
 #include "CatalogMaterial.h"
 #include "OrbitLayout.h"
 #include "Planet.h"
-#include "../Auxiliary_Modules/TextureLODController.h"
+#include "../assets/TextureLODController.h"
 
 /**
  * A planet built entirely from a catalog row — no per-body C++ class.
@@ -19,18 +19,21 @@
  */
 class CatalogBody : public Planet {
 public:
-    CatalogBody(const PlanetInfo& planetInfo, std::shared_ptr<Star> parentStar,
+    CatalogBody(PlanetInfo&& planetInfo, std::shared_ptr<Star> parentStar,
                 const BodyCatalog::Entry& entry);
 
-    void AdjustToParent(float timeScale) override;
-    void Render() const override;
-    void LoadHighResIfClose(const glm::vec3& cameraPos) override;
-    void UnloadHighResIfFar(const glm::vec3& cameraPos) override;
+    void AdjustToParent() override;
+    void Draw(const Shader& shader) const override;
+    unsigned ShaderVariant() const override { return CatalogMaterial::Variant(_material, CurrentTextures()); }
+    void LoadHighResIfClose(const glm::vec3& cameraPos, const TextureLodPolicy& policy) override;
 
     OrbitLayout::Body GetBody() const { return _body; }
     const BodyCatalog::Entry& GetEntry() const { return _entry; }
 
 private:
+    /** The GL names of this draw's maps (0 where the material has none). */
+    CatalogMaterial::Textures CurrentTextures() const;
+
     const BodyCatalog::Entry& _entry;
     OrbitLayout::Body _body;
     CatalogMaterial::Material _material;

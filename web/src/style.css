@@ -920,3 +920,56 @@ body.observe-mode #magnetic-fields-enabled {
   opacity: 0.45;
   pointer-events: none;
 }
+
+/* Fatal error / context-loss panel (web/src/fatalOverlay.ts). */
+#fatal-panel {
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: min(440px, calc(100vw - 32px));
+  box-sizing: border-box;
+  padding: 20px 22px;
+  background: rgba(0, 0, 0, 0.92);
+  color: #ffffff;
+  font-family: Arial, sans-serif;
+  border: 1px solid rgba(242, 61, 83, 0.6);
+  border-radius: 8px;
+  box-shadow: 0 2px 16px rgba(0, 0, 0, 0.6);
+  z-index: 1100;
+}
+
+#fatal-panel h2 {
+  margin: 0 0 10px;
+  font-size: 20px;
+}
+
+#fatal-panel .fatal-panel-message {
+  margin: 0 0 10px;
+  font-size: 14px;
+  line-height: 1.4;
+}
+
+#fatal-panel .fatal-panel-hints {
+  margin: 0 0 14px;
+  padding-left: 18px;
+  font-size: 13px;
+  line-height: 1.5;
+  color: #cccccc;
+}
+
+#fatal-panel-reload {
+  padding: 8px 18px;
+  font-size: 14px;
+  font-weight: bold;
+  color: #000000;
+  background: #4dd9f0;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+}
+
+#fatal-panel-reload:focus-visible {
+  outline: 2px solid #ffffff;
+  outline-offset: 2px;
+}

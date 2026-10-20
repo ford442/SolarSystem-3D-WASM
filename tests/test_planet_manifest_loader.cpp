@@ -6,7 +6,7 @@
 #include <glm/glm.hpp>
 
 #include "PlanetSystemManifest.h"
-#include "Auxiliary_Modules/PlanetManifestLoader.h"
+#include "assets/PlanetManifestLoader.h"
 
 namespace fs = std::filesystem;
 
@@ -135,6 +135,20 @@ TEST(PlanetManifestLoaderTest, RejectsInvalidActivationRadius) {
 
     EXPECT_TRUE(manifests.empty());
     EXPECT_NE(error.find("invalid activationRadius"), std::string::npos);
+}
+
+TEST(PlanetManifestLoaderTest, RejectsOutOfRangeNumbers) {
+    std::string text = kValidManifest;
+    text.replace(text.find("800"), 3, "1e999");
+    TempManifestFile manifest(text);
+    int version = 0;
+    std::string error;
+
+    const auto manifests = PlanetManifestLoader::LoadManifests(
+        manifest.path(), glm::vec3(0.0f), makeInitFactory(), version, error);
+
+    EXPECT_TRUE(manifests.empty());
+    EXPECT_FALSE(error.empty());
 }
 
 TEST(PlanetManifestLoaderTest, RejectsUnknownInitTag) {

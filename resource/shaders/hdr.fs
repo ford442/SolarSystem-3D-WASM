@@ -4,7 +4,7 @@ precision highp int;
 
 in vec2 TexCoords;
 
-uniform sampler2D hdrBuffer;
+layout(binding = TU_DIFFUSE) uniform sampler2D hdrBuffer;
 uniform bool hdr;
 uniform float gamma;
 uniform float exposure;

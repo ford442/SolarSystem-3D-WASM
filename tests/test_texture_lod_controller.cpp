@@ -2,11 +2,10 @@
 
 #include <vector>
 
-#include "Auxiliary_Modules/TextureLODController.h"
-#include "Auxiliary_Modules/TextureImage2D.h"
-#include "Auxiliary_Modules/WebResourceFetcher.h"
+#include "assets/TextureLODController.h"
+#include "gfx/TextureImage2D.h"
+#include "assets/WebResourceFetcher.h"
 #include "QualitySettings.h"
-#include "SimState.h"
 
 namespace {
 
@@ -25,8 +24,7 @@ protected:
             });
         TextureLoadingQueue::GetInstance().ResetForTests();
         TextureLoadingQueue::GetInstance().SetMaxConcurrentLoads(4);
-        gSimState->qualityPreset = 2;
-        gSimState->isMobileWeb = false;
+        preset_ = 2;
         controller_.ResetForTests();
         texture_ = TextureImage2D{};
         controller_.Configure(texture_,
@@ -40,7 +38,7 @@ protected:
     void TearDown() override {
         WebResourceFetcher::ClearTestDownloadHandler();
         TextureLoadingQueue::GetInstance().ResetForTests();
-        gSimState->qualityPreset = 2;
+        preset_ = 2;
     }
 
     void CompleteDownload(std::size_t index, bool success) {
@@ -53,10 +51,11 @@ protected:
     void TickNear(float distance, float threshold = 50.0f) {
         const glm::vec3 object{0.0f, 0.0f, 0.0f};
         const glm::vec3 camera{distance, 0.0f, 0.0f};
-        controller_.Update(camera, object, threshold);
+        controller_.Update(camera, object, threshold, GetTextureLodPolicy(preset_, false).maxTier);
         TextureLoadingQueue::GetInstance().ProcessQueue();
     }
 
+    int preset_ = 2; // quality preset the controller is capped by
     std::vector<DeferredDownload> deferredDownloads_;
     TextureImage2D texture_;
     TextureLODController controller_;
@@ -65,7 +64,7 @@ protected:
 } // namespace
 
 TEST_F(TextureLODControllerTest, MediumPresetQueuesMidNeverHigh) {
-    gSimState->qualityPreset = 1;
+    preset_ = 1;
     TickNear(20.0f);
 
     ASSERT_EQ(deferredDownloads_.size(), 1u);
@@ -82,7 +81,7 @@ TEST_F(TextureLODControllerTest, MediumPresetQueuesMidNeverHigh) {
 }
 
 TEST_F(TextureLODControllerTest, FullPresetStagesMidThenHigh) {
-    gSimState->qualityPreset = 2;
+    preset_ = 2;
     TickNear(20.0f);
     ASSERT_EQ(deferredDownloads_.size(), 1u);
     EXPECT_NE(deferredDownloads_[0].path.find("textures_mid"), std::string::npos);
@@ -97,7 +96,7 @@ TEST_F(TextureLODControllerTest, FullPresetStagesMidThenHigh) {
 }
 
 TEST_F(TextureLODControllerTest, DowngradesHighToMidToLow) {
-    gSimState->qualityPreset = 2;
+    preset_ = 2;
     TickNear(10.0f);
     CompleteDownload(0, true); // mid
     TickNear(10.0f);
@@ -112,7 +111,7 @@ TEST_F(TextureLODControllerTest, DowngradesHighToMidToLow) {
 }
 
 TEST_F(TextureLODControllerTest, CancelsHighUpgradeWhenCameraRetreats) {
-    gSimState->qualityPreset = 2;
+    preset_ = 2;
     TickNear(10.0f);
     CompleteDownload(0, true); // mid
     TickNear(10.0f);
@@ -126,7 +125,7 @@ TEST_F(TextureLODControllerTest, CancelsHighUpgradeWhenCameraRetreats) {
 }
 
 TEST_F(TextureLODControllerTest, LowPresetNeverUpgrades) {
-    gSimState->qualityPreset = 0;
+    preset_ = 0;
     TextureLoadingQueue::GetInstance().SetMaxConcurrentLoads(0);
     TickNear(5.0f);
     EXPECT_TRUE(deferredDownloads_.empty());
@@ -134,14 +133,14 @@ TEST_F(TextureLODControllerTest, LowPresetNeverUpgrades) {
 }
 
 TEST_F(TextureLODControllerTest, QualityCapDowngradesResidentHigh) {
-    gSimState->qualityPreset = 2;
+    preset_ = 2;
     TickNear(10.0f);
     CompleteDownload(0, true);
     TickNear(10.0f);
     CompleteDownload(0, true);
     EXPECT_EQ(controller_.GetResidentTier(), TextureLodTier::High);
 
-    gSimState->qualityPreset = 1;
+    preset_ = 1;
     TickNear(10.0f);
     EXPECT_EQ(controller_.GetResidentTier(), TextureLodTier::Mid);
 }

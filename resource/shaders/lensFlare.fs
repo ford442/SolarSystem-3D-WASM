@@ -1,5 +1,5 @@
 #version 300 es
-uniform sampler2D lensTexture;
+layout(binding = TU_DIFFUSE) uniform sampler2D lensTexture;
 uniform vec3 color;
 
 uniform bool isPlanetaryRingInView;
@@ -8,7 +8,7 @@ uniform vec3 cameraPosition;
 uniform vec3 ringCenter; // Center of disk in eye space
 uniform vec3 ringNormal; // Disk plane normal in eye space
 uniform vec2 ringInnerOuterRadiuses; // x = Inner, y = Outer
-uniform sampler2D ringDiffuse;
+layout(binding = TU_RING) uniform sampler2D ringDiffuse;
 
 in vec3 fCenter;
 in vec2 fPosition;

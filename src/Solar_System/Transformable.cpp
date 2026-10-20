@@ -1,9 +1,5 @@
 #include "Transformable.h"
 
-Transformable::Transformable(const Shader& shader) : _shader(&shader)
-{
-}
-
 void Transformable::Translate(const glm::vec3& position) {
     _position = position;
     _matrixModel = glm::translate(_matrixModel, position);
@@ -26,14 +22,6 @@ void Transformable::LoadIdentityModelMatrix() {
 
 const glm::mat4& Transformable::GetModelMatrix() const {
     return _matrixModel;
-}
-
-void Transformable::SetShader(const Shader& shader) {
-    _shader = &shader;
-}
-
-const Shader& Transformable::GetShader() const {
-    return *_shader;
 }
 
 glm::mat4 Transformable::GetRotationMatrix() const {

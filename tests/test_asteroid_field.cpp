@@ -2,7 +2,7 @@
 
 #include <cmath>
 
-#include "Auxiliary_Modules/Ephemeris.h"
+#include "astro/Ephemeris.h"
 #include "Solar_System/AsteroidOrbit.h"
 #include "Solar_System/OrbitLayout.h"
 

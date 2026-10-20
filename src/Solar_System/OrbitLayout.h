@@ -38,6 +38,8 @@ enum class ScaleMode : int {
 
 /** Wall seconds for one Earth orbit at timeScale == 1. */
 constexpr float kEarthOrbitSecondsAt1x = 120.0f;
+/** Days per Earth orbit, the other half of the orrery-seconds ↔ days conversion. */
+constexpr float kEarthYearDays = 365.25f;
 
 /** 1 AU in scene units (matches Earth's compressed orbit radius). */
 constexpr float kAuToSceneUnits = 1900.0f;

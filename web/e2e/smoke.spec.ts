@@ -106,6 +106,18 @@ test('WASM module boots and staged loading reacts to camera pose', async ({ page
   await expect(page.locator('#tour-stop')).not.toHaveAttribute('hidden');
   await page.locator('#tour-stop').evaluate((el: HTMLButtonElement) => el.click());
 
+  // Focus from C++ (the F7 = Saturn preset) reaches the explorer through Module['onPlanetFocused']
+  // on the module instance. The explorer used to poll every 750 ms, so a sub-750 ms deadline
+  // proves the event path, not the old timer.
+  await page.locator('#canvas').hover();
+  await page.keyboard.press('F7');
+  await page.waitForFunction(
+    () => document.querySelector('#explorer-body-list [data-planet-index="6"]')?.classList.contains('is-selected') === true,
+    undefined,
+    { timeout: 500 },
+  );
+  await expect(page.locator('#planet-info-title')).toHaveText('Saturn');
+
   // Every preset must switch cleanly: Low falls back to the O'Neil atmosphere and the flat
   // corona, Medium/Full draw the LUT atmosphere and the sliced corona (ARCHITECTURE §9.2).
   // A shader or LUT problem would surface as a console error or a missing tier line.
@@ -222,4 +234,25 @@ test('Observe mode puts the camera on Earth, ignores movement, and restores Expl
   });
   await expect(page.locator('#observe-controls')).toBeHidden();
   expect(consoleErrors).toEqual([]);
+});
+
+test('Losing the WebGL context shows a reload panel that keeps the view', async ({ page, baseURL }) => {
+  const response = await page.goto(`${baseURL ?? '/'}?planet=mars`, { waitUntil: 'domcontentloaded' });
+  expect(response?.ok()).toBeTruthy();
+  await page.waitForFunction(() => typeof window.setCameraPose === 'function', undefined, {
+    timeout: 45_000,
+  });
+
+  await page.evaluate(() => {
+    const canvas = document.getElementById('canvas') as HTMLCanvasElement;
+    canvas.getContext('webgl2')?.getExtension('WEBGL_lose_context')?.loseContext();
+  });
+
+  const panel = page.locator('#fatal-panel');
+  await expect(panel).toBeVisible({ timeout: 5_000 });
+  await expect(panel).toContainText('Graphics context lost');
+
+  // Reload carries the current view as a deep link rather than reloading the bare URL.
+  await page.locator('#fatal-panel-reload').click();
+  await page.waitForURL(/[?&]quality=/, { timeout: 10_000 });
 });

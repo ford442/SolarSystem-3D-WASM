@@ -1,7 +1,7 @@
 #ifndef SOLARSYSTEM_SATELLITEORBIT_H
 #define SOLARSYSTEM_SATELLITEORBIT_H
 
-#include "../Auxiliary_Modules/Ephemeris.h"
+#include "../astro/Ephemeris.h"
 #include "BodyCatalog.generated.h"
 #include "OrbitLayout.h"
 #include <cmath>

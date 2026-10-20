@@ -5,7 +5,7 @@
 
 #include <glm/glm.hpp>
 
-#include "Auxiliary_Modules/MissionCatalog.h"
+#include "astro/MissionCatalog.h"
 
 namespace {
 
@@ -71,6 +71,15 @@ TEST(MissionCatalogTest, DownsampleKeepsEndpoints) {
     EXPECT_NEAR(low.back().x, 9.0f, 1.0e-4f);
     const auto full = MissionCatalog::DownsampledAu(catalog.missions[0], 2);
     EXPECT_EQ(full.size(), 5u);
+}
+
+TEST(MissionCatalogTest, RejectsOutOfRangeNumbers) {
+    MissionCatalog::Catalog catalog;
+    std::string error;
+    std::string text = kCatalog;
+    text.replace(text.find("2440000.0"), 9, "1e999");
+    EXPECT_FALSE(MissionCatalog::LoadFromString(text, catalog, error));
+    EXPECT_FALSE(error.empty());
 }
 
 TEST(MissionCatalogTest, RejectsInvalidRoot) {

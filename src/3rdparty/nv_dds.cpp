@@ -593,7 +593,7 @@ void CDDSImage::load(istream& is, bool flipImage) {
         m_format = GL_RED;
         m_components = 1;
 #else
-        m_format = GL_LUMINANCE;
+        m_format = GL_RED; // GL_LUMINANCE is gone from the core profile
         m_components = 1;
 #endif
     } else {
@@ -1038,7 +1038,9 @@ void CDDSImage::upload_texture2D(uint32_t imageIndex, uint32_t target) {
             }
         }
 #else
-        GLenum internalFormat = m_components;
+        // Core profile needs a sized internal format: the legacy component count (1/3/4) is
+        // GL_INVALID_VALUE, which used to send every uncompressed DDS to the fallback texture.
+        const GLenum internalFormat = m_components == 1 ? GL_R8 : m_components == 3 ? GL_RGB8 : GL_RGBA8;
         glTexImage2D(target, 0, internalFormat, image.get_width(), image.get_height(), 0, m_format, GL_UNSIGNED_BYTE, image);
         {
             GLenum err = glGetError();

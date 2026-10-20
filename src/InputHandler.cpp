@@ -4,7 +4,7 @@
 #include "JsBridge.h"
 #include "SimState.h"
 #include "WasmExports.h"
-#include "Auxiliary_Modules/Ephemeris.h"
+#include "astro/Ephemeris.h"
 #include "Solar_System/OrbitLayout.h"
 #include <algorithm>
 #include <cmath>
@@ -12,8 +12,6 @@
 using namespace std;
 
 void Application::ProcessInput(GLFWwindow* window) {
-    static float movementSpeed = _camera.GetMovementSpeed();
-
     if (_isFirstMouse) {
         _lastX = 0;
         _lastY = 0;
@@ -73,30 +71,29 @@ void Application::ProcessInput(GLFWwindow* window) {
     }
 #endif
     if (glfwGetKey(window, GLFW_KEY_1) == GLFW_PRESS) {
-        movementSpeed = glm::clamp(movementSpeed + 0.01f, 0.0f, 150.f);
-        _camera.SetMovementSpeed(movementSpeed);
+        _camera.SetMovementSpeed(glm::clamp(_camera.GetMovementSpeed() + 0.01f, 0.0f, 150.f));
     }
     if (glfwGetKey(window, GLFW_KEY_2) == GLFW_PRESS) {
-        movementSpeed = glm::clamp(movementSpeed - 0.01f, 0.0f, 150.f);
-        _camera.SetMovementSpeed(movementSpeed);
+        _camera.SetMovementSpeed(glm::clamp(_camera.GetMovementSpeed() - 0.01f, 0.0f, 150.f));
     }
+    Renderer::StarTuning& star = _renderer.GetStarTuning();
     if (glfwGetKey(window, GLFW_KEY_3) == GLFW_PRESS) {
-        _renderer.starExposure = glm::clamp(_renderer.starExposure + 0.1f, 0.0f, 20.f);
+        star.exposure = glm::clamp(star.exposure + 0.1f, 0.0f, 20.f);
     }
     if (glfwGetKey(window, GLFW_KEY_4) == GLFW_PRESS) {
-        _renderer.starExposure = glm::clamp(_renderer.starExposure - 0.1f, 0.0f, 20.f);
+        star.exposure = glm::clamp(star.exposure - 0.1f, 0.0f, 20.f);
     }
     if (glfwGetKey(window, GLFW_KEY_5) == GLFW_PRESS) {
-        _renderer.starGamma = glm::clamp(_renderer.starGamma + 0.01f, 0.0f, 2.f);
+        star.gamma = glm::clamp(star.gamma + 0.01f, 0.0f, 2.f);
     }
     if (glfwGetKey(window, GLFW_KEY_6) == GLFW_PRESS) {
-        _renderer.starGamma = glm::clamp(_renderer.starGamma - 0.01f, 0.0f, 2.f);
+        star.gamma = glm::clamp(star.gamma - 0.01f, 0.0f, 2.f);
     }
     if (glfwGetKey(window, GLFW_KEY_7) == GLFW_PRESS) {
-        _renderer.starTemperatureInKelvin = glm::clamp(_renderer.starTemperatureInKelvin + 15.0f, 800.f, 30000.f);
+        star.temperatureKelvin = glm::clamp(star.temperatureKelvin + 15.0f, 800.f, 30000.f);
     }
     if (glfwGetKey(window, GLFW_KEY_8) == GLFW_PRESS) {
-        _renderer.starTemperatureInKelvin = glm::clamp(_renderer.starTemperatureInKelvin - 15.0f, 800.f, 30000.f);
+        star.temperatureKelvin = glm::clamp(star.temperatureKelvin - 15.0f, 800.f, 30000.f);
     }
     if (glfwGetKey(window, GLFW_KEY_LEFT) == GLFW_PRESS) {
         xPos -= 1;
@@ -188,13 +185,13 @@ void Application::KeyCallback(GLFWwindow* window, int key, int, int action, int)
     if (!app) return;
 
     if (key == GLFW_KEY_Z && action == GLFW_PRESS) {
-        app->_renderer.isRenderPlanetStarDistances = !app->_renderer.isRenderPlanetStarDistances;
+        app->_renderer.GetOverlayToggles().planetStarDistances = !app->_renderer.GetOverlayToggles().planetStarDistances;
     }
     if (key == GLFW_KEY_X && action == GLFW_PRESS) {
-        app->_renderer.isRenderSatelliteDistances = !app->_renderer.isRenderSatelliteDistances;
+        app->_renderer.GetOverlayToggles().satelliteDistances = !app->_renderer.GetOverlayToggles().satelliteDistances;
     }
     if (key == GLFW_KEY_TAB && action == GLFW_PRESS) {
-        app->_renderer.isRenderHints = !app->_renderer.isRenderHints;
+        app->_renderer.GetOverlayToggles().hints = !app->_renderer.GetOverlayToggles().hints;
     }
     if (key == GLFW_KEY_F1 && action == GLFW_PRESS) {
         app->_isVertSyncEnabled = !app->_isVertSyncEnabled;
@@ -205,7 +202,7 @@ void Application::KeyCallback(GLFWwindow* window, int key, int, int action, int)
         if (!app->IsObserveActive()) {
             // Entering from the keyboard starts at the current wall-clock UTC, running live.
             OrbitLayout::SetJulianDate(Ephemeris::JulianDateNowUtc());
-            gSimState->timePaused = false;
+            app->_simState.timePaused = false;
             app->SetObserveTimeRate(1.0);
             NotifySettingsChanged("simulationEpoch");
             NotifySettingsChanged("paused");
@@ -229,15 +226,15 @@ void Application::KeyCallback(GLFWwindow* window, int key, int, int action, int)
 
         // Time scale / pause / step
         if (key == GLFW_KEY_EQUAL || key == GLFW_KEY_KP_ADD) {
-            gSimState->timeScale = glm::clamp(gSimState->timeScale * 2.0f, 0.01f, 10000.0f);
+            app->_simState.timeScale = glm::clamp(app->_simState.timeScale * 2.0f, 0.01f, 10000.0f);
             NotifySettingsChanged("timeScale");
         }
         if (key == GLFW_KEY_MINUS || key == GLFW_KEY_KP_SUBTRACT) {
-            gSimState->timeScale = glm::clamp(gSimState->timeScale / 2.0f, 0.01f, 10000.0f);
+            app->_simState.timeScale = glm::clamp(app->_simState.timeScale / 2.0f, 0.01f, 10000.0f);
             NotifySettingsChanged("timeScale");
         }
         if (key == GLFW_KEY_P) {
-            gSimState->timePaused = !gSimState->timePaused;
+            app->_simState.timePaused = !app->_simState.timePaused;
             NotifySettingsChanged("paused");
         }
         if (key == GLFW_KEY_M) {
@@ -246,7 +243,7 @@ void Application::KeyCallback(GLFWwindow* window, int key, int, int action, int)
             NotifySettingsChanged("magneticFieldMode");
         }
         if (key == GLFW_KEY_PERIOD) {
-            gSimState->advanceStep = true;
+            app->_simState.advanceStep = true;
         }
     }
 }

@@ -7,9 +7,9 @@ glm::vec3 ToVec3(const BodyCatalog::Rgb& rgb) {
 }
 } // namespace
 
-Atmosphere::Atmosphere(MeshHolder model, const Shader& shader, const BodyCatalog::AtmosphereRow& row,
+Atmosphere::Atmosphere(MeshHolder model, const BodyCatalog::AtmosphereRow& row,
                        std::shared_ptr<SpaceObject> parent, float parentRadius)
-    : OuterShell(std::move(model), shader, std::move(parent), row.oneil.shellScale),
+    : OuterShell(std::move(model), std::move(parent), row.oneil.shellScale),
       _row(&row),
       _body(BodyCatalog::FindById(row.bodyId)),
       _parentRadius(parentRadius),
@@ -22,19 +22,9 @@ Atmosphere::Atmosphere(MeshHolder model, const Shader& shader, const BodyCatalog
     }
 }
 
-Atmosphere::~Atmosphere() {
-    SetLuts(0, 0);
-}
-
-void Atmosphere::SetLuts(unsigned int transmittance, unsigned int multiScattering) {
-    if (_transmittanceLut != 0) {
-        glDeleteTextures(1, &_transmittanceLut);
-    }
-    if (_multiScatteringLut != 0) {
-        glDeleteTextures(1, &_multiScatteringLut);
-    }
-    _transmittanceLut = transmittance;
-    _multiScatteringLut = multiScattering;
+void Atmosphere::SetLuts(GlTexture transmittance, GlTexture multiScattering) {
+    _transmittanceLut = std::move(transmittance);
+    _multiScatteringLut = std::move(multiScattering);
     if (!HasLuts()) {
         _physicalPathActive = false;
     }
@@ -48,7 +38,7 @@ float Atmosphere::ShellScale() const {
     return _row->oneil.shellScale;
 }
 
-void Atmosphere::AdjustToParent(float /*timeScale*/) {
+void Atmosphere::AdjustToParent() {
     LoadIdentityModelMatrix();
     Translate(_parent->GetPosition());
     Scale(glm::vec3(ShellScale()));

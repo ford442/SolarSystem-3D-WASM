@@ -9,10 +9,7 @@ out vec3 vFragPos;
 out vec3 vNormal;
 out vec3 vColor;
 
-uniform mat4 projection;
-uniform mat4 view;
-uniform float zCoef;
-
+#include "common/frame.glsl"
 #include "common/log_depth.glsl"
 
 void main() {
@@ -21,6 +18,6 @@ void main() {
     vNormal = mat3(aInstanceMatrix) * aNormal;
     vColor = aInstanceColor.rgb;
 
-    gl_Position = projection * view * worldPos;
-    gl_Position = ApplyLogDepth(gl_Position, zCoef);
+    gl_Position = frame.proj * frame.view * worldPos;
+    gl_Position = ApplyLogDepth(gl_Position, frame.zCoef);
 }

@@ -3,7 +3,7 @@ precision highp float;
 
 in vec2 TexCoords;
 
-uniform sampler2D uImage;
+layout(binding = TU_DIFFUSE) uniform sampler2D uImage;
 uniform float uIntensity;
 
 out vec4 fragColor;

@@ -69,19 +69,24 @@ The CMakeLists.txt has separate configurations for EMSCRIPTEN vs native builds, 
   - `XrSession.cpp` — WebXR eye state and the stereo render pass (web only)
 - `Renderer.h` — The `Renderer` class: shadow/color/overlay/HDR draw passes and the GPU
   resources they own (shaders, shadow FBO, HDR, skybox, lens flare, text renderer, orbit/
-  mission/magnetic-field overlay meshes). `Application` holds one (`_renderer`) and reaches it
-  through public fields/methods; `Renderer` reaches back into scene state it doesn't own
-  (camera, planet list, sun, mission/asteroid data) via a `friend`-granted `Application&`
-  rather than duplicating storage — see the comment at the top of Renderer.h.
+  mission/magnetic-field overlay meshes), all private. `Application` holds one (`_renderer`).
+  Every pass takes a `FrameContext` (`FrameContext.h`: `CameraView`, `SceneSnapshot`,
+  `SimState`, display size, XR flag), which `Application::BuildFrameSnapshot` fills after
+  `UpdateScene`. The renderer has no reference back to `Application`, and there is no global
+  `SimState`: anything a pass needs goes into the snapshot.
+  - `FramePasses.h` — the GL-free frame order: simulate once, then per-component shadow pass followed by every view's colour pass (unit-tested). `Application::CullScene` drops components no view sees (bounding spheres vs `gfx/Frustum.h`) and orders the rest front to back; each light frustum's depth range is fitted to its component's bodies (ARCHITECTURE §7.5)
+  - Scene objects hold no shader: a pass calls `SpaceObject::Draw(shader)` with the program it bound
   - `SceneRenderer.cpp` — shadow/color passes for planets, atmospheres, rings, clouds, text overlays
   - `SceneOverlayRenderer.cpp` — magnetic field ribbons, orbit paths, mission paths, asteroid belt
-- `SystemModules.h` — Convenience headers bundling system includes
+- `SystemModules.h` — Convenience headers bundling system includes (GL itself comes from `gfx/GlPlatform.h`)
 
-**Auxiliary Modules** (`Auxiliary_Modules/`)
-- Graphics: `Shader`, `Mesh`, `MeshHolder`, `TextureImage2D`
-- Camera system: `Camera` with acceleration/zoom, `FPS_Handler`
-- Rendering: `ShadowMapFBO` (PCF/ray-traced shadows), `LensFlare`, `HDR`, `TextRenderer`
-- Async loading: `WebResourceFetcher` (Emscripten-specific async file loading via callback-based `emscripten_async_wget2`; the blocking `emscripten_wget_data` path is gone — see "No blocking fetches" below)
+**Subsystem folders** (ARCHITECTURE §7.2; there is no `Auxiliary_Modules/` any more)
+- `core/` — `Log` (`LOG_*`), `Camera` with acceleration/zoom, `FrameTimer`
+- `gfx/` — every GL object: `GlHandle` (the only `glGen*`/`glDelete*`), `Shader`/`ShaderLibrary`/`ShaderSource`, `Mesh`/`MeshHolder`, `LineStripBatch`, `TextureImage2D`, `FloatLutTexture`, `ShadowMapFBO`, `HDR`, `FrameUniforms`, `TextureUnits.h`, `Frustum.h`, `GlCapabilities`
+- `render/` — features built on `gfx/`: `LensFlare`, `TextRenderer`, orbit/mission/XR-pointer/magnetic-field renderers, field-line bloom
+- `assets/` — `WebResourceFetcher` (callback-based `emscripten_async_wget2`; the blocking `emscripten_wget_data` path is gone — see "No blocking fetches" below), `TextureLoadingQueue`, `TextureLODController`, `PlanetManifestLoader`, `TextureFormatSupport`, `BlockCompression`
+- `astro/` — GL-free: `Ephemeris`, `SkyEvents`, `Observer`, `LunarTheory`, `StarCatalog`, `MissionCatalog`, `MagneticField*` models, `SeatedView.h`
+- Headers carry no `using namespace`, and `Renderer.h` forward-declares the GPU helpers it holds by `unique_ptr` — include their headers in the `.cpp` that uses them. `scripts/check-source-rules.sh` and `scripts/check-gl-handles.sh` (CI) enforce both rules plus "no `std::cout`/`std::cerr` in `src/`"
 
 **Solar System** (`Solar_System/`)
 - Base classes:
@@ -123,7 +128,7 @@ The CMakeLists.txt has separate configurations for EMSCRIPTEN vs native builds, 
 ### Key Integration Points
 
 **Progress Tracking (C++ ↔ Web)**
-- C++ calls `Module['updateLoadingProgress'](loaded, total)` from an `EM_ASM` block in `JsBridge.cpp` (same for `onSettingsChanged` / `updateStreamingProgress` / `onPlanetFocused`); `web/src/wasmCallbacks.ts` installs them on `Module`
+- C++ calls `Module['updateLoadingProgress'](loaded, total, failed)` from an `EM_ASM` block in `JsBridge.cpp` (same for `onSettingsChanged` / `updateStreamingProgress` / `onPlanetFocused` / `onNearestPlanetChanged` / `onMissionFocused`); `web/src/wasmCallbacks.ts` installs them on the module instance (`setModuleInstance`). The build is `MODULARIZE`, so there is no global `Module` — writing to `globalThis.Module` reaches nothing
 - Bracket notation is load-bearing: Release links with `--closure 1`, which renames dotted property reads. A new bridge written as `Module.foo` is silently renamed and never fires in Release while working in Debug
 - Web receives `WebResourceFetcher` events and updates progress bar
 
@@ -169,11 +174,14 @@ Ceres, Vesta, Eris/Haumea/Makemake, 1P/Halley (kind `comet`), Mercury–Pluto, t
 
 ### Modifying Shaders
 - Shaders are in `resource/shaders/`
-- Changes are reflected immediately in web (dev mode with Vite)
 - Every shader is authored once as `#version 300 es`; native `Shader.cpp` rewrites the directive to `#version 460 core` at load (ARCHITECTURE §9.1)
 - Shared helpers live in `resource/shaders/common/` and are pulled in with `#include "common/x.glsl"` (expanded once per stage by `ShaderSource`, with `#line` so errors name the right file); `common/preamble.glsl` supplies the precision defaults. Don't paste a helper into a shader that can include it — `test_shader_source.cpp` fails on duplicate definitions
-- `SOLARSYSTEM_SHADER_SELFTEST=1 ./build/SolarSystem` compiles every stage as both `460 core` and `300 es` and exits (under Mesa/Xvfb also set `MESA_GLSL_VERSION_OVERRIDE=460`)
-- Native reads `resource/shaders/` from disk at runtime — restart the app, no recompile needed
+- Samplers name their unit: `layout(binding = TU_SHADOW_MAP) uniform sampler2D shadowMap;`. The `TU_*` names come from `src/gfx/TextureUnits.h` via the generated `common/texture_units.glsl` (`npm run generate:texture-units`, checked in CI). ShaderSource strips the qualifier and Shader sets the unit once at link, so C++ never `SetInt`s a sampler; bind with `glBindTextureUnit(Unit(TextureUnit::X), tex)`
+- Per-view values (view/proj matrices, eye and Sun position, far plane, zCoef, time) live in `FrameUBO` (`#include "common/frame.glsl"`, read as `frame.view` etc.), uploaded once per view by `Renderer::BeginView`. Don't add `uniform mat4 projection/view` or `zCoef` to a lit shader
+- `Shader::Set*` takes a `string_view`, looks up a link-time location table, and skips the GL call when the value is unchanged. At debug level the `[FrameStats]` line logs pass counts and `glUniform*` calls every N frames (`SOLARSYSTEM_FRAME_STATS=N`, default 120)
+- Per-material switches are `#define` permutations, not `uniform bool`s: a stage tests `#ifdef HAS_CLOUDS` and lists its switches on a `// permutations: …` line; programs are `ShaderSpec`s (files + defines) built once by `ShaderLibrary`. planetLighting's variant comes from `CatalogMaterial::Variant` per draw (ARCHITECTURE §9.1)
+- `SOLARSYSTEM_SHADER_SELFTEST=1 ./build/SolarSystem` compiles every stage as both `460 core` and `300 es`, once per subset of its declared permutations, and exits (under Mesa/Xvfb also set `MESA_GLSL_VERSION_OVERRIDE=460`)
+- Hot reload: native polls `resource/shaders/` mtimes every 0.5 s and rebuilds changed programs in place (`SOLARSYSTEM_SHADER_HOT_RELOAD=0` disables); under `npm run dev` call `await window.__solarSystem.reloadShaders()` in the console. A failed compile keeps the old program
 
 ### Adjusting Graphics Settings (Shadows, Scattering, etc.)
 - Most parameters are exposed in the UI (accessed via GUI)
@@ -191,7 +199,8 @@ npm run dev
 
 ## Debugging Notes
 
-- **Emscripten console output**: Appears in browser DevTools Console
+- **Logging**: use `LOG_DEBUG/INFO/WARN/ERROR("Category", fmt, ...)` from `src/core/Log.h`, not `std::cout`/`std::cerr`; lines read `[Category] …` (tests grep for them). Level: `SOLARSYSTEM_LOG=debug` native, `?log=debug` web. Native Debug builds get a KHR_debug context whose messages arrive as `[GL] 0x…` (`SOLARSYSTEM_GL_DEBUG=1/0` overrides). See ARCHITECTURE §7.6
+- **Emscripten console output**: Appears in browser DevTools Console (`console.debug` lines need the Verbose filter)
 - **WebResourceFetcher errors**: Check Network tab for CORS or 404 errors
 - **Memory issues**: If the app crashes during texture load, check Emscripten memory ceiling and Browser console for OOM messages
 - **Performance**: Use WebGL profiling in DevTools; consider LOD (Level of Detail) for distant objects if needed

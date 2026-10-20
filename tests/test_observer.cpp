@@ -4,9 +4,9 @@
 #include <cmath>
 #include <vector>
 
-#include "Auxiliary_Modules/Ephemeris.h"
-#include "Auxiliary_Modules/Observer.h"
-#include "Auxiliary_Modules/SkyEvents.h"
+#include "astro/Ephemeris.h"
+#include "astro/Observer.h"
+#include "astro/SkyEvents.h"
 
 namespace {
 

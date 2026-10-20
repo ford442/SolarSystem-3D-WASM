@@ -1,7 +1,7 @@
 #include "Sun.h"
 #include "../OrbitLayout.h"
 
-Sun::Sun(const StarInfo& starInfo) : Star(starInfo) {
+Sun::Sun(StarInfo&& starInfo) : Star(std::move(starInfo)) {
 }
 
 void Sun::TakeStarSystemCenter() {

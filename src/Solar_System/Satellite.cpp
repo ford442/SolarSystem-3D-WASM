@@ -1,7 +1,7 @@
 #include "Satellite.h"
 
 Satellite::Satellite(const SatelliteInfo& satelliteInfo, std::shared_ptr<SpaceObject> parent) :
-    SpaceObject(satelliteInfo.satelliteModel, *satelliteInfo.satelliteShader, satelliteInfo.engName, satelliteInfo.otherLangName), _parent(std::move(parent)),
+    SpaceObject(satelliteInfo.satelliteModel, satelliteInfo.engName, satelliteInfo.otherLangName), _parent(std::move(parent)),
     _earthSizeCoefficient(satelliteInfo.earthSizeCoefficient)
 {
     _radius *= _earthSizeCoefficient;
@@ -25,6 +25,6 @@ void Satellite::ConfigureDiffuseLOD(TextureImage2D& diffuse, const std::string& 
     _diffuseLOD.Configure(diffuse, lowPath, midPath, highPath, label, TextureLoadCategory::Satellite);
 }
 
-void Satellite::LoadHighResIfClose(const glm::vec3& cameraPosition) {
-    _diffuseLOD.Update(cameraPosition, GetPosition());
+void Satellite::LoadHighResIfClose(const glm::vec3& cameraPosition, const TextureLodPolicy& policy) {
+    _diffuseLOD.Update(cameraPosition, GetPosition(), 50.0f, policy.maxTier);
 }

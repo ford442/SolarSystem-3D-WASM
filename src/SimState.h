@@ -1,6 +1,11 @@
 #ifndef SOLARSYSTEM_SIM_STATE_H
 #define SOLARSYSTEM_SIM_STATE_H
 
+/**
+ * Clock and quality state owned by Application (`_simState`) and handed explicitly to what
+ * needs it: the renderer through FrameContext, LOD through TextureLodPolicy. There is no
+ * global instance.
+ */
 struct SimState {
     float timeScale = 1.0f;
     bool timePaused = false;
@@ -12,10 +17,5 @@ struct SimState {
     /** Canvas backing-store pixels per CSS pixel (capped per quality tier); see webglContext.ts. */
     float backingStoreScale = 1.0f;
 };
-
-/** Active simulation state; points at Application::_simState while the app runs. */
-extern SimState* gSimState;
-
-void ResetSimStateToFallback();
 
 #endif // SOLARSYSTEM_SIM_STATE_H

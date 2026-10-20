@@ -32,12 +32,23 @@ struct QualityTierSettings {
     // How many of the brightest catalog stars Observe mode draws (the list is sorted by
     // magnitude, so this is a prefix). Planets, Sun and Moon are always drawn.
     int observeStarCount;
+    // Web staged loading: how many planet systems nearest the start pose load right away
+    // instead of waiting for the camera to approach them (see ActivateNearestPlanetSystems).
+    int eagerPlanetSystems;
     const char* name;
 };
 
 std::string GetTexturePath(const std::string& lowRes, const std::string& highRes);
 QualityTierSettings GetQualitySettings(int preset, bool mobile);
-TextureLodTier GetMaxTextureLodTier();
+/**
+ * What the quality tier allows the texture LOD controllers: the highest tier they may
+ * stream, and the factor on a planet's upgrade distance (web Medium upgrades 1.5x closer).
+ */
+struct TextureLodPolicy {
+    TextureLodTier maxTier = TextureLodTier::High;
+    float planetThresholdScale = 1.0f;
+};
+TextureLodPolicy GetTextureLodPolicy(int preset, bool mobile);
 const char* TextureLodTierName(TextureLodTier tier);
 void LogQualityTier(const QualityTierSettings& settings, bool hdrEnabled, int shadowQuality);
 

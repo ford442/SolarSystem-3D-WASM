@@ -13,7 +13,7 @@ uniform vec3 sunDir;
 uniform float sunTanRadius; // tan of the Sun's angular radius
 uniform float sunCoverage;  // fraction of the Sun's disc covered by the Moon, 0..1
 uniform mat3 moonBodyFromHorizon; // horizon frame → selenographic axes (X lon 0, Y lon +90 E, Z north)
-uniform sampler2D moonTexture;
+layout(binding = TU_MOON) uniform sampler2D moonTexture;
 uniform bool hasMoonTexture;
 
 const float PI = 3.14159265358979;

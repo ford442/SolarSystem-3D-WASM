@@ -2,8 +2,8 @@
 // reader, the vkFormat -> GL mapping / pack selection, and the software BC decoder.
 
 #include "3rdparty/ktx2_reader.h"
-#include "Auxiliary_Modules/BlockCompression.h"
-#include "Auxiliary_Modules/TextureFormatSupport.h"
+#include "assets/BlockCompression.h"
+#include "assets/TextureFormatSupport.h"
 
 #include <gtest/gtest.h>
 

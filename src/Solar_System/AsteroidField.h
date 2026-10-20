@@ -2,7 +2,7 @@
 #define SOLARSYSTEM_ASTEROIDFIELD_H
 
 #include "AsteroidOrbit.h"
-#include "../Auxiliary_Modules/Shader.h"
+#include "../gfx/Shader.h"
 #include <glm/glm.hpp>
 #include <memory>
 #include <vector>
@@ -27,7 +27,6 @@ public:
 
     explicit AsteroidField(uint32_t seed = kDefaultSeed, int instanceCount = 1800,
                            Population population = Population::MainBelt);
-    ~AsteroidField();
 
     AsteroidField(const AsteroidField&) = delete;
     AsteroidField& operator=(const AsteroidField&) = delete;
@@ -36,17 +35,19 @@ public:
     int GetActiveInstanceCount() const { return _activeCount; }
     int GetGeneratedCount() const { return static_cast<int>(_asteroids.size()); }
 
-    /** Advance mean anomalies / spin; rebuild instance matrices. */
-    void Update(float simDeltaSeconds);
+    /**
+     * Pose every rock and comet for `julianDate` and rebuild the instance matrices. A
+     * function of the date, not an accumulator: scrubbing the date jumps the belt with the
+     * planets, and calling it twice for one date (an XR frame, a scale change) moves nothing.
+     */
+    void Update(double julianDate);
 
     /**
-     * Draw belt (one instanced call) then comet nuclei + tails.
+     * Draw belt (one instanced call) then comet nuclei + tails, inside a view bound by
+     * Renderer::BeginView: matrices, eye, Sun and zCoef come from FrameUBO.
      * No self-shadowing — depth writes enabled for rock meshes only.
      */
-    void Render(const glm::mat4& projection, const glm::mat4& view,
-                const glm::vec3& sunPos, const glm::vec3& viewPos,
-                const glm::vec3& cameraRight, const glm::vec3& cameraUp,
-                float zCoef) const;
+    void Render(const glm::vec3& cameraRight) const;
 
     const std::vector<OrbitalElements>& GetAsteroids() const { return _asteroids; }
     const std::vector<OrbitalElements>& GetComets() const { return _comets; }
@@ -69,16 +70,24 @@ private:
     int _activeCount = 0;
     std::vector<OrbitalElements> _asteroids;
     std::vector<OrbitalElements> _comets;
+    // Mean anomaly and spin phase of each body at _epochJd; Update() advances from these.
+    struct Phase {
+        float meanAnomalyRad;
+        float spinPhaseRad;
+    };
+    std::vector<Phase> _asteroidEpoch;
+    std::vector<Phase> _cometEpoch;
+    double _epochJd = 0.0;
     std::vector<InstanceGPU> _instanceData;
 
-    GLuint _rockVao = 0;
-    GLuint _rockVbo = 0;
-    GLuint _rockEbo = 0;
-    GLuint _instanceVbo = 0;
+    GlVertexArray _rockVao;
+    GlBuffer _rockVbo;
+    GlBuffer _rockEbo;
+    GlBuffer _instanceVbo;
     GLsizei _rockIndexCount = 0;
 
-    GLuint _tailVao = 0;
-    GLuint _tailVbo = 0;
+    GlVertexArray _tailVao;
+    GlBuffer _tailVbo;
 
     std::unique_ptr<Shader> _asteroidShader;
     std::unique_ptr<Shader> _cometTailShader;

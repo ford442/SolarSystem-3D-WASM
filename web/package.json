@@ -17,6 +17,8 @@
     "generate:wasm-exports:check": "node ../scripts/generate-wasm-exports.mjs --check",
     "generate:planet-metadata": "node ../scripts/generate-planet-metadata.mjs",
     "generate:planet-metadata:check": "node ../scripts/generate-planet-metadata.mjs --check",
+    "generate:texture-units": "node ../scripts/generate-texture-units.mjs",
+    "generate:texture-units:check": "node ../scripts/generate-texture-units.mjs --check",
     "prebuild": "npm run generate:planet-metadata"
   },
   "devDependencies": {

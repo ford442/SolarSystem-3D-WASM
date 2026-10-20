@@ -1,9 +1,10 @@
 #include "SaturnRing.h"
+#include "../../gfx/TextureUnits.h"
 #include "../TexturePaths.h"
 #include "../BodyCatalog.generated.h"
 #include "../OrbitLayout.h"
 
-SaturnRing::SaturnRing(const PlanetaryRingInfo& planetaryRingInfo, std::shared_ptr<Planet> parent) : PlanetaryRing(planetaryRingInfo, std::move(parent)) {
+SaturnRing::SaturnRing(PlanetaryRingInfo&& planetaryRingInfo, std::shared_ptr<Planet> parent) : PlanetaryRing(std::move(planetaryRingInfo), std::move(parent)) {
     ConfigureDiffuseLOD(TexturePaths::Resolve("resource/textures_low/Saturn_Rings_Low.dds"),
                         TexturePaths::Resolve("resource/textures_mid/Saturn_Rings_Mid.dds"),
                         TexturePaths::Resolve("resource/textures/Saturn_Rings.dds"), "SaturnRing");
@@ -21,10 +22,9 @@ void SaturnRing::AdjustToParent() {
     UpdateRingNormal();
 }
 
-void SaturnRing::Render() const {
-    GetShader().SetVec3("planetPos", _parentPlanet->GetPosition());
-    GetShader().SetFloat("planetRadius", _parentPlanet->GetRadius());
-    GetShader().SetInt("ringDiffuse", 0);
-    glBindTextureUnit(0, _ringTexture.GetTexture());
-    SpaceObject::Render();
+void SaturnRing::Draw(const Shader& shader) const {
+    shader.SetVec3("planetPos", _parentPlanet->GetPosition());
+    shader.SetFloat("planetRadius", _parentPlanet->GetRadius());
+    glBindTextureUnit(Unit(TextureUnit::Diffuse), _ringTexture.GetTexture()); // ringTexture
+    SpaceObject::Draw(shader);
 }

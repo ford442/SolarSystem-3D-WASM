@@ -62,6 +62,8 @@ export interface CachedCwrapExports {
     getCameraHeliocentricZ: () => number;
     getCameraYaw: () => number;
     getCameraPitch: () => number;
+    getShaderSourceFiles: () => string;
+    reloadShaders: () => number;
 }
 
 export function createCachedCwrapExports(cwrap: SolarSystemCwrap): CachedCwrapExports {
@@ -126,7 +128,9 @@ export function createCachedCwrapExports(cwrap: SolarSystemCwrap): CachedCwrapEx
     getCameraHeliocentricZ: cwrap('GetCameraHeliocentricZ', 'number', []) as () => number,
     getCameraYaw: cwrap('GetCameraYaw', 'number', []) as () => number,
     getCameraPitch: cwrap('GetCameraPitch', 'number', []) as () => number,
+    getShaderSourceFiles: cwrap('GetShaderSourceFiles', 'string', []) as () => string,
+    reloadShaders: cwrap('ReloadShaders', 'number', []) as () => number,
     };
 }
 
-export const EXPORT_COUNT = 64;
+export const EXPORT_COUNT = 62;

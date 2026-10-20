@@ -1,9 +1,8 @@
 #include "QualitySettings.h"
-#include "SimState.h"
+#include "core/Log.h"
 #include <cstdlib>
 #include <cstring>
-#include <iomanip>
-#include <iostream>
+#include <string>
 
 #ifdef __EMSCRIPTEN__
 #include <emscripten.h>
@@ -35,51 +34,59 @@ QualityTierSettings GetQualitySettings(int preset, bool mobile) {
     // rather than shader cost decides.
     if (mobile) {
         switch (preset) {
-            case 0: return {1024, 0, 0, false, false, 0, 400, 0, TextureLodTier::Low, false, 0, false, 0, 500, "low"};
-            case 1: return {2048, 2, 0, true, true, 1, 900, 400, TextureLodTier::Mid, true, 8, false, 0, 1500, "medium"};
-            default: return {3000, 2, 0, true, true, 1, 1400, 800, TextureLodTier::High, true, 12, true, 16, 2500, "full"};
+            case 0: return {1024, 0, 0, false, false, 0, 400, 0, TextureLodTier::Low, false, 0, false, 0, 500, 3, "low"};
+            case 1: return {2048, 2, 0, true, true, 1, 900, 400, TextureLodTier::Mid, true, 8, false, 0, 1500, 3, "medium"};
+            default: return {3000, 2, 0, true, true, 1, 1400, 800, TextureLodTier::High, true, 12, true, 16, 2500, 4, "full"};
         }
     }
     switch (preset) {
-        case 0: return {1024, 0, 0, false, false, 0, 600, 0, TextureLodTier::Low, false, 0, false, 0, 500, "low"};
-        case 1: return {2048, 2, 0, true, true, 1, 1800, 800, TextureLodTier::Mid, true, 8, true, 16, 2000, "medium"};
-        default: return {3000, 4, 4, true, true, 2, 4000, 2000, TextureLodTier::High, true, 16, true, 32, 5000, "full"};
+        case 0: return {1024, 0, 0, false, false, 0, 600, 0, TextureLodTier::Low, false, 0, false, 0, 500, 3, "low"};
+        case 1: return {2048, 2, 0, true, true, 1, 1800, 800, TextureLodTier::Mid, true, 8, true, 16, 2000, 4, "medium"};
+        default: return {3000, 4, 4, true, true, 2, 4000, 2000, TextureLodTier::High, true, 16, true, 32, 5000, 5, "full"};
     }
 }
 
-TextureLodTier GetMaxTextureLodTier() {
-    return GetQualitySettings(gSimState->qualityPreset, gSimState->isMobileWeb).maxTextureLodTier;
+TextureLodPolicy GetTextureLodPolicy(int preset, bool mobile) {
+    TextureLodPolicy policy;
+    policy.maxTier = GetQualitySettings(preset, mobile).maxTextureLodTier;
+#ifdef __EMSCRIPTEN__
+    // Medium uses a 1.5x distance multiplier. Expressed as a threshold, this
+    // means the camera must be 1.5x closer than full quality before upgrading.
+    if (preset == 1) {
+        policy.planetThresholdScale = 1.0f / 1.5f;
+    }
+#endif
+    return policy;
 }
 
 void LogQualityTier(const QualityTierSettings& settings, bool hdrEnabled, int shadowQuality) {
     const double shadowMemoryMiB =
         static_cast<double>(settings.shadowResolution) * settings.shadowResolution * 4.0 / (1024.0 * 1024.0);
-    std::cout << "[Quality] Active tier: " << settings.name
-              << " | shadows="
-              << (shadowQuality > 0 ? std::to_string(settings.shadowResolution) + "x" + std::to_string(settings.shadowResolution)
-                                  : "off")
-              << " (~" << std::fixed << std::setprecision(1) << shadowMemoryMiB << " MiB depth)"
-              << " | HDR=" << (hdrEnabled ? "on" : "off (direct composite)")
-              << " | field bloom="
-              << (settings.enableMagneticBloom ? (std::to_string(settings.magneticBloomPasses) + " pass") : "off")
-              << " | high-res concurrency=" << settings.maxConcurrentTextureLoads
-              << " | max texture LOD=" << TextureLodTierName(settings.maxTextureLodTier)
-              << " | LOD distance multiplier=" << (std::strcmp(settings.name, "medium") == 0 ? 1.5f : 1.0f)
-              << " | MSAA=" << settings.requestedMsaaSamples << "x"
-              << " | asteroids=" << settings.asteroidInstanceCount
-              << " | kuiper=" << settings.kuiperInstanceCount
-              << " | atmosphere="
-              << (settings.enablePbrAtmosphere ? "LUT " + std::to_string(settings.atmosphereSteps) + " steps" : "O'Neil")
-              << " | corona="
-              << (settings.enableVolumetricCorona ? std::to_string(settings.coronaSlices) + " slices" : "billboard")
-              << " | observe stars=" << settings.observeStarCount
-              << std::defaultfloat << std::endl;
+    const std::string shadows =
+        shadowQuality > 0 ? std::to_string(settings.shadowResolution) + "x" + std::to_string(settings.shadowResolution)
+                          : "off";
+    const std::string bloom =
+        settings.enableMagneticBloom ? std::to_string(settings.magneticBloomPasses) + " pass" : "off";
+    const std::string atmosphere =
+        settings.enablePbrAtmosphere ? "LUT " + std::to_string(settings.atmosphereSteps) + " steps" : "O'Neil";
+    const std::string corona =
+        settings.enableVolumetricCorona ? std::to_string(settings.coronaSlices) + " slices" : "billboard";
+    LOG_INFO("Quality",
+             "Active tier: %s | shadows=%s (~%.1f MiB depth) | HDR=%s | field bloom=%s | high-res concurrency=%d"
+             " | max texture LOD=%s | LOD distance multiplier=%g | MSAA=%dx | asteroids=%d | kuiper=%d"
+             " | atmosphere=%s | corona=%s | observe stars=%d",
+             settings.name, shadows.c_str(), shadowMemoryMiB, hdrEnabled ? "on" : "off (direct composite)",
+             bloom.c_str(), settings.maxConcurrentTextureLoads,
+             TextureLodTierName(settings.maxTextureLodTier), std::strcmp(settings.name, "medium") == 0 ? 1.5 : 1.0,
+             settings.requestedMsaaSamples, settings.asteroidInstanceCount,
+             settings.kuiperInstanceCount, atmosphere.c_str(), corona.c_str(),
+             settings.observeStarCount);
 #ifdef __EMSCRIPTEN__
-    std::cout << "[Quality] WebGL MSAA is fixed when the context is created; reload with ?quality="
-              << settings.name << " to change it." << std::endl;
+    LOG_INFO("Quality", "WebGL MSAA is fixed when the context is created; reload with ?quality=%s to change it.",
+             settings.name);
 #else
-    std::cout << "[Quality] MSAA is fixed when the GL context is created; restart with "
-                 "SOLARSYSTEM_QUALITY=low|medium|full to change the sample count." << std::endl;
+    LOG_INFO("Quality", "MSAA is fixed when the GL context is created; restart with "
+                        "SOLARSYSTEM_QUALITY=low|medium|full to change the sample count.");
 #endif
 }
 
@@ -143,8 +150,7 @@ int ReadInitialQualityPreset() {
     if (std::strcmp(requested, "full") == 0 || std::strcmp(requested, "2") == 0) {
         return 2;
     }
-    std::cerr << "[Quality] Unrecognized SOLARSYSTEM_QUALITY=\"" << requested
-              << "\"; using \"full\"." << std::endl;
+    LOG_WARN("Quality", "Unrecognized SOLARSYSTEM_QUALITY=\"%s\"; using \"full\".", requested);
     return 2;
 }
 #endif

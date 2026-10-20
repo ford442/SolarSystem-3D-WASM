@@ -1,6 +1,8 @@
 import './style.css';
-import Module, { type SolarSystemModuleConfig } from './SolarSystem.js';
-import { parseDeepLinkFromUrl } from './deepLink';
+import Module, { type SolarSystemModule, type SolarSystemModuleConfig } from './SolarSystem.js';
+import { buildShareableUrl, parseDeepLinkFromUrl } from './deepLink';
+import { isoDateFromJulianDate } from './ephemeris';
+import { showFatalPanel } from './fatalOverlay';
 import { initEducationalLayer } from './educationalLayer';
 import { initObservePanel, type ObservePanelController } from './observe';
 import { publishInitConfig, resolveInitConfig } from './initialSettings';
@@ -13,8 +15,9 @@ import { initWebXr } from './webxr';
 import {
     createSolarSystemRuntime,
     exposeConsoleHelpers,
+    type SolarSystemRuntime,
 } from './wasmBridge';
-import { installWasmCallbacksOnConfig } from './wasmCallbacks';
+import { installWasmCallbacksOnConfig, setModuleInstance } from './wasmCallbacks';
 import { computeWebGlSizing } from './webglContext';
 
 const canvas = document.getElementById('canvas') as HTMLCanvasElement;
@@ -135,6 +138,64 @@ if (preinitializedWebGLContext) {
     console.error('[WebGL] Failed to create a WebGL2 context with', contextOptions);
 }
 
+const BROWSER_HINTS = [
+    'Turn on hardware acceleration in your browser settings, then reload.',
+    'Update your graphics driver, or try a current Chrome, Edge, Firefox or Safari.',
+    'Close other tabs that use 3D graphics to free GPU memory.',
+];
+
+let moduleInstance: SolarSystemModule | null = null;
+let runtimeForReload: SolarSystemRuntime | null = null;
+let contextLost = false;
+
+// Reload into the view the user had, using the same deep-link encoding as "Copy view link".
+// The getters below only read simulation state, so they still work after the GL context is gone.
+function currentViewUrl(): string {
+    const runtime = runtimeForReload;
+    if (!runtime) {
+        return window.location.href;
+    }
+    return buildShareableUrl({
+        getQualityPreset: () => runtime.getQualityPreset(),
+        getTimeScale: () => runtime.getTimeScale(),
+        getPaused: () => runtime.getPaused(),
+        getSimulationEpoch: () => runtime.getSimulationEpoch(),
+        getOrbitScaleMode: () => runtime.getOrbitScaleMode(),
+        getShadowQuality: () => runtime.getShadowQuality(),
+        getOrbitLines: () => runtime.getOrbitLines(),
+        getMagneticFields: () => runtime.getMagneticFields(),
+        getFocusedPlanetIndex: () => runtime.getFocusedPlanetIndex(),
+        getFocusedMission: () => runtime.getFocusedMission(),
+        getCameraPose: () => runtime.getCameraPose(),
+        getObserveState: () => runtime.getObserveState(),
+        isoDateFromJulianDate,
+    });
+}
+
+function pauseMainLoop(): void {
+    // Emscripten's library_browser.js puts these on the module instance, which is built on the
+    // config object, so they are there during loading too, before the factory promise resolves.
+    const target = (moduleInstance ?? moduleConfig) as Pick<SolarSystemModule, 'pauseMainLoop'>;
+    target['pauseMainLoop']?.();
+}
+
+// A mobile GPU reset or a long-backgrounded tab can drop the context. preventDefault() is
+// what tells the browser we may want it back; v1 does not rebuild GL state in place, so it
+// stops the frame loop (every GL call would fail) and offers a reload into the same view.
+canvas.addEventListener('webglcontextlost', (event) => {
+    event.preventDefault();
+    if (contextLost) return;
+    contextLost = true;
+    console.error('[WebGL] Context lost; pausing the main loop');
+    pauseMainLoop();
+    showFatalPanel({
+        title: 'Graphics context lost',
+        message: 'The browser reset the GPU context, so the scene can no longer be drawn. '
+            + 'Reload to pick up where you left off.',
+        reloadUrl: currentViewUrl,
+    });
+}, false);
+
 for (const eventName of ['pointerdown', 'pointerup', 'click', 'keydown', 'keyup']) {
     settingsPanel.addEventListener(eventName, (event) => event.stopPropagation());
     explorerPanel.addEventListener(eventName, (event) => event.stopPropagation());
@@ -156,11 +217,28 @@ const moduleConfig: SolarSystemModuleConfig = installWasmCallbacksOnConfig({
     },
 }, { ...progressCallbacks, onMusicDuck: (duck: number) => music.setDuck(duck) });
 
-void Module(moduleConfig).then((instance) => {
+function startModule(): Promise<SolarSystemModule> {
+    if (!preinitializedWebGLContext) {
+        // GLFW would try the same context creation and fail inside main(); say so up front.
+        return Promise.reject(new Error('WebGL 2 is not available'));
+    }
+    return Module(moduleConfig);
+}
+
+void startModule().then((instance) => {
     console.log('Module loaded successfully', instance);
+    moduleInstance = instance;
+    setModuleInstance(instance);
+    if (contextLost) {
+        pauseMainLoop();
+    }
 
     const runtime = createSolarSystemRuntime(instance);
+    runtimeForReload = runtime;
     exposeConsoleHelpers(runtime);
+    if (import.meta.env.DEV) {
+        void import('./shaderReload').then(({ installShaderReload }) => installShaderReload(instance, runtime, deployedBaseUrl));
+    }
 
     const deepLink = parseDeepLinkFromUrl();
     const explorer = new PlanetExplorer(explorerPanel);
@@ -304,7 +382,20 @@ void Module(moduleConfig).then((instance) => {
     if (deepLink.planet !== undefined && !deepLink.mission && !deepLink.tour) {
         explorer.applyDeepLinkPlanet(deepLink.planet, { focusCamera: false });
     }
-}).catch((error: unknown) => {
+}, (error: unknown) => {
     settingsStatus.textContent = 'Controls unavailable';
     console.error('Failed to initialize SolarSystem WASM:', error);
+    const noWebGl = !preinitializedWebGLContext;
+    showFatalPanel({
+        title: noWebGl ? 'WebGL 2 is not available' : 'The simulation failed to start',
+        message: noWebGl
+            ? 'This browser could not create a WebGL 2 context, which the 3D scene needs.'
+            : `Loading the simulation failed: ${error instanceof Error ? error.message : String(error)}`,
+        hints: noWebGl
+            ? BROWSER_HINTS
+            : ['Check your connection and reload.', ...BROWSER_HINTS],
+    });
+}).catch((error: unknown) => {
+    settingsStatus.textContent = 'Controls unavailable';
+    console.error('Failed to initialize the SolarSystem UI:', error);
 });

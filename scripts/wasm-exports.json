@@ -59,5 +59,7 @@
   "_GetCameraHeliocentricY",
   "_GetCameraHeliocentricZ",
   "_GetCameraYaw",
-  "_GetCameraPitch"
+  "_GetCameraPitch",
+  "_GetShaderSourceFiles",
+  "_ReloadShaders"
 ]

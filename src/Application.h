@@ -2,18 +2,25 @@
 #define SOLARSYSTEM_APPLICATION_H
 #include "ApplicationTypes.h"
 #include "ObserveState.h"
+#include "FrameContext.h"
+#include "FramePasses.h"
 #include "Renderer.h"
 #include "SimState.h"
-#include "Auxiliary_Modules/AuxiliaryModules.h"
-#include "Auxiliary_Modules/Observer.h"
-#include "Auxiliary_Modules/SkyEvents.h"
+#include "astro/MissionCatalog.h"
+#include "astro/Observer.h"
+#include "astro/SkyEvents.h"
 #include "PlanetSystemManifest.h"
 #include "Solar_System/AsteroidField.h"
 #include "Solar_System/SolarSystem.h"
 #include "SystemModules.h"
 #include "XrState.h"
+#include "core/Camera.h"
+#include "core/FrameTimer.h"
+#include "gfx/MeshHolder.h"
+#include <array>
 #include <atomic>
 #include <functional>
+#include <optional>
 #include <string>
 #include <unordered_set>
 
@@ -28,11 +35,9 @@
 #include <SDL_mixer.h>
 #elif !defined(__EMSCRIPTEN__)
 #include <irrKlang.h>
-using namespace irrklang;
 #endif
 
 class Application {
-    friend class Renderer;
 public:
     Application();
     ~Application();
@@ -108,8 +113,6 @@ public:
     bool GetOrbitLinesEnabled() const;
     void SetMagneticFieldsEnabled(bool enabled);
     bool GetMagneticFieldsEnabled() const;
-    void ForEachEnabledMagneticField(
-        const std::function<void(const SpaceObject& object, const MagneticFieldParams& params)>& fn) const;
     /**
      * Place the fly camera at a heliocentric scene position (deep links, tours, leaving
      * Observe). On realistic scale the render origin moves onto the pose first, so a link to
@@ -143,13 +146,14 @@ private:
     enum class AppState { LOADING, RUNNING };
     AppState _appState = AppState::LOADING;
     std::atomic<int> _resourcesPending{0};
+    int _resourcesFailed = 0; // Finished core resources that did not arrive (subset of the finished ones)
     int _totalResources = 0;
 
     GLFWwindow* _mainWindow = nullptr;
     uint16_t _displayWidth = 0, _displayHeight = 0;
-    ssize_t _nearestPlanetIndex = -1;  // -1 when no planets are loaded yet
+    int _nearestPlanetIndex = -1;      // Into _renderableSceneComponents; -1 when no planets are loaded yet
     int _focusedPlanetIndex = -1;      // FocusPlanet index (0=sun … 9=pluto); -1 = none
-    FPS_Handler _fpsHandler;
+    FrameTimer _frameTimer;
     FT_Library _ft = nullptr;
     bool _isBackgroundMusicPlay = false, _isSearchNearestPlanet = false;
 
@@ -163,14 +167,8 @@ private:
     bool _musicMuted = false;
     std::unordered_set<std::string> _availableSongPaths;
 #endif
-#ifndef __EMSCRIPTEN__
-    std::unique_ptr<std::thread> _searchNearestPlanetThread;
-#endif
-#ifdef __EMSCRIPTEN__
-    int _nearestPlanetSearchFrameCounter = 0;
-#endif
 #if !defined(SOLARSYSTEM_USE_SDL_MIXER) && !defined(__EMSCRIPTEN__)
-    ISoundEngine* _soundEngine = nullptr;
+    irrklang::ISoundEngine* _soundEngine = nullptr;
     std::unique_ptr<std::thread> _backgroundMusicThread;
 #endif
 
@@ -207,6 +205,12 @@ private:
 
     // Shadow/color/overlay/HDR draw passes and the GPU resources they own — see Renderer.h.
     Renderer _renderer;
+    // This frame's FrameContext pieces (BuildFrameSnapshot), read by the passes and the HUD.
+    SceneSnapshot _frameScene;
+    std::array<CameraView, 2> _frameViews{};
+    HudState _frameHud;
+    // Each mission's probe position at this frame's date (UpdateScene); nullopt off its trajectory.
+    std::vector<std::optional<glm::vec3>> _missionProbes;
 
     void InitSystems();
     void InitScene();
@@ -215,18 +219,21 @@ private:
     void InitStarSystem();
     void LoadPlanetSystemManifests(); // WASM: parse resource/planet_manifest.json
     std::function<void()> MakePlanetInitFunc(const std::string& initTag);
+    void ActivateNearestPlanetSystems(int count);  // WASM: load the `count` systems nearest the camera now
+    void ActivatePlanetSystem(OrbitLayout::Body body); // WASM: load one system now (focus / deep link)
+    void StartPlanetSystemDownload(PlanetSystemManifest& manifest, const char* reason);
     /** Build a catalog system (planet + moons + atmosphere/clouds/rings flags) from an initTag. */
     void InitCatalogSystem(const MeshHolder& sphereModel, const std::string& initTag);
     /** Focus-index wrapper around InitCatalogSystem (Ceres, Vesta, or any catalog primary). */
     void InitCatalogBody(const MeshHolder& sphereModel, OrbitLayout::Body body);
     void InitSongList();
     void Dispose();
+    void ReleaseGpuResources(); // Scene + renderer GL objects; called before the context goes
     void UpdateLoadingProgress(); // Update JavaScript loading progress bar
     void UpdatePlanetSystemLoading(); // Staged download + init of planet systems (WASM)
     void RefreshPlanetProxyPositions(); // Keep WASM proxy markers aligned with orbit scale
-    void ApplyRenderResources(uint16_t shadowResolution, bool enableHdr);
     void UpdateLOD();             // Central LOD manager: upgrade textures for nearest planets (WASM)
-    void RenderPlanetProxyMarkers() const; // Show orbital markers for unloaded planets (WASM)
+    glm::ivec2 DisplaySize() const { return {_displayWidth, _displayHeight}; }
     void LoadMissionCatalog();
     void LoadMissions();
     void UpdateMissionFollow();
@@ -248,15 +255,43 @@ private:
 #ifdef __EMSCRIPTEN__
     float _reportedMusicDuck = 1.0f;
 #endif
-    void RenderFrameContent(); // Sky → planets → effects (one eye / mono)
+    /**
+     * Everything that moves this frame, once, before any pass: body placement and light
+     * matrices, the belts, proxy markers, LOD, the nearest-planet search and the sky-event
+     * caches. The render passes after it only read scene state (so an XR frame, which draws
+     * twice, still simulates once).
+     */
+    void UpdateScene(double julianDate);
+    /** Re-derive every body's render-frame placement from the ephemeris (no drawing). */
+    void PlaceSceneComponents();
+    /** Simulate once, then draw the scene into `viewCount` views (1 mono, 2 XR) — see FramePasses.h. */
+    void RenderFrame(int viewCount);
+    /** Debug: the previous frame's FramePasses::Stats and glUniform* count (SOLARSYSTEM_FRAME_STATS=N). */
+    void ReportFrameStats();
+    /**
+     * Frustum culling after the views are known: marks every scene object and component
+     * visible or not in any of the `viewCount` views, and fills _drawOrder with the visible
+     * components front to back (plus the nearest one, which draws the star).
+     */
+    void CullScene(int viewCount);
+    std::vector<std::size_t> _drawOrder; // into _renderableSceneComponents, this frame
+#ifndef __EMSCRIPTEN__
+    /** Native shader hot reload: every ~0.5 s, rebuild programs whose files changed (off with SOLARSYSTEM_SHADER_HOT_RELOAD=0). */
+    void PollShaderHotReload(double now);
+    double _lastShaderPoll = 0.0;
+#endif
+    /** After UpdateScene: fill _frameScene, _frameViews and _frameHud for this frame's passes. */
+    void BuildFrameSnapshot(int viewCount);
+    /** The passes' view of frame state for view `view`; valid until the next BuildFrameSnapshot. */
+    FrameContext FrameContextFor(int view) const;
+    void EndFrame();           // Count the frame for the FPS HUD; native: apply the frame limiter
 #ifdef __EMSCRIPTEN__
     void RenderXrStereoFrame();
 #endif
     void StartSearchNearestPlanet();
-    void UpdateSearchNearestPlanet(); // For Emscripten frame-based search
+    void UpdateSearchNearestPlanet(); // Once per frame, on the main thread
     void StartPlayBackgroundMusic();
     void UpdateBackgroundMusic(); // For Emscripten frame-based music
-    void StopSearchNearestPlanet();
     void StopPlayBackgroundMusic();
     void LoadWindowIcon() const;
     void DisplaySystemInformation() const;

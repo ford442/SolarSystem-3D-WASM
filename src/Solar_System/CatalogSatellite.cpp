@@ -1,20 +1,20 @@
 #include "CatalogSatellite.h"
 #include "SatelliteOrbit.h"
 
-CatalogSatellite::CatalogSatellite(const SatelliteInfo& satelliteInfo,
+CatalogSatellite::CatalogSatellite(SatelliteInfo&& satelliteInfo,
                                    std::shared_ptr<SpaceObject> parent,
                                    const BodyCatalog::Entry& entry)
     : Satellite(satelliteInfo, std::move(parent)),
       _entry(entry),
       _material(CatalogMaterial::Material::FromEntry(entry)),
-      _diffuses(satelliteInfo.diffuseTextures),
-      _normalMap(satelliteInfo.normalMap),
-      _specular(satelliteInfo.specularTexture) {
+      _diffuses(std::move(satelliteInfo.diffuseTextures)),
+      _normalMap(std::move(satelliteInfo.normalMap)),
+      _specular(std::move(satelliteInfo.specularTexture)) {
     const TexturePaths::Paths diffuse = TexturePaths::ForTextureId(entry.lod.diffuse);
     ConfigureDiffuseLOD(_diffuses.at(0), diffuse.low, diffuse.mid, diffuse.high, entry.lod.diffuse);
 }
 
-void CatalogSatellite::AdjustToParent(float /*timeScale*/) {
+void CatalogSatellite::AdjustToParent() {
     // Pose is a function of the simulation date only, so SetSimulationEpoch jumps and
     // reverse scrubbing are exact. Keplerian placement where the backend has a solution
     // (Moon, Galileans, Titan, Triton); otherwise the circular mean-anomaly offset.
@@ -49,7 +49,7 @@ float CatalogSatellite::OrbitSceneUnitsPerKm() const {
     return _entry.sceneOrbitRadius / _entry.keplerian.aKm;
 }
 
-void CatalogSatellite::Render() const {
+CatalogMaterial::Textures CatalogSatellite::CurrentTextures() const {
     CatalogMaterial::Textures textures;
     textures.diffuse = _diffuses.at(0).GetTexture();
     textures.normal = _normalMap.GetTexture();
@@ -57,7 +57,11 @@ void CatalogSatellite::Render() const {
         textures.specular = _specular.GetTexture();
     }
     // SatelliteInfo carries no night/cloud maps; the generator rejects a moon row that asks
-    // for them, and BindMaterial clears both flags when their texture is 0.
-    CatalogMaterial::BindMaterial(GetShader(), _material, textures);
-    SpaceObject::Render();
+    // for them, and Variant() drops both flags when their texture is 0.
+    return textures;
+}
+
+void CatalogSatellite::Draw(const Shader& shader) const {
+    CatalogMaterial::BindMaterial(shader, _material, CurrentTextures());
+    SpaceObject::Draw(shader);
 }

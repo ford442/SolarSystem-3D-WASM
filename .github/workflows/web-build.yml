@@ -87,6 +87,10 @@ jobs:
         working-directory: web
         run: npm run generate:planet-metadata:check
 
+      - name: Verify texture_units.glsl matches src/gfx/TextureUnits.h
+        working-directory: web
+        run: npm run generate:texture-units:check
+
       - name: Verify wasm export bindings are generated
         working-directory: web
         run: npm run generate:wasm-exports:check

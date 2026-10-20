@@ -10,7 +10,7 @@ import type { NextConjunction } from './conjunction.js';
 import { parseObserveStateJson, type ObserveState } from './observe.js';
 import { parseSkyEventJson, type NextSkyEvent } from './skyEvents.js';
 import { createCachedCwrapExports } from './wasmBridge.exports.js';
-import { clearWasmCallback, registerWasmCallbacks } from './wasmCallbacks.js';
+import { clearWasmCallback, emitWasmCallback, registerWasmCallbacks } from './wasmCallbacks.js';
 
 /**
  * Planet index conventions (FocusPlanet / GetFocusedPlanetIndex):
@@ -177,6 +177,10 @@ export interface SolarSystemRuntime {
     getCameraYaw(): number;
     getCameraPitch(): number;
     setXrControllerRay(hand: number, ox: number, oy: number, oz: number, dx: number, dy: number, dz: number, visible: boolean): void;
+    /** Files the live shader programs were built from (MEMFS paths); dev reload only. */
+    getShaderSourceFiles(): string[];
+    /** Rebuild the programs whose files changed in MEMFS; returns how many. Dev reload only. */
+    reloadChangedShaders(): number;
 }
 
 let activeRuntime: SolarSystemRuntime | null = null;
@@ -216,7 +220,11 @@ export function createSolarSystemRuntime(instance: SolarSystemModule): SolarSyst
         addTouchZoom: exports.addTouchZoom,
         isMobileWeb: () => exports.isMobileWeb() !== 0,
         focusPlanet: (index) => exports.focusPlanet(index),
-        setOrbitScaleMode: (mode) => exports.setOrbitScaleMode(mode),
+        setOrbitScaleMode: (mode) => {
+            exports.setOrbitScaleMode(mode);
+            // Only JS ever changes the scale mode, so the event is raised here rather than in C++.
+            emitWasmCallback('onSettingsChanged', 'orbitScaleMode');
+        },
         getOrbitScaleMode: () => exports.getOrbitScaleMode() as OrbitScaleMode,
         getNearestPlanetIndex: exports.getNearestPlanetIndex,
         getFocusedPlanetIndex: exports.getFocusedPlanetIndex,
@@ -242,7 +250,10 @@ export function createSolarSystemRuntime(instance: SolarSystemModule): SolarSyst
         setObserveFov: (fovDeg) => exports.setObserveFov(fovDeg),
         setObserveTimeRate: (rate) => exports.setObserveTimeRate(rate),
         getObserveState: () => parseObserveStateJson(exports.getObserveStateJson()),
-        focusMission: (index) => exports.focusMission(index),
+        focusMission: (index) => {
+            exports.focusMission(index);
+            emitWasmCallback('onMissionFocused', exports.getFocusedMissionIndex());
+        },
         getFocusedMissionIndex: exports.getFocusedMissionIndex,
         getMissionCount: exports.getMissionCount,
         getMissionCatalog: () => parseMissionCatalogJson(exports.getMissionCatalogJson()),
@@ -287,6 +298,8 @@ export function createSolarSystemRuntime(instance: SolarSystemModule): SolarSyst
         setXrControllerRay: (hand, ox, oy, oz, dx, dy, dz, visible) => {
             exports.setXrControllerRay(hand, ox, oy, oz, dx, dy, dz, visible ? 1 : 0);
         },
+        getShaderSourceFiles: () => exports.getShaderSourceFiles().split('\n').filter((path) => path.length > 0),
+        reloadChangedShaders: exports.reloadShaders,
     };
 
     activeRuntime = runtime;

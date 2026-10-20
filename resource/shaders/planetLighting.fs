@@ -1,4 +1,7 @@
 #version 300 es
+// Material switches: CatalogMaterial::Defines() picks them per draw from the row's
+// render.shaderFlags and which maps are resident (ShaderLibrary caches each combination).
+// permutations: HAS_NIGHT_TEXTURE HAS_SPECULAR_MAP HAS_CLOUDS USE_SPHERE_INTERSECT
 in vec3 vFragPos;
 in vec2 vTexCoords;
 in vec3 vTangentLightPos;
@@ -6,38 +9,40 @@ in vec3 vTangentViewPos;
 in vec3 vTangentFragPos;
 in vec4 vFragPosLightSpace;
 
-uniform sampler2D mainDiffuseTexture;
-uniform sampler2D cloudTexture;
-uniform sampler2D nightTexture;
-uniform sampler2D normalMap;
-uniform sampler2D specularMap;
-uniform sampler2D ringDiffuse;
-uniform sampler2D shadowMap;
+layout(binding = TU_DIFFUSE) uniform sampler2D mainDiffuseTexture;
+layout(binding = TU_NORMAL) uniform sampler2D normalMap;
+#ifdef HAS_CLOUDS
+layout(binding = TU_CLOUDS) uniform sampler2D cloudTexture;
+#endif
+#ifdef HAS_NIGHT_TEXTURE
+layout(binding = TU_NIGHT) uniform sampler2D nightTexture;
+#endif
+#ifdef HAS_SPECULAR_MAP
+layout(binding = TU_SPECULAR) uniform sampler2D specularMap;
+#endif
+layout(binding = TU_RING) uniform sampler2D ringDiffuse;
+layout(binding = TU_SHADOW_MAP) uniform sampler2D shadowMap;
 
-uniform vec3 lightPos;
-uniform vec3 viewPos;
 uniform vec3 starGlowTint;
 
-uniform float farPlane;
 uniform float ambientFactor;
-uniform float bias; // For shadows
+uniform float bias; // For shadows, in shadow-map depth units
+uniform vec2 shadowDepthRange; // this component's light frustum: near, far - near (scene units)
 uniform float yRotation; // For fake cloud shadows
 uniform float uSurfaceDim;
 
-uniform bool hasNightTexture;
-uniform bool hasSpecularMap;
-uniform bool hasSpecular;
-uniform bool hasClouds;
 uniform bool isNearbyPlanetaryRing;
-uniform bool isUseSphereIntersect; // To avoid the ring shadow while behind a planet (parent planet with rings)
 
+#ifdef USE_SPHERE_INTERSECT
+// A moon of a ringed planet: no ring shadow while the planet itself is in the way.
 uniform vec3 parentPlanetCenter; // Center of parent planet with planetary ring in eye space
 uniform float parentPlanetRadiusSquared;
+#endif
 
 // Eclipse umbra decal: one sphere occluding the star, projected onto this surface in the
 // lighting pass. No extra FBO and no geometry shader — see Application::ConfigureMainPlanetShader.
 uniform bool hasEclipseCaster;
-uniform vec3 eclipseCasterCenter; // Same space as vFragPos / lightPos
+uniform vec3 eclipseCasterCenter; // Same space as vFragPos / frame.sunPos.xyz
 uniform float eclipseCasterRadius;
 uniform float eclipseStarRadius;  // 0.0 => hard-edged disc (Low quality preset)
 
@@ -47,6 +52,7 @@ uniform vec2 ringInnerOuterRadiuses; // x = Inner, y = Outer
 
 out vec4 fragColor;
 
+#include "common/frame.glsl"
 #include "common/raytrace.glsl"
 #include "common/ring.glsl"
 #include "common/eclipse.glsl"
@@ -55,7 +61,7 @@ out vec4 fragColor;
 float EclipseVisibility() {
     if (!hasEclipseCaster)
         return 1.0;
-    return EclipseVisibilityAt(vFragPos, lightPos, eclipseCasterCenter, eclipseCasterRadius, eclipseStarRadius);
+    return EclipseVisibilityAt(vFragPos, frame.sunPos.xyz, eclipseCasterCenter, eclipseCasterRadius, eclipseStarRadius);
 }
 
 float CalculateShadow(vec4 fragPosLightSpace) {
@@ -70,20 +76,22 @@ float CalculateShadow(vec4 fragPosLightSpace) {
 
     // Get depth of current fragment from light's perspective
     float currentDepth = projCoords.z;
-    vec3 lightDir = lightPos - vFragPos;
+    vec3 lightDir = frame.sunPos.xyz - vFragPos;
     vec3 lightDirNorm = normalize(lightDir);
 
     float shadow = currentDepth - bias > closestDepth ? 1.0 : 0.0;
 
     if (isNearbyPlanetaryRing) {
+#ifdef USE_SPHERE_INTERSECT
         // Behind the parent planet with rings (to avoid shadow from the ring)
-        if (isUseSphereIntersect && intersectSphereAhead(vFragPos, lightDirNorm, parentPlanetCenter, parentPlanetRadiusSquared))
+        if (intersectSphereAhead(vFragPos, lightDirNorm, parentPlanetCenter, parentPlanetRadiusSquared))
             return 0.0;
+#endif
 
         float u;
         if (RingCrossing(vFragPos, lightDirNorm, lightDirNorm, ringCenter, ringNormal, ringInnerOuterRadiuses, u)) {
             // If some planet obscures the ring
-            if (shadow > 0.0 && length(lightPos - ringCenter) - closestDepth * farPlane > ringInnerOuterRadiuses.y) {
+            if (shadow > 0.0 && length(frame.sunPos.xyz - ringCenter) - (shadowDepthRange.x + closestDepth * shadowDepthRange.y) > ringInnerOuterRadiuses.y) {
                 // PCF won't work, because physically in the place where the penumbra from the PCF should be, there will be a shadow from the ring, and not from the planet
                 return 1.0 - shadow;
             }
@@ -97,9 +105,7 @@ float CalculateShadow(vec4 fragPosLightSpace) {
 }
 
 void main() {
-    vec3 diffuseColor, specular;
-
-    diffuseColor = texture(mainDiffuseTexture, vTexCoords).rgb;
+    vec3 diffuseColor = texture(mainDiffuseTexture, vTexCoords).rgb;
 
     vec3 normal = texture(normalMap, vTexCoords).rgb;
     normal = normalize(normal * 2.0 - 1.0);
@@ -108,51 +114,39 @@ void main() {
 
     float NdotL = dot(normal, lightDir);
 
-    if (hasClouds) {
-        vec2 cloudTexCoord = vTexCoords - vec2(yRotation / 360.0, 0.0);
-        vec3 cloudColor = texture(cloudTexture, cloudTexCoord).rgb;
-        diffuseColor -= cloudColor * 0.5;
-    }
+#ifdef HAS_CLOUDS
+    vec2 cloudTexCoord = vTexCoords - vec2(yRotation / 360.0, 0.0);
+    vec3 cloudColor = texture(cloudTexture, cloudTexCoord).rgb;
+    diffuseColor -= cloudColor * 0.5;
+#endif
 
-    if (hasNightTexture) {
-        vec3 nightColor = texture(nightTexture, vTexCoords).rgb;
-        float dayNightAlpha = smoothstep(-0.15, 0.15, NdotL);
-        diffuseColor = mix(nightColor, diffuseColor, dayNightAlpha);
-    }
+#ifdef HAS_NIGHT_TEXTURE
+    vec3 nightColor = texture(nightTexture, vTexCoords).rgb;
+    float dayNightAlpha = smoothstep(-0.15, 0.15, NdotL);
+    diffuseColor = mix(nightColor, diffuseColor, dayNightAlpha);
+#endif
 
     vec3 ambient = ambientFactor * diffuseColor;
 
     float diff = max(dot(lightDir, normal), 0.0);
     diffuseColor *= diff;
 
-    float spec;
-    if (hasSpecular) {
-        vec3 viewDir = normalize(vTangentViewPos - vTangentFragPos);
-        vec3 reflectDir = reflect(-lightDir, normal);
-        vec3 halfwayDir = normalize(lightDir + viewDir);
-        spec = pow(max(dot(normal, halfwayDir), 0.0), 32.0);
-        float specularMix = smoothstep(-0.08, 0.08, NdotL);
-        spec = mix(0.0, spec, specularMix) * 0.675;
-    }
-
-    if (hasSpecularMap) {
-        vec4 specularMapColor = texture(specularMap, vTexCoords);
-        specular = specularMapColor.rrr * specularMapColor.a * spec * starGlowTint;
-    }
-    else {
-        specular = spec * starGlowTint;
-    }
-
     float shadow = CalculateShadow(vFragPosLightSpace) * EclipseVisibility();
 
     if (shadow < 0.05)
         ambient *= 0.1;
 
-    vec3 lighting;
-    if (hasSpecular)
-        lighting = ambient + shadow * (diffuseColor + specular);
-    else
-        lighting = ambient + shadow * diffuseColor;
+    vec3 lighting = ambient + shadow * diffuseColor;
+
+#ifdef HAS_SPECULAR_MAP
+    // Blinn-Phong highlight, masked by the map (oceans on Earth) and faded at the terminator.
+    vec3 viewDir = normalize(vTangentViewPos - vTangentFragPos);
+    vec3 halfwayDir = normalize(lightDir + viewDir);
+    float spec = pow(max(dot(normal, halfwayDir), 0.0), 32.0);
+    spec *= smoothstep(-0.08, 0.08, NdotL) * 0.675;
+    vec4 specularMapColor = texture(specularMap, vTexCoords);
+    lighting += shadow * specularMapColor.rrr * specularMapColor.a * spec * starGlowTint;
+#endif
 
     fragColor = vec4(lighting * uSurfaceDim, 1.0);
 }
