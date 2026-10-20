@@ -36,5 +36,5 @@ void main() {
     fLocal = sliceForward * depth + (sliceRight * aPos.x + sliceUp * aPos.y) * halfSize;
 
     vec3 world = sunCenter + fLocal * sunRadius;
-    gl_Position = ApplyLogDepth(frame.proj * frame.view * vec4(world, 1.0), frame.zCoef);
+    gl_Position = ApplyLogDepth(frame.proj * frame.view * vec4(world, 1.0));
 }

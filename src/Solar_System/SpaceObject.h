@@ -17,6 +17,12 @@ public:
     virtual void Draw(const Shader& shader) const;
     /** The planetLighting permutation this object draws with now (CatalogMaterial::Variant); 0 = none. */
     virtual unsigned ShaderVariant() const { return 0; }
+    /**
+     * Drawn size over art size: 1 on compressed scale, true radius over art radius on
+     * realistic (SceneScale::BodySizeFactor). Lengths tied to a body — its shells, rings,
+     * focus and LOD distances — are the art numbers times this.
+     */
+    virtual float SizeFactor() const { return 1.0f; }
     const MeshHolder& GetModel() const;
     /** The mesh's bounds under the current model matrix (render frame). */
     BoundingSphere GetBoundingSphere() const;

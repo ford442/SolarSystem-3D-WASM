@@ -27,6 +27,7 @@ class MissionPathRenderer;
 class OrbitPathRenderer;
 class ShadowMapFBO;
 class SkyBox;
+class SurfacePatchMesh;
 class TextRenderer;
 class XrPointerRenderer;
 
@@ -101,8 +102,14 @@ public:
     void CountSceneUpdate() { ++_stats.sceneUpdates; }
     void CountCulledComponents(int count) { _stats.culledComponents = count; }
 
-    /** Re-upload every mission path in the render frame (origin move, scale or quality change). */
+    /**
+     * Re-upload every mission path relative to the current render origin (scale or quality
+     * change). Draws offset them by where that origin is now, so the per-frame origin move
+     * only re-uploads once it has gone kMissionPathRebaseDistance (FollowMissionPathOrigin).
+     */
     void RebuildMissionPaths(const MissionCatalog::Catalog& catalog, int qualityPreset);
+    /** After the render origin moved: rebuild the paths if it is now far from their upload origin. */
+    void FollowMissionPathOrigin(const MissionCatalog::Catalog& catalog, int qualityPreset);
     void SetOrbitLinesEnabled(bool enabled) { _orbitLinesEnabled = enabled; }
     bool GetOrbitLinesEnabled() const { return _orbitLinesEnabled; }
     void SetMagneticFieldsEnabled(bool enabled, int qualityPreset);
@@ -141,12 +148,12 @@ private:
     void RenderObserveLabels(const FrameContext& ctx, float width, float height, float textScale);
     void EnsureMagneticFieldsBuilt(int qualityPreset);
 
-    void RenderAtmospheres(const FrameContext& ctx, const RenderableSceneComponent& component) const;
+    void RenderAtmospheres(const FrameContext& ctx, const RenderableSceneComponent& component);
     void RenderOneilAtmosphere(const FrameContext& ctx, const RenderableAtmosphere& renderableAtmosphere,
-                               const RenderableSceneComponent& component) const;
+                               const RenderableSceneComponent& component);
     void RenderPbrAtmosphere(const FrameContext& ctx, const RenderableAtmosphere& renderableAtmosphere,
-                             const RenderableSceneComponent& component) const;
-    void RenderClouds(const RenderableSceneComponent& component) const;
+                             const RenderableSceneComponent& component);
+    void RenderClouds(const FrameContext& ctx, const RenderableSceneComponent& component);
     void RenderPlanetaryRing(const Shader& shader, const RenderableSceneComponent& component) const;
     void RenderStar(const FrameContext& ctx) const;
     void RenderSpaceObjectDistance(const FrameContext& ctx, const SpaceObject* spaceObject) const;
@@ -166,6 +173,23 @@ private:
     /** Bind `program` and give it this component's shadow, ring and eclipse uniforms. */
     void ConfigurePlanetProgram(const FrameContext& ctx, const Shader& program,
                                 const RenderableSceneComponent& component, const EclipseUmbra& umbra) const;
+    /**
+     * Whether `object` is close enough to this view's eye for the NEAR_SURFACE permutations:
+     * within CameraNavigation::kNearSurfaceRadii of its bounding radius above it.
+     */
+    static bool NearSurface(const SpaceObject& object, const CameraView& view);
+    /** NEAR_SURFACE planetLighting.vs: the relative-to-eye anchor for `object` (gfx/MeshAnchor.h). */
+    static void SetMeshAnchor(const Shader& program, const SpaceObject& object, const CameraView& view);
+    /**
+     * After `body` drew with a NEAR_SURFACE `program`: its facets that pass within metres of
+     * the eye, re-tessellated (gfx/SurfacePatch.h) and drawn over them with the same state.
+     */
+    void DrawSurfacePatch(const Shader& program, const SpaceObject& body, const CameraView& view);
+    /**
+     * `normal` with NEAR_SURFACE when `near`: the near build of a shell program once it has
+     * compiled (it is submitted on first use), `normal` until then.
+     */
+    Shader& ShellProgram(Shader& normal, Shader*& nearCache, const ShaderSpec& nearSpec, bool near);
     /** Draw one body (planet or moon) with its own material variant. */
     void DrawLitBody(const FrameContext& ctx, const SpaceObject& body, const RenderableSceneComponent& component,
                      const EclipseUmbra& umbra);
@@ -188,8 +212,17 @@ private:
     // LUT atmosphere (atmosphere.vs + atmospherePbr.fs). Null if it failed to compile, in
     // which case every shell stays on mainAtmosphereShader.
     Shader* _pbrAtmosphereShader = nullptr;
+    // NEAR_SURFACE builds of the shell programs, compiled on first use (ShellProgram).
+    Shader *_nearAtmosphereShader = nullptr, *_nearPbrAtmosphereShader = nullptr, *_nearCloudsShader = nullptr;
     Shader* _coronaVolumeShader = nullptr;
     std::unique_ptr<LensFlare> _lensFlare;
+    std::unique_ptr<SurfacePatchMesh> _surfacePatch;
+    // What _surfacePatch was last built for, so the second XR eye reuses the first's patch.
+    struct SurfacePatchKey {
+        const SpaceObject* body = nullptr;
+        glm::dvec3 eyeModel{0.0};
+        float nearPlane = 0.0f;
+    } _surfacePatchKey;
     // Null if its shaders failed to compile; Observe then draws an empty sky.
     std::unique_ptr<ObserveSky> _observeSky;
     std::unique_ptr<OrbitPathRenderer> _orbitPathRenderer;
@@ -197,6 +230,7 @@ private:
     std::unique_ptr<MagneticFieldLineRenderer> _magneticFieldRenderer;
     std::unique_ptr<MagneticFieldBloom> _magneticFieldBloom;
     std::vector<std::unique_ptr<MissionPathRenderer>> _missionPathMeshes;
+    glm::dvec3 _missionPathOrigin{0.0}; // world point the path vertices are relative to
 
     bool _orbitLinesEnabled = true;
     bool _magneticFieldsEnabled = false;

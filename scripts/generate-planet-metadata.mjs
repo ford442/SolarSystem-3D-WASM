@@ -414,6 +414,15 @@ function cppFloat(n) {
   return `${text.includes('.') ? text : `${text}.0`}f`;
 }
 
+/** facts.diameterKm / 2: the radius a body is drawn at on realistic (true) scale. */
+function trueRadiusKm(body) {
+  const radiusKm = (body.facts?.diameterKm ?? 0) / 2;
+  if (!(radiusKm > 0)) {
+    throw new Error(`${body.id} needs facts.diameterKm > 0: realistic scale draws every body at its true radius`);
+  }
+  return radiusKm;
+}
+
 /**
  * Generates the body-physics table OrbitLayout::kBodies[] (see OrbitLayout.cpp):
  * heliocentric compressed-art offset, AU distance, orbital period, inclination, and
@@ -519,7 +528,7 @@ function buildBodyCatalogHeader(catalog) {
       `${cppWideString(body.displayName?.en ?? body.id)}, ` +
       `${cppWideString(body.displayName?.ru ?? body.displayName?.en ?? body.id)}, ` +
       `${cppFloat(o.distanceAu)}, ${cppFloat(o.orbitalPeriodDays)}, ` +
-      `${cppFloat(o.earthRadiusScale ?? 1)}, ${cppFloat(o.axialTiltDegrees)}, ` +
+      `${cppFloat(o.earthRadiusScale ?? 1)}, ${cppFloat(trueRadiusKm(body))}, ${cppFloat(o.axialTiltDegrees)}, ` +
       `${cppFloat(r.artTiltXDegrees)}, ${cppFloat(r.oblateness)}, ${cppFloat(o.yawOffsetDegrees)}, ` +
       `${cppFloat(o.artRollDegrees)}, ` +
       `{${!!flags.hasNightTexture}, ${!!flags.hasSpecularMap}, ${!!flags.hasClouds}}, ` +
@@ -622,6 +631,7 @@ function buildBodyCatalogHeader(catalog) {
     '    float auDistance;',
     '    float orbitalPeriodDays;',
     '    float earthRadiusScale;',
+    '    float radiusKm;         // true equatorial radius (facts.diameterKm / 2): the drawn radius on realistic scale.',
     '    float axialTiltDegrees; // catalog SSOT; Rotate(Z) in CatalogBody.',
     '    float artTiltXDegrees;  // Saturn ring-presentation overlay; else 0.',
     '    float oblateness;       // flattening 1 - polar/equatorial; the mesh radius is equatorial.',

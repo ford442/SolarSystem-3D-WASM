@@ -2,6 +2,7 @@
 #include "QualitySettings.h"
 #include "Solar_System/CatalogClouds.h"
 #include "Solar_System/CatalogSatellite.h"
+#include "Solar_System/SceneScale.h"
 #include "Solar_System/SystemVisuals.h"
 #include "Solar_System/AtmosphereModel.h"
 #include "gfx/FloatLutTexture.h"
@@ -74,10 +75,11 @@ void LoadAtmosphereLuts(Atmosphere& atmosphere) {
 }
 
 RenderableAtmosphere MakeAtmosphere(const MeshHolder& sphereModel, const BodyCatalog::AtmosphereRow& row,
-                                    const std::shared_ptr<SpaceObject>& parent,
-                                    float parentRadius, float parentEarthSize) {
+                                    const std::shared_ptr<SpaceObject>& parent, float parentEarthSize) {
     RenderableAtmosphere renderable;
-    renderable.atmosphere = std::make_unique<Atmosphere>(sphereModel, row, parent, parentRadius);
+    // The art (compressed-scale) radius: Atmosphere scales it with the parent's SizeFactor.
+    renderable.atmosphere =
+        std::make_unique<Atmosphere>(sphereModel, row, parent, SceneScale::kMeshRadius * parentEarthSize);
     renderable.parentEarthSizeCoefficient = parentEarthSize;
     LoadAtmosphereLuts(*renderable.atmosphere);
     return renderable;
@@ -161,12 +163,11 @@ void Application::InitCatalogSystem(const MeshHolder& sphereModel, const std::st
 
     RenderableSceneComponent component;
     if (const auto* row = BodyCatalog::FindAtmosphere(primary->id)) {
-        component.atmospheres.push_back(MakeAtmosphere(sphereModel, *row, planet,
-                                                       planet->GetRadius(), planet->GetEarthSizeCoefficient()));
+        component.atmospheres.push_back(MakeAtmosphere(sphereModel, *row, planet, planet->GetEarthSizeCoefficient()));
     }
     for (const auto& [satellite, row] : satelliteAtmospheres) {
-        component.atmospheres.push_back(MakeAtmosphere(sphereModel, *row, satellite,
-                                                       satellite->GetRadius(), satellite->GetEarthSizeCoefficient()));
+        component.atmospheres.push_back(
+            MakeAtmosphere(sphereModel, *row, satellite, satellite->GetEarthSizeCoefficient()));
     }
 
     if (primary->hasCloudLayer && primary->cloudLayer.diffuse) {

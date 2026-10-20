@@ -21,6 +21,7 @@ public:
     void AdjustToParent() override;
     void Draw(const Shader& shader) const override;
     unsigned ShaderVariant() const override { return CatalogMaterial::Variant(_material, CurrentTextures()); }
+    float SizeFactor() const override;
 
     bool IsEphemerisPlaced() const override { return _ephemerisPlaced; }
     float OrbitSceneUnitsPerKm() const override;

@@ -1,5 +1,6 @@
 #include "CatalogBody.h"
 #include "BodyShape.h"
+#include "SceneScale.h"
 
 #include <glm/glm.hpp>
 
@@ -12,7 +13,7 @@ CatalogBody::CatalogBody(PlanetInfo&& planetInfo, std::shared_ptr<Star> parentSt
       _diffuses(std::move(planetInfo.diffuseTextures)),
       _normalMap(std::move(planetInfo.normalMap)),
       _specular(std::move(planetInfo.specularTexture)) {
-    Translate(OrbitLayout::GetRenderPosition(_body));
+    Place(OrbitLayout::GetHeliocentricScenePosition(_body));
 
     const TexturePaths::Paths diffuse = TexturePaths::ForTextureId(entry.lod.diffuse);
     _diffuseLOD.Configure(_diffuses.at(0), diffuse.low, diffuse.mid, diffuse.high, entry.lod.diffuse,
@@ -36,13 +37,15 @@ CatalogBody::CatalogBody(PlanetInfo&& planetInfo, std::shared_ptr<Star> parentSt
 #endif
 }
 
+float CatalogBody::SizeFactor() const {
+    return SceneScale::BodySizeFactor(_entry);
+}
+
 void CatalogBody::AdjustToParent() {
-    LoadIdentityModelMatrix();
-    // Not _parentStar->GetPosition() + GetOffset(): that sum is two large floats on
-    // realistic scale. The Sun is the simulation origin, so the render-frame position is
-    // the heliocentric one minus the render origin, taken in double.
-    Translate(OrbitLayout::GetRenderPosition(_body));
-    Scale(glm::vec3(_earthSizeCoefficient));
+    // The Sun is the simulation origin, so the world position is the heliocentric one; Place
+    // takes it to the render frame in double.
+    Place(OrbitLayout::GetHeliocentricScenePosition(_body));
+    Scale(glm::vec3(_earthSizeCoefficient * SizeFactor()));
     Rotate(_entry.axialTiltDegrees, glm::vec3(0.0f, 0.0f, 1.0f));
     if (_entry.artTiltXDegrees != 0.0f) {
         Rotate(_entry.artTiltXDegrees, glm::vec3(1.0f, 0.0f, 0.0f));

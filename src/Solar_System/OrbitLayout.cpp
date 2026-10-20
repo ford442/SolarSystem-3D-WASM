@@ -286,16 +286,6 @@ glm::vec3 GetRenderPosition(Body body) {
     return ToRenderFrame(GetHeliocentricScenePosition(body));
 }
 
-glm::dvec3 ChooseRenderOrigin(const glm::vec3& cameraRenderFrame) {
-    if (g_scaleMode != ScaleMode::Realistic) {
-        return glm::dvec3(0.0);
-    }
-    if (glm::length(cameraRenderFrame) <= kRenderOriginRebaseDistance) {
-        return g_renderOrigin;
-    }
-    return ToHeliocentricScene(cameraRenderFrame);
-}
-
 Body BodyFromName(const std::string& name) {
     if (name == "Mercury") return Body::Mercury;
     if (name == "Venus") return Body::Venus;

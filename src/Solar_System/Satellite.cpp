@@ -12,7 +12,7 @@ std::shared_ptr<SpaceObject> Satellite::GetParent() const {
 }
 
 float Satellite::GetRadius() const {
-    return _radius;
+    return _radius * SizeFactor();
 }
 
 float Satellite::GetEarthSizeCoefficient() const {
@@ -26,5 +26,5 @@ void Satellite::ConfigureDiffuseLOD(TextureImage2D& diffuse, const std::string& 
 }
 
 void Satellite::LoadHighResIfClose(const glm::vec3& cameraPosition, const TextureLodPolicy& policy) {
-    _diffuseLOD.Update(cameraPosition, GetPosition(), 50.0f, policy.maxTier);
+    _diffuseLOD.Update(cameraPosition, GetPosition(), 50.0f * SizeFactor(), policy.maxTier);
 }

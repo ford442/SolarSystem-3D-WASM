@@ -19,11 +19,11 @@ glm::vec3 PlanetaryRing::GetRingNormal() const {
 }
 
 float PlanetaryRing::GetInnerRadius() const {
-    return _ringInnerRadius;
+    return _ringInnerRadius * _parentPlanet->SizeFactor();
 }
 
 float PlanetaryRing::GetOuterRadius() const {
-    return _ringOuterRadius;
+    return _ringOuterRadius * _parentPlanet->SizeFactor();
 }
 
 void PlanetaryRing::UpdateRingNormal() {
@@ -36,5 +36,5 @@ void PlanetaryRing::ConfigureDiffuseLOD(const std::string& lowPath, const std::s
 }
 
 void PlanetaryRing::LoadHighResIfClose(const glm::vec3& cameraPosition, const TextureLodPolicy& policy) {
-    _diffuseLOD.Update(cameraPosition, _parentPlanet->GetPosition(), 50.0f, policy.maxTier);
+    _diffuseLOD.Update(cameraPosition, _parentPlanet->GetPosition(), 50.0f * _parentPlanet->SizeFactor(), policy.maxTier);
 }

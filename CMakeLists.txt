@@ -36,6 +36,7 @@ set(SOLARSYSTEM_SOURCES_CORE
     src/QualitySettings.cpp
     src/ResourceManifest.cpp
     src/PlanetSystemLoader.cpp
+    src/CameraController.cpp
     src/SceneRenderer.cpp
     src/SceneOverlayRenderer.cpp
     src/StarSystemFactory.cpp
@@ -52,6 +53,7 @@ set(SOLARSYSTEM_SOURCES_AUX
     # core/: logging, camera, frame timing
     src/core/Log.cpp
     src/core/Camera.cpp
+    src/core/CameraNavigation.cpp
     src/core/FrameTimer.cpp
     # gfx/: GL objects and programs
     src/gfx/Shader.cpp
@@ -66,6 +68,8 @@ set(SOLARSYSTEM_SOURCES_AUX
     src/gfx/FloatLutTexture.cpp
     src/gfx/FrameUniforms.cpp
     src/gfx/LineStripBatch.cpp
+    src/gfx/SurfacePatch.cpp
+    src/gfx/SurfacePatchMesh.cpp
     # render/: overlays and post effects built on gfx/
     src/render/LensFlare.cpp
     src/render/TextRenderer.cpp

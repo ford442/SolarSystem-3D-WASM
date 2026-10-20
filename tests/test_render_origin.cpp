@@ -78,86 +78,48 @@ TEST_F(RenderOriginTest, CameraOneEarthRadiusFromAFarBodySeesItAtTheDoubleOffset
     EXPECT_GT(glm::length(floatRelative - expected), tolerance);
 }
 
-TEST_F(RenderOriginTest, CameraAnywhereInsideTheRebaseRadiusStaysPrecise) {
-    const glm::dvec3 body = OrbitLayout::GetHeliocentricScenePosition(kFarBody);
-    const glm::dvec3 camera = body + glm::dvec3(0.0, 0.0, kEarthRadiusScene);
-    const glm::dvec3 directions[] = {
-        {1.0, 0.0, 0.0}, {0.0, -1.0, 0.0}, {0.577, 0.577, 0.577}, {-0.3, 0.8, -0.52},
-    };
-    for (const glm::dvec3& direction : directions) {
-        // The camera flew here from an origin just inside the rebase radius, so it has not
-        // rebased and its float position is as coarse as it is ever allowed to get.
-        const double reach = static_cast<double>(OrbitLayout::kRenderOriginRebaseDistance) - 1.0;
-        const glm::dvec3 origin = camera + glm::normalize(direction) * reach;
-        OrbitLayout::SetRenderOrigin(origin);
-        const glm::vec3 cameraRender = OrbitLayout::ToRenderFrame(camera);
-        ASSERT_EQ(OrbitLayout::ChooseRenderOrigin(cameraRender), origin);
-
-        // Compare against where the camera really is: its float position defines that.
-        const glm::dvec3 expected = body - OrbitLayout::ToHeliocentricScene(cameraRender);
-        const glm::dvec3 relative(OrbitLayout::GetRenderPosition(kFarBody) - cameraRender);
-        EXPECT_LT(glm::length(relative - expected), 1.0e-3 * kEarthRadiusScene);
-    }
-}
-
-TEST_F(RenderOriginTest, RebasingMidFlightDoesNotMoveTheBodyOnScreen) {
+TEST_F(RenderOriginTest, OriginOnTheCameraEveryFrameKeepsAFlybyOnItsExactTrack) {
+    // Application::MoveRenderOrigin puts the origin on the camera once per frame, so the
+    // camera is always at an exact zero and the view matrix has no translation. Fly past a
+    // body 90 AU out at a tenth of an Earth radius per frame and compare where the float
+    // pipeline puts it on screen with a double-precision projection of the true geometry.
     const glm::dvec3 body = OrbitLayout::GetHeliocentricScenePosition(kFarBody);
     const glm::dvec3 outward = glm::normalize(glm::dvec3(0.48, -0.2, 0.85));
     const glm::dvec3 sideways = glm::normalize(glm::cross(outward, glm::dvec3(0.0, 1.0, 0.0)));
-    const double rebase = static_cast<double>(OrbitLayout::kRenderOriginRebaseDistance);
-
-    // Put the body just inside the rebase radius so the camera, skimming past it at about
-    // one Earth radius, crosses the boundary while it is that close.
-    OrbitLayout::SetRenderOrigin(body - outward * (rebase - 0.3 * kEarthRadiusScene));
-    glm::vec3 camera = OrbitLayout::ToRenderFrame(body + sideways * kEarthRadiusScene - outward * (0.5 * kEarthRadiusScene));
     const glm::vec3 front = glm::normalize(glm::vec3(-sideways + 0.15 * outward));
-    const glm::vec3 step = glm::vec3(outward) * static_cast<float>(kEarthRadiusScene / 100.0);
+    glm::dvec3 camera = body + sideways * kEarthRadiusScene - outward * (2.0 * kEarthRadiusScene);
 
-    int rebases = 0;
-    for (int frame = 0; frame < 100; ++frame) {
-        camera += step; // what Camera::ProcessKeyboard does
+    for (int frame = 0; frame < 40; ++frame) {
+        camera += outward * (0.1 * kEarthRadiusScene);
+        OrbitLayout::SetRenderOrigin(camera);
+        const glm::vec3 cameraRender = OrbitLayout::ToRenderFrame(camera);
+        ASSERT_EQ(cameraRender, glm::vec3(0.0f));
 
-        const glm::dvec3 previous = OrbitLayout::GetRenderOrigin();
-        const glm::dvec3 next = OrbitLayout::ChooseRenderOrigin(camera);
-        if (next == previous) {
-            continue;
+        const glm::vec2 drawn = ProjectToNdc(cameraRender, front, OrbitLayout::GetRenderPosition(kFarBody));
+        const glm::dmat4 view = glm::lookAt(glm::dvec3(0.0), glm::dvec3(front), glm::dvec3(0.0, 1.0, 0.0));
+        const glm::dmat4 projection = glm::perspective(glm::radians(45.0), 16.0 / 9.0, 0.001, 20000.0);
+        const glm::dvec4 clip = projection * view * glm::dvec4(body - camera, 1.0);
+        const glm::dvec2 exact = glm::dvec2(clip) / clip.w;
+        if (std::fabs(exact.x) < 1.0 && std::fabs(exact.y) < 1.0) {
+            EXPECT_LT(glm::length(glm::dvec2(drawn) - exact), 0.01 * kOnePixelNdc) << "frame " << frame;
         }
-        ++rebases;
-        const glm::dvec3 cameraHeliocentric = OrbitLayout::ToHeliocentricScene(camera);
-        EXPECT_LT(glm::distance(cameraHeliocentric, body), 1.2 * kEarthRadiusScene);
-        const glm::vec2 before = ProjectToNdc(camera, front, OrbitLayout::GetRenderPosition(kFarBody));
-
-        // Application::MoveRenderOrigin, reduced to what the camera and a body see.
-        OrbitLayout::SetRenderOrigin(next);
-        camera -= glm::vec3(next - previous);
-        const glm::vec2 after = ProjectToNdc(camera, front, OrbitLayout::GetRenderPosition(kFarBody));
-
-        EXPECT_LT(glm::length(camera), 1.0e-6f);
-        EXPECT_LT(glm::distance(OrbitLayout::ToHeliocentricScene(camera), cameraHeliocentric), 1.0e-9);
-        EXPECT_LT(std::fabs(before.x), 1.0f); // on screen, so the comparison means something
-        EXPECT_LT(std::fabs(before.y), 1.0f);
-        EXPECT_LT(glm::length(after - before), kOnePixelNdc);
     }
-    EXPECT_EQ(rebases, 1);
 }
 
-TEST_F(RenderOriginTest, RealisticOriginOnlyMovesPastTheRebaseRadius) {
-    const glm::dvec3 origin(-60000.0, 120.0, 31000.0);
-    OrbitLayout::SetRenderOrigin(origin);
-    const float inside = OrbitLayout::kRenderOriginRebaseDistance * 0.99f;
-    EXPECT_EQ(OrbitLayout::ChooseRenderOrigin(glm::vec3(inside, 0.0f, 0.0f)), origin);
-    EXPECT_EQ(OrbitLayout::ChooseRenderOrigin(glm::vec3(0.0f, -inside, 0.0f)), origin);
-
-    const glm::vec3 outside(OrbitLayout::kRenderOriginRebaseDistance * 1.01f, 0.0f, 0.0f);
-    EXPECT_EQ(OrbitLayout::ChooseRenderOrigin(outside), origin + glm::dvec3(outside));
+TEST_F(RenderOriginTest, WithoutTheFloatingOriginTheSameFlybyIsOffByPixels) {
+    // The control for the test above: the camera's own float position 90 AU out (what an
+    // origin pinned at the Sun gives) puts the body tens of pixels off at this range.
+    const glm::dvec3 body = OrbitLayout::GetHeliocentricScenePosition(kFarBody);
+    const glm::dvec3 camera = body + glm::dvec3(0.25, 0.1, 0.3) * kEarthRadiusScene;
+    // Looking a little to one side of the body, so its position error shows on screen.
+    const glm::vec3 front = glm::normalize(glm::vec3(body - camera) + glm::vec3(0.002f, 0.0f, 0.0f));
+    const glm::vec2 pinned = ProjectToNdc(glm::vec3(camera), front, glm::vec3(body));
+    const glm::vec2 floating = ProjectToNdc(glm::vec3(0.0f), front, glm::vec3(body - camera));
+    EXPECT_GT(glm::length(pinned - floating), 10.0f * kOnePixelNdc);
 }
 
-TEST_F(RenderOriginTest, CompressedScaleKeepsTheSunAsTheRenderOrigin) {
-    // Leaving realistic scale collapses whatever origin it had back onto the Sun.
-    OrbitLayout::SetRenderOrigin(glm::dvec3(50000.0, 0.0, -2000.0));
+TEST_F(RenderOriginTest, CompressedScaleMatchesTheFloatPositionsItReplaced) {
     OrbitLayout::SetScaleMode(OrbitLayout::ScaleMode::Compressed);
-    EXPECT_EQ(OrbitLayout::ChooseRenderOrigin(glm::vec3(4000.0f, 0.0f, 0.0f)), glm::dvec3(0.0));
-    EXPECT_EQ(OrbitLayout::ChooseRenderOrigin(glm::vec3(0.0f)), glm::dvec3(0.0));
     OrbitLayout::SetRenderOrigin(glm::dvec3(0.0));
 
     // With the origin at the Sun the render frame is the heliocentric frame, and positions
@@ -172,5 +134,16 @@ TEST_F(RenderOriginTest, CompressedScaleKeepsTheSunAsTheRenderOrigin) {
             const float tolerance = 1.0e-5f * glm::length(legacy) + 1.0e-5f;
             EXPECT_LT(glm::distance(render, legacy), tolerance) << "body " << i;
         }
+    }
+
+    // A camera-centred origin is the same frame shifted: compressed scale moves its origin
+    // with the camera too, and offsets between bodies do not change past float rounding.
+    const glm::dvec3 camera = OrbitLayout::GetHeliocentricScenePosition(OrbitLayout::Body::Earth) + glm::dvec3(30.0, 4.0, 22.0);
+    OrbitLayout::SetRenderOrigin(camera);
+    for (int i = 0; i < OrbitLayout::kBodyCount; ++i) {
+        const auto body = static_cast<OrbitLayout::Body>(i);
+        const glm::dvec3 exact = OrbitLayout::GetHeliocentricScenePosition(body) - camera;
+        EXPECT_LT(glm::distance(glm::dvec3(OrbitLayout::GetRenderPosition(body)), exact), 1.0e-7 * glm::length(exact) + 1e-9)
+            << "body " << i;
     }
 }

@@ -194,13 +194,14 @@ function roundCoord(value: number): number {
 }
 
 /**
- * Camera coordinates. Realistic scale keeps 1e-6 scene units: Earth's radius there is ~0.08
- * units, so the compressed 0.01 rounding would move a pose by an eighth of an Earth radius,
- * and setCameraPose takes doubles, so the extra digits survive the round trip.
+ * Camera coordinates. Realistic scale is true scale and the camera can stand a metre above
+ * the ground, so it keeps 1e-9 scene units (8 cm; a metre is 1.3e-8 units). setCameraPose
+ * takes doubles, and 1e-9 of a coordinate in the thousands is still well inside a double's
+ * 15 significant digits, so the round trip is exact to that.
  */
 function roundPosition(value: number, orbitScale: OrbitScaleMode | undefined): number {
     if (orbitScale === 1) {
-        return Math.round(value * 1e6) / 1e6;
+        return Math.round(value * 1e9) / 1e9;
     }
     return roundCoord(value);
 }

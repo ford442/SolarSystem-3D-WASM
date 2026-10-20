@@ -82,25 +82,17 @@ glm::dvec3 GetHeliocentricScenePosition(Body body);
 
 // --- Render origin -----------------------------------------------------------------------
 //
-// The simulation origin is the Sun, but the frame the GPU sees is centred on a render
-// origin near the camera so that the float positions near the viewer stay fine-grained.
-// Every glm::vec3 scene position in the engine (Transformable::GetPosition, the camera,
-// the Sun's own position, uniforms, model matrices) is in this render frame:
+// The simulation origin is the Sun, but the frame the GPU sees is centred on the camera
+// (a floating origin, docs/ARCHITECTURE.md §11.1) so that float positions near the viewer
+// are as fine-grained as a float gets. Every glm::vec3 scene position in the engine
+// (Transformable::GetPosition, the Sun's own position, uniforms, model matrices) is in this
+// render frame:
 //
 //     render = float(heliocentricScene - renderOrigin)
 //
-// computed in double. The origin only moves when the camera strays more than
-// kRenderOriginRebaseDistance from it (ChooseRenderOrigin), and on compressed scale it
-// stays pinned at the Sun, so the render frame is the heliocentric frame there.
-
-/**
- * How far (scene units) the camera may stray from the render origin before it rebases.
- * Floats below 512 are spaced at most 6e-5 units apart, under a thousandth of Earth's
- * realistic radius (~0.08), so a body one Earth radius away is placed to well under a pixel.
- * At the top fly speed (150 units/s) that is a rebase every few seconds, not every frame;
- * only a focus transition across the system rebases on most frames for its two seconds.
- */
-constexpr float kRenderOriginRebaseDistance = 512.0f;
+// computed in double. Application::MoveRenderOrigin puts the origin on the camera's world
+// position once per frame, in both scale modes, after everything that moves the camera;
+// the view matrix then has no translation.
 
 glm::dvec3 GetRenderOrigin();
 void SetRenderOrigin(const glm::dvec3& origin);
@@ -113,13 +105,6 @@ glm::dvec3 ToHeliocentricScene(const glm::vec3& renderFrame);
 
 /** GetHeliocentricScenePosition(body) in the render frame. The Sun's is -origin. */
 glm::vec3 GetRenderPosition(Body body);
-
-/**
- * The origin the render frame should use given where the camera is in it. Compressed:
- * always the Sun. Realistic: the current origin until the camera is more than
- * kRenderOriginRebaseDistance from it, then the camera's own heliocentric position.
- */
-glm::dvec3 ChooseRenderOrigin(const glm::vec3& cameraRenderFrame);
 
 /** Semi-major axis in astronomical units (NASA fact-sheet averages). */
 float GetAuDistance(Body body);

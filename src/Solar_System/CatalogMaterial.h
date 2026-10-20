@@ -51,8 +51,11 @@ enum VariantBit : unsigned {
     kSpecularMap = 1u << 1,     // HAS_SPECULAR_MAP
     kClouds = 1u << 2,          // HAS_CLOUDS
     kSphereIntersect = 1u << 3, // USE_SPHERE_INTERSECT
+    // NEAR_SURFACE: not a material switch. The Renderer adds it for a body close to the eye
+    // (relative-to-eye vertices, fragment log depth; docs/ARCHITECTURE.md §11.1).
+    kNearSurface = 1u << 4,
 };
-constexpr unsigned kVariantCount = 1u << 4;
+constexpr unsigned kVariantCount = 1u << 5;
 
 /**
  * The permutation this draw needs. A map flag only counts when its texture is resident;

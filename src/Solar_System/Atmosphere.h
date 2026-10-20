@@ -18,7 +18,7 @@
 class Atmosphere : public OuterShell {
 public:
     Atmosphere(MeshHolder model, const BodyCatalog::AtmosphereRow& row,
-               std::shared_ptr<SpaceObject> parent, float parentRadius);
+               std::shared_ptr<SpaceObject> parent, float artParentRadius);
     Atmosphere(const Atmosphere&) = delete;
     Atmosphere& operator=(const Atmosphere&) = delete;
 
@@ -29,7 +29,8 @@ public:
     glm::vec3 GetMieTint() const;
     float GetInnerRadius() const;
     float GetOuterRadius() const;
-    float GetParentRadius() const { return _parentRadius; }
+    /** The body's drawn radius: the art radius times the body's SizeFactor. */
+    float GetParentRadius() const;
     /** Distance from the centre inside which the camera is "in" the shell being drawn. */
     float GetAtmosphereOuterBoundary() const;
     /** Whether a scene-space point is inside the shell being drawn (oblate-aware). */
@@ -62,6 +63,7 @@ private:
     const BodyCatalog::AtmosphereRow* _row;
     const BodyCatalog::Entry* _body; // the row's body; nullptr only for a malformed catalog
     glm::mat3 _bodyToSphere{1.0f}, _sphereToBody{1.0f};
+    // Compressed-scale (art) lengths; the getters scale them with the parent's SizeFactor.
     float _parentRadius, _innerRadius;
     GlTexture _transmittanceLut, _multiScatteringLut;
     bool _physicalPathActive = false;

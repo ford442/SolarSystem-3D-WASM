@@ -1,4 +1,9 @@
 #version 300 es
+// NEAR_SURFACE (atmosphere.vs) writes depth per fragment.
+// permutations: NEAR_SURFACE
+#ifdef NEAR_SURFACE
+in float vLogDepth;
+#endif
 
 //
 // Atmospheric scattering fragment shader
@@ -61,6 +66,7 @@ uniform float SCALE_L_FACTOR;
 out vec4 fragColor;
 
 #include "common/frame.glsl"
+#include "common/log_depth.glsl"
 #include "common/raytrace.glsl"
 #include "common/ring.glsl"
 #include "common/phase.glsl"
@@ -176,6 +182,9 @@ float criticalLengthFactor() {
 }
 
 void main() {
+#ifdef NEAR_SURFACE
+    gl_FragDepth = LogFragDepth(vLogDepth); // first: every path that is not discarded writes it
+#endif
     float shadow = CalculateShadow(fragPosLightSpace);
 
     if (shadow > 0.0)

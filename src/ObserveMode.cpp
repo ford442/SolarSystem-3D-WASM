@@ -6,6 +6,7 @@
 #include "astro/Ephemeris.h"
 #include "Solar_System/CatalogSatellite.h"
 #include "Solar_System/OrbitLayout.h"
+#include "Solar_System/SceneScale.h"
 #include <algorithm>
 #include <cmath>
 #include <cstdio>
@@ -28,7 +29,7 @@ void Application::SetObserveMode(bool active) {
     }
 
     if (active) {
-        _observe.savedPosition = OrbitLayout::ToHeliocentricScene(_camera.GetPosition());
+        _observe.savedPosition = _camera.GetWorldPosition();
         _observe.savedYaw = _camera.GetYaw();
         _observe.savedPitch = _camera.GetPitch();
         _observe.savedZoom = _camera.GetZoom();
@@ -151,8 +152,10 @@ void Application::UpdateObserveFrame() {
     // The sky pass draws from the horizon frame, not from this position. Parking the camera
     // just above Earth keeps everything keyed on camera distance (staged planet loading, the
     // LOD manager, the nearest-planet search) behaving as if the viewer were there.
-    const glm::vec3 earth = OrbitLayout::GetRenderPosition(OrbitLayout::Body::Earth);
-    _camera.SetPosition(earth + glm::vec3(0.0f, ObserveState::kEarthSurfaceSceneUnits, 0.0f));
+    const glm::dvec3 earth = OrbitLayout::GetHeliocentricScenePosition(OrbitLayout::Body::Earth);
+    const BodyCatalog::Entry* entry = BodyCatalog::FindByIndex(static_cast<int>(OrbitLayout::Body::Earth));
+    const double height = ObserveState::kEarthSurfaceSceneUnits * (entry ? SceneScale::BodySizeFactor(*entry) : 1.0f);
+    _camera.SetWorldPosition(earth + glm::dvec3(0.0, height, 0.0));
 }
 
 std::string Application::GetObserveStateJson() const {

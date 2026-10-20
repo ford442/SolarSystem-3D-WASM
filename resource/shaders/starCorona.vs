@@ -22,5 +22,5 @@ void main() {
     vec3 vpw = fPosition * maxSize;
     gl_Position = frame.proj * frame.view * model * vec4(vpw, 1.0);
 
-    gl_Position = ApplyLogDepth(gl_Position, frame.zCoef);
+    gl_Position = ApplyLogDepth(gl_Position);
 }

@@ -412,12 +412,14 @@ logging out of `src/`.
 | Folder | Module | Role |
 |--------|--------|------|
 | `core/` | `Log` | `LOG_*` macros, level from `SOLARSYSTEM_LOG` / `?log=` (§7.6) |
-| | `Camera`, `FrameTimer` | First-person navigation; native frame pacing and the FPS count |
+| | `Camera`, `FrameTimer` | First-person camera (double world position); native frame pacing and the FPS count |
+| | `CameraNavigation` | GL-free altitude, floor, facet ray cast, clip planes, altitude-scaled speed and anchor hysteresis (§11.1) |
 | `gfx/` | `GlHandle`, `GlPlatform.h` | Move-only RAII GL objects (the only `glGen*`/`glDelete*`); the GL header and web polyfills |
 | | `Shader` / `ShaderLibrary` | Deferred compile/link (`KHR_parallel_shader_compile`), link-time uniform table with a value cache, hot reload; programs keyed by `ShaderSpec` (files + permutation defines) (§9.1) |
 | | `ShaderSource` | GL-free source assembly: `#version` rewrite, `common/preamble.glsl`, permutation `#define`s, `#include`, sampler bindings, `#line` bookkeeping (§9.1) |
 | | `FrameUniforms`, `TextureUnits.h` | The per-view `FrameUBO` and the shared texture-unit list (§9.1) |
-| | `Mesh`, `MeshHolder`, `LineStripBatch` | Model meshes (with bounding radius) and the one ribbon VAO layout |
+| | `Mesh`, `MeshHolder`, `Vertex.h`, `LineStripBatch` | Model meshes (with bounding radius and a CPU copy of their triangles) and the one ribbon VAO layout |
+| | `MeshAnchor.h`, `SurfacePatch`, `SurfacePatchMesh` | Relative-to-eye vertex placement and the re-tessellated facets under a camera metres up (§11.1) |
 | | `TextureImage2D`, `FloatLutTexture` | DDS/KTX2 load, reload, mip level management; baked RGBA16F LUTs (quiet `nullopt` instead of a checkerboard) |
 | | `ShadowMapFBO`, `HDR`, `Frustum.h` | Shadow map target; star HDR target; frustum test and fitted depth range (§7.5) |
 | | `GlCapabilities` | One probe of extensions and limits (compressed formats, float FBOs, parallel compile) |
@@ -650,8 +652,9 @@ never `SetInt`s a sampler. The units are fixed across programs (diffuse 0, norma
 specular 2, night 3, clouds 4, shadow map 5, ring 6, the two atmosphere LUTs 7/8, Observe's
 Moon 9), so the shadow map is bound once per view, not per program.
 
-**Per-frame uniforms.** View/projection matrices, the eye and Sun positions, far plane,
-log-depth `zCoef`, time and exposure are one std140 block, `FrameUBO`
+**Per-frame uniforms.** View/projection matrices, the eye and Sun positions, near and far
+planes, the log-depth `zCoef` and `logDepthC` (§11.1), time and exposure are one std140
+block, `FrameUBO`
 (`common/frame.glsl`, read as `frame.view` etc.; C++ layout `gfx/FrameUniforms.h`).
 `Renderer::BeginView` uploads it once per view (per eye in XR) to binding 0; `Shader` binds
 the block of every program that declares it at link. Every lit program reads it (planets,
@@ -741,7 +744,8 @@ under the LUT ground sphere, so the view ray stops at the surface above them; dr
 
 **Comparing captures.** Native `SOLARSYSTEM_CAMERA_POSE=x,y,z,yaw,pitch[,jd]` applies the same
 pose as the web's `window.setCameraPose(x, y, z, yaw, pitch)`; the optional Julian date pins
-and pauses the clock so planet positions match. `exposure` is a display uniform, not part of
+and pauses the clock so planet positions match. `SOLARSYSTEM_SCALE=realistic` switches scale
+first (§11.1). `exposure` is a display uniform, not part of
 the bake, so a native and a web capture at one pose differ only by the display.
 
 `thicknessScale` stretches a shell while keeping vertical optical depth, for bodies whose
@@ -916,39 +920,114 @@ than a fan of `GetEclipseX/Y/Z` scalars, because an event's body pair only means
 alongside its kind tag. `web/src/skyEvents.ts` parses it and owns the chip; `web/src/
 conjunction.ts` remains for the explorer's conjunction-only chip.
 
-### 11.1 Render origin (how positions reach the GPU)
+### 11.1 Precision and scale (how positions reach the GPU)
 
-Realistic scale puts Neptune ~57 000 scene units from the Sun, where adjacent floats are ~0.004
-apart — a tenth of Earth's realistic radius (~0.08). Logarithmic depth (`common/log_depth.glsl`)
-fixes the depth buffer, not vertex positions, so the simulation stays heliocentric in double and
-only the *rendered* frame is camera-relative:
+**World frame.** Simulation state is heliocentric scene units in double:
+`Transformable::Place` / `GetWorldPosition`, `Camera::GetWorldPosition`,
+`OrbitLayout::GetHeliocentricScenePosition`. Realistic scale is true scale — 1 AU = 1900
+units, `SceneScale::kKmPerSceneUnit` ≈ 78 737 km — so Earth's radius is 0.081 units and a
+metre is 1.27e-8 units, below a float's spacing anywhere more than ~0.1 units from the
+origin. `OrbitLayout::GetOffset` (the float cast) is for coarse callers only.
 
-- `OrbitLayout` keeps the ephemeris cache (lon, lat, r) in double and exposes
-  `GetHeliocentricScenePosition(body)`. `GetOffset` is that cast to float, for coarse callers
-  only (nearest-planet search, activation radii).
-- A **render origin** (`OrbitLayout::GetRenderOrigin`, double) is subtracted in double before
-  anything becomes a `glm::vec3`: `ToRenderFrame(helio)`, `GetRenderPosition(body)`. Every float
-  scene position in the engine — `Transformable::GetPosition`, `Camera` position, the Sun's own
-  position (`-origin`), uniforms, model matrices, overlay VBOs — is in that frame.
-- `Application::UpdateRenderOrigin` runs once per frame after input. `ChooseRenderOrigin` moves the
-  origin onto the camera only when it is more than `kRenderOriginRebaseDistance` (512) units away,
-  so ordinary flight does not rebase every frame. `MoveRenderOrigin` then carries what holds a
-  render-frame position across frames: the camera and its transition endpoints, this frame's XR eye
-  views (webxr.ts built them before the shift), XR pointer rays, staged-loading proxies, mission
-  path VBOs, and the bodies themselves (re-placed at once so the LOD manager sees them next to the
-  shifted camera).
-- On compressed scale the origin is pinned at the Sun, so the render frame is the heliocentric
-  frame and positions are what they always were.
-- The shadow light view is built with a double `lookAt` (its eye is the Sun, far from the origin);
-  lighting gets the Sun's render-frame position, which shaders only use as a direction.
-- The camera pose JS reads and writes is heliocentric: `SetCameraPose` takes doubles and, on
-  realistic scale, rebases onto the pose so the camera stores an exact zero; deep links carry
-  1e-6-unit coordinates on realistic scale. `GetCameraPositionX/Y/Z` stay render-frame because
-  webxr.ts composes eye views from them.
+**Compressed is a view of the same bodies.** The scale mode picks, per body, where it sits
+and how big it is drawn (`Solar_System/SceneScale.h`). Compressed puts planets on the art
+orbit radii, moons on their catalog `sceneOrbitRadius`, and draws every body at its art
+radius; realistic draws the true radius (`radiusKm`) at the true distances.
+`SpaceObject::SizeFactor()` is drawn size over art size (1 on compressed), and every art
+length tied to a body — atmosphere and cloud shells, rings, focus distances, LOD distances,
+magnetic-field radius, music ducking, Observe height — is multiplied by it, so those numbers
+stay compressed-scale numbers. `Application::PlaceBodies` places every body from the date
+each frame, so `ApplyOrbitScaleMode` switches without reloading; the camera keeps its offset
+in radii from its nearest body (`CaptureCameraBodyFrame` / `RestoreCameraBodyFrame`).
 
-`tests/test_render_origin.cpp` pins this down: a camera one Earth radius from Eris (≥ 50 AU)
-sees it at the double offset, a rebase mid-flight moves it on screen by under a pixel, and
-compressed positions match the old float computation.
+**Floating origin.** The render origin (`OrbitLayout::GetRenderOrigin`, double) is put on
+the camera once per frame in both modes, after everything that moves the camera
+(`UpdateRenderOrigin` → `MoveRenderOrigin`). Every float position — model matrices
+(`Transformable::Rebase`), uniforms, overlay VBOs — is world minus origin taken in double
+(`ToRenderFrame`, `GetRenderPosition`); the camera sits at an exact zero and the view matrix
+has no translation (`Camera::GetViewMatrix(eyeRender)`). `MoveRenderOrigin` carries what
+holds a render-frame position across the shift: this frame's XR eye views (webxr.ts built
+them before it), XR pointer rays, the bodies, staged-loading proxies and the mission-path
+origin. Mission paths are uploaded relative to `_missionPathOrigin` and drawn with a
+`pathOffset` uniform, re-uploading only once the camera is 512 units from it. On compressed
+scale the moving origin changes positions by float rounding only: the golden poses differ
+from the Sun-origin build by under 0.04 px, all of it the ulp of the camera position that
+the old `lookAt(camPos, camPos + front)` lost from its forward axis.
+
+**Depth.** One logarithmic curve for every pass (`common/log_depth.glsl`):
+depth = log2(1 + C·w) / log2(1 + C·far), `frame.zCoef` = 2 / log2(1 + C·far),
+`frame.logDepthC` = C. Compressed keeps near 0.001, far 20000 and C = 1, bit-identical to
+the curve it always used. Realistic uses far 1e6, a near plane of half the altitude above
+the nearest surface (0.25 m up to 0.001 units) and C = 1/near
+(`CameraNavigation::ChooseClipPlanes`): a 24-bit buffer then separates 1 cm at 1 m and
+1000 km at 1 AU (`test_mesh_anchor.cpp`). Reversed-Z was the alternative, but its precision
+needs `glClipControl` (GL 4.5 / `EXT_clip_control`), which WebGL 2 does not dependably
+have, so the web needed log depth regardless; one scheme serves both targets.
+
+The vertex form (`ApplyLogDepth`) interpolates z linearly on screen, which is only right
+while a triangle is small next to its distance; the facet under the camera is neither. With
+the eye within 1.5× a body's bounding radius (`Renderer::NearSurface`), its surface, cloud
+and atmosphere programs use the **`NEAR_SURFACE`** permutation:
+- depth is written per fragment from an interpolated 1 + C·w (`PrepareLogFragDepth` /
+  `LogFragDepth`; exact, as it is linear in w);
+- clip z is parked at −`frame.nearPlane`, so clipping happens at the navigation's near
+  plane whatever near the projection was built with (WebXR keeps a fixed depthNear). Not
+  z = 0: that is the eye plane, and vertices clipped there divide by zero;
+- vertices are placed relative to the eye (below).
+
+The near programs compile on first use; until then a body draws with its normal program.
+
+**Relative-to-eye vertices** (`gfx/MeshAnchor.h`). `model * aPos` adds a body-sized
+translation and a body-sized vertex offset in float: 0.6 m of error on realistic Earth.
+`NEAR_SURFACE` planetLighting.vs computes `mat3(model) * (aPos - meshAnchor) +
+meshAnchorOffset`, where `meshAnchor` is the eye in model space rounded to float and
+`meshAnchorOffset` the render-frame position of that rounded point, both from double: a
+vertex under the eye lands within a millimetre.
+
+**Surface patch** (`gfx/SurfacePatch.h`, `Renderer::DrawSurfacePatch`). sphere.obj's facets
+are ~600 km across on realistic Earth. When one passes a metre under the eye, the GPU clips
+it by interpolating corners hundreds of kilometres away in float, and the clipped edges land
+about a centimetre off — 1–2 % of the screen at that range, seen as holes along the screen
+borders (measured: 13 700 hole pixels at 0.5 m, 800 at 5 m, none at 50 m). The patch
+re-tessellates every facet that comes within size/1000 of the eye until each piece is at
+most 1000× its distance (or the near plane), with barycentric attributes and positions
+stored as offsets from the eye (a float at the mesh radius is spaced 0.75 m), and draws it
+over the mesh with the same program; the facet underneath fills any T-junction crack. It
+exists only below ~600 m over Earth and is rebuilt when the eye moves, once per frame for
+both XR eyes. Terrain tiles (#151 phase 2) will replace it where a body has a DEM. Shells
+get no patch: an eye within a few hundred metres of a cloud or atmosphere shell (crossing
+it) can see the same holes in that shell for the moment it takes.
+
+**Navigation** (GL-free math in `core/CameraNavigation.h`, fed by `CameraController.cpp`).
+- *Co-moving anchor:* the camera carries the motion of the body it is near (engage within
+  64 radii, release past 80, hand over to a body twice as close), so a planet does not run
+  off at 30 km/s and a date jump keeps it in view. A focus flight pins its target; mission
+  follow and Observe pose the camera themselves and suspend the anchor. It carries
+  translation, not spin: with time running, the ground slides under a hovering camera.
+- *Speed:* on realistic scale movement is scaled by the altitude above the nearest surface,
+  altitude per second at the default speed, from 1 mm/s to 1 AU/s. Compressed keeps its
+  constant speed.
+- *Floor:* the camera stays a margin above the drawn surface (0.5 m realistic, 0.002 units
+  compressed). Within 0.05 radii the facets are ray-cast (`FacetRadius`, double
+  Möller–Trumbore cast inward from outside the mesh, so an eye that ended up beneath a facet
+  still finds it), since they sit up to kilometres inside the analytic sphere.
+
+**Interfaces.** The camera pose JS reads and writes is heliocentric: `SetCameraPose` takes
+doubles, and deep links keep 1e-9-unit coordinates on realistic scale (8 cm).
+`GetCameraPositionX/Y/Z` stay render-frame, because webxr.ts composes eye views from them.
+Native `SOLARSYSTEM_SCALE=compressed|realistic` runs the toggle at start-up, before
+`SOLARSYSTEM_CAMERA_POSE`, so a pose can be given in realistic coordinates.
+
+**Known limits.** No co-rotation (above). Shadow maps keep their ±3-radii light frustum, so
+near the ground on realistic scale a shadow texel is kilometres wide.
+
+**Tests.** `test_render_origin.cpp`: a flyby 90 AU out stays on its exact track to 0.01 px
+with the origin on the camera, while the float-only control is over 10 px off; compressed
+positions match the float computation they replaced. `test_camera_navigation.cpp`: altitude,
+the floor from above and beneath a facet, clip planes, speed, anchor hysteresis, the camera
+moving in double. `test_mesh_anchor.cpp`: millimetre placement and both depth curves.
+`test_surface_patch.cpp`: the pieces tile their facet in place to the millimetre and meet
+the size rule.
 
 ## 12. Common pitfalls
 
@@ -961,7 +1040,9 @@ compressed positions match the old float computation.
 7. After `TextureImage2D::ReloadTexture`, render passes must rebind texture IDs each frame.
 8. Black textures on web usually mean incorrect `GL_TEXTURE_MAX_LEVEL` — verify mip chain upload.
 9. Do not add a heliocentric float to a render-frame float (`sun->GetPosition() + GetOffset(...)`)
-   or cache a render-frame position across frames without shifting it in `MoveRenderOrigin` (§11.1).
+   or cache a render-frame position across frames without shifting it in `MoveRenderOrigin`;
+   keep world positions (`GetWorldPosition`) in double instead, and multiply an art length
+   tied to a body by its `SizeFactor()` (§11.1).
 
 ---
 

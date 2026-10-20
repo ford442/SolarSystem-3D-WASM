@@ -1,7 +1,11 @@
 #version 300 es
 // Material switches: CatalogMaterial::Defines() picks them per draw from the row's
 // render.shaderFlags and which maps are resident (ShaderLibrary caches each combination).
-// permutations: HAS_NIGHT_TEXTURE HAS_SPECULAR_MAP HAS_CLOUDS USE_SPHERE_INTERSECT
+// NEAR_SURFACE (planetLighting.vs) writes depth per fragment.
+// permutations: HAS_NIGHT_TEXTURE HAS_SPECULAR_MAP HAS_CLOUDS USE_SPHERE_INTERSECT NEAR_SURFACE
+#ifdef NEAR_SURFACE
+in float vLogDepth;
+#endif
 in vec3 vFragPos;
 in vec2 vTexCoords;
 in vec3 vTangentLightPos;
@@ -53,6 +57,7 @@ uniform vec2 ringInnerOuterRadiuses; // x = Inner, y = Outer
 out vec4 fragColor;
 
 #include "common/frame.glsl"
+#include "common/log_depth.glsl"
 #include "common/raytrace.glsl"
 #include "common/ring.glsl"
 #include "common/eclipse.glsl"
@@ -105,6 +110,9 @@ float CalculateShadow(vec4 fragPosLightSpace) {
 }
 
 void main() {
+#ifdef NEAR_SURFACE
+    gl_FragDepth = LogFragDepth(vLogDepth); // first: every path that is not discarded writes it
+#endif
     vec3 diffuseColor = texture(mainDiffuseTexture, vTexCoords).rgb;
 
     vec3 normal = texture(normalMap, vTexCoords).rgb;

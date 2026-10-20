@@ -1,4 +1,16 @@
 #include "Transformable.h"
+#include "OrbitLayout.h"
+
+void Transformable::Place(const glm::dvec3& worldPosition) {
+    LoadIdentityModelMatrix();
+    _worldPosition = worldPosition;
+    Translate(OrbitLayout::ToRenderFrame(worldPosition));
+}
+
+void Transformable::Rebase() {
+    _position = OrbitLayout::ToRenderFrame(_worldPosition);
+    _matrixModel[3] = glm::vec4(_position, 1.0f);
+}
 
 void Transformable::Translate(const glm::vec3& position) {
     _position = position;
@@ -30,6 +42,10 @@ glm::mat4 Transformable::GetRotationMatrix() const {
 
 glm::vec3 Transformable::GetPosition() const {
     return _position;
+}
+
+const glm::dvec3& Transformable::GetWorldPosition() const {
+    return _worldPosition;
 }
 
 float Transformable::GetLastRotationAngle() const {

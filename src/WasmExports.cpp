@@ -331,17 +331,17 @@ extern "C" {
             activeApplication->SetXrControllerRay(hand, ox, oy, oz, dx, dy, dz, visible);
         }
     }
-    // Render-frame camera position (relative to the render origin). webxr.ts composes the
-    // eye views from it, so it must be the frame the scene is drawn in; deep links and tours
-    // read GetCameraHeliocentric* instead.
+    // Render-frame camera position (relative to the render origin, which follows the camera,
+    // so about zero between frames). webxr.ts composes the eye views from it, so it must be
+    // the frame the scene is drawn in; deep links and tours read GetCameraHeliocentric*.
     EMSCRIPTEN_KEEPALIVE float GetCameraPositionX() {
-        return activeApplication ? activeApplication->GetCamera().GetPosition().x : 0.0f;
+        return activeApplication ? activeApplication->CameraRenderPosition().x : 0.0f;
     }
     EMSCRIPTEN_KEEPALIVE float GetCameraPositionY() {
-        return activeApplication ? activeApplication->GetCamera().GetPosition().y : 0.0f;
+        return activeApplication ? activeApplication->CameraRenderPosition().y : 0.0f;
     }
     EMSCRIPTEN_KEEPALIVE float GetCameraPositionZ() {
-        return activeApplication ? activeApplication->GetCamera().GetPosition().z : 0.0f;
+        return activeApplication ? activeApplication->CameraRenderPosition().z : 0.0f;
     }
     EMSCRIPTEN_KEEPALIVE double GetCameraHeliocentricX() {
         return activeApplication ? activeApplication->GetCameraHeliocentricPosition().x : 0.0;
