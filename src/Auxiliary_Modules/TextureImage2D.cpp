@@ -4,7 +4,6 @@
 #include "BlockCompression.h"
 #include "TextureFormatSupport.h"
 #include "../3rdparty/ktx2_reader.h"
-#include "../SimState.h"
 #include <cstdint>
 #include <algorithm>
 #include <fstream>
@@ -216,6 +215,12 @@ namespace {
     }
 }
 
+float TextureImage2D::s_webAnisotropyCap = 8.0f;
+
+void TextureImage2D::SetWebAnisotropyCap(float cap) {
+    s_webAnisotropyCap = cap;
+}
+
 TextureImage2D::TextureImage2D(const std::string& path, GLint wrapParam, GLint minFilter, GLint magFilter) {
     LoadTextureFromFile(path, wrapParam, minFilter, magFilter, true);
 }
@@ -344,7 +349,7 @@ void TextureImage2D::LoadTextureFromFile(const std::string& path, GLint wrapPara
 #ifdef __EMSCRIPTEN__
     const auto& glCaps = GetGlCapabilities();
     if (glCaps.anisotropicFiltering) {
-        const float cap = gSimState->isMobileWeb ? 4.0f : 8.0f;
+        const float cap = s_webAnisotropyCap;
         glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_MAX_ANISOTROPY_EXT, std::min(glCaps.maxAnisotropy, cap));
     }
 #else

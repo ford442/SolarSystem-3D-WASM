@@ -8,9 +8,7 @@
 #include <memory>
 #include <limits>
 
-#ifdef __EMSCRIPTEN__
 #include "../QualitySettings.h"
-#endif
 
 struct PlanetInfo {
     MeshHolder planetModel;
@@ -34,14 +32,13 @@ public:
     virtual void AdjustToParent() = 0;
     float GetRadius() const;
     float GetEarthSizeCoefficient() const;
-    virtual void LoadHighResIfClose(const glm::vec3& /*cameraPos*/) { } // Default: no-op
-    virtual void UnloadHighResIfFar(const glm::vec3& /*cameraPos*/) { } // Default: no-op
+    virtual void LoadHighResIfClose(const glm::vec3& /*cameraPos*/, const TextureLodPolicy& /*policy*/) { } // Default: no-op
 
     bool IsHighResLoaded() const { return _isHighResLoaded; }
     float GetLastCameraDistance() const { return _lastCameraDistance; }
 
 protected:
-    float GetEffectiveLODThreshold() const;
+    float GetEffectiveLODThreshold(const TextureLodPolicy& policy) const;
 
     std::shared_ptr<Star> _parentStar;
     float _radius = 2.0; // Radius of the earth 3d model in Blender

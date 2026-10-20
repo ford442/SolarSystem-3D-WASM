@@ -69,10 +69,12 @@ The CMakeLists.txt has separate configurations for EMSCRIPTEN vs native builds, 
   - `XrSession.cpp` — WebXR eye state and the stereo render pass (web only)
 - `Renderer.h` — The `Renderer` class: shadow/color/overlay/HDR draw passes and the GPU
   resources they own (shaders, shadow FBO, HDR, skybox, lens flare, text renderer, orbit/
-  mission/magnetic-field overlay meshes). `Application` holds one (`_renderer`) and reaches it
-  through public fields/methods; `Renderer` reaches back into scene state it doesn't own
-  (camera, planet list, sun, mission/asteroid data) via a `friend`-granted `Application&`
-  rather than duplicating storage — see the comment at the top of Renderer.h.
+  mission/magnetic-field overlay meshes), all private. `Application` holds one (`_renderer`).
+  Every pass takes a `FrameContext` (`FrameContext.h`: `CameraView`, `SceneSnapshot`,
+  `SimState`, display size, XR flag), which `Application::BuildFrameSnapshot` fills after
+  `UpdateScene`. The renderer has no reference back to `Application`, and there is no global
+  `SimState`: anything a pass needs goes into the snapshot.
+  - `FramePasses.h` — the GL-free frame order: simulate once, then per-component shadow pass followed by every view's colour pass (unit-tested)
   - `SceneRenderer.cpp` — shadow/color passes for planets, atmospheres, rings, clouds, text overlays
   - `SceneOverlayRenderer.cpp` — magnetic field ribbons, orbit paths, mission paths, asteroid belt
 - `SystemModules.h` — Convenience headers bundling system includes

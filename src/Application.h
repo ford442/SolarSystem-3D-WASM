@@ -2,6 +2,7 @@
 #define SOLARSYSTEM_APPLICATION_H
 #include "ApplicationTypes.h"
 #include "ObserveState.h"
+#include "FrameContext.h"
 #include "FramePasses.h"
 #include "Renderer.h"
 #include "SimState.h"
@@ -13,8 +14,10 @@
 #include "Solar_System/SolarSystem.h"
 #include "SystemModules.h"
 #include "XrState.h"
+#include <array>
 #include <atomic>
 #include <functional>
+#include <optional>
 #include <string>
 #include <unordered_set>
 
@@ -33,7 +36,6 @@ using namespace irrklang;
 #endif
 
 class Application {
-    friend class Renderer;
 public:
     Application();
     ~Application();
@@ -109,8 +111,6 @@ public:
     bool GetOrbitLinesEnabled() const;
     void SetMagneticFieldsEnabled(bool enabled);
     bool GetMagneticFieldsEnabled() const;
-    void ForEachEnabledMagneticField(
-        const std::function<void(const SpaceObject& object, const MagneticFieldParams& params)>& fn) const;
     /**
      * Place the fly camera at a heliocentric scene position (deep links, tours, leaving
      * Observe). On realistic scale the render origin moves onto the pose first, so a link to
@@ -203,6 +203,12 @@ private:
 
     // Shadow/color/overlay/HDR draw passes and the GPU resources they own — see Renderer.h.
     Renderer _renderer;
+    // This frame's FrameContext pieces (BuildFrameSnapshot), read by the passes and the HUD.
+    SceneSnapshot _frameScene;
+    std::array<CameraView, 2> _frameViews{};
+    HudState _frameHud;
+    // Each mission's probe position at this frame's date (UpdateScene); nullopt off its trajectory.
+    std::vector<std::optional<glm::vec3>> _missionProbes;
 
     void InitSystems();
     void InitScene();
@@ -224,9 +230,8 @@ private:
     void UpdateLoadingProgress(); // Update JavaScript loading progress bar
     void UpdatePlanetSystemLoading(); // Staged download + init of planet systems (WASM)
     void RefreshPlanetProxyPositions(); // Keep WASM proxy markers aligned with orbit scale
-    void ApplyRenderResources(uint16_t shadowResolution, bool enableHdr);
     void UpdateLOD();             // Central LOD manager: upgrade textures for nearest planets (WASM)
-    void RenderPlanetProxyMarkers() const; // Show orbital markers for unloaded planets (WASM)
+    glm::ivec2 DisplaySize() const { return {_displayWidth, _displayHeight}; }
     void LoadMissionCatalog();
     void LoadMissions();
     void UpdateMissionFollow();
@@ -259,6 +264,10 @@ private:
     void PlaceSceneComponents();
     /** Simulate once, then draw the scene into `viewCount` views (1 mono, 2 XR) — see FramePasses.h. */
     void RenderFrame(int viewCount);
+    /** After UpdateScene: fill _frameScene, _frameViews and _frameHud for this frame's passes. */
+    void BuildFrameSnapshot(int viewCount);
+    /** The passes' view of frame state for view `view`; valid until the next BuildFrameSnapshot. */
+    FrameContext FrameContextFor(int view) const;
     void EndFrame();           // Count the frame for the FPS HUD; native: apply the frame limiter
 #ifdef __EMSCRIPTEN__
     void RenderXrStereoFrame();

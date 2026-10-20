@@ -35,6 +35,6 @@ void PlanetaryRing::ConfigureDiffuseLOD(const std::string& lowPath, const std::s
     _diffuseLOD.Configure(_ringTexture, lowPath, midPath, highPath, label, TextureLoadCategory::Ring);
 }
 
-void PlanetaryRing::LoadHighResIfClose(const glm::vec3& cameraPosition) {
-    _diffuseLOD.Update(cameraPosition, _parentPlanet->GetPosition());
+void PlanetaryRing::LoadHighResIfClose(const glm::vec3& cameraPosition, const TextureLodPolicy& policy) {
+    _diffuseLOD.Update(cameraPosition, _parentPlanet->GetPosition(), 50.0f, policy.maxTier);
 }

@@ -18,7 +18,7 @@ class Clouds : public OuterShell {
 public:
     explicit Clouds(CloudsInfo&& cloudsInfo, std::shared_ptr<SpaceObject> parent);
     void AdjustToParent() = 0;
-    void LoadHighResIfClose(const glm::vec3& cameraPosition);
+    void LoadHighResIfClose(const glm::vec3& cameraPosition, const TextureLodPolicy& policy);
 
 protected:
     TextureImage2D _diffuse, _normal;

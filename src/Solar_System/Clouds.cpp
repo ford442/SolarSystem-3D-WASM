@@ -10,6 +10,6 @@ void Clouds::ConfigureDiffuseLOD(const std::string& lowPath, const std::string& 
     _diffuseLOD.Configure(_diffuse, lowPath, midPath, highPath, label, TextureLoadCategory::Clouds);
 }
 
-void Clouds::LoadHighResIfClose(const glm::vec3& cameraPosition) {
-    _diffuseLOD.Update(cameraPosition, _parent->GetPosition());
+void Clouds::LoadHighResIfClose(const glm::vec3& cameraPosition, const TextureLodPolicy& policy) {
+    _diffuseLOD.Update(cameraPosition, _parent->GetPosition(), 50.0f, policy.maxTier);
 }

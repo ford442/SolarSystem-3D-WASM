@@ -1,7 +1,6 @@
 #include <gtest/gtest.h>
 
 #include "QualitySettings.h"
-#include "SimState.h"
 
 namespace {
 
@@ -86,14 +85,17 @@ TEST(QualitySettingsTest, OutOfRangePresetUsesFullTier) {
     ExpectTier(GetQualitySettings(99, false), 3000, 4, 4, true, true, 2, 4000, TextureLodTier::High, "full");
 }
 
-TEST(QualitySettingsTest, GetMaxTextureLodTierFollowsPreset) {
-    gSimState->qualityPreset = 0;
-    gSimState->isMobileWeb = false;
-    EXPECT_EQ(GetMaxTextureLodTier(), TextureLodTier::Low);
-    gSimState->qualityPreset = 1;
-    EXPECT_EQ(GetMaxTextureLodTier(), TextureLodTier::Mid);
-    gSimState->qualityPreset = 2;
-    EXPECT_EQ(GetMaxTextureLodTier(), TextureLodTier::High);
+TEST(QualitySettingsTest, TextureLodPolicyFollowsPreset) {
+    EXPECT_EQ(GetTextureLodPolicy(0, false).maxTier, TextureLodTier::Low);
+    EXPECT_EQ(GetTextureLodPolicy(1, false).maxTier, TextureLodTier::Mid);
+    EXPECT_EQ(GetTextureLodPolicy(2, false).maxTier, TextureLodTier::High);
+    // The distance multiplier is a web Medium rule; native and the other tiers keep 1.
+    EXPECT_FLOAT_EQ(GetTextureLodPolicy(2, false).planetThresholdScale, 1.0f);
+#ifdef __EMSCRIPTEN__
+    EXPECT_FLOAT_EQ(GetTextureLodPolicy(1, false).planetThresholdScale, 1.0f / 1.5f);
+#else
+    EXPECT_FLOAT_EQ(GetTextureLodPolicy(1, false).planetThresholdScale, 1.0f);
+#endif
 }
 
 #ifndef __EMSCRIPTEN__

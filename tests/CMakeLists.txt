@@ -22,7 +22,6 @@ set(SOLARSYSTEM_TEST_SOURCES
     ${CMAKE_SOURCE_DIR}/src/Auxiliary_Modules/MagneticFieldModel.cpp
     ${CMAKE_SOURCE_DIR}/src/Auxiliary_Modules/MagneticFieldTracer.cpp
     ${CMAKE_SOURCE_DIR}/src/QualitySettings.cpp
-    ${CMAKE_SOURCE_DIR}/src/SimState.cpp
     ${CMAKE_SOURCE_DIR}/src/Auxiliary_Modules/PlanetManifestLoader.cpp
     ${CMAKE_SOURCE_DIR}/src/Auxiliary_Modules/MissionCatalog.cpp
     ${CMAKE_SOURCE_DIR}/src/Auxiliary_Modules/TextureLoadingQueue.cpp

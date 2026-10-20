@@ -31,7 +31,7 @@ public:
     std::shared_ptr<SpaceObject> GetParent() const;
     float GetRadius() const;
     float GetEarthSizeCoefficient() const;
-    void LoadHighResIfClose(const glm::vec3& cameraPosition);
+    void LoadHighResIfClose(const glm::vec3& cameraPosition, const TextureLodPolicy& policy);
     virtual void AdjustToParent() = 0;
 
     /**

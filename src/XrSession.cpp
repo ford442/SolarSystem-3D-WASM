@@ -17,7 +17,6 @@ void Application::SetXrBaseLayerFramebuffer(unsigned int framebuffer) {
 
 void Application::SetXrActive(bool active) {
     _xr.active = active;
-    _xr.currentEye = 0;
     if (!active) {
         _xr.eyeCount = 0;
         _xr.baseLayerFramebuffer = 0;
@@ -79,6 +78,5 @@ void Application::RenderXrStereoFrame() {
     }
     // One simulation step, then both eyes per pass (each shadow map rendered once).
     RenderFrame(eyes);
-    _xr.currentEye = 0;
 }
 #endif

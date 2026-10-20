@@ -96,16 +96,16 @@ void Application::InitSystems() {
     }
 
 #ifdef __EMSCRIPTEN__
-    gSimState->isMobileWeb = ReadIsMobileWeb();
-    gSimState->qualityPreset = ReadInitialQualityPreset();
-    gSimState->backingStoreScale = ReadBackingStoreScale();
+    _simState.isMobileWeb = ReadIsMobileWeb();
+    _simState.qualityPreset = ReadInitialQualityPreset();
+    _simState.backingStoreScale = ReadBackingStoreScale();
 #else
-    gSimState->qualityPreset = ReadInitialQualityPreset();
+    _simState.qualityPreset = ReadInitialQualityPreset();
 #endif
     // MSAA is fixed when the context is created, so it must come from the *initial*
     // quality preset; ApplyQualityPreset cannot change it later (same restriction as
     // web, where the WebGL context's `antialias` is decided in bootstrap.ts).
-    const auto qualitySettings = GetQualitySettings(gSimState->qualityPreset, gSimState->isMobileWeb);
+    const auto qualitySettings = GetQualitySettings(_simState.qualityPreset, _simState.isMobileWeb);
 
 #ifdef __EMSCRIPTEN__
     glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 3);
@@ -135,8 +135,8 @@ void Application::InitSystems() {
     double cssWidth = 0.0, cssHeight = 0.0;
     emscripten_get_element_css_size("#canvas", &cssWidth, &cssHeight);
     if (cssWidth > 0.0 && cssHeight > 0.0) {
-        _displayWidth = static_cast<uint16_t>(std::lround(cssWidth * gSimState->backingStoreScale));
-        _displayHeight = static_cast<uint16_t>(std::lround(cssHeight * gSimState->backingStoreScale));
+        _displayWidth = static_cast<uint16_t>(std::lround(cssWidth * _simState.backingStoreScale));
+        _displayHeight = static_cast<uint16_t>(std::lround(cssHeight * _simState.backingStoreScale));
     } else {
         _displayWidth = 1280;
         _displayHeight = 720;
@@ -405,8 +405,8 @@ EM_BOOL Application::WebWindowResizeCallback(int /*eventType*/, const Emscripten
     double cssWidth = 0.0, cssHeight = 0.0;
     emscripten_get_element_css_size("#canvas", &cssWidth, &cssHeight);
     if (cssWidth > 0.0 && cssHeight > 0.0) {
-        const int width = static_cast<int>(std::lround(cssWidth * gSimState->backingStoreScale));
-        const int height = static_cast<int>(std::lround(cssHeight * gSimState->backingStoreScale));
+        const int width = static_cast<int>(std::lround(cssWidth * app->_simState.backingStoreScale));
+        const int height = static_cast<int>(std::lround(cssHeight * app->_simState.backingStoreScale));
         emscripten_set_canvas_element_size("#canvas", width, height);
         app->HandleResize(width, height);
     }

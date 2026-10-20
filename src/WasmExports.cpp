@@ -13,6 +13,13 @@
 namespace {
     Application* activeApplication = nullptr;
 
+    // Settings written before the Application exists (or after it is gone) land here and
+    // are dropped, as they were with the old global fallback.
+    SimState& Sim() {
+        static SimState fallback;
+        return activeApplication ? activeApplication->GetSimState() : fallback;
+    }
+
     float g_touchForward = 0.0f;
     float g_touchRight = 0.0f;
     float g_touchVertical = 0.0f;
@@ -56,28 +63,28 @@ extern "C" {
         activeApplication->SetCameraHeliocentricPose(glm::dvec3(x, y, z), yaw, pitch);
     }
     EMSCRIPTEN_KEEPALIVE void SetQualityPreset(int preset) {
-        gSimState->qualityPreset = (preset < 0 ? 0 : preset > 2 ? 2 : preset);
+        Sim().qualityPreset = (preset < 0 ? 0 : preset > 2 ? 2 : preset);
         if (activeApplication) {
-            activeApplication->ApplyQualityPreset(gSimState->qualityPreset);
+            activeApplication->ApplyQualityPreset(Sim().qualityPreset);
         }
         NotifySettingsChanged("quality");
     }
     EMSCRIPTEN_KEEPALIVE int GetQualityPreset() {
-        return gSimState->qualityPreset;
+        return Sim().qualityPreset;
     }
     EMSCRIPTEN_KEEPALIVE void SetTimeScale(float scale) {
-        gSimState->timeScale = glm::clamp(scale, 0.01f, 10000.0f);
+        Sim().timeScale = glm::clamp(scale, 0.01f, 10000.0f);
         NotifySettingsChanged("timeScale");
     }
     EMSCRIPTEN_KEEPALIVE float GetTimeScale() {
-        return gSimState->timeScale;
+        return Sim().timeScale;
     }
     EMSCRIPTEN_KEEPALIVE void SetPaused(bool paused) {
-        gSimState->timePaused = paused;
+        Sim().timePaused = paused;
         NotifySettingsChanged("paused");
     }
     EMSCRIPTEN_KEEPALIVE int GetPaused() {
-        return gSimState->timePaused ? 1 : 0;
+        return Sim().timePaused ? 1 : 0;
     }
     EMSCRIPTEN_KEEPALIVE void SetSimulationEpoch(double julianDate) {
         OrbitLayout::SetJulianDate(julianDate);
@@ -90,12 +97,12 @@ extern "C" {
         if (activeApplication) {
             activeApplication->ApplyShadowQuality(quality);
         } else {
-            gSimState->shadowQuality = std::clamp(quality, 0, 3);
+            Sim().shadowQuality = std::clamp(quality, 0, 3);
         }
         NotifySettingsChanged("shadowQuality");
     }
     EMSCRIPTEN_KEEPALIVE int GetShadowQuality() {
-        return gSimState->shadowQuality;
+        return Sim().shadowQuality;
     }
     EMSCRIPTEN_KEEPALIVE void SetTouchMovement(float forward, float right, float vertical) {
         g_touchForward = glm::clamp(forward, -1.0f, 1.0f);
@@ -113,7 +120,7 @@ extern "C" {
         }
     }
     EMSCRIPTEN_KEEPALIVE int IsMobileWeb() {
-        return gSimState->isMobileWeb ? 1 : 0;
+        return Sim().isMobileWeb ? 1 : 0;
     }
     EMSCRIPTEN_KEEPALIVE void FocusPlanet(int idx) {
         if (activeApplication) {

@@ -24,8 +24,7 @@ public:
 
     void AdjustToParent() override;
     void Render() const override;
-    void LoadHighResIfClose(const glm::vec3& cameraPos) override;
-    void UnloadHighResIfFar(const glm::vec3& cameraPos) override;
+    void LoadHighResIfClose(const glm::vec3& cameraPos, const TextureLodPolicy& policy) override;
 
     OrbitLayout::Body GetBody() const { return _body; }
     const BodyCatalog::Entry& GetEntry() const { return _entry; }

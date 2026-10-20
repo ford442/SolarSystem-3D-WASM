@@ -1,8 +1,8 @@
 // Shadow/color passes for planets, atmospheres, rings, clouds and text overlays, plus the
-// GPU-resource setup they need. Renderer:: methods; see Renderer.h for what it owns versus
-// what it reaches into Application for (camera, scene components, sun, display size, ...).
+// GPU-resource setup they need. Renderer:: methods; everything a pass reads about the
+// camera and the scene comes in through its FrameContext (FrameContext.h).
 #include "Solar_System/TexturePaths.h"
-#include "Application.h"
+#include "Renderer.h"
 #include "JsBridge.h"
 #include "QualitySettings.h"
 #include "ResourceManifest.h"
@@ -22,52 +22,52 @@
 
 using namespace std;
 
-void Renderer::Init() {
-    Application& app = _app;
+void Renderer::Init(const SimState& sim, FT_Library ft, glm::ivec2 display) {
     const auto qualitySettings = GetQualitySettings(
-        gSimState->shadowQuality == 0 ? gSimState->qualityPreset : gSimState->shadowQuality - 1, gSimState->isMobileWeb);
-    shadowMapFBO = make_unique<ShadowMapFBO>(qualitySettings.shadowResolution, qualitySettings.shadowResolution);
-    hdrEnabled = qualitySettings.enableHdr;
-    hdrShader = make_unique<Shader>("resource/shaders/passThrough.vs", "resource/shaders/hdr.fs");
-    hdr = make_unique<HDR>(*hdrShader, app._displayWidth, app._displayHeight, hdrEnabled);
-    hudProjection = glm::ortho(0.0f, static_cast<float>(app._displayWidth), 0.0f, static_cast<float>(app._displayHeight));
+        sim.shadowQuality == 0 ? sim.qualityPreset : sim.shadowQuality - 1, sim.isMobileWeb);
+    _shadowMapFBO = make_unique<ShadowMapFBO>(qualitySettings.shadowResolution, qualitySettings.shadowResolution);
+    _hdrEnabled = qualitySettings.enableHdr;
+    _hdrShader = make_unique<Shader>("resource/shaders/passThrough.vs", "resource/shaders/hdr.fs");
+    _hdr = make_unique<HDR>(*_hdrShader, display.x, display.y, _hdrEnabled);
+    _hudProjection = glm::ortho(0.0f, static_cast<float>(display.x), 0.0f, static_cast<float>(display.y));
     // HDR turns itself off when the GPU cannot give it a complete float FBO; follow it,
     // otherwise the composite path would keep sampling an empty buffer.
-    hdrEnabled = hdr->IsEnabled();
-    LogQualityTier(qualitySettings, hdrEnabled, gSimState->shadowQuality);
+    _hdrEnabled = _hdr->IsEnabled();
+    LogQualityTier(qualitySettings, _hdrEnabled, sim.shadowQuality);
 
-    mainTextShader = make_unique<Shader>("resource/shaders/text.vs", "resource/shaders/text.fs");
-    textRenderer = make_unique<TextRenderer>(app._ft, "resource/fonts/Arial.ttf");
-    FT_Done_FreeType(app._ft);
-    shadowMapShader = make_unique<Shader>("resource/shaders/shadowMap.vs", "resource/shaders/shadowMap.fs");
-    mainSkyBoxShader = make_unique<Shader>("resource/shaders/skyBox.vs", "resource/shaders/skyBox.fs");
-    mainStarShader = make_unique<Shader>("resource/shaders/star.vs", "resource/shaders/star.fs");
-    mainCoronaStarShader = make_unique<Shader>("resource/shaders/starCorona.vs", "resource/shaders/starCorona.fs");
-    mainPlanetShader = make_unique<Shader>("resource/shaders/planetLighting.vs", "resource/shaders/planetLighting.fs");
-    mainAtmosphereShader = make_unique<Shader>("resource/shaders/atmosphere.vs", "resource/shaders/atmosphere.fs");
+    _mainTextShader = make_unique<Shader>("resource/shaders/text.vs", "resource/shaders/text.fs");
+    _textRenderer = make_unique<TextRenderer>(ft, "resource/fonts/Arial.ttf");
+    FT_Done_FreeType(ft);
+    _shadowMapShader = make_unique<Shader>("resource/shaders/shadowMap.vs", "resource/shaders/shadowMap.fs");
+    _mainSkyBoxShader = make_unique<Shader>("resource/shaders/skyBox.vs", "resource/shaders/skyBox.fs");
+    _mainStarShader = make_unique<Shader>("resource/shaders/star.vs", "resource/shaders/star.fs");
+    _mainCoronaStarShader = make_unique<Shader>("resource/shaders/starCorona.vs", "resource/shaders/starCorona.fs");
+    _mainPlanetShader = make_unique<Shader>("resource/shaders/planetLighting.vs", "resource/shaders/planetLighting.fs");
+    _mainAtmosphereShader = make_unique<Shader>("resource/shaders/atmosphere.vs", "resource/shaders/atmosphere.fs");
     try {
-        pbrAtmosphereShader = make_unique<Shader>("resource/shaders/atmosphere.vs", "resource/shaders/atmospherePbr.fs");
+        _pbrAtmosphereShader = make_unique<Shader>("resource/shaders/atmosphere.vs", "resource/shaders/atmospherePbr.fs");
     } catch (const std::exception&) {
         // Already reported by Shader (and fatal to the CI shader self-test); the O'Neil
         // shell still draws every atmosphere.
         std::cerr << "[Atmosphere] LUT atmosphere shader unavailable; using the O'Neil shell" << std::endl;
-        pbrAtmosphereShader.reset();
+        _pbrAtmosphereShader.reset();
     }
-    mainCloudsShader = make_unique<Shader>("resource/shaders/planetLighting.vs", "resource/shaders/cloudsLighting.fs");
-    mainRingShader = make_unique<Shader>("resource/shaders/planetaryRingLighting.vs", "resource/shaders/planetaryRingLighting.fs");
-    lensFlareShader = make_unique<Shader>("resource/shaders/lensFlare.vs", "resource/shaders/lensFlare.fs");
+    _mainCloudsShader = make_unique<Shader>("resource/shaders/planetLighting.vs", "resource/shaders/cloudsLighting.fs");
+    _mainRingShader = make_unique<Shader>("resource/shaders/planetaryRingLighting.vs", "resource/shaders/planetaryRingLighting.fs");
+    _lensFlareShader = make_unique<Shader>("resource/shaders/lensFlare.vs", "resource/shaders/lensFlare.fs");
+    _starGlowShader = make_unique<Shader>("resource/shaders/starGlow.vs", "resource/shaders/starGlow.fs");
     try {
-        coronaVolumeShader = make_unique<Shader>("resource/shaders/starCoronaVolume.vs", "resource/shaders/starCoronaVolume.fs");
+        _coronaVolumeShader = make_unique<Shader>("resource/shaders/starCoronaVolume.vs", "resource/shaders/starCoronaVolume.fs");
     } catch (const std::exception&) {
         std::cerr << "[Corona] volumetric corona shader unavailable; using the flat corona" << std::endl;
-        coronaVolumeShader.reset();
+        _coronaVolumeShader.reset();
     }
 
     // After every program is built: a missing skybox face aborts start-up (native has no
     // checkerboard fallback), and the native CI smoke run should still have compiled the
     // shaders by then.
-    skyBox = make_unique<SkyBox>(GetSkyBoxFaces());
-    lensFlare = make_unique<LensFlare>(*lensFlareShader, TextureImage2D(TexturePaths::Resolve("resource/textures_low/flares_bright_Low.dds")),
+    _skyBox = make_unique<SkyBox>(GetSkyBoxFaces());
+    _lensFlare = make_unique<LensFlare>(*_lensFlareShader, TextureImage2D(TexturePaths::Resolve("resource/textures_low/flares_bright_Low.dds")),
             FlaresInfo {4,
             {
                 FlareSprite{false, 1.0, 7.0, 0},
@@ -80,178 +80,207 @@ void Renderer::Init() {
                 FlareSprite{false, 2.75, 2.0, 7}
             }});
     try {
-        observeSky = make_unique<ObserveSky>();
+        _observeSky = make_unique<ObserveSky>();
     } catch (const std::exception&) {
         std::cerr << "[Observe] sky shaders unavailable; Observe mode will draw an empty sky" << std::endl;
-        observeSky.reset();
+        _observeSky.reset();
     }
-    orbitPathRenderer = make_unique<OrbitPathRenderer>();
-    xrPointerRenderer = make_unique<XrPointerRenderer>();
-    magneticFieldRenderer = make_unique<MagneticFieldLineRenderer>();
+    _orbitPathRenderer = make_unique<OrbitPathRenderer>();
+    _xrPointerRenderer = make_unique<XrPointerRenderer>();
+    _magneticFieldRenderer = make_unique<MagneticFieldLineRenderer>();
     {
-        const auto fieldQuality = GetQualitySettings(gSimState->qualityPreset, gSimState->isMobileWeb);
-        magneticFieldBloom = make_unique<MagneticFieldBloom>(app._displayWidth, app._displayHeight,
+        const auto fieldQuality = GetQualitySettings(sim.qualityPreset, sim.isMobileWeb);
+        _magneticFieldBloom = make_unique<MagneticFieldBloom>(display.x, display.y,
                                                               fieldQuality.enableMagneticBloom);
         ApplyEffectQuality(fieldQuality);
     }
 }
 
 void Renderer::Resize(uint16_t width, uint16_t height) {
-    hudProjection = glm::ortho(0.0f, static_cast<float>(width), 0.0f, static_cast<float>(height));
-    if (hdr) {
-        hdr->Resize(width, height);
+    _hudProjection = glm::ortho(0.0f, static_cast<float>(width), 0.0f, static_cast<float>(height));
+    if (_hdr) {
+        _hdr->Resize(width, height);
     }
-    if (magneticFieldBloom) {
-        magneticFieldBloom->Resize(width, height);
+    if (_magneticFieldBloom) {
+        _magneticFieldBloom->Resize(width, height);
     }
 }
 
 void Renderer::Release() {
     // Users before the shaders they hold by reference (LensFlare, HDR).
-    missionPathMeshes.clear();
-    magneticFieldBloom.reset();
-    magneticFieldRenderer.reset();
-    magneticFieldsBuilt = false;
-    xrPointerRenderer.reset();
-    orbitPathRenderer.reset();
-    observeSky.reset();
-    lensFlare.reset();
-    skyBox.reset();
-    hdr.reset();
-    textRenderer.reset();
-    shadowMapFBO.reset();
-    for (auto* shader : {&shadowMapShader, &mainSkyBoxShader, &mainTextShader, &mainStarShader,
-                         &mainCoronaStarShader, &mainPlanetShader, &mainAtmosphereShader,
-                         &mainCloudsShader, &mainRingShader, &hdrShader, &lensFlareShader,
-                         &starGlowShader, &pbrAtmosphereShader, &coronaVolumeShader}) {
+    _missionPathMeshes.clear();
+    _magneticFieldBloom.reset();
+    _magneticFieldRenderer.reset();
+    _magneticFieldsBuilt = false;
+    _xrPointerRenderer.reset();
+    _orbitPathRenderer.reset();
+    _observeSky.reset();
+    _lensFlare.reset();
+    _skyBox.reset();
+    _hdr.reset();
+    _textRenderer.reset();
+    _shadowMapFBO.reset();
+    for (auto* shader : {&_shadowMapShader, &_mainSkyBoxShader, &_mainTextShader, &_mainStarShader,
+                         &_mainCoronaStarShader, &_mainPlanetShader, &_mainAtmosphereShader,
+                         &_mainCloudsShader, &_mainRingShader, &_hdrShader, &_lensFlareShader,
+                         &_starGlowShader, &_pbrAtmosphereShader, &_coronaVolumeShader}) {
         shader->reset();
     }
 }
 
-void Renderer::ApplyEffectQuality(const QualityTierSettings& settings) {
-    pbrAtmosphereSteps = settings.enablePbrAtmosphere ? settings.atmosphereSteps : 0;
-    coronaSlices = settings.enableVolumetricCorona ? settings.coronaSlices : 0;
-    observeStarCount = settings.observeStarCount;
-    if (observeSky) {
-        observeSky->SetStarLimit(observeStarCount);
+void Renderer::ApplyRenderResources(const SimState& sim, uint16_t shadowResolution, bool enableHdr, glm::ivec2 display) {
+    _hdrEnabled = enableHdr;
+
+    if (_shadowMapFBO && sim.shadowQuality > 0) {
+        _shadowMapFBO->Resize(shadowResolution, shadowResolution);
+    }
+
+    if (_hdr) {
+        _hdr->SetEnabled(enableHdr, display.x, display.y);
+        // SetEnabled can refuse (no renderable float buffers / incomplete FBO).
+        _hdrEnabled = _hdr->IsEnabled();
+    }
+    if (_magneticFieldBloom) {
+        const auto bloomSettings = GetQualitySettings(sim.qualityPreset, sim.isMobileWeb);
+        _magneticFieldBloom->SetEnabled(bloomSettings.enableMagneticBloom, display.x, display.y);
     }
 }
 
-glm::vec3 Renderer::CameraWorldPosition() const {
-    // The view matrix is the current eye's (ConfigureMainShaders swaps in the XR eye), so
-    // this is right per eye where _app._camera.GetPosition() is the head.
-    return glm::vec3(glm::inverse(cameraView)[3]);
+void Renderer::ResizeShadowMap(uint16_t resolution) {
+    if (_shadowMapFBO) {
+        _shadowMapFBO->Resize(resolution, resolution);
+    }
+}
+
+void Renderer::ApplyEffectQuality(const QualityTierSettings& settings) {
+    _pbrAtmosphereSteps = settings.enablePbrAtmosphere ? settings.atmosphereSteps : 0;
+    _coronaSlices = settings.enableVolumetricCorona ? settings.coronaSlices : 0;
+    _observeStarCount = settings.observeStarCount;
+    if (_observeSky) {
+        _observeSky->SetStarLimit(_observeStarCount);
+    }
 }
 
 void Renderer::BeginFrame() {
-    _configuredView = -1;
-    stats = FramePasses::Stats{};
+    _configuredView = nullptr;
+    _stats = FramePasses::Stats{};
 }
 
-void Renderer::BeginView(int view) {
-#ifdef __EMSCRIPTEN__
-    if (_app._xr.active) {
-        _app._xr.currentEye = view;
-        const auto& eye = _app._xr.eyes[view];
-        glViewport(eye.viewportX, eye.viewportY, eye.viewportWidth, eye.viewportHeight);
-    } else
-#endif
-    {
-        glViewport(0, 0, _app._displayWidth, _app._displayHeight);
-    }
+void Renderer::BeginView(const FrameContext& ctx) {
+    const glm::ivec4& viewport = ctx.view.viewport;
+    glViewport(viewport.x, viewport.y, viewport.z, viewport.w);
     // The per-view uniforms only change with the view; a shadow pass in between leaves them.
-    if (view != _configuredView) {
-        ConfigureMainShaders();
-        _configuredView = view;
-        ++stats.viewBinds;
+    if (&ctx.view != _configuredView) {
+        ConfigureMainShaders(ctx);
+        _configuredView = &ctx.view;
+        ++_stats.viewBinds;
     }
 }
 
-void Renderer::RenderBackground() {
-    if (_app._observe.active) {
+void Renderer::RenderBackground(const FrameContext& ctx) {
+    if (ctx.scene.observeActive) {
         // Ground-level sky pass only: no scene meshes, orbit lines, glow or lens flare.
-        RenderObserveSky();
+        RenderObserveSky(ctx);
         return;
     }
-    skyBox->Render(*mainSkyBoxShader);
-    RenderOrbitPaths();
-    RenderMissionPaths();
-    RenderXrPointers();
-    RenderStarCorona();
+    _skyBox->Render(*_mainSkyBoxShader);
+    RenderOrbitPaths(ctx);
+    RenderMissionPaths(ctx);
+    RenderXrPointers(ctx);
+    RenderStarCorona(ctx);
 }
 
-void Renderer::RenderForeground() {
-    if (_app._observe.active) {
+void Renderer::RenderForeground(const FrameContext& ctx) {
+    if (ctx.scene.observeActive) {
         return;
     }
-    RenderStarCoronaVolume();
-    RenderAsteroidField();
-    RenderMagneticFields();
+    RenderStarCoronaVolume(ctx);
+    RenderAsteroidField(ctx);
+    RenderMagneticFields(ctx);
 }
 
-void Renderer::ShadowMapPass(const RenderableSceneComponent& component) {
+void Renderer::RenderMonoEffects(const FrameContext& ctx) {
+    if (ctx.scene.observeActive) {
+        return;
+    }
+    RenderPlanetProxyMarkers(ctx);
+    RenderStarEffects(ctx);
+}
+
+void Renderer::RenderHud(const FrameContext& ctx) {
+    if (ctx.scene.observeActive) {
+        RenderObserveHud(ctx);
+        return;
+    }
+    if (_overlayToggles.planetStarDistances || _overlayToggles.satelliteDistances) {
+        RenderPlanetSatelliteStarDistances(ctx);
+    }
+    if (_overlayToggles.hints) {
+        RenderHints(ctx);
+    }
+}
+
+void Renderer::ShadowMapPass(const FrameContext& ctx, const RenderableSceneComponent& component) {
     // Under WebXR the frame composites into the XRWebGLLayer framebuffer, not FBO 0, so
     // every exit below restores DefaultFramebuffer() instead of hardcoding 0. Getting
     // that wrong is what used to force the whole pass to be skipped in VR, leaving the
     // lighting shaders reading a cleared depth map as "fully lit".
 #ifdef __EMSCRIPTEN__
-    if (_app._xr.active && _app._xr.baseLayerFramebuffer == 0) {
+    if (ctx.xr && ctx.defaultFramebuffer == 0) {
         // No layer framebuffer to return to (JS could not register it). Fall back to the
         // old behaviour rather than composite the eyes into FBO 0; RenderXrStereoFrame
         // logs the reason once per session.
         return;
     }
 #endif
-    glBindFramebuffer(GL_FRAMEBUFFER, shadowMapFBO->GetFBO());
+    glBindFramebuffer(GL_FRAMEBUFFER, _shadowMapFBO->GetFBO());
     glClear(GL_DEPTH_BUFFER_BIT);
-    glViewport(0, 0, shadowMapFBO->GetShadowMapWidth(), shadowMapFBO->GetShadowMapHeight());
+    glViewport(0, 0, _shadowMapFBO->GetShadowMapWidth(), _shadowMapFBO->GetShadowMapHeight());
 
     // A cleared depth texture contains 1.0 everywhere, which the existing
     // lighting shaders interpret as fully lit. Keep the texture bound but skip
     // all shadow geometry when shadows are disabled.
-    if (gSimState->shadowQuality == 0) {
-        glBindFramebuffer(GL_FRAMEBUFFER, _app.DefaultFramebuffer());
+    if (ctx.sim.shadowQuality == 0) {
+        glBindFramebuffer(GL_FRAMEBUFFER, ctx.defaultFramebuffer);
         return;
     }
 
-    ++stats.shadowPasses;
-    shadowMapShader->Use();
-    shadowMapShader->SetMat4("lightSpaceMatrix", component.lightSpaceMatrix);
+    ++_stats.shadowPasses;
+    _shadowMapShader->Use();
+    _shadowMapShader->SetMat4("lightSpaceMatrix", component.lightSpaceMatrix);
 
-    component.planet->SetShader(*shadowMapShader);
+    component.planet->SetShader(*_shadowMapShader);
     component.planet->Render();
 
     for (const auto& satellite : component.satellites) {
-        satellite->SetShader(*shadowMapShader);
+        satellite->SetShader(*_shadowMapShader);
         satellite->Render();
     }
 
-    RenderPlanetaryRing(*shadowMapShader, component.planetaryRing.get(), component.lightSpaceMatrix);
-    glBindFramebuffer(GL_FRAMEBUFFER, _app.DefaultFramebuffer());
+    RenderPlanetaryRing(*_shadowMapShader, component.planetaryRing.get(), component.lightSpaceMatrix);
+    glBindFramebuffer(GL_FRAMEBUFFER, ctx.defaultFramebuffer);
 }
 
-void Renderer::RenderPass(const RenderableSceneComponent& component) {
+void Renderer::RenderPass(const FrameContext& ctx, const RenderableSceneComponent& component) {
     // BeginView set this view's viewport after the shadow pass changed it.
-    ++stats.componentDraws;
-    mainPlanetShader->Use();
+    ++_stats.componentDraws;
+    _mainPlanetShader->Use();
 
-    ConfigureMainPlanetShader(component);
+    ConfigureMainPlanetShader(ctx, component);
 
-    component.planet->SetShader(*mainPlanetShader);
+    component.planet->SetShader(*_mainPlanetShader);
     component.planet->Render();
 
-    // The moons share mainPlanetShader with their primary, so the umbra decal has to come
+    // The moons share _mainPlanetShader with their primary, so the umbra decal has to come
     // back off before they draw — otherwise the caster would shadow its own night side.
-    mainPlanetShader->SetBool("hasEclipseCaster", false);
+    _mainPlanetShader->SetBool("hasEclipseCaster", false);
     for (const auto& satellite : component.satellites) {
-        satellite->SetShader(*mainPlanetShader);
+        satellite->SetShader(*_mainPlanetShader);
         satellite->Render();
     }
 
-    if (_app._nearestPlanetIndex >= 0
-        && static_cast<size_t>(_app._nearestPlanetIndex) < _app._renderableSceneComponents.size()
-        && component.planet == _app._renderableSceneComponents[static_cast<size_t>(_app._nearestPlanetIndex)].planet)
-        ProcessStarRendering();
+    if (const RenderableSceneComponent* nearest = ctx.scene.Nearest(); nearest && component.planet == nearest->planet)
+        ProcessStarRendering(ctx);
 
     // The LUT atmosphere attenuates what is behind it, so the cloud deck has to be there
     // first; the additive O'Neil shell keeps its historical order.
@@ -260,15 +289,15 @@ void Renderer::RenderPass(const RenderableSceneComponent& component) {
                     [](const RenderableAtmosphere& a) { return a.atmosphere->IsPhysicalPathActive(); });
     if (physicalAtmosphere) {
         RenderClouds(component.clouds.get(), component.lightSpaceMatrix);
-        RenderAtmospheres(component);
+        RenderAtmospheres(ctx, component);
     } else {
-        RenderAtmospheres(component);
+        RenderAtmospheres(ctx, component);
         RenderClouds(component.clouds.get(), component.lightSpaceMatrix);
     }
-    RenderPlanetaryRing(*mainRingShader, component.planetaryRing.get(), component.lightSpaceMatrix);
+    RenderPlanetaryRing(*_mainRingShader, component.planetaryRing.get(), component.lightSpaceMatrix);
 }
 
-void Renderer::RenderAtmospheres(const RenderableSceneComponent& component) const {
+void Renderer::RenderAtmospheres(const FrameContext& ctx, const RenderableSceneComponent& component) const {
     if (component.atmospheres.empty()) {
         return;
     }
@@ -277,14 +306,14 @@ void Renderer::RenderAtmospheres(const RenderableSceneComponent& component) cons
 
     for (const auto& renderableAtmosphere : component.atmospheres) {
         // Inside the shell, draw its far side (the near side is behind the camera).
-        const bool inside = renderableAtmosphere.atmosphere->Contains(CameraWorldPosition());
+        const bool inside = renderableAtmosphere.atmosphere->Contains(ctx.view.eyePosition);
         if (inside) {
             glFrontFace(GL_CW);
         }
         if (renderableAtmosphere.atmosphere->IsPhysicalPathActive()) {
-            RenderPbrAtmosphere(renderableAtmosphere, component);
+            RenderPbrAtmosphere(ctx, renderableAtmosphere, component);
         } else {
-            RenderOneilAtmosphere(renderableAtmosphere, component);
+            RenderOneilAtmosphere(ctx, renderableAtmosphere, component);
         }
         glFrontFace(GL_CCW);
     }
@@ -293,68 +322,68 @@ void Renderer::RenderAtmospheres(const RenderableSceneComponent& component) cons
     glDepthMask(GL_TRUE);
 }
 
-void Renderer::RenderOneilAtmosphere(const RenderableAtmosphere& renderableAtmosphere,
+void Renderer::RenderOneilAtmosphere(const FrameContext& ctx, const RenderableAtmosphere& renderableAtmosphere,
                                      const RenderableSceneComponent& component) const {
     Atmosphere& atmosphere = *renderableAtmosphere.atmosphere;
     const PlanetaryRing* ring = component.planetaryRing.get();
     glBlendFunc(GL_ONE, GL_ONE);
 
-    mainAtmosphereShader->Use();
-    mainAtmosphereShader->SetMat4("lightSpaceMatrix", component.lightSpaceMatrix);
+    _mainAtmosphereShader->Use();
+    _mainAtmosphereShader->SetMat4("lightSpaceMatrix", component.lightSpaceMatrix);
     // Per-shell constants are set here, after Use(): Saturn and Titan share a component,
     // so setting them at placement time let the last shell's values win for both.
-    mainAtmosphereShader->SetVec3("C_R", atmosphere.GetAtmosphereColor());
-    mainAtmosphereShader->SetFloat("innerRadius", atmosphere.GetInnerRadius());
-    mainAtmosphereShader->SetFloat("outerRadius", atmosphere.GetOuterRadius());
-    mainAtmosphereShader->SetVec3("camPosition", CameraWorldPosition() - atmosphere.GetPosition());
-    mainAtmosphereShader->SetVec3("lightPos", _app._sun->GetPosition() - atmosphere.GetPosition());
-    mainAtmosphereShader->SetVec3("mieTint", atmosphere.GetMieTint());
-    mainAtmosphereShader->SetFloat("SCALE_H_FACTOR", atmosphere.GetRow().oneil.hScaleFactor);
-    mainAtmosphereShader->SetFloat("SCALE_L_FACTOR", 1.0f);
-    mainAtmosphereShader->SetFloat("earthSizeCoefficient", renderableAtmosphere.parentEarthSizeCoefficient);
-    mainAtmosphereShader->SetBool("isUseToneMapping", atmosphere.GetRow().oneil.toneMapping);
-    mainAtmosphereShader->SetMat3("bodyToSphere", atmosphere.GetBodyToSphere());
-    mainAtmosphereShader->SetBool("isNearbyPlanetaryRing", ring != nullptr);
+    _mainAtmosphereShader->SetVec3("C_R", atmosphere.GetAtmosphereColor());
+    _mainAtmosphereShader->SetFloat("innerRadius", atmosphere.GetInnerRadius());
+    _mainAtmosphereShader->SetFloat("outerRadius", atmosphere.GetOuterRadius());
+    _mainAtmosphereShader->SetVec3("camPosition", ctx.view.eyePosition - atmosphere.GetPosition());
+    _mainAtmosphereShader->SetVec3("lightPos", ctx.scene.sun->GetPosition() - atmosphere.GetPosition());
+    _mainAtmosphereShader->SetVec3("mieTint", atmosphere.GetMieTint());
+    _mainAtmosphereShader->SetFloat("SCALE_H_FACTOR", atmosphere.GetRow().oneil.hScaleFactor);
+    _mainAtmosphereShader->SetFloat("SCALE_L_FACTOR", 1.0f);
+    _mainAtmosphereShader->SetFloat("earthSizeCoefficient", renderableAtmosphere.parentEarthSizeCoefficient);
+    _mainAtmosphereShader->SetBool("isUseToneMapping", atmosphere.GetRow().oneil.toneMapping);
+    _mainAtmosphereShader->SetMat3("bodyToSphere", atmosphere.GetBodyToSphere());
+    _mainAtmosphereShader->SetBool("isNearbyPlanetaryRing", ring != nullptr);
 
     if (ring) {
-        mainAtmosphereShader->SetVec3("ringParentPlanetCenter", ring->GetParent()->GetPosition());
-        mainAtmosphereShader->SetFloat("ringParentPlanetRadiusSquared", ring->GetParent()->GetRadius() * ring->GetParent()->GetRadius());
-        mainAtmosphereShader->SetBool("isUseSphereIntersect", ring->GetParent() != atmosphere.GetParent());
+        _mainAtmosphereShader->SetVec3("ringParentPlanetCenter", ring->GetParent()->GetPosition());
+        _mainAtmosphereShader->SetFloat("ringParentPlanetRadiusSquared", ring->GetParent()->GetRadius() * ring->GetParent()->GetRadius());
+        _mainAtmosphereShader->SetBool("isUseSphereIntersect", ring->GetParent() != atmosphere.GetParent());
 
-        mainAtmosphereShader->SetVec3("ringCenter", ring->GetPosition());
-        mainAtmosphereShader->SetVec3("ringNormal", ring->GetRingNormal());
-        mainAtmosphereShader->SetVec2("ringInnerOuterRadiuses", glm::vec2(ring->GetInnerRadius(), ring->GetOuterRadius()));
-        mainAtmosphereShader->SetInt("ringDiffuse", 9);
+        _mainAtmosphereShader->SetVec3("ringCenter", ring->GetPosition());
+        _mainAtmosphereShader->SetVec3("ringNormal", ring->GetRingNormal());
+        _mainAtmosphereShader->SetVec2("ringInnerOuterRadiuses", glm::vec2(ring->GetInnerRadius(), ring->GetOuterRadius()));
+        _mainAtmosphereShader->SetInt("ringDiffuse", 9);
         glBindTextureUnit(9, ring->GetRingTexture());
     }
 
-    atmosphere.SetShader(*mainAtmosphereShader);
+    atmosphere.SetShader(*_mainAtmosphereShader);
     atmosphere.Render();
 }
 
-void Renderer::RenderPbrAtmosphere(const RenderableAtmosphere& renderableAtmosphere,
+void Renderer::RenderPbrAtmosphere(const FrameContext& ctx, const RenderableAtmosphere& renderableAtmosphere,
                                    const RenderableSceneComponent& component) const {
     Atmosphere& atmosphere = *renderableAtmosphere.atmosphere;
     const PlanetaryRing* ring = component.planetaryRing.get();
     const BodyCatalog::AtmosphereRow& row = atmosphere.GetRow();
     const AtmosphereModel::Params params = AtmosphereModel::FromCatalog(row.physical);
     const glm::vec3 center = atmosphere.GetPosition();
-    const glm::vec3 camera = CameraWorldPosition();
+    const glm::vec3 camera = ctx.view.eyePosition;
 
     // Premultiplied: rgb is in-scattered light, alpha what survives of the scene behind.
     glBlendFunc(GL_ONE, GL_SRC_ALPHA);
 
-    Shader& shader = *pbrAtmosphereShader;
+    Shader& shader = *_pbrAtmosphereShader;
     shader.Use();
     shader.SetMat4("lightSpaceMatrix", component.lightSpaceMatrix);
     shader.SetVec3("camPosition", camera - center);
-    shader.SetVec3("lightPos", _app._sun->GetPosition() - center);
+    shader.SetVec3("lightPos", ctx.scene.sun->GetPosition() - center);
     shader.SetFloat("kmPerSceneUnit", atmosphere.GetKmPerSceneUnit());
     shader.SetBool("isCameraInsideShell", atmosphere.Contains(camera));
     // Oblate giants: the ray is traced where the cloud deck is a sphere (BodyShape.h).
     shader.SetMat3("bodyToSphere", atmosphere.GetBodyToSphere());
     shader.SetMat3("sphereToBody", atmosphere.GetSphereToBody());
-    shader.SetInt("uSteps", pbrAtmosphereSteps);
+    shader.SetInt("uSteps", _pbrAtmosphereSteps);
     shader.SetFloat("uExposure", row.physical.exposure);
 
     shader.SetFloat("uAtmosphere.bottomRadius", static_cast<float>(params.bottomRadius));
@@ -391,7 +420,7 @@ void Renderer::RenderPbrAtmosphere(const RenderableAtmosphere& renderableAtmosph
 
     // A moon's umbra darkens the air above it as well as the ground. Only the primary's
     // atmosphere has casters (its moons); a moon's own atmosphere skips this.
-    const EclipseUmbra umbra = atmosphere.GetParent() == component.planet ? ComputeEclipseUmbra(component)
+    const EclipseUmbra umbra = atmosphere.GetParent() == component.planet ? ComputeEclipseUmbra(ctx, component)
                                                                            : EclipseUmbra{};
     shader.SetBool("hasEclipseCaster", umbra.active);
     if (umbra.active) {
@@ -411,8 +440,8 @@ void Renderer::RenderClouds(Clouds* renderableClouds, const glm::mat4& lightSpac
         glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_COLOR);
         glDisable(GL_CULL_FACE);
 
-        mainCloudsShader->Use();
-        mainCloudsShader->SetMat4("lightSpaceMatrix", lightSpaceMatrix);
+        _mainCloudsShader->Use();
+        _mainCloudsShader->SetMat4("lightSpaceMatrix", lightSpaceMatrix);
         renderableClouds->Render();
 
         glEnable(GL_CULL_FACE);
@@ -435,71 +464,71 @@ void Renderer::RenderPlanetaryRing(const Shader& shader, PlanetaryRing* planetar
     }
 }
 
-void Renderer::ProcessStarRendering() {
+void Renderer::ProcessStarRendering(const FrameContext& ctx) {
 #ifdef __EMSCRIPTEN__
     glDepthMask(GL_FALSE);
     glDisable(GL_DEPTH_TEST);
     glEnable(GL_BLEND);
-    RenderStar();
+    RenderStar(ctx);
     glDisable(GL_BLEND);
     glEnable(GL_DEPTH_TEST);
     glDepthMask(GL_TRUE);
-    _app._sun->SetVisibility(1.0f);
+    ctx.scene.sun->SetVisibility(1.0f);
 #else
     glDepthMask(GL_FALSE);
-    glBeginQuery(GL_SAMPLES_PASSED, _app._sun->GetStarOcclusionValue(0));
+    glBeginQuery(GL_SAMPLES_PASSED, ctx.scene.sun->GetStarOcclusionValue(0));
     glDisable(GL_DEPTH_TEST);
     glEnable(GL_BLEND);
-    RenderStar();
+    RenderStar(ctx);
     glDisable(GL_BLEND);
     glEnable(GL_DEPTH_TEST);
     glDepthFunc(GL_LEQUAL);
     glEndQuery(GL_SAMPLES_PASSED);
 
-    glBeginQuery(GL_SAMPLES_PASSED, _app._sun->GetStarOcclusionValue(1));
-    RenderStar();
+    glBeginQuery(GL_SAMPLES_PASSED, ctx.scene.sun->GetStarOcclusionValue(1));
+    RenderStar(ctx);
     glEndQuery(GL_SAMPLES_PASSED);
     glDepthMask(GL_TRUE);
     glDepthFunc(GL_LESS);
 
-    UpdateOcclusionQuery();
+    UpdateOcclusionQuery(*ctx.scene.sun);
 #endif
 }
 
-void Renderer::UpdateOcclusionQuery() {
+void Renderer::UpdateOcclusionQuery(Star& sun) {
     GLuint totalSamples = 0;
     GLuint visibleSamples = 0;
-    glGetQueryObjectuiv(_app._sun->GetStarOcclusionValue(0), GL_QUERY_RESULT, &totalSamples);
-    glGetQueryObjectuiv(_app._sun->GetStarOcclusionValue(1), GL_QUERY_RESULT, &visibleSamples);
+    glGetQueryObjectuiv(sun.GetStarOcclusionValue(0), GL_QUERY_RESULT, &totalSamples);
+    glGetQueryObjectuiv(sun.GetStarOcclusionValue(1), GL_QUERY_RESULT, &visibleSamples);
 
     if (totalSamples == 0) {
-        _app._sun->SetVisibility(0.0f);
+        sun.SetVisibility(0.0f);
         return;
     }
 
-    _app._sun->SetVisibility(static_cast<float>(visibleSamples) / static_cast<float>(totalSamples));
+    sun.SetVisibility(static_cast<float>(visibleSamples) / static_cast<float>(totalSamples));
 }
 
-void Renderer::RenderStarCorona() const {
-    if (coronaSlices > 0 && coronaVolumeShader) {
+void Renderer::RenderStarCorona(const FrameContext& ctx) const {
+    if (_coronaSlices > 0 && _coronaVolumeShader) {
         return; // RenderStarCoronaVolume draws the corona instead.
     }
     glDepthMask(GL_FALSE);
     glEnable(GL_BLEND);
     glBlendFunc(GL_ONE, GL_ONE);
 
-    mainCoronaStarShader->Use();
-    _app._sun->SetShader(*mainCoronaStarShader);
-    _app._sun->TakeStarSystemCenter();
-    _app._sun->Render();
-    _app._sun->SetShader(*mainStarShader);
+    _mainCoronaStarShader->Use();
+    ctx.scene.sun->SetShader(*_mainCoronaStarShader);
+    ctx.scene.sun->TakeStarSystemCenter();
+    ctx.scene.sun->Render();
+    ctx.scene.sun->SetShader(*_mainStarShader);
 
     glDepthMask(GL_TRUE);
     glDisable(GL_BLEND);
 }
 
-void Renderer::RenderStarCoronaVolume() const {
-    if (coronaSlices <= 0 || !coronaVolumeShader) {
+void Renderer::RenderStarCoronaVolume(const FrameContext& ctx) const {
+    if (_coronaSlices <= 0 || !_coronaVolumeShader) {
         return;
     }
     // In solar radii. The K-corona is visible to a few radii; 6 keeps the slices' discs
@@ -509,9 +538,9 @@ void Renderer::RenderStarCoronaVolume() const {
     // the HDR glow and lens flare sit on top of it.
     constexpr float kCoronaIntensity = 0.8f;
 
-    const glm::vec3 sunCenter = _app._sun->GetPosition();
-    const float sunRadius = _app._sun->GetSceneRadius();
-    const glm::mat4 inverseView = glm::inverse(cameraView);
+    const glm::vec3 sunCenter = ctx.scene.sun->GetPosition();
+    const float sunRadius = ctx.scene.sun->GetSceneRadius();
+    const glm::mat4 inverseView = glm::inverse(ctx.view.view);
     const glm::vec3 camera(inverseView[3]);
     const glm::vec3 cameraUp(inverseView[1]);
     const glm::vec3 cameraLocal = (camera - sunCenter) / sunRadius;
@@ -524,13 +553,13 @@ void Renderer::RenderStarCoronaVolume() const {
     // crossed squarely. Inside, rays to the edge of the screen would graze those slices, so
     // they follow the view direction instead (every on-screen ray within FOV/2 of normal).
     // The thresholds differ so the switch does not flicker at the boundary.
-    coronaSlicesViewAligned = distance < (coronaSlicesViewAligned ? 1.25f : 1.15f) * kCoronaExtent;
-    const glm::vec3 forward = coronaSlicesViewAligned ? -glm::normalize(glm::vec3(inverseView[2]))
+    _coronaSlicesViewAligned = distance < (_coronaSlicesViewAligned ? 1.25f : 1.15f) * kCoronaExtent;
+    const glm::vec3 forward = _coronaSlicesViewAligned ? -glm::normalize(glm::vec3(inverseView[2]))
                                                       : -cameraLocal / distance;
 
     // Slice depths along `forward` from the Sun's centre: only the part of the sphere in front
     // of the camera, starting a little past the near plane so no slab is clipped by it.
-    const float nearMargin = std::max(2.0f * _app._camera.GetNear() / sunRadius, 0.05f);
+    const float nearMargin = std::max(2.0f * ctx.view.nearPlane / sunRadius, 0.05f);
     const float depthMax = kCoronaExtent;
     const float depthMin = std::max(-kCoronaExtent, glm::dot(cameraLocal, forward) + nearMargin);
     if (depthMin >= depthMax) {
@@ -549,87 +578,83 @@ void Renderer::RenderStarCoronaVolume() const {
     glBlendFunc(GL_ONE, GL_ONE);
     glDisable(GL_CULL_FACE);
 
-    Shader& shader = *coronaVolumeShader;
+    Shader& shader = *_coronaVolumeShader;
     shader.Use();
-    shader.SetMat4("projection", cameraProjection);
-    shader.SetMat4("view", cameraView);
-    shader.SetFloat("zCoef", static_cast<float>(2.0 / glm::log2(_app._camera.GetFar() + 1.0)));
+    shader.SetMat4("projection", ctx.view.projection);
+    shader.SetMat4("view", ctx.view.view);
+    shader.SetFloat("zCoef", ctx.view.zCoef);
     shader.SetVec3("sunCenter", sunCenter);
     shader.SetFloat("sunRadius", sunRadius);
     shader.SetVec3("sliceForward", forward);
     shader.SetVec3("sliceRight", right);
     shader.SetVec3("sliceUp", up);
     shader.SetFloat("coronaExtent", kCoronaExtent);
-    shader.SetInt("sliceCount", coronaSlices);
+    shader.SetInt("sliceCount", _coronaSlices);
     shader.SetFloat("sliceDepthMin", depthMin);
     shader.SetFloat("sliceDepthMax", depthMax);
     shader.SetFloat("nearMargin", nearMargin);
     shader.SetVec3("cameraLocal", cameraLocal);
-    shader.SetFloat("sliceSpacing", (depthMax - depthMin) / static_cast<float>(coronaSlices));
-    shader.SetVec3("coronaColor", _app._sun->GetShiftColor());
+    shader.SetFloat("sliceSpacing", (depthMax - depthMin) / static_cast<float>(_coronaSlices));
+    shader.SetVec3("coronaColor", ctx.scene.sun->GetShiftColor());
     shader.SetFloat("coronaIntensity", kCoronaIntensity);
     shader.SetFloat("time", static_cast<float>(glfwGetTime() * 0.004));
-    _app._sun->DrawCoronaSlices(coronaSlices);
+    ctx.scene.sun->DrawCoronaSlices(_coronaSlices);
 
     glEnable(GL_CULL_FACE);
     glDisable(GL_BLEND);
     glDepthMask(GL_TRUE);
 }
 
-void Renderer::RenderStar() const {
+void Renderer::RenderStar(const FrameContext& ctx) const {
     glEnable(GL_BLEND);
     glBlendFunc(GL_SRC_ALPHA, GL_ONE);
 
-    mainStarShader->Use();
-    _app._sun->TakeStarSystemCenter();
-    _app._sun->Render();
+    _mainStarShader->Use();
+    ctx.scene.sun->TakeStarSystemCenter();
+    ctx.scene.sun->Render();
 
     glDisable(GL_BLEND);
 }
 
-void Renderer::RenderStarEffects() const {
-    const PlanetaryRing* nearestPlanetaryRing = nullptr;
-    if (!_app._renderableSceneComponents.empty()
-        && _app._nearestPlanetIndex >= 0
-        && static_cast<size_t>(_app._nearestPlanetIndex) < _app._renderableSceneComponents.size()) {
-        nearestPlanetaryRing = _app._renderableSceneComponents[static_cast<size_t>(_app._nearestPlanetIndex)].planetaryRing.get();
-    }
+void Renderer::RenderStarEffects(const FrameContext& ctx) const {
+    const RenderableSceneComponent* nearest = ctx.scene.Nearest();
+    const PlanetaryRing* nearestPlanetaryRing = nearest ? nearest->planetaryRing.get() : nullptr;
 
     optional<RingCameraInfo> ringCameraInfo;
     if (nearestPlanetaryRing) {
-        ringCameraInfo = {_app._camera.GetPosition(), nearestPlanetaryRing->GetPosition(), nearestPlanetaryRing->GetRingNormal(),
+        ringCameraInfo = {ctx.view.headPosition, nearestPlanetaryRing->GetPosition(), nearestPlanetaryRing->GetRingNormal(),
                           glm::vec2(nearestPlanetaryRing->GetInnerRadius(), nearestPlanetaryRing->GetOuterRadius()),
                           nearestPlanetaryRing->GetRingTexture()};
     }
 
-    if (hdrEnabled && hdr && hdr->IsEnabled()) {
-        glBindFramebuffer(GL_FRAMEBUFFER, hdr->GetHdrFBO());
+    if (_hdrEnabled && _hdr && _hdr->IsEnabled()) {
+        glBindFramebuffer(GL_FRAMEBUFFER, _hdr->GetHdrFBO());
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
         glEnable(GL_BLEND);
         glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
-        _app._sun->RenderGlow(cameraProjection, cameraView, _app._camera.GetFrontVector() - _app._camera.GetRightVector(), _app._camera.GetAspect(),
-                         _app.CalculateSpaceObjectDistance(_app._sun.get()), ringCameraInfo, starTemperatureInKelvin);
+        ctx.scene.sun->RenderGlow(ctx.view.projection, ctx.view.view, ctx.view.front - ctx.view.right, ctx.view.aspect,
+                         glm::distance(ctx.view.headPosition, ctx.scene.sun->GetPosition()), ringCameraInfo, _starTuning.temperatureKelvin);
     } else {
-        glBindFramebuffer(GL_FRAMEBUFFER, _app.DefaultFramebuffer());
+        glBindFramebuffer(GL_FRAMEBUFFER, ctx.defaultFramebuffer);
         glEnable(GL_BLEND);
         glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
-        _app._sun->RenderGlow(cameraProjection, cameraView, _app._camera.GetFrontVector() - _app._camera.GetRightVector(), _app._camera.GetAspect(),
-                         _app.CalculateSpaceObjectDistance(_app._sun.get()), ringCameraInfo, starTemperatureInKelvin);
+        ctx.scene.sun->RenderGlow(ctx.view.projection, ctx.view.view, ctx.view.front - ctx.view.right, ctx.view.aspect,
+                         glm::distance(ctx.view.headPosition, ctx.scene.sun->GetPosition()), ringCameraInfo, _starTuning.temperatureKelvin);
     }
 
-    glBindFramebuffer(GL_FRAMEBUFFER, _app.DefaultFramebuffer());
+    glBindFramebuffer(GL_FRAMEBUFFER, ctx.defaultFramebuffer);
     glDisable(GL_DEPTH_TEST);
     glDepthMask(GL_FALSE);
     glEnable(GL_BLEND);
 
-    if (hdrEnabled && hdr && hdr->IsEnabled()) {
+    if (_hdrEnabled && _hdr && _hdr->IsEnabled()) {
         glBlendFunc(GL_ONE, GL_ONE);
-        hdr->Render(starExposure, starGamma);
+        _hdr->Render(_starTuning.exposure, _starTuning.gamma);
     }
 
     glBlendFunc(GL_ONE, GL_ONE);
-    float intensity = glm::min(_app._sun->GetCurrentGlowSize() * _app._sun->GetVisibility(), 1.0f);
-    lensFlare->Render(cameraProjection, cameraView, _app._sun->GetPosition(), glm::vec3(1.0), _app._camera.GetAspect(), 0.1, intensity, ringCameraInfo);
+    float intensity = glm::min(ctx.scene.sun->GetCurrentGlowSize() * ctx.scene.sun->GetVisibility(), 1.0f);
+    _lensFlare->Render(ctx.view.projection, ctx.view.view, ctx.scene.sun->GetPosition(), glm::vec3(1.0), ctx.view.aspect, 0.1, intensity, ringCameraInfo);
 
     glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
     glDisable(GL_BLEND);
@@ -637,22 +662,56 @@ void Renderer::RenderStarEffects() const {
     glEnable(GL_DEPTH_TEST);
 }
 
-void Renderer::RenderPlanetSatelliteStarDistances() const {
+void Renderer::RenderPlanetProxyMarkers(const FrameContext& ctx) const {
+    // Web staged loading: a label at the orbital position of every system not READY yet.
+    if (!ctx.scene.stagedSystems || ctx.scene.stagedSystems->empty()) return;
+
     glDisable(GL_DEPTH_TEST);
     glEnable(GL_BLEND);
     glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
 
-    if (isRenderPlanetStarDistances)
-        RenderSpaceObjectDistance(_app._sun.get());
+    _mainTextShader->Use();
+    _mainTextShader->SetMat4("projection", ctx.view.projection);
+    _mainTextShader->SetMat4("view", ctx.view.view);
+    _mainTextShader->SetBool("is3D", true);
 
-    for(const auto& renderableComponentPS : _app._renderableSceneComponents) {
-        if (isRenderPlanetStarDistances) {
-            RenderSpaceObjectDistance(renderableComponentPS.planet.get());
+    for (const auto& manifest : *ctx.scene.stagedSystems) {
+        if (manifest.state == PlanetSystemManifest::State::READY) continue;
+
+        std::wstring label(manifest.name.begin(), manifest.name.end());
+        if (manifest.state == PlanetSystemManifest::State::NOT_LOADED) {
+            label += L" (approach to load)";
+        } else if (manifest.state == PlanetSystemManifest::State::DOWNLOADING) {
+            int done = manifest.totalDownloads - manifest.pendingDownloads;
+            int pct = (manifest.totalDownloads > 0) ? (done * 100 / manifest.totalDownloads) : 0;
+            label += L" [downloading " + std::to_wstring(pct) + L"%]";
         }
 
-        if (isRenderSatelliteDistances) {
+        std::deque<wchar_t> chars(label.begin(), label.end());
+        _mainTextShader->SetVec3("particleCenterWorldSpace", manifest.proxyPosition);
+        _textRenderer->Render(*_mainTextShader, chars, 0.0, 0.0, 0.075, glm::vec3(0.5f, 0.7f, 1.0f));
+    }
+
+    glDisable(GL_BLEND);
+    glEnable(GL_DEPTH_TEST);
+}
+
+void Renderer::RenderPlanetSatelliteStarDistances(const FrameContext& ctx) const {
+    glDisable(GL_DEPTH_TEST);
+    glEnable(GL_BLEND);
+    glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+
+    if (_overlayToggles.planetStarDistances)
+        RenderSpaceObjectDistance(ctx, ctx.scene.sun);
+
+    for(const auto& renderableComponentPS : (*ctx.scene.components)) {
+        if (_overlayToggles.planetStarDistances) {
+            RenderSpaceObjectDistance(ctx, renderableComponentPS.planet.get());
+        }
+
+        if (_overlayToggles.satelliteDistances) {
             for(const auto& satellite : renderableComponentPS.satellites) {
-                RenderSpaceObjectDistance(satellite.get());
+                RenderSpaceObjectDistance(ctx, satellite.get());
             }
         }
     }
@@ -661,28 +720,28 @@ void Renderer::RenderPlanetSatelliteStarDistances() const {
     glEnable(GL_DEPTH_TEST);
 }
 
-void Renderer::RenderSpaceObjectDistance(const SpaceObject* spaceObject) const {
+void Renderer::RenderSpaceObjectDistance(const FrameContext& ctx, const SpaceObject* spaceObject) const {
     // Reuse pre-allocated container to eliminate per-frame heap allocation
-    distanceInfoCache.clear();
-    distanceInfoCache.insert(distanceInfoCache.end(), spaceObject->GetEngName().begin(), spaceObject->GetEngName().end());
+    _distanceInfoCache.clear();
+    _distanceInfoCache.insert(_distanceInfoCache.end(), spaceObject->GetEngName().begin(), spaceObject->GetEngName().end());
 
     if (!spaceObject->GetOtherLangName().empty()) {
-        distanceInfoCache.push_back(L'[');
-        distanceInfoCache.insert(distanceInfoCache.end(), spaceObject->GetOtherLangName().begin(), spaceObject->GetOtherLangName().end());
-        distanceInfoCache.push_back(L']');
-        distanceInfoCache.push_back(L' ');
+        _distanceInfoCache.push_back(L'[');
+        _distanceInfoCache.insert(_distanceInfoCache.end(), spaceObject->GetOtherLangName().begin(), spaceObject->GetOtherLangName().end());
+        _distanceInfoCache.push_back(L']');
+        _distanceInfoCache.push_back(L' ');
     }
 
-    wstring distance(to_wstring(static_cast<uint16_t>(_app.CalculateSpaceObjectDistance(spaceObject))));
-    distanceInfoCache.insert(distanceInfoCache.end(), make_move_iterator(distance.begin()), make_move_iterator(distance.end()));
+    wstring distance(to_wstring(static_cast<uint16_t>(glm::distance(ctx.view.headPosition, spaceObject->GetPosition()))));
+    _distanceInfoCache.insert(_distanceInfoCache.end(), make_move_iterator(distance.begin()), make_move_iterator(distance.end()));
 
-    mainTextShader->Use();
-    mainTextShader->SetVec3("particleCenterWorldSpace", spaceObject->GetPosition());
-    mainTextShader->SetBool("is3D", true);
-    textRenderer->Render(*mainTextShader, distanceInfoCache, 0.0, 0.0, 0.075, glm::vec3(0.98431, 0.80784, 0.69412));
+    _mainTextShader->Use();
+    _mainTextShader->SetVec3("particleCenterWorldSpace", spaceObject->GetPosition());
+    _mainTextShader->SetBool("is3D", true);
+    _textRenderer->Render(*_mainTextShader, _distanceInfoCache, 0.0, 0.0, 0.075, glm::vec3(0.98431, 0.80784, 0.69412));
 }
 
-void Renderer::RenderHints() const {
+void Renderer::RenderHints(const FrameContext& ctx) const {
     static const string gpuHintString = string(reinterpret_cast<const char *>(glGetString(GL_RENDERER)));
     static constexpr glm::vec3 textColor = glm::vec3(0.98431, 0.80784, 0.69412);
 
@@ -690,37 +749,33 @@ void Renderer::RenderHints() const {
     glEnable(GL_BLEND);
     glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
 
-    mainTextShader->Use();
-    mainTextShader->SetMat4("projection", hudProjection);
-    mainTextShader->SetBool("is3D", false);
+    _mainTextShader->Use();
+    _mainTextShader->SetMat4("projection", _hudProjection);
+    _mainTextShader->SetBool("is3D", false);
 
     // Reuse pre-allocated containers to eliminate per-frame heap allocations
-    fpsHintCache.clear();
-    fpsHintCache.emplace_back(L"FPS: ");
-    fpsHintCache.emplace_back(to_wstring(_app._fpsHandler.GetCurrentFps()));
+    _fpsHintCache.clear();
+    _fpsHintCache.emplace_back(L"FPS: ");
+    _fpsHintCache.emplace_back(to_wstring(ctx.hud->fps));
 
-    gpuHintCache.clear();
-    gpuHintCache.emplace_back(wstring(gpuHintString.begin(), gpuHintString.end()));
+    _gpuHintCache.clear();
+    _gpuHintCache.emplace_back(wstring(gpuHintString.begin(), gpuHintString.end()));
 
 #ifndef __EMSCRIPTEN__ // web: volume and track live in the settings panel (web/src/music.ts)
-    soundVolumeHintCache.clear();
+    _soundVolumeHintCache.clear();
     stringstream soundVolumeStream;
-#ifdef SOLARSYSTEM_USE_SDL_MIXER
-    soundVolumeStream << fixed << setprecision(0) << (_app._musicMuted ? 0.0f : _app._musicVolume) * 100.0;
-#else
-    soundVolumeStream << fixed << setprecision(0) << _app._soundEngine->getSoundVolume() * 100.0;
-#endif
+    soundVolumeStream << fixed << setprecision(0) << ctx.hud->musicVolumePercent;
     string soundVolume = soundVolumeStream.str();
-    soundVolumeHintCache.emplace_back(wstring(L"Sound volume(PgUp/PgDown): ").append(soundVolume.begin(), soundVolume.end()).append(L" %"));
+    _soundVolumeHintCache.emplace_back(wstring(L"Sound volume(PgUp/PgDown): ").append(soundVolume.begin(), soundVolume.end()).append(L" %"));
 
-    tmpStringCache.clear();
-    tmpStringCache.emplace_back(wstring(_app._currentMusicTrack.begin(), _app._currentMusicTrack.end()));
+    _tmpStringCache.clear();
+    _tmpStringCache.emplace_back(wstring(ctx.hud->musicTrack.begin(), ctx.hud->musicTrack.end()));
 #endif
 
     deque<wstring> timeRunHint;
     timeRunHint.emplace_back(L"Time (P:pause, +/-:scale, .:step): ");
     std::wstringstream wss;
-    wss << (gSimState->timePaused ? L"paused" : L"run") << L" x" << static_cast<int>(gSimState->timeScale);
+    wss << (ctx.sim.timePaused ? L"paused" : L"run") << L" x" << static_cast<int>(ctx.sim.timeScale);
     int year = 0;
     int month = 0;
     int day = 0;
@@ -731,18 +786,18 @@ void Renderer::RenderHints() const {
 
     // Sky event driven by the ephemeris, not a baked animation — see SkyEvents.h.
     deque<wstring> conjunctionHint;
-    if (const SkyEvents::SkyEvent& next = _app.GetNextSkyEvent(); next.valid) {
-        const std::string line = SkyEvents::FormatEvent(next);
+    if (const SkyEvents::SkyEvent* next = ctx.scene.nextSkyEvent; next && next->valid) {
+        const std::string line = SkyEvents::FormatEvent(*next);
         conjunctionHint.emplace_back(line.begin(), line.end()); // ASCII only, see SkyEvents
     }
 
     deque<wstring> planetStarHint;
     planetStarHint.emplace_back(L"Planet/Star distances(Z): ");
-    planetStarHint.emplace_back((isRenderPlanetStarDistances) ? L"On" : L"Off");
+    planetStarHint.emplace_back((_overlayToggles.planetStarDistances) ? L"On" : L"Off");
 
     deque<wstring> satelliteHint;
     satelliteHint.emplace_back(L"Satellite distances(X): ");
-    satelliteHint.emplace_back((isRenderSatelliteDistances) ? L"On" : L"Off");
+    satelliteHint.emplace_back((_overlayToggles.satelliteDistances) ? L"On" : L"Off");
 
 #ifdef __EMSCRIPTEN__
     // Indicate low-res start + high-res streaming (visual in streaming-progress + on-screen when active)
@@ -752,7 +807,7 @@ void Renderer::RenderHints() const {
 
     deque<wstring> cameraSpeedHint;
     cameraSpeedHint.emplace_back(L"Camera speed(1/2): ");
-    cameraSpeedHint.emplace_back(to_wstring(_app._camera.GetMovementSpeed()));
+    cameraSpeedHint.emplace_back(to_wstring(ctx.hud->cameraSpeed));
 
     deque<wstring> smoothCameraHint;
     smoothCameraHint.emplace_back(L"Smooth camera(Arrows)");
@@ -768,63 +823,63 @@ void Renderer::RenderHints() const {
 
     deque<wstring> starExposureHint;
     starExposureHint.emplace_back(L"Star Exposure(3/4): ");
-    starExposureHint.emplace_back(to_wstring(starExposure));
+    starExposureHint.emplace_back(to_wstring(_starTuning.exposure));
 
     deque<wstring> starGammaHint;
     starGammaHint.emplace_back(L"Star Gamma(5/6): ");
-    starGammaHint.emplace_back(to_wstring(starGamma));
+    starGammaHint.emplace_back(to_wstring(_starTuning.gamma));
 
     deque<wstring> starTemperatureHint;
     stringstream  starTemperatureStream;
-    starTemperatureStream << fixed << setprecision(0) << starTemperatureInKelvin;
+    starTemperatureStream << fixed << setprecision(0) << _starTuning.temperatureKelvin;
     string starTemperatureStr = starTemperatureStream.str();
     starTemperatureHint.emplace_back(wstring(L"Star Temperature(7/8): ").append(make_move_iterator(starTemperatureStr.begin()),
                                                                                 make_move_iterator(starTemperatureStr.end())));
     deque<wstring> vertSyncHint;
     vertSyncHint.emplace_back(L"Vert Sync(F1): ");
-    vertSyncHint.emplace_back((_app._isVertSyncEnabled) ? L"On" : L"Off");
+    vertSyncHint.emplace_back((ctx.hud->vsync) ? L"On" : L"Off");
 
     deque<wstring> textHints;
     textHints.emplace_back(L"Text hints(TAB)");
 
     deque<wstring> magneticHint;
     magneticHint.emplace_back(L"Magnetic fields(M): ");
-    magneticHint.emplace_back(magneticFieldsEnabled ? L"On" : L"Off");
+    magneticHint.emplace_back(_magneticFieldsEnabled ? L"On" : L"Off");
 
 #ifndef __EMSCRIPTEN__
-    textRenderer->ReverseRender(*mainTextShader, tmpStringCache, 0.99 * _app._displayWidth, 0.95 * _app._displayHeight, 0.35, textColor);
+    _textRenderer->ReverseRender(*_mainTextShader, _tmpStringCache, 0.99 * ctx.display.x, 0.95 * ctx.display.y, 0.35, textColor);
 #endif
     if (!conjunctionHint.empty()) {
-        textRenderer->ReverseRender(*mainTextShader, conjunctionHint, 0.99 * _app._displayWidth, 0.925 * _app._displayHeight, 0.35, textColor);
+        _textRenderer->ReverseRender(*_mainTextShader, conjunctionHint, 0.99 * ctx.display.x, 0.925 * ctx.display.y, 0.35, textColor);
     }
-    textRenderer->Render(*mainTextShader, fpsHintCache, 0.01 * _app._displayWidth, 0.95 * _app._displayHeight, 0.35, _app.CurrentFpsColor());
-    textRenderer->Render(*mainTextShader, gpuHintCache, 0.01 * _app._displayWidth, 0.925 * _app._displayHeight, 0.35, textColor);
+    _textRenderer->Render(*_mainTextShader, _fpsHintCache, 0.01 * ctx.display.x, 0.95 * ctx.display.y, 0.35, ctx.hud->fpsColor);
+    _textRenderer->Render(*_mainTextShader, _gpuHintCache, 0.01 * ctx.display.x, 0.925 * ctx.display.y, 0.35, textColor);
 #ifndef __EMSCRIPTEN__
-    textRenderer->Render(*mainTextShader, soundVolumeHintCache, 0.01 * _app._displayWidth, 0.9 * _app._displayHeight, 0.35, textColor);
+    _textRenderer->Render(*_mainTextShader, _soundVolumeHintCache, 0.01 * ctx.display.x, 0.9 * ctx.display.y, 0.35, textColor);
 #endif
-    textRenderer->Render(*mainTextShader, timeRunHint, 0.01 * _app._displayWidth, 0.875 * _app._displayHeight, 0.35, textColor);
-    textRenderer->Render(*mainTextShader, planetStarHint, 0.01 * _app._displayWidth, 0.85 * _app._displayHeight, 0.35, textColor);
-    textRenderer->Render(*mainTextShader, satelliteHint, 0.01 * _app._displayWidth, 0.825 * _app._displayHeight, 0.35, textColor);
+    _textRenderer->Render(*_mainTextShader, timeRunHint, 0.01 * ctx.display.x, 0.875 * ctx.display.y, 0.35, textColor);
+    _textRenderer->Render(*_mainTextShader, planetStarHint, 0.01 * ctx.display.x, 0.85 * ctx.display.y, 0.35, textColor);
+    _textRenderer->Render(*_mainTextShader, satelliteHint, 0.01 * ctx.display.x, 0.825 * ctx.display.y, 0.35, textColor);
 #ifdef __EMSCRIPTEN__
-    textRenderer->Render(*mainTextShader, textureHint, 0.01 * _app._displayWidth, 0.80 * _app._displayHeight, 0.30, glm::vec3(0.6f, 0.8f, 1.0f));
+    _textRenderer->Render(*_mainTextShader, textureHint, 0.01 * ctx.display.x, 0.80 * ctx.display.y, 0.30, glm::vec3(0.6f, 0.8f, 1.0f));
 #endif
-    textRenderer->Render(*mainTextShader, cameraSpeedHint, 0.01 * _app._displayWidth, 0.8 * _app._displayHeight, 0.35, textColor);
-    textRenderer->Render(*mainTextShader, smoothCameraHint, 0.01 * _app._displayWidth, 0.775 * _app._displayHeight, 0.35, textColor);
-    textRenderer->Render(*mainTextShader, smoothZoomHint, 0.01 * _app._displayWidth, 0.75 * _app._displayHeight, 0.35, textColor);
-    textRenderer->Render(*mainTextShader, movementHint, 0.01 * _app._displayWidth, 0.725 * _app._displayHeight, 0.35, textColor);
-    textRenderer->Render(*mainTextShader, speedBostHint, 0.01 * _app._displayWidth, 0.7 * _app._displayHeight, 0.35, textColor);
-    textRenderer->Render(*mainTextShader, starExposureHint, 0.01 * _app._displayWidth, 0.675 * _app._displayHeight, 0.35, textColor);
-    textRenderer->Render(*mainTextShader, starGammaHint, 0.01 * _app._displayWidth, 0.65 * _app._displayHeight, 0.35, textColor);
-    textRenderer->Render(*mainTextShader, starTemperatureHint, 0.01 * _app._displayWidth, 0.625 * _app._displayHeight, 0.35, textColor);
-    textRenderer->Render(*mainTextShader, vertSyncHint, 0.01 * _app._displayWidth, 0.6 * _app._displayHeight, 0.35, textColor);
-    textRenderer->Render(*mainTextShader, textHints, 0.01 * _app._displayWidth, 0.575 * _app._displayHeight, 0.35, textColor);
-    textRenderer->Render(*mainTextShader, magneticHint, 0.01 * _app._displayWidth, 0.55 * _app._displayHeight, 0.35, textColor);
+    _textRenderer->Render(*_mainTextShader, cameraSpeedHint, 0.01 * ctx.display.x, 0.8 * ctx.display.y, 0.35, textColor);
+    _textRenderer->Render(*_mainTextShader, smoothCameraHint, 0.01 * ctx.display.x, 0.775 * ctx.display.y, 0.35, textColor);
+    _textRenderer->Render(*_mainTextShader, smoothZoomHint, 0.01 * ctx.display.x, 0.75 * ctx.display.y, 0.35, textColor);
+    _textRenderer->Render(*_mainTextShader, movementHint, 0.01 * ctx.display.x, 0.725 * ctx.display.y, 0.35, textColor);
+    _textRenderer->Render(*_mainTextShader, speedBostHint, 0.01 * ctx.display.x, 0.7 * ctx.display.y, 0.35, textColor);
+    _textRenderer->Render(*_mainTextShader, starExposureHint, 0.01 * ctx.display.x, 0.675 * ctx.display.y, 0.35, textColor);
+    _textRenderer->Render(*_mainTextShader, starGammaHint, 0.01 * ctx.display.x, 0.65 * ctx.display.y, 0.35, textColor);
+    _textRenderer->Render(*_mainTextShader, starTemperatureHint, 0.01 * ctx.display.x, 0.625 * ctx.display.y, 0.35, textColor);
+    _textRenderer->Render(*_mainTextShader, vertSyncHint, 0.01 * ctx.display.x, 0.6 * ctx.display.y, 0.35, textColor);
+    _textRenderer->Render(*_mainTextShader, textHints, 0.01 * ctx.display.x, 0.575 * ctx.display.y, 0.35, textColor);
+    _textRenderer->Render(*_mainTextShader, magneticHint, 0.01 * ctx.display.x, 0.55 * ctx.display.y, 0.35, textColor);
 
     glDisable(GL_BLEND);
     glEnable(GL_DEPTH_TEST);
 }
 
-void Renderer::RenderTextureLoadingProgress() const {
+void Renderer::RenderTextureLoadingProgress(const FrameContext& ctx) const {
     auto& queue = TextureLoadingQueue::GetInstance();
     const int queued    = queue.GetQueuedCount();
     const int completed = queue.GetTotalProcessed();
@@ -854,16 +909,16 @@ void Renderer::RenderTextureLoadingProgress() const {
 
     static constexpr glm::vec3 textColor = glm::vec3(0.3f, 0.8f, 1.0f);
 
-    mainTextShader->Use();
-    mainTextShader->SetMat4("projection", hudProjection);
-    mainTextShader->SetBool("is3D", false);
+    _mainTextShader->Use();
+    _mainTextShader->SetMat4("projection", _hudProjection);
+    _mainTextShader->SetBool("is3D", false);
 
     // Hint string with progress counters, e.g. "Mid-res upgrade (2/5)". Rebuilt only when a
     // counter changes, but drawn every frame: the frame is cleared, so a hint drawn one frame
     // in ten (as the old throttle did) flickers.
     const std::array<int, 4> counters = {completed, total, active, tierCode};
-    if (loadingHintCache.empty() || counters != loadingHintCounters) {
-        loadingHintCounters = counters;
+    if (_loadingHintCache.empty() || counters != _loadingHintCounters) {
+        _loadingHintCounters = counters;
         const wchar_t* tierLabel = L"Texture upgrade";
         if (tierCode == 1) {
             tierLabel = L"Mid-res upgrade";
@@ -875,133 +930,118 @@ void Renderer::RenderTextureLoadingProgress() const {
         if (active > 0) {
             hint += L" [" + std::to_wstring(active) + L" active]";
         }
-        loadingHintCache.clear();
-        loadingHintCache.emplace_back(std::move(hint));
+        _loadingHintCache.clear();
+        _loadingHintCache.emplace_back(std::move(hint));
     }
-    textRenderer->Render(*mainTextShader, loadingHintCache, 0.5f * _app._displayWidth - 150, 0.1f * _app._displayHeight, 0.25, textColor);
+    _textRenderer->Render(*_mainTextShader, _loadingHintCache, 0.5f * ctx.display.x - 150, 0.1f * ctx.display.y, 0.25, textColor);
 
     glDisable(GL_BLEND);
     glEnable(GL_DEPTH_TEST);
 }
 
-void Renderer::ConfigureMainShaders() {
-    const double zCoef = 2.0 / glm::log2(_app._camera.GetFar() + 1.0);
-
-#ifdef __EMSCRIPTEN__
-    if (_app._xr.active && _app._xr.currentEye >= 0 && _app._xr.currentEye < _app._xr.eyeCount) {
-        const auto& eye = _app._xr.eyes[_app._xr.currentEye];
-        cameraProjection = eye.projection;
-        cameraView = eye.view;
-    } else
-#endif
-    {
-        cameraProjection = _app._camera.GetProjectionMatrix();
-        cameraView = _app._camera.GetViewMatrix();
-    }
+void Renderer::ConfigureMainShaders(const FrameContext& ctx) {
+    const float zCoef = ctx.view.zCoef;
 
     // Skybox uses the active view's rotation; projection matches the eye frustum in XR.
-    const glm::mat4 skyBoxProjection =
-#ifdef __EMSCRIPTEN__
-        (_app._xr.active) ? cameraProjection :
-#endif
-        glm::perspective(glm::radians(45.0f), _app._camera.GetAspect(), _app._camera.GetNear(), _app._camera.GetFar());
+    const glm::mat4 skyBoxProjection = ctx.xr ? ctx.view.projection : glm::perspective(glm::radians(45.0f), ctx.view.aspect, ctx.view.nearPlane, ctx.view.farPlane);
 
-    mainSkyBoxShader->Use();
-    mainSkyBoxShader->SetMat4("view", glm::mat4(glm::mat3(cameraView)));
-    mainSkyBoxShader->SetMat4("projection", skyBoxProjection);
+    _mainSkyBoxShader->Use();
+    _mainSkyBoxShader->SetMat4("view", glm::mat4(glm::mat3(ctx.view.view)));
+    _mainSkyBoxShader->SetMat4("projection", skyBoxProjection);
 
-    mainTextShader->Use();
-    mainTextShader->SetMat4("projection", cameraProjection);
-    mainTextShader->SetMat4("view", cameraView);
-    mainTextShader->SetInt("text", 0);
+    _mainTextShader->Use();
+    _mainTextShader->SetMat4("projection", ctx.view.projection);
+    _mainTextShader->SetMat4("view", ctx.view.view);
+    _mainTextShader->SetInt("text", 0);
 
-    mainStarShader->Use();
-    mainStarShader->SetMat4("projection", cameraProjection);
-    mainStarShader->SetMat4("view", cameraView);
-    mainStarShader->SetVec3("viewPos", CameraWorldPosition());
-    mainStarShader->SetVec3("shiftStarColor", _app._sun->GetShiftColor());
-    mainStarShader->SetVec3("colorMult", glm::vec3(0.96862745, 0.58039215, 0.235294117) * _app._sun->GetShiftColor());
-    mainStarShader->SetFloat("starRadiusInKilometers", _app._sun->GetStarRadius());
-    mainStarShader->SetFloat("zCoef", zCoef);
-    mainStarShader->SetFloat("uColorMap", _app._sun->GetTemperatureColorUCoordinate());
-    mainStarShader->SetBool("isVisible", _app._sun->GetVisibility() == 1.0);
-    mainStarShader->SetInt("colorMap", 0);
-    glBindTextureUnit(0, _app._sun->GetStarSpectrumTexture());
+    _mainStarShader->Use();
+    _mainStarShader->SetMat4("projection", ctx.view.projection);
+    _mainStarShader->SetMat4("view", ctx.view.view);
+    _mainStarShader->SetVec3("viewPos", ctx.view.eyePosition);
+    _mainStarShader->SetVec3("shiftStarColor", ctx.scene.sun->GetShiftColor());
+    _mainStarShader->SetVec3("colorMult", glm::vec3(0.96862745, 0.58039215, 0.235294117) * ctx.scene.sun->GetShiftColor());
+    _mainStarShader->SetFloat("starRadiusInKilometers", ctx.scene.sun->GetStarRadius());
+    _mainStarShader->SetFloat("zCoef", zCoef);
+    _mainStarShader->SetFloat("uColorMap", ctx.scene.sun->GetTemperatureColorUCoordinate());
+    _mainStarShader->SetBool("isVisible", ctx.scene.sun->GetVisibility() == 1.0);
+    _mainStarShader->SetInt("colorMap", 0);
+    glBindTextureUnit(0, ctx.scene.sun->GetStarSpectrumTexture());
 
-    mainCoronaStarShader->Use();
-    mainCoronaStarShader->SetMat4("projection", cameraProjection);
-    mainCoronaStarShader->SetMat4("view", cameraView);
-    mainCoronaStarShader->SetVec3("center", _app._sun->GetPosition());
+    _mainCoronaStarShader->Use();
+    _mainCoronaStarShader->SetMat4("projection", ctx.view.projection);
+    _mainCoronaStarShader->SetMat4("view", ctx.view.view);
+    _mainCoronaStarShader->SetVec3("center", ctx.scene.sun->GetPosition());
     // The eye's axes, not the head's (the billboard faces each XR eye).
-    const glm::mat4 inverseView = glm::inverse(cameraView);
-    mainCoronaStarShader->SetVec3("cameraRight", glm::normalize(glm::vec3(inverseView[0])));
-    mainCoronaStarShader->SetVec3("cameraUp", glm::normalize(glm::vec3(inverseView[1])));
-    mainCoronaStarShader->SetVec3("starShiftColor", _app._sun->GetShiftColor());
-    mainCoronaStarShader->SetFloat("zCoef", zCoef);
-    mainCoronaStarShader->SetFloat("maxSize", 7.1);
-    mainCoronaStarShader->SetFloat("starRadius", _app._sun->GetStarRadius());
-    mainCoronaStarShader->SetFloat("deltaTime", glfwGetTime() * 0.002);
+    const glm::mat4 inverseView = glm::inverse(ctx.view.view);
+    _mainCoronaStarShader->SetVec3("cameraRight", glm::normalize(glm::vec3(inverseView[0])));
+    _mainCoronaStarShader->SetVec3("cameraUp", glm::normalize(glm::vec3(inverseView[1])));
+    _mainCoronaStarShader->SetVec3("starShiftColor", ctx.scene.sun->GetShiftColor());
+    _mainCoronaStarShader->SetFloat("zCoef", zCoef);
+    _mainCoronaStarShader->SetFloat("maxSize", 7.1);
+    _mainCoronaStarShader->SetFloat("starRadius", ctx.scene.sun->GetStarRadius());
+    _mainCoronaStarShader->SetFloat("deltaTime", glfwGetTime() * 0.002);
 
-    const float surfaceDim = magneticFieldsEnabled ? 0.28f : 1.0f;
-    const float atmosphereDim = magneticFieldsEnabled ? 0.40f : 1.0f;
-    const float ringDim = magneticFieldsEnabled ? 0.35f : 1.0f;
+    const float surfaceDim = _magneticFieldsEnabled ? 0.28f : 1.0f;
+    const float atmosphereDim = _magneticFieldsEnabled ? 0.40f : 1.0f;
+    const float ringDim = _magneticFieldsEnabled ? 0.35f : 1.0f;
 
-    mainPlanetShader->Use();
-    mainPlanetShader->SetMat4("projection", cameraProjection);
-    mainPlanetShader->SetMat4("view", cameraView);
-    mainPlanetShader->SetVec3("viewPos", _app._camera.GetPosition());
-    mainPlanetShader->SetVec3("lightPos", _app._sun->GetPosition());
-    mainPlanetShader->SetVec3("starGlowTint", _app._sun->GetGlowTintMult());
-    mainPlanetShader->SetFloat("farPlane", _app._camera.GetFar());
-    mainPlanetShader->SetFloat("zCoef", zCoef);
-    mainPlanetShader->SetFloat("bias", 0.0005);
-    mainPlanetShader->SetFloat("uSurfaceDim", surfaceDim);
-    mainPlanetShader->SetInt("shadowMap", 6);
-    glBindTextureUnit(6, shadowMapFBO->GetShadowMap());
+    _mainPlanetShader->Use();
+    _mainPlanetShader->SetMat4("projection", ctx.view.projection);
+    _mainPlanetShader->SetMat4("view", ctx.view.view);
+    _mainPlanetShader->SetVec3("viewPos", ctx.view.headPosition);
+    _mainPlanetShader->SetVec3("lightPos", ctx.scene.sun->GetPosition());
+    _mainPlanetShader->SetVec3("starGlowTint", ctx.scene.sun->GetGlowTintMult());
+    _mainPlanetShader->SetFloat("farPlane", ctx.view.farPlane);
+    _mainPlanetShader->SetFloat("zCoef", zCoef);
+    _mainPlanetShader->SetFloat("bias", 0.0005);
+    _mainPlanetShader->SetFloat("uSurfaceDim", surfaceDim);
+    _mainPlanetShader->SetInt("shadowMap", 6);
+    glBindTextureUnit(6, _shadowMapFBO->GetShadowMap());
 
-    mainAtmosphereShader->Use();
-    mainAtmosphereShader->SetMat4("projection", cameraProjection);
-    mainAtmosphereShader->SetMat4("view", cameraView);
-    mainAtmosphereShader->SetFloat("farPlane", _app._camera.GetFar());
-    mainAtmosphereShader->SetFloat("zCoef", zCoef);
-    mainAtmosphereShader->SetFloat("bias", 0.001);
-    mainAtmosphereShader->SetFloat("uSurfaceDim", atmosphereDim);
-    mainAtmosphereShader->SetInt("shadowMap", 11);
-    glBindTextureUnit(11, shadowMapFBO->GetShadowMap());
+    _mainAtmosphereShader->Use();
+    _mainAtmosphereShader->SetMat4("projection", ctx.view.projection);
+    _mainAtmosphereShader->SetMat4("view", ctx.view.view);
+    _mainAtmosphereShader->SetFloat("farPlane", ctx.view.farPlane);
+    _mainAtmosphereShader->SetFloat("zCoef", zCoef);
+    _mainAtmosphereShader->SetFloat("bias", 0.001);
+    _mainAtmosphereShader->SetFloat("uSurfaceDim", atmosphereDim);
+    _mainAtmosphereShader->SetInt("shadowMap", 11);
+    glBindTextureUnit(11, _shadowMapFBO->GetShadowMap());
 
-    if (pbrAtmosphereShader) {
-        pbrAtmosphereShader->Use();
-        pbrAtmosphereShader->SetMat4("projection", cameraProjection);
-        pbrAtmosphereShader->SetMat4("view", cameraView);
-        pbrAtmosphereShader->SetFloat("zCoef", zCoef);
-        pbrAtmosphereShader->SetFloat("uSurfaceDim", atmosphereDim);
+    if (_pbrAtmosphereShader) {
+        _pbrAtmosphereShader->Use();
+        _pbrAtmosphereShader->SetMat4("projection", ctx.view.projection);
+        _pbrAtmosphereShader->SetMat4("view", ctx.view.view);
+        _pbrAtmosphereShader->SetFloat("zCoef", zCoef);
+        _pbrAtmosphereShader->SetFloat("uSurfaceDim", atmosphereDim);
     }
 
-    mainCloudsShader->Use();
-    mainCloudsShader->SetMat4("projection", cameraProjection);
-    mainCloudsShader->SetMat4("view", cameraView);
-    mainCloudsShader->SetVec3("viewPos", _app._camera.GetPosition());
-    mainCloudsShader->SetVec3("lightPos", _app._sun->GetPosition());
-    mainCloudsShader->SetFloat("farPlane", _app._camera.GetFar());
-    mainCloudsShader->SetFloat("zCoef", zCoef);
-    mainCloudsShader->SetFloat("bias", 0.001);
-    mainCloudsShader->SetFloat("uSurfaceDim", surfaceDim);
-    mainCloudsShader->SetInt("shadowMap", 8);
-    glBindTextureUnit(8, shadowMapFBO->GetShadowMap());
+    _mainCloudsShader->Use();
+    _mainCloudsShader->SetMat4("projection", ctx.view.projection);
+    _mainCloudsShader->SetMat4("view", ctx.view.view);
+    _mainCloudsShader->SetVec3("viewPos", ctx.view.headPosition);
+    _mainCloudsShader->SetVec3("lightPos", ctx.scene.sun->GetPosition());
+    _mainCloudsShader->SetFloat("farPlane", ctx.view.farPlane);
+    _mainCloudsShader->SetFloat("zCoef", zCoef);
+    _mainCloudsShader->SetFloat("bias", 0.001);
+    _mainCloudsShader->SetFloat("uSurfaceDim", surfaceDim);
+    _mainCloudsShader->SetInt("shadowMap", 8);
+    glBindTextureUnit(8, _shadowMapFBO->GetShadowMap());
 
-    mainRingShader->Use();
-    mainRingShader->SetMat4("projection", cameraProjection);
-    mainRingShader->SetMat4("view", cameraView);
-    mainRingShader->SetVec3("lightPos", _app._sun->GetPosition());
-    mainRingShader->SetVec3("camPos", _app._camera.GetPosition());
-    mainRingShader->SetVec3("starGlowTint", _app._sun->GetGlowTintMult());
-    mainRingShader->SetFloat("zCoef", zCoef);
-    mainRingShader->SetFloat("bias", 0.001);
-    mainRingShader->SetFloat("uSurfaceDim", ringDim);
-    mainRingShader->SetInt("shadowMap", 5);
-    glBindTextureUnit(5, shadowMapFBO->GetShadowMap());
+    _mainRingShader->Use();
+    _mainRingShader->SetMat4("projection", ctx.view.projection);
+    _mainRingShader->SetMat4("view", ctx.view.view);
+    _mainRingShader->SetVec3("lightPos", ctx.scene.sun->GetPosition());
+    _mainRingShader->SetVec3("camPos", ctx.view.headPosition);
+    _mainRingShader->SetVec3("starGlowTint", ctx.scene.sun->GetGlowTintMult());
+    _mainRingShader->SetFloat("zCoef", zCoef);
+    _mainRingShader->SetFloat("bias", 0.001);
+    _mainRingShader->SetFloat("uSurfaceDim", ringDim);
+    _mainRingShader->SetInt("shadowMap", 5);
+    glBindTextureUnit(5, _shadowMapFBO->GetShadowMap());
 }
-Renderer::EclipseUmbra Renderer::ComputeEclipseUmbra(const RenderableSceneComponent& renderableComponent) const {
+
+Renderer::EclipseUmbra Renderer::ComputeEclipseUmbra(const FrameContext& ctx, const RenderableSceneComponent& renderableComponent) const {
     // Real physical constants, because the eclipse *decision* has to be made at true scale.
     // The scene draws body radii, moon orbits, and planet orbits at three different
     // exaggerations; at art scale the Moon sits 12.5 Earth-radii away instead of 60, so its
@@ -1013,12 +1053,12 @@ Renderer::EclipseUmbra Renderer::ComputeEclipseUmbra(const RenderableSceneCompon
     constexpr float kAuKm = 149597870.7f;
 
     const std::shared_ptr<Planet>& planet = renderableComponent.planet;
-    if (!planet || !_app._sun || renderableComponent.satellites.empty()) {
+    if (!planet || !ctx.scene.sun || renderableComponent.satellites.empty()) {
         return {};
     }
 
     const glm::vec3 planetPosition = planet->GetPosition();
-    const glm::vec3 sunPosition = _app._sun->GetPosition();
+    const glm::vec3 sunPosition = ctx.scene.sun->GetPosition();
     const float planetRadiusKm = planet->GetEarthSizeCoefficient() * kEarthRadiusKm;
 
     // Pick the moon whose shadow axis passes closest to the planet's centre. Only one
@@ -1072,7 +1112,7 @@ Renderer::EclipseUmbra Renderer::ComputeEclipseUmbra(const RenderableSceneCompon
 
     // Low drops the penumbra entirely: a zero-radius star gives a hard-edged disc, which is
     // one smoothstep and no extra bandwidth.
-    const bool softPenumbra = gSimState->qualityPreset >= 2;
+    const bool softPenumbra = ctx.sim.qualityPreset >= 2;
 
     EclipseUmbra umbra;
     umbra.active = true;
@@ -1082,26 +1122,26 @@ Renderer::EclipseUmbra Renderer::ComputeEclipseUmbra(const RenderableSceneCompon
     return umbra;
 }
 
-void Renderer::ConfigureEclipseUmbra(const RenderableSceneComponent& renderableComponent) {
-    const EclipseUmbra umbra = ComputeEclipseUmbra(renderableComponent);
-    mainPlanetShader->SetBool("hasEclipseCaster", umbra.active);
+void Renderer::ConfigureEclipseUmbra(const FrameContext& ctx, const RenderableSceneComponent& renderableComponent) {
+    const EclipseUmbra umbra = ComputeEclipseUmbra(ctx, renderableComponent);
+    _mainPlanetShader->SetBool("hasEclipseCaster", umbra.active);
     if (umbra.active) {
-        mainPlanetShader->SetVec3("eclipseCasterCenter", umbra.casterCenter);
-        mainPlanetShader->SetFloat("eclipseCasterRadius", umbra.casterRadius);
-        mainPlanetShader->SetFloat("eclipseStarRadius", umbra.starRadius);
+        _mainPlanetShader->SetVec3("eclipseCasterCenter", umbra.casterCenter);
+        _mainPlanetShader->SetFloat("eclipseCasterRadius", umbra.casterRadius);
+        _mainPlanetShader->SetFloat("eclipseStarRadius", umbra.starRadius);
     }
 }
 
-void Renderer::ConfigureMainPlanetShader(const RenderableSceneComponent& renderableComponent) {
-    mainPlanetShader->SetMat4("lightSpaceMatrix", renderableComponent.lightSpaceMatrix);
-    mainPlanetShader->SetBool("isNearbyPlanetaryRing", renderableComponent.planetaryRing != nullptr);
-    ConfigureEclipseUmbra(renderableComponent);
+void Renderer::ConfigureMainPlanetShader(const FrameContext& ctx, const RenderableSceneComponent& renderableComponent) {
+    _mainPlanetShader->SetMat4("lightSpaceMatrix", renderableComponent.lightSpaceMatrix);
+    _mainPlanetShader->SetBool("isNearbyPlanetaryRing", renderableComponent.planetaryRing != nullptr);
+    ConfigureEclipseUmbra(ctx, renderableComponent);
 
     if (renderableComponent.planetaryRing) {
-        mainPlanetShader->SetVec3("ringCenter", renderableComponent.planetaryRing->GetPosition());
-        mainPlanetShader->SetVec3("ringNormal", renderableComponent.planetaryRing->GetRingNormal());
-        mainPlanetShader->SetVec2("ringInnerOuterRadiuses", glm::vec2(renderableComponent.planetaryRing->GetInnerRadius(), renderableComponent.planetaryRing->GetOuterRadius()));
-        mainPlanetShader->SetInt("ringDiffuse", 7);
+        _mainPlanetShader->SetVec3("ringCenter", renderableComponent.planetaryRing->GetPosition());
+        _mainPlanetShader->SetVec3("ringNormal", renderableComponent.planetaryRing->GetRingNormal());
+        _mainPlanetShader->SetVec2("ringInnerOuterRadiuses", glm::vec2(renderableComponent.planetaryRing->GetInnerRadius(), renderableComponent.planetaryRing->GetOuterRadius()));
+        _mainPlanetShader->SetInt("ringDiffuse", 7);
         glBindTextureUnit(7, renderableComponent.planetaryRing->GetRingTexture());
     }
 }

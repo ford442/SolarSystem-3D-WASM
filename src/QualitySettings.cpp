@@ -1,5 +1,4 @@
 #include "QualitySettings.h"
-#include "SimState.h"
 #include <cstdlib>
 #include <cstring>
 #include <iomanip>
@@ -47,8 +46,17 @@ QualityTierSettings GetQualitySettings(int preset, bool mobile) {
     }
 }
 
-TextureLodTier GetMaxTextureLodTier() {
-    return GetQualitySettings(gSimState->qualityPreset, gSimState->isMobileWeb).maxTextureLodTier;
+TextureLodPolicy GetTextureLodPolicy(int preset, bool mobile) {
+    TextureLodPolicy policy;
+    policy.maxTier = GetQualitySettings(preset, mobile).maxTextureLodTier;
+#ifdef __EMSCRIPTEN__
+    // Medium uses a 1.5x distance multiplier. Expressed as a threshold, this
+    // means the camera must be 1.5x closer than full quality before upgrading.
+    if (preset == 1) {
+        policy.planetThresholdScale = 1.0f / 1.5f;
+    }
+#endif
+    return policy;
 }
 
 void LogQualityTier(const QualityTierSettings& settings, bool hdrEnabled, int shadowQuality) {

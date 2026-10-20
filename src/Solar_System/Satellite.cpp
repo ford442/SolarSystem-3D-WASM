@@ -25,6 +25,6 @@ void Satellite::ConfigureDiffuseLOD(TextureImage2D& diffuse, const std::string& 
     _diffuseLOD.Configure(diffuse, lowPath, midPath, highPath, label, TextureLoadCategory::Satellite);
 }
 
-void Satellite::LoadHighResIfClose(const glm::vec3& cameraPosition) {
-    _diffuseLOD.Update(cameraPosition, GetPosition());
+void Satellite::LoadHighResIfClose(const glm::vec3& cameraPosition, const TextureLodPolicy& policy) {
+    _diffuseLOD.Update(cameraPosition, GetPosition(), 50.0f, policy.maxTier);
 }

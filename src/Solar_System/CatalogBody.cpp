@@ -74,25 +74,21 @@ void CatalogBody::Render() const {
     SpaceObject::Render();
 }
 
-void CatalogBody::LoadHighResIfClose(const glm::vec3& cameraPos) {
+void CatalogBody::LoadHighResIfClose(const glm::vec3& cameraPos, const TextureLodPolicy& policy) {
     const float distance = glm::length(cameraPos - GetPosition());
-    const float lodThreshold = GetEffectiveLODThreshold();
+    const float lodThreshold = GetEffectiveLODThreshold(policy);
     _lastCameraDistance = distance;
 
-    _diffuseLOD.Update(cameraPos, GetPosition(), lodThreshold);
-    _normalLOD.Update(cameraPos, GetPosition(), lodThreshold);
+    _diffuseLOD.Update(cameraPos, GetPosition(), lodThreshold, policy.maxTier);
+    _normalLOD.Update(cameraPos, GetPosition(), lodThreshold, policy.maxTier);
 
     _isHighResLoading = _diffuseLOD.IsLoading() || _normalLOD.IsLoading();
     _isHighResLoaded = _diffuseLOD.GetResidentTier() == TextureLodTier::High &&
                        _normalLOD.GetResidentTier() == TextureLodTier::High;
 
     if (_material.hasSpecular) {
-        _specularLOD.Update(cameraPos, GetPosition(), lodThreshold);
+        _specularLOD.Update(cameraPos, GetPosition(), lodThreshold, policy.maxTier);
         _isHighResLoading = _isHighResLoading || _specularLOD.IsLoading();
         _isHighResLoaded = _isHighResLoaded && _specularLOD.GetResidentTier() == TextureLodTier::High;
     }
-}
-
-void CatalogBody::UnloadHighResIfFar(const glm::vec3& cameraPos) {
-    LoadHighResIfClose(cameraPos);
 }

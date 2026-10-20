@@ -46,7 +46,6 @@ set(SOLARSYSTEM_SOURCES_CORE
     src/AudioPlayer.cpp
     src/RenderSettings.cpp
     src/XrSession.cpp
-    src/SimState.cpp
 )
 
 set(SOLARSYSTEM_SOURCES_AUX

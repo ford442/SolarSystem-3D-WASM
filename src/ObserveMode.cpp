@@ -171,10 +171,10 @@ std::string Application::GetObserveStateJson() const {
                   _observe.active ? "true" : "false", _observe.site.latDeg, _observe.site.lonDeg,
                   _observe.site.altM, jd, utc.c_str(),
                   wrapDegrees(_camera.GetYaw() + 90.0f), _camera.GetPitch(), _camera.GetZoom(),
-                  _observe.timeRate, gSimState->timePaused ? "true" : "false", sky.lstDeg,
+                  _observe.timeRate, _simState.timePaused ? "true" : "false", sky.lstDeg,
                   sun.altDeg, sun.azDeg, moon.altDeg, moon.azDeg, moon.illuminatedFraction,
                   sky.sunCoverage, sky.moonSubEarthLonDeg, sky.moonSubEarthLatDeg, ObserveEventVisibility(),
-                  _renderer.observeSky ? _renderer.observeSky->DrawnStarCount() : 0);
+                  _renderer.ObserveStarsDrawn());
     return buffer;
 }
 
@@ -198,7 +198,7 @@ void Application::ApplyObserveEnvOverride() {
     SetObserverSite(values[0], values[1], 0.0);
     if (parsed >= 3 && values[2] > 0.0) {
         OrbitLayout::SetJulianDate(values[2]);
-        gSimState->timePaused = true;
+        _simState.timePaused = true;
     }
     SetObserveMode(true);
     if (parsed >= 5) {

@@ -24,8 +24,11 @@ public:
     GLuint GetWidth() const;
     GLuint GetHeight() const;
     void ReloadTexture(const std::string& path, GLint wrapParam = GL_REPEAT, GLint minFilter = GL_LINEAR_MIPMAP_LINEAR, GLint magFilter = GL_LINEAR);
+    /** Web: anisotropic filtering ceiling for textures loaded from now on (mobile GPUs get 4). */
+    static void SetWebAnisotropyCap(float cap);
 
 private:
+    static float s_webAnisotropyCap;
     GlTexture _texture;
     GLuint _width = 0, _height = 0;
 

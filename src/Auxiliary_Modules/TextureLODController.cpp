@@ -129,7 +129,8 @@ void TextureLODController::QueueTier(TextureLodTier tier) {
     }
 }
 
-void TextureLODController::Update(const glm::vec3& cameraPosition, const glm::vec3& objectPosition, float threshold) {
+void TextureLODController::Update(const glm::vec3& cameraPosition, const glm::vec3& objectPosition, float threshold,
+                                  TextureLodTier allowedMax) {
 #if SOLARSYSTEM_TEXTURE_LOD_ENABLED
     if (!_texture) {
         return;
@@ -140,7 +141,6 @@ void TextureLODController::Update(const glm::vec3& cameraPosition, const glm::ve
         return;
     }
 
-    const TextureLodTier allowedMax = GetMaxTextureLodTier();
     const float distance = glm::distance(cameraPosition, objectPosition);
 
     // Cap resident tier when quality preset drops (e.g. full → medium/low).
@@ -205,6 +205,7 @@ void TextureLODController::Update(const glm::vec3& cameraPosition, const glm::ve
     (void)cameraPosition;
     (void)objectPosition;
     (void)threshold;
+    (void)allowedMax;
 #endif
 }
 

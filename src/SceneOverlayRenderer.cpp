@@ -1,53 +1,41 @@
 // Non-body scene overlays drawn on top of the planets: magnetic field-line ribbons
 // (with their optional bloom pass), orbit path rings, mission trajectory paths, XR
 // controller rays and the asteroid belt, plus the toggles that gate them. Renderer::
-// methods; see Renderer.h for what it owns versus what it reaches into Application for.
-#include "Application.h"
+// methods; scene and camera state comes in through the FrameContext.
+#include "Renderer.h"
 #include "QualitySettings.h"
-#include "SimState.h"
+#include "Solar_System/AsteroidField.h"
 #include "Solar_System/OrbitLayout.h"
 #include <algorithm>
 #include <iostream>
+#include <optional>
 #include <string>
 
 using namespace std;
 
-void Renderer::SetMagneticFieldsEnabled(bool enabled) {
-    magneticFieldsEnabled = enabled;
+void Renderer::SetMagneticFieldsEnabled(bool enabled, int qualityPreset) {
+    _magneticFieldsEnabled = enabled;
     if (enabled) {
-        EnsureMagneticFieldsBuilt();
+        EnsureMagneticFieldsBuilt(qualityPreset);
     }
 }
 
-void Renderer::ForEachEnabledMagneticField(
-    const std::function<void(const SpaceObject& object, const MagneticFieldParams& params)>& fn) const {
-    if (!fn) {
-        return;
-    }
-    if (_app._sun && _app._sun->HasMagneticField()) {
-        fn(*_app._sun, _app._sun->GetMagneticField());
-    }
-    for (const auto& component : _app._renderableSceneComponents) {
-        if (component.planet && component.planet->HasMagneticField()) {
-            fn(*component.planet, component.planet->GetMagneticField());
-        }
-        for (const auto& satellite : component.satellites) {
-            if (satellite && satellite->HasMagneticField()) {
-                fn(*satellite, satellite->GetMagneticField());
-            }
-        }
+void Renderer::RebuildMagneticFields(int qualityPreset) {
+    if (_magneticFieldsEnabled) {
+        _magneticFieldsBuilt = false;
+        EnsureMagneticFieldsBuilt(qualityPreset);
     }
 }
 
-void Renderer::EnsureMagneticFieldsBuilt() {
-    if (!magneticFieldRenderer) {
+void Renderer::EnsureMagneticFieldsBuilt(int qualityPreset) {
+    if (!_magneticFieldRenderer) {
         return;
     }
-    if (magneticFieldsBuilt && magneticFieldsQuality == gSimState->qualityPreset) {
+    if (_magneticFieldsBuilt && _magneticFieldsQuality == qualityPreset) {
         return;
     }
 
-    magneticFieldRenderer->Clear();
+    _magneticFieldRenderer->Clear();
     static constexpr OrbitLayout::Body kFieldBodies[] = {
         OrbitLayout::Body::Sun,
         OrbitLayout::Body::Mercury,
@@ -58,24 +46,24 @@ void Renderer::EnsureMagneticFieldsBuilt() {
         OrbitLayout::Body::Neptune,
     };
     for (const auto body : kFieldBodies) {
-        const MagneticFieldParams params = MagneticFieldCatalog::ParamsForBody(body, gSimState->qualityPreset);
+        const MagneticFieldParams params = MagneticFieldCatalog::ParamsForBody(body, qualityPreset);
         MagneticFieldLineMesh mesh;
         mesh.Upload(MagneticFieldTracer::Trace(params));
-        magneticFieldRenderer->AddBody(body, std::move(mesh), params);
+        _magneticFieldRenderer->AddBody(body, std::move(mesh), params);
     }
-    magneticFieldsBuilt = true;
-    magneticFieldsQuality = gSimState->qualityPreset;
-    std::cout << "[MagneticField] Built field-line ribbons for quality preset " << gSimState->qualityPreset << std::endl;
+    _magneticFieldsBuilt = true;
+    _magneticFieldsQuality = qualityPreset;
+    std::cout << "[MagneticField] Built field-line ribbons for quality preset " << qualityPreset << std::endl;
 }
 
-void Renderer::RenderMagneticFields() {
-    if (!magneticFieldsEnabled || !magneticFieldRenderer || magneticFieldRenderer->Empty()) {
+void Renderer::RenderMagneticFields(const FrameContext& ctx) {
+    if (!_magneticFieldsEnabled || !_magneticFieldRenderer || _magneticFieldRenderer->Empty()) {
         return;
     }
 
-    const float zCoef = static_cast<float>(2.0 / glm::log2(_app._camera.GetFar() + 1.0));
+    const float zCoef = ctx.view.zCoef;
     const float now = static_cast<float>(glfwGetTime());
-    const glm::vec3 camPos = _app._camera.GetPosition();
+    const glm::vec3 camPos = ctx.view.headPosition;
 
     auto drawBodies = [&](float ribbonWidthScale, float opacityScale) {
         auto drawBody = [&](OrbitLayout::Body body, const MagneticFieldParams& params, const glm::vec3& position,
@@ -88,19 +76,19 @@ void Renderer::RenderMagneticFields() {
             model *= rotation;
             model = glm::rotate(model, glm::radians(params.dipoleTiltDeg), glm::vec3(1.0f, 0.0f, 0.0f));
             model = glm::scale(model, glm::vec3(radius));
-            magneticFieldRenderer->Draw(cameraProjection, cameraView, model, params, body, camPos, zCoef, now,
+            _magneticFieldRenderer->Draw(ctx.view.projection, ctx.view.view, model, params, body, camPos, zCoef, now,
                                          ribbonWidthScale, opacityScale);
         };
 
-        if (_app._sun) {
+        if (ctx.scene.sun) {
             const MagneticFieldParams sunParams =
-                MagneticFieldCatalog::ParamsForBody(OrbitLayout::Body::Sun, gSimState->qualityPreset);
+                MagneticFieldCatalog::ParamsForBody(OrbitLayout::Body::Sun, ctx.sim.qualityPreset);
             // Mesh is scaled 0.5 × sphere radius (~2) ≈ 1 unit; inflate so the torus is readable.
             const float sunRadius = 28.0f;
-            drawBody(OrbitLayout::Body::Sun, sunParams, _app._sun->GetPosition(), glm::mat4(1.0f), sunRadius);
+            drawBody(OrbitLayout::Body::Sun, sunParams, ctx.scene.sun->GetPosition(), glm::mat4(1.0f), sunRadius);
         }
 
-        for (const auto& component : _app._renderableSceneComponents) {
+        for (const auto& component : (*ctx.scene.components)) {
             if (!component.planet) {
                 continue;
             }
@@ -110,7 +98,7 @@ void Renderer::RenderMagneticFields() {
             if (body == OrbitLayout::Body::Sun) {
                 continue;
             }
-            const MagneticFieldParams params = MagneticFieldCatalog::ParamsForBody(body, gSimState->qualityPreset);
+            const MagneticFieldParams params = MagneticFieldCatalog::ParamsForBody(body, ctx.sim.qualityPreset);
             if (!params.enabled) {
                 continue;
             }
@@ -132,15 +120,15 @@ void Renderer::RenderMagneticFields() {
     bindRibbonState();
     drawBodies(1.0f, 1.0f);
 
-    const auto quality = GetQualitySettings(gSimState->qualityPreset, gSimState->isMobileWeb);
-    if (magneticFieldBloom && quality.enableMagneticBloom) {
-        magneticFieldBloom->Resize(_app._displayWidth, _app._displayHeight);
-        if (magneticFieldBloom->IsEnabled()) {
-            magneticFieldBloom->BeginCapture();
+    const auto quality = GetQualitySettings(ctx.sim.qualityPreset, ctx.sim.isMobileWeb);
+    if (_magneticFieldBloom && quality.enableMagneticBloom) {
+        _magneticFieldBloom->Resize(ctx.display.x, ctx.display.y);
+        if (_magneticFieldBloom->IsEnabled()) {
+            _magneticFieldBloom->BeginCapture();
             bindRibbonState();
             drawBodies(2.0f, 1.35f);
-            const float intensity = gSimState->isMobileWeb ? 0.48f : (quality.magneticBloomPasses >= 2 ? 0.82f : 0.62f);
-            magneticFieldBloom->BlurAndComposite(quality.magneticBloomPasses, intensity);
+            const float intensity = ctx.sim.isMobileWeb ? 0.48f : (quality.magneticBloomPasses >= 2 ? 0.82f : 0.62f);
+            _magneticFieldBloom->BlurAndComposite(quality.magneticBloomPasses, intensity);
         }
     }
 
@@ -152,8 +140,8 @@ void Renderer::RenderMagneticFields() {
     glDisable(GL_BLEND);
 }
 
-void Renderer::RenderOrbitPaths() const {
-    if (!orbitLinesEnabled || !orbitPathRenderer || !_app._sun) {
+void Renderer::RenderOrbitPaths(const FrameContext& ctx) const {
+    if (!_orbitLinesEnabled || !_orbitPathRenderer || !ctx.scene.sun) {
         return;
     }
 
@@ -162,8 +150,8 @@ void Renderer::RenderOrbitPaths() const {
     glEnable(GL_DEPTH_TEST);
     glDepthMask(GL_FALSE);
 
-    const glm::vec3 sunPos = _app._sun->GetPosition();
-    const float orbitAlpha = magneticFieldsEnabled ? 0.08f : 0.35f;
+    const glm::vec3 sunPos = ctx.scene.sun->GetPosition();
+    const float orbitAlpha = _magneticFieldsEnabled ? 0.08f : 0.35f;
     const glm::vec4 color(0.45f, 0.55f, 0.75f, orbitAlpha);
 
     for (int i = 1; i < OrbitLayout::kBodyCount; ++i) {
@@ -177,37 +165,37 @@ void Renderer::RenderOrbitPaths() const {
         model = glm::translate(model, sunPos);
         model = glm::rotate(model, glm::radians(OrbitLayout::GetInclinationDegrees(body)), glm::vec3(1.0f, 0.0f, 0.0f));
         model = glm::scale(model, glm::vec3(radius));
-        orbitPathRenderer->Draw(cameraProjection, cameraView, model, color);
+        _orbitPathRenderer->Draw(ctx.view.projection, ctx.view.view, model, color);
     }
 
     glDepthMask(GL_TRUE);
     glDisable(GL_BLEND);
 }
 
-void Renderer::RebuildMissionPaths() {
+void Renderer::RebuildMissionPaths(const MissionCatalog::Catalog& catalog, int qualityPreset) {
     // Vertices are uploaded in the render frame, so this also runs whenever the render
     // origin moves. Reuse the renderers (each owns a compiled shader) and only re-upload.
-    const auto& missions = _app._missionCatalog.missions;
-    if (missionPathMeshes.size() != missions.size()) {
-        missionPathMeshes.clear();
-        missionPathMeshes.reserve(missions.size());
+    const auto& missions = catalog.missions;
+    if (_missionPathMeshes.size() != missions.size()) {
+        _missionPathMeshes.clear();
+        _missionPathMeshes.reserve(missions.size());
         for (size_t i = 0; i < missions.size(); ++i) {
-            missionPathMeshes.push_back(std::make_unique<MissionPathRenderer>());
+            _missionPathMeshes.push_back(std::make_unique<MissionPathRenderer>());
         }
     }
     for (size_t i = 0; i < missions.size(); ++i) {
-        const auto auSamples = MissionCatalog::DownsampledAu(missions[i], gSimState->qualityPreset);
+        const auto auSamples = MissionCatalog::DownsampledAu(missions[i], qualityPreset);
         std::vector<glm::vec3> scene;
         scene.reserve(auSamples.size());
         for (const auto& au : auSamples) {
             scene.push_back(OrbitLayout::ToRenderFrame(OrbitLayout::HelioAuToSceneDouble(glm::dvec3(au))));
         }
-        missionPathMeshes[i]->Upload(scene);
+        _missionPathMeshes[i]->Upload(scene);
     }
 }
 
-void Renderer::RenderMissionPaths() const {
-    if (missionPathMeshes.empty()) {
+void Renderer::RenderMissionPaths(const FrameContext& ctx) const {
+    if (_missionPathMeshes.empty() || !ctx.scene.missions) {
         return;
     }
     glEnable(GL_BLEND);
@@ -216,21 +204,25 @@ void Renderer::RenderMissionPaths() const {
     glDepthMask(GL_FALSE);
     glDisable(GL_CULL_FACE);
 
-    const float zCoef = static_cast<float>(2.0 / glm::log2(_app._camera.GetFar() + 1.0));
-    const glm::vec3 camPos = _app._camera.GetPosition();
-    for (size_t i = 0; i < missionPathMeshes.size(); ++i) {
-        if (!missionPathMeshes[i] || missionPathMeshes[i]->Empty()) {
+    const float zCoef = ctx.view.zCoef;
+    const glm::vec3 camPos = ctx.view.headPosition;
+    for (size_t i = 0; i < _missionPathMeshes.size(); ++i) {
+        if (!_missionPathMeshes[i] || _missionPathMeshes[i]->Empty()) {
             continue;
         }
-        const auto& mission = _app._missionCatalog.missions[i];
-        const bool focused = static_cast<int>(i) == _app._focusedMissionIndex;
-        missionPathMeshes[i]->Draw(cameraProjection, cameraView, camPos, zCoef, mission.color,
+        if (i >= ctx.scene.missions->missions.size()) {
+            break;
+        }
+        const auto& mission = ctx.scene.missions->missions[i];
+        const bool focused = static_cast<int>(i) == ctx.scene.focusedMission;
+        _missionPathMeshes[i]->Draw(ctx.view.projection, ctx.view.view, camPos, zCoef, mission.color,
                                     focused ? 0.85f : 0.45f, focused);
-        glm::vec3 probe(0.0f);
-        if (_app.SampleMissionScenePosition(static_cast<int>(i), probe)) {
-            missionPathMeshes[i]->DrawProbe(cameraProjection, cameraView, camPos,
-                                             _app._camera.GetRightVector(), _app._camera.GetUpVector(), zCoef,
-                                             probe, mission.color);
+        const std::optional<glm::vec3>* probe =
+            ctx.scene.missionProbes && i < ctx.scene.missionProbes->size() ? &(*ctx.scene.missionProbes)[i] : nullptr;
+        if (probe && probe->has_value()) {
+            _missionPathMeshes[i]->DrawProbe(ctx.view.projection, ctx.view.view, camPos,
+                                             ctx.view.right, ctx.view.up, zCoef,
+                                             **probe, mission.color);
         }
     }
 
@@ -240,42 +232,42 @@ void Renderer::RenderMissionPaths() const {
     glDisable(GL_BLEND);
 }
 
-void Renderer::RenderXrPointers() const {
+void Renderer::RenderXrPointers(const FrameContext& ctx) const {
 #ifdef __EMSCRIPTEN__
-    if (!_app._xr.active || !xrPointerRenderer || gSimState->qualityPreset <= 0) {
+    if (!ctx.xr || !_xrPointerRenderer || ctx.sim.qualityPreset <= 0) {
         return;
     }
     glEnable(GL_BLEND);
     glBlendFunc(GL_SRC_ALPHA, GL_ONE);
     glDepthMask(GL_FALSE);
     glDisable(GL_CULL_FACE);
-    const float zCoef = static_cast<float>(2.0 / glm::log2(_app._camera.GetFar() + 1.0));
-    xrPointerRenderer->Draw(cameraProjection, cameraView, _app._camera.GetPosition(), zCoef);
+    const float zCoef = ctx.view.zCoef;
+    _xrPointerRenderer->Draw(ctx.view.projection, ctx.view.view, ctx.view.headPosition, zCoef);
     glEnable(GL_CULL_FACE);
     glDepthMask(GL_TRUE);
     glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
     glDisable(GL_BLEND);
 #else
-    (void)0;
+    (void)ctx;
 #endif
 }
 
-void Renderer::RenderAsteroidField() {
-    if (!_app._asteroidField || !_app._sun) {
+void Renderer::RenderAsteroidField(const FrameContext& ctx) const {
+    if (!ctx.scene.asteroidField || !ctx.scene.sun) {
         return;
     }
 
     // Advanced once per frame by Application::UpdateScene; this pass only draws.
-    const float zCoef = static_cast<float>(2.0 / glm::log2(_app._camera.GetFar() + 1.0));
-    _app._asteroidField->Render(cameraProjection, cameraView,
-                           _app._sun->GetPosition(), _app._camera.GetPosition(),
-                           _app._camera.GetRightVector(), _app._camera.GetUpVector(),
+    const float zCoef = ctx.view.zCoef;
+    ctx.scene.asteroidField->Render(ctx.view.projection, ctx.view.view,
+                           ctx.scene.sun->GetPosition(), ctx.view.headPosition,
+                           ctx.view.right, ctx.view.up,
                            zCoef);
 
-    if (_app._kuiperField) {
-        _app._kuiperField->Render(cameraProjection, cameraView,
-                                  _app._sun->GetPosition(), _app._camera.GetPosition(),
-                                  _app._camera.GetRightVector(), _app._camera.GetUpVector(),
+    if (ctx.scene.kuiperField) {
+        ctx.scene.kuiperField->Render(ctx.view.projection, ctx.view.view,
+                                  ctx.scene.sun->GetPosition(), ctx.view.headPosition,
+                                  ctx.view.right, ctx.view.up,
                                   zCoef);
     }
 }

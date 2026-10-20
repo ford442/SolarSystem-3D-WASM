@@ -17,7 +17,9 @@ public:
                    std::string label,
                    TextureLoadCategory category);
 
-    void Update(const glm::vec3& cameraPosition, const glm::vec3& objectPosition, float threshold = 50.0f);
+    /** `allowedMax` is the quality tier's ceiling (TextureLodPolicy::maxTier). */
+    void Update(const glm::vec3& cameraPosition, const glm::vec3& objectPosition, float threshold,
+                TextureLodTier allowedMax);
 
     TextureLodTier GetResidentTier() const { return _residentTier; }
     TextureLodTier GetInFlightTier() const { return _inFlightTier; }

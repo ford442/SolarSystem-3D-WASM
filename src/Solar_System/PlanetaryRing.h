@@ -23,7 +23,7 @@ public:
     float GetOuterRadius() const;
     glm::vec3 GetRingNormal() const;
     GLuint GetRingTexture() const;
-    void LoadHighResIfClose(const glm::vec3& cameraPosition);
+    void LoadHighResIfClose(const glm::vec3& cameraPosition, const TextureLodPolicy& policy);
 
 protected:
     TextureImage2D _ringTexture;

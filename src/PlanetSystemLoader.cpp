@@ -36,7 +36,7 @@ void Application::LoadPlanetSystemManifests() {
               << " with " << _planetSystemManifests.size()
               << " planet systems deferred until camera approaches." << std::endl;
     ActivateNearestPlanetSystems(
-        GetQualitySettings(gSimState->qualityPreset, gSimState->isMobileWeb).eagerPlanetSystems);
+        GetQualitySettings(_simState.qualityPreset, _simState.isMobileWeb).eagerPlanetSystems);
 #endif
 }
 
@@ -151,37 +151,3 @@ void Application::RefreshPlanetProxyPositions() {
 #endif
 }
 
-void Application::RenderPlanetProxyMarkers() const {
-#ifdef __EMSCRIPTEN__
-    if (_planetSystemManifests.empty()) return;
-
-    glDisable(GL_DEPTH_TEST);
-    glEnable(GL_BLEND);
-    glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
-
-    _renderer.mainTextShader->Use();
-    _renderer.mainTextShader->SetMat4("projection", _renderer.cameraProjection);
-    _renderer.mainTextShader->SetMat4("view", _renderer.cameraView);
-    _renderer.mainTextShader->SetBool("is3D", true);
-
-    for (const auto& manifest : _planetSystemManifests) {
-        if (manifest.state == PlanetSystemManifest::State::READY) continue;
-
-        std::wstring label(manifest.name.begin(), manifest.name.end());
-        if (manifest.state == PlanetSystemManifest::State::NOT_LOADED) {
-            label += L" (approach to load)";
-        } else if (manifest.state == PlanetSystemManifest::State::DOWNLOADING) {
-            int done = manifest.totalDownloads - manifest.pendingDownloads;
-            int pct = (manifest.totalDownloads > 0) ? (done * 100 / manifest.totalDownloads) : 0;
-            label += L" [downloading " + std::to_wstring(pct) + L"%]";
-        }
-
-        std::deque<wchar_t> chars(label.begin(), label.end());
-        _renderer.mainTextShader->SetVec3("particleCenterWorldSpace", manifest.proxyPosition);
-        _renderer.textRenderer->Render(*_renderer.mainTextShader, chars, 0.0, 0.0, 0.075, glm::vec3(0.5f, 0.7f, 1.0f));
-    }
-
-    glDisable(GL_BLEND);
-    glEnable(GL_DEPTH_TEST);
-#endif
-}
