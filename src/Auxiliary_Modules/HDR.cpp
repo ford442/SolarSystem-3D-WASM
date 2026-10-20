@@ -49,7 +49,6 @@ void HDR::Render(float exposure, float gamma) const {
     }
 
     _hdrShader->Use();
-    _hdrShader->SetInt("hdrBuffer", 0);
     glBindTextureUnit(0, _colorBuffer.get());
     _hdrShader->SetBool("hdr", true);
     _hdrShader->SetFloat("exposure", exposure);

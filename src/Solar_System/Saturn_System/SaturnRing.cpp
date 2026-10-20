@@ -1,4 +1,5 @@
 #include "SaturnRing.h"
+#include "../../gfx/TextureUnits.h"
 #include "../TexturePaths.h"
 #include "../BodyCatalog.generated.h"
 #include "../OrbitLayout.h"
@@ -24,7 +25,6 @@ void SaturnRing::AdjustToParent() {
 void SaturnRing::Render() const {
     GetShader().SetVec3("planetPos", _parentPlanet->GetPosition());
     GetShader().SetFloat("planetRadius", _parentPlanet->GetRadius());
-    GetShader().SetInt("ringDiffuse", 0);
-    glBindTextureUnit(0, _ringTexture.GetTexture());
+    glBindTextureUnit(Unit(TextureUnit::Diffuse), _ringTexture.GetTexture()); // ringTexture
     SpaceObject::Render();
 }

@@ -18,7 +18,6 @@ void SkyBox::Render(const Shader& shader) const {
     glDepthFunc(GL_LEQUAL);
 
     shader.Use();
-    shader.SetInt("skybox", 0);
 #ifndef __EMSCRIPTEN__
     glBindTextureUnit(0, _texture.get());
 #endif

@@ -6,8 +6,8 @@
 #include <string>
 #include <vector>
 
-// GL-free shader source assembly: the `#version` rewrite, the shared preamble and
-// `#include "common/x.glsl"` expansion. Shader.cpp feeds the result to glShaderSource;
+// GL-free shader source assembly: the `#version` rewrite, the shared preamble,
+// `#include "common/x.glsl"` expansion and sampler `binding =` extraction. Shader.cpp feeds the result to glShaderSource;
 // tests feed it in-memory files. See docs/ARCHITECTURE.md §9.1.
 //
 // Output layout (source-string numbers are what the GLSL compiler prints in errors):
@@ -28,11 +28,19 @@ enum class Dialect { GlslEs300, Desktop460 };
 // Returns the file's contents, or nullopt when it cannot be read.
 using FileReader = std::function<std::optional<std::string>(const std::string& path)>;
 
+// `layout(binding = TU_X) uniform sampler… name;` with the qualifier stripped (GLSL ES 3.00
+// has no sampler binding). Shader assigns `unit` to `uniform` once, after linking.
+struct SamplerBinding {
+    std::string uniform;
+    int unit = 0;
+};
+
 struct Result {
     bool ok = false;
     std::string code;
     // sourceNames[i] is the path that GLSL source-string number i refers to.
     std::vector<std::string> sourceNames;
+    std::vector<SamplerBinding> samplerBindings;
     std::string error;
 };
 

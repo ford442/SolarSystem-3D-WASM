@@ -1,4 +1,5 @@
 #include "Star.h"
+#include "../gfx/TextureUnits.h"
 
 Star::Star(StarInfo&& starInfo) : SpaceObject(starInfo.starModel, *starInfo.starShader, starInfo.engName, starInfo.otherLangName),
     _starTemperature(starInfo.starTemperature), _starRadius(starInfo.starRadius), _glowTintMult(starInfo.glowTintMult),
@@ -36,9 +37,7 @@ void Star::RenderGlow(const glm::mat4& projection, const glm::mat4& view, const 
     _glowShader->SetVec2("dims", glowDimensions * 0.5f);
     _glowShader->SetFloat("uColorMap", _starTemperatureColorUCoordinate);
     _glowShader->SetFloat("noiseZ", (vs.x + vs.y - vs.z) * 0.25f);
-    _glowShader->SetInt("colorMap", 0);
-    _glowShader->SetInt("ringDiffuse", 1);
-    glBindTextureUnit(0, _starSpectrumTexture.GetTexture());
+    glBindTextureUnit(Unit(TextureUnit::Diffuse), _starSpectrumTexture.GetTexture());
 
     _glowShader->SetBool("isPlanetaryRingInView", ringCameraInfo.has_value());
     if (ringCameraInfo) {
@@ -46,7 +45,7 @@ void Star::RenderGlow(const glm::mat4& projection, const glm::mat4& view, const 
         _glowShader->SetVec3("ringCenter", ringCameraInfo->ringCenter);
         _glowShader->SetVec3("ringNormal", ringCameraInfo->ringNormal);
         _glowShader->SetVec2("ringInnerOuterRadiuses", ringCameraInfo->ringInnerOuterRadiuses);
-        glBindTextureUnit(1, ringCameraInfo->ringDiffuse);
+        glBindTextureUnit(Unit(TextureUnit::Ring), ringCameraInfo->ringDiffuse);
     }
 
     glBindVertexArray(_glowVao.get());

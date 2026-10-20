@@ -1,8 +1,10 @@
-// Covers ShaderSource: the #version rewrite, the preamble, #include expansion and the
-// #line bookkeeping that keeps compiler errors pointing at the right file and line. The
-// last tests run every real shader in resource/shaders through the preprocessor.
+// Covers ShaderSource: the #version rewrite, the preamble, #include expansion, sampler
+// `binding =` extraction and the #line bookkeeping that keeps compiler errors pointing at
+// the right file and line. The last tests run every real shader in resource/shaders
+// through the preprocessor.
 
 #include "Auxiliary_Modules/ShaderSource.h"
+#include "gfx/TextureUnits.h"
 
 #include <gtest/gtest.h>
 
@@ -201,6 +203,39 @@ TEST(ShaderSource, NumberedListingAndSourceLegend) {
     EXPECT_EQ(ShaderSource::NumberedListing("a\nb\n"), "1\ta\n2\tb\n");
 }
 
+TEST(ShaderSource, StripsSamplerBindingsAndRecordsTheirUnits) {
+    MemoryFiles fs = BaseFiles();
+    fs.files["shaders/a.fs"] =
+        "#version 300 es\n"
+        "layout(binding = TU_SHADOW_MAP) uniform sampler2D shadowMap;\n"
+        "  layout (binding=3) uniform highp samplerCube sky; // trailing comment\n"
+        "layout(location = 0) out vec4 color;\n"
+        "void main() {}\n";
+    const auto result = Preprocess("shaders/a.fs", Stage::Fragment, Dialect::GlslEs300, fs.Reader());
+    ASSERT_TRUE(result.ok) << result.error;
+    EXPECT_EQ(result.code.find("binding"), std::string::npos);
+    EXPECT_NE(result.code.find("\nuniform sampler2D shadowMap;\n"), std::string::npos);
+    EXPECT_NE(result.code.find("\n  uniform highp samplerCube sky; // trailing comment\n"), std::string::npos);
+    EXPECT_NE(result.code.find("layout(location = 0) out vec4 color;"), std::string::npos); // not a binding
+    ASSERT_EQ(result.samplerBindings.size(), 2u);
+    EXPECT_EQ(result.samplerBindings[0].uniform, "shadowMap");
+    EXPECT_EQ(result.samplerBindings[0].unit, static_cast<int>(TextureUnit::ShadowMap));
+    EXPECT_EQ(result.samplerBindings[1].uniform, "sky");
+    EXPECT_EQ(result.samplerBindings[1].unit, 3);
+}
+
+TEST(ShaderSource, RejectsUnknownUnitsAndBindingsOffSamplers) {
+    MemoryFiles fs = BaseFiles();
+    fs.files["shaders/unknown.fs"] = "#version 300 es\nlayout(binding = TU_NOPE) uniform sampler2D a;\n";
+    fs.files["shaders/block.fs"] = "#version 300 es\nlayout(binding = 0) uniform float notASampler;\n";
+    const auto unknown = Preprocess("shaders/unknown.fs", Stage::Fragment, Dialect::GlslEs300, fs.Reader());
+    EXPECT_FALSE(unknown.ok);
+    EXPECT_NE(unknown.error.find("TU_NOPE"), std::string::npos);
+    EXPECT_NE(unknown.error.find("shaders/unknown.fs:2"), std::string::npos);
+    const auto block = Preprocess("shaders/block.fs", Stage::Fragment, Dialect::GlslEs300, fs.Reader());
+    EXPECT_FALSE(block.ok);
+}
+
 // ---------------------------------------------------------------------------------------
 // The real shader tree.
 
@@ -258,6 +293,68 @@ TEST(ShaderSourceTree, PreambleDeclaresNoMacrosThatShadowShaderConstants) {
     const auto preamble = ShaderSource::ReadFileFromDisk(kShaderDir + "/common/preamble.glsl");
     ASSERT_TRUE(preamble.has_value());
     EXPECT_FALSE(std::regex_search(*preamble, std::regex(R"((^|\n)[ \t]*#[ \t]*define)")));
+    // The one include it pulls in only defines TU_* names, which no shader constant uses.
+    const auto units = ShaderSource::ReadFileFromDisk(kShaderDir + "/common/texture_units.glsl");
+    ASSERT_TRUE(units.has_value());
+    std::istringstream lines(*units);
+    std::string line;
+    while (std::getline(lines, line)) {
+        if (std::regex_search(line, std::regex(R"(^\s*#\s*define)"))) {
+            EXPECT_TRUE(std::regex_search(line, std::regex(R"(^#define TU_\w+ +\d+$)"))) << line;
+        }
+    }
+}
+
+TEST(ShaderSourceTree, TextureUnitsGlslMatchesTheHeader) {
+    // scripts/generate-texture-units.mjs writes this file; CI runs it with --check. This is the
+    // same check without node: every X-list entry appears as its #define, and nothing else.
+    const auto units = ShaderSource::ReadFileFromDisk(kShaderDir + "/common/texture_units.glsl");
+    ASSERT_TRUE(units.has_value());
+    size_t entries = 0;
+#define SOLARSYSTEM_EXPECT_UNIT(name, value, glsl)                                                  \
+    ++entries;                                                                                      \
+    EXPECT_TRUE(std::regex_search(*units, std::regex("\n#define " #glsl " +" #value "\n"))) << #glsl;
+    SOLARSYSTEM_TEXTURE_UNITS(SOLARSYSTEM_EXPECT_UNIT)
+#undef SOLARSYSTEM_EXPECT_UNIT
+    EXPECT_EQ(CountOf(*units, "#define "), entries);
+}
+
+// Every sampler names its unit, so no draw has to SetInt it (and none can forget to).
+TEST(ShaderSourceTree, EverySamplerDeclaresItsTextureUnit) {
+    const std::regex bareSampler(R"((^|\n)\s*uniform\s+(?:(?:lowp|mediump|highp)\s+)?[iu]?sampler\w*\s+\w+)");
+    for (const auto& file : TopLevelShaders()) {
+        const Stage stage = file.extension() == ".vs" ? Stage::Vertex : Stage::Fragment;
+        const auto raw = ShaderSource::ReadFileFromDisk(file.string());
+        ASSERT_TRUE(raw.has_value());
+        EXPECT_FALSE(std::regex_search(*raw, bareSampler)) << file << " has a sampler without layout(binding = TU_...)";
+        const auto result = Preprocess(file.string(), stage, Dialect::GlslEs300, ShaderSource::ReadFileFromDisk);
+        ASSERT_TRUE(result.ok) << result.error;
+        EXPECT_FALSE(std::regex_search(result.code, std::regex(R"((^|\n)\s*layout\s*\(\s*binding)")))
+            << file << ": GLSL ES 3.00 has no sampler binding";
+    }
+}
+
+// The lit programs (vertex + fragment pairs Renderer builds) read the per-frame uniforms
+// from FrameUBO rather than taking projection/view/zCoef/lightPos per draw.
+TEST(ShaderSourceTree, LitProgramsReadTheFrameUniformBlock) {
+    const std::pair<const char*, const char*> programs[] = {
+        {"planetLighting.vs", "planetLighting.fs"}, {"planetLighting.vs", "cloudsLighting.fs"},
+        {"atmosphere.vs", "atmosphere.fs"},         {"atmosphere.vs", "atmospherePbr.fs"},
+        {"planetaryRingLighting.vs", "planetaryRingLighting.fs"},
+        {"star.vs", "star.fs"},                     {"starCorona.vs", "starCorona.fs"},
+        {"starCoronaVolume.vs", "starCoronaVolume.fs"},
+    };
+    for (const auto& [vs, fs] : programs) {
+        const auto vertex = Preprocess(kShaderDir + "/" + vs, Stage::Vertex, Dialect::GlslEs300, ShaderSource::ReadFileFromDisk);
+        ASSERT_TRUE(vertex.ok) << vertex.error;
+        EXPECT_NE(vertex.code.find("uniform FrameUBO"), std::string::npos) << vs;
+        const auto fragment = Preprocess(kShaderDir + "/" + fs, Stage::Fragment, Dialect::GlslEs300, ShaderSource::ReadFileFromDisk);
+        ASSERT_TRUE(fragment.ok) << fragment.error;
+        for (const char* stale : {"uniform mat4 projection;", "uniform mat4 view;", "uniform float zCoef;"}) {
+            EXPECT_EQ(vertex.code.find(stale), std::string::npos) << vs << " still declares " << stale;
+            EXPECT_EQ(fragment.code.find(stale), std::string::npos) << fs << " still declares " << stale;
+        }
+    }
 }
 #endif
 

@@ -1,7 +1,9 @@
 #include "Shader.h"
+#include "../gfx/FrameUniforms.h"
+#include <algorithm>
+#include <cstring>
 
 #ifndef __EMSCRIPTEN__
-#include <algorithm>
 #include <filesystem>
 #endif
 
@@ -89,231 +91,139 @@ void Shader::Build(const std::string& vertexPath, const std::string& fragmentPat
         glDetachShader(program, geometry.get());
     }
 #endif
+
+    std::vector<ShaderSource::SamplerBinding> samplerBindings = vertexSource.samplerBindings;
+    samplerBindings.insert(samplerBindings.end(), fragmentSource.samplerBindings.begin(),
+                           fragmentSource.samplerBindings.end());
+    Introspect(samplerBindings);
 }
 
-GLint Shader::GetUniformLocation(const std::string& name) const {
-    const auto it = _uniformLocationCache.find(name);
-    if (it != _uniformLocationCache.end()) {
-        return it->second;
+void Shader::Introspect(const std::vector<ShaderSource::SamplerBinding>& samplerBindings) {
+    const GLuint program = _program.get();
+    GLint count = 0;
+    GLint maxLength = 0;
+    glGetProgramiv(program, GL_ACTIVE_UNIFORMS, &count);
+    glGetProgramiv(program, GL_ACTIVE_UNIFORM_MAX_LENGTH, &maxLength);
+    std::vector<char> nameBuffer(static_cast<size_t>(std::max(maxLength, 1)));
+    _slots.clear();
+    _uniformIndex.clear();
+    for (GLint i = 0; i < count; ++i) {
+        GLsizei length = 0;
+        GLint size = 0;
+        GLenum type = 0;
+        glGetActiveUniform(program, static_cast<GLuint>(i), static_cast<GLsizei>(nameBuffer.size()), &length, &size,
+                           &type, nameBuffer.data());
+        std::string name(nameBuffer.data(), static_cast<size_t>(length));
+        const GLint location = glGetUniformLocation(program, name.c_str());
+        if (location < 0) {
+            continue; // a uniform-block member
+        }
+        const auto slot = static_cast<unsigned int>(_slots.size());
+        _slots.push_back(UniformSlot{location});
+        if (name.size() > 3 && name.compare(name.size() - 3, 3, "[0]") == 0) {
+            _uniformIndex.emplace_back(name.substr(0, name.size() - 3), slot);
+        }
+        _uniformIndex.emplace_back(std::move(name), slot);
     }
-    const GLint location = glGetUniformLocation(_program.get(), name.c_str());
-    _uniformLocationCache.emplace(name, location);
-    return location;
+    std::sort(_uniformIndex.begin(), _uniformIndex.end());
+
+    // SetInt binds the program for the call and restores the current one.
+    for (const ShaderSource::SamplerBinding& binding : samplerBindings) {
+        SetInt(binding.uniform, binding.unit);
+    }
+
+    const GLuint frameBlock = glGetUniformBlockIndex(program, "FrameUBO");
+    _usesFrameUniforms = frameBlock != GL_INVALID_INDEX;
+    if (_usesFrameUniforms) {
+        glUniformBlockBinding(program, frameBlock, FrameUniformBuffer::kBinding);
+    }
+}
+
+Shader::UniformSlot* Shader::FindSlot(std::string_view name) const {
+    const auto it = std::lower_bound(_uniformIndex.begin(), _uniformIndex.end(), name,
+                                     [](const auto& entry, std::string_view key) { return entry.first < key; });
+    return it != _uniformIndex.end() && it->first == name ? &_slots[it->second] : nullptr;
+}
+
+template <class T>
+bool Shader::Store(UniformSlot& slot, const T& value) {
+    static_assert(sizeof(T) <= sizeof(UniformSlot::value), "uniform value larger than a mat4");
+    if (slot.size == sizeof(T) && std::memcmp(slot.value, &value, sizeof(T)) == 0) {
+        return false;
+    }
+    std::memcpy(slot.value, &value, sizeof(T));
+    slot.size = static_cast<unsigned char>(sizeof(T));
+    return true;
 }
 
 void Shader::Use() const {
     glUseProgram(_program.get());
+    s_currentProgram = _program.get();
 }
 
-void Shader::SetBool(const std::string& name, bool value) const {
-    const GLint location = GetUniformLocation(name);
-    if (location >= 0) {
-        glUniform1i(location, static_cast<int>(value));
+// Every setter: find the slot, skip an unchanged value, and only then count and issue the
+// call. glUniform* writes to the *current* program, so a setter on a Shader that is not the
+// one last Use()d binds its own program for the call and puts the current one back; the
+// value then lands where the caller meant it, and the slot cache stays true.
+#define SOLARSYSTEM_SHADER_SET(stored, call)                          \
+    UniformSlot* slot = FindSlot(name);                               \
+    if (slot && Store(*slot, stored)) {                               \
+        const GLint location = slot->location;                        \
+        const GLuint current = s_currentProgram;                      \
+        const bool foreign = current != _program.get();               \
+        if (foreign) {                                                \
+            glUseProgram(_program.get());                             \
+        }                                                             \
+        ++s_uniformCalls;                                             \
+        call;                                                         \
+        if (foreign) {                                                \
+            glUseProgram(current);                                    \
+        }                                                             \
     }
+
+void Shader::SetBool(std::string_view name, bool value) const {
+    // Stored as the int GL keeps, so SetBool(true) and SetInt(1) agree.
+    const int asInt = value ? 1 : 0;
+    SOLARSYSTEM_SHADER_SET(asInt, glUniform1i(location, asInt))
 }
 
-void Shader::SetInt(const std::string& name, int value) const {
-    const GLint location = GetUniformLocation(name);
-    if (location >= 0) {
-        glUniform1i(location, value);
-    }
+void Shader::SetInt(std::string_view name, int value) const {
+    SOLARSYSTEM_SHADER_SET(value, glUniform1i(location, value))
 }
 
-void Shader::SetFloat(const std::string& name, float value) const {
-    const GLint location = GetUniformLocation(name);
-    if (location >= 0) {
-        glUniform1f(location, value);
-    }
+void Shader::SetFloat(std::string_view name, float value) const {
+    SOLARSYSTEM_SHADER_SET(value, glUniform1f(location, value))
 }
 
-void Shader::SetDouble(const std::string &name, double value) const {
-    // [PORTING NOTE] WebGL 2 does NOT support glUniform1d (double precision).
-    // Cast to float for web builds.
-    const GLint location = GetUniformLocation(name);
-    if (location < 0) {
-        return;
-    }
-    #ifdef __EMSCRIPTEN__
-    glUniform1f(location, static_cast<float>(value));
-    #else
-    glUniform1d(location, value);
-    #endif
+void Shader::SetVec2(std::string_view name, const glm::vec2& value) const {
+    SOLARSYSTEM_SHADER_SET(value, glUniform2fv(location, 1, &value[0]))
 }
 
-void Shader::SetVec2(const std::string& name, const glm::vec2& value) const {
-    const GLint location = GetUniformLocation(name);
-    if (location >= 0) {
-        glUniform2fv(location, 1, &value[0]);
-    }
+void Shader::SetVec2(std::string_view name, float x, float y) const {
+    SetVec2(name, glm::vec2(x, y));
 }
 
-void Shader::SetVec2(const std::string& name, float x, float y) const {
-    const GLint location = GetUniformLocation(name);
-    if (location >= 0) {
-        glUniform2f(location, x, y);
-    }
+void Shader::SetVec3(std::string_view name, const glm::vec3& value) const {
+    SOLARSYSTEM_SHADER_SET(value, glUniform3fv(location, 1, &value[0]))
 }
 
-void Shader::SetVec3(const std::string& name, const glm::vec3& value) const {
-    const GLint location = GetUniformLocation(name);
-    if (location >= 0) {
-        glUniform3fv(location, 1, &value[0]);
-    }
+void Shader::SetVec3(std::string_view name, float x, float y, float z) const {
+    SetVec3(name, glm::vec3(x, y, z));
 }
 
-void Shader::SetVec3(const std::string& name, float x, float y, float z) const {
-    const GLint location = GetUniformLocation(name);
-    if (location >= 0) {
-        glUniform3f(location, x, y, z);
-    }
+void Shader::SetVec4(std::string_view name, const glm::vec4& value) const {
+    SOLARSYSTEM_SHADER_SET(value, glUniform4fv(location, 1, &value[0]))
 }
 
-void Shader::SetVec4(const std::string& name, const glm::vec4& value) const {
-    const GLint location = GetUniformLocation(name);
-    if (location >= 0) {
-        glUniform4fv(location, 1, &value[0]);
-    }
+void Shader::SetMat3(std::string_view name, const glm::mat3& mat) const {
+    SOLARSYSTEM_SHADER_SET(mat, glUniformMatrix3fv(location, 1, GL_FALSE, &mat[0][0]))
 }
 
-void Shader::SetVec4(const std::string& name, float x, float y, float z, float w) const {
-    const GLint location = GetUniformLocation(name);
-    if (location >= 0) {
-        glUniform4f(location, x, y, z, w);
-    }
+void Shader::SetMat4(std::string_view name, const glm::mat4& mat) const {
+    SOLARSYSTEM_SHADER_SET(mat, glUniformMatrix4fv(location, 1, GL_FALSE, &mat[0][0]))
 }
 
-void Shader::SetMat2(const std::string& name, const glm::mat2& mat) const {
-    const GLint location = GetUniformLocation(name);
-    if (location >= 0) {
-        glUniformMatrix2fv(location, 1, GL_FALSE, &mat[0][0]);
-    }
-}
-
-void Shader::SetMat3(const std::string& name, const glm::mat3& mat) const {
-    const GLint location = GetUniformLocation(name);
-    if (location >= 0) {
-        glUniformMatrix3fv(location, 1, GL_FALSE, &mat[0][0]);
-    }
-}
-
-void Shader::SetMat4(const std::string& name, const glm::mat4& mat) const {
-    const GLint location = GetUniformLocation(name);
-    if (location >= 0) {
-        glUniformMatrix4fv(location, 1, GL_FALSE, &mat[0][0]);
-    }
-}
-
-void Shader::SetVec2Double(const std::string& name, const glm::dvec2& value) const {
-    const GLint location = GetUniformLocation(name);
-    if (location < 0) {
-        return;
-    }
-    #ifdef __EMSCRIPTEN__
-    glUniform2fv(location, 1, &glm::vec2(value)[0]);
-    #else
-    glUniform2dv(location, 1, &value[0]);
-    #endif
-}
-
-void Shader::SetVec2Double(const std::string& name, double x, double y) const {
-    const GLint location = GetUniformLocation(name);
-    if (location < 0) {
-        return;
-    }
-    #ifdef __EMSCRIPTEN__
-    glUniform2f(location, (float)x, (float)y);
-    #else
-    glUniform2d(location, x, y);
-    #endif
-}
-
-void Shader::SetVec3Double(const std::string& name, const glm::dvec3& value) const {
-    const GLint location = GetUniformLocation(name);
-    if (location < 0) {
-        return;
-    }
-    #ifdef __EMSCRIPTEN__
-    glUniform3fv(location, 1, &glm::vec3(value)[0]);
-    #else
-    glUniform3dv(location, 1, &value[0]);
-    #endif
-}
-
-void Shader::SetVec3Double(const std::string& name, double x, double y, double z) const {
-    const GLint location = GetUniformLocation(name);
-    if (location < 0) {
-        return;
-    }
-    #ifdef __EMSCRIPTEN__
-    glUniform3f(location, (float)x, (float)y, (float)z);
-    #else
-    glUniform3d(location, x, y, z);
-    #endif
-}
-
-void Shader::SetVec4Double(const std::string& name, const glm::dvec4& value) const {
-    const GLint location = GetUniformLocation(name);
-    if (location < 0) {
-        return;
-    }
-    #ifdef __EMSCRIPTEN__
-    glUniform4fv(location, 1, &glm::vec4(value)[0]);
-    #else
-    glUniform4dv(location, 1, &value[0]);
-    #endif
-}
-
-void Shader::SetVec4Double(const std::string& name, double x, double y, double z, double w) const {
-    const GLint location = GetUniformLocation(name);
-    if (location < 0) {
-        return;
-    }
-    #ifdef __EMSCRIPTEN__
-    glUniform4f(location, (float)x, (float)y, (float)z, (float)w);
-    #else
-    glUniform4d(location, x, y, z, w);
-    #endif
-}
-
-void Shader::SetMat2Double(const std::string& name, const glm::dmat2& mat) const {
-    const GLint location = GetUniformLocation(name);
-    if (location < 0) {
-        return;
-    }
-    #ifdef __EMSCRIPTEN__
-    glUniformMatrix2fv(location, 1, GL_FALSE, &glm::mat2(mat)[0][0]);
-    #else
-    glUniformMatrix2dv(location, 1, GL_FALSE, &mat[0][0]);
-    #endif
-}
-
-void Shader::SetMat3Double(const std::string& name, const glm::dmat3& mat) const {
-    const GLint location = GetUniformLocation(name);
-    if (location < 0) {
-        return;
-    }
-    #ifdef __EMSCRIPTEN__
-    glUniformMatrix3fv(location, 1, GL_FALSE, &glm::mat3(mat)[0][0]);
-    #else
-    glUniformMatrix3dv(location, 1, GL_FALSE, &mat[0][0]);
-    #endif
-}
-
-void Shader::SetMat4Double(const std::string& name, const glm::dmat4& mat) const {
-    const GLint location = GetUniformLocation(name);
-    if (location < 0) {
-        return;
-    }
-    #ifdef __EMSCRIPTEN__
-    glUniformMatrix4fv(location, 1, GL_FALSE, &glm::mat4(mat)[0][0]);
-    #else
-    glUniformMatrix4dv(location, 1, GL_FALSE, &mat[0][0]);
-    #endif
-}
-
-size_t Shader::GetProgramId() const {
-    return _program.get();
-}
+#undef SOLARSYSTEM_SHADER_SET
 
 #ifndef __EMSCRIPTEN__
 int Shader::SelfTestDirectory(const std::string& directory) {

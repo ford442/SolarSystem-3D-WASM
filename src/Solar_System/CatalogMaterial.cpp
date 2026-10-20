@@ -1,4 +1,5 @@
 #include "CatalogMaterial.h"
+#include "../gfx/TextureUnits.h"
 #include "../Auxiliary_Modules/Shader.h"
 
 namespace CatalogMaterial {
@@ -17,22 +18,16 @@ void BindMaterial(const Shader& shader, const Material& material, const Textures
     shader.SetBool("isUseSphereIntersect", material.useSphereIntersect);
     shader.SetFloat("ambientFactor", material.ambientFactor);
 
-    shader.SetInt("mainDiffuseTexture", kDiffuseUnit);
-    shader.SetInt("normalMap", kNormalUnit);
-    shader.SetInt("specularMap", kSpecularUnit);
-    shader.SetInt("nightTexture", kNightUnit);
-    shader.SetInt("cloudTexture", kCloudUnit);
-
-    glBindTextureUnit(kDiffuseUnit, textures.diffuse);
-    glBindTextureUnit(kNormalUnit, textures.normal);
+    glBindTextureUnit(Unit(TextureUnit::Diffuse), textures.diffuse);
+    glBindTextureUnit(Unit(TextureUnit::Normal), textures.normal);
     if (hasSpecular) {
-        glBindTextureUnit(kSpecularUnit, textures.specular);
+        glBindTextureUnit(Unit(TextureUnit::Specular), textures.specular);
     }
     if (hasNight) {
-        glBindTextureUnit(kNightUnit, textures.night);
+        glBindTextureUnit(Unit(TextureUnit::Night), textures.night);
     }
     if (hasClouds) {
-        glBindTextureUnit(kCloudUnit, textures.clouds);
+        glBindTextureUnit(Unit(TextureUnit::Clouds), textures.clouds);
     }
 }
 

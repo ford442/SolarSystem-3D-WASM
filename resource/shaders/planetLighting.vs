@@ -13,16 +13,12 @@ out vec3 vTangentViewPos;
 out vec3 vTangentFragPos;
 out vec4 vFragPosLightSpace;
 
-uniform mat4 projection;
-uniform mat4 view;
 uniform mat4 model;
 uniform mat4 lightSpaceMatrix;
 
-uniform vec3 lightPos;
-uniform vec3 viewPos;
 
-uniform float zCoef; // For log z-buffer (2.0 / log2(farPlane + 1.0))
 
+#include "common/frame.glsl"
 #include "common/log_depth.glsl"
 
 void main() {
@@ -37,12 +33,12 @@ void main() {
 
     mat3 TBN = transpose(mat3(T, B, N));
 
-    vTangentLightPos = TBN * lightPos;
-    vTangentViewPos  = TBN * viewPos;
+    vTangentLightPos = TBN * frame.sunPos.xyz;
+    vTangentViewPos  = TBN * frame.cameraPos.xyz;
     vTangentFragPos  = TBN * vFragPos;
     vFragPosLightSpace = lightSpaceMatrix * vec4(vFragPos, 1.0);
 
-    gl_Position = projection * view * vec4(vFragPos, 1.0f);
+    gl_Position = frame.proj * frame.view * vec4(vFragPos, 1.0f);
 
-    gl_Position = ApplyLogDepth(gl_Position, zCoef);
+    gl_Position = ApplyLogDepth(gl_Position, frame.zCoef);
 }

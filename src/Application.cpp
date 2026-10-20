@@ -211,9 +211,27 @@ void Application::PlaceSceneComponents() {
     }
 }
 
+void Application::ReportFrameStats() {
+    // SOLARSYSTEM_FRAME_STATS=N: print the previous frame's pass counts every N frames.
+    static const int every = [] {
+        const char* value = std::getenv("SOLARSYSTEM_FRAME_STATS");
+        return value ? std::max(0, std::atoi(value)) : 0;
+    }();
+    static unsigned long long frame = 0;
+    const unsigned long long uniformCalls = Shader::UniformCallCount();
+    Shader::ResetUniformCallCount();
+    if (every > 0 && frame++ % static_cast<unsigned long long>(every) == 0) {
+        const FramePasses::Stats& stats = _renderer.Stats();
+        std::cerr << "[FrameStats] updates=" << stats.sceneUpdates << " viewBinds=" << stats.viewBinds
+                  << " shadowPasses=" << stats.shadowPasses << " componentDraws=" << stats.componentDraws
+                  << " uniformCalls=" << uniformCalls << std::endl;
+    }
+}
+
 void Application::RenderFrame(int viewCount) {
     FramePasses::Hooks hooks;
     hooks.updateScene = [this, viewCount]() -> std::size_t {
+        ReportFrameStats();
         _renderer.BeginFrame();
         UpdateScene(OrbitLayout::GetJulianDate());
         BuildFrameSnapshot(viewCount);

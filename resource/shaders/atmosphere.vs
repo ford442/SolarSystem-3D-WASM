@@ -15,13 +15,11 @@ out vec3 fPosition;
 out mat3 modelMat3;
 out vec4 fragPosLightSpace;
 
-uniform mat4 projection;
-uniform mat4 view;
 uniform mat4 model;
 uniform mat4 lightSpaceMatrix;
 
-uniform float zCoef; // for log z-buffer (2.0 / log2(farPlane + 1.0)) [логарифмический z-буфер]
 
+#include "common/frame.glsl"
 #include "common/log_depth.glsl"
 
 void main() {
@@ -30,7 +28,7 @@ void main() {
     modelMat3 = mat3(model);
     fragPosLightSpace = lightSpaceMatrix * vec4(fWorldPosition, 1.0);
 
-    gl_Position = projection * view * vec4(fWorldPosition, 1);
+    gl_Position = frame.proj * frame.view * vec4(fWorldPosition, 1);
 
-    gl_Position = ApplyLogDepth(gl_Position, zCoef);
+    gl_Position = ApplyLogDepth(gl_Position, frame.zCoef);
 }

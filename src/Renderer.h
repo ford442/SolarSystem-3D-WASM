@@ -4,6 +4,7 @@
 #include "FrameContext.h"
 #include "FramePasses.h"
 #include "SystemModules.h"
+#include "gfx/FrameUniforms.h"
 #include "Auxiliary_Modules/MissionCatalog.h"
 #include "Solar_System/ObserveSky.h"
 #include <array>
@@ -201,6 +202,8 @@ private:
     mutable std::deque<std::wstring> _loadingHintCache;
     mutable std::array<int, 4> _loadingHintCounters{};
 
+    FrameUniformBuffer _frameUniforms;
+    unsigned int _uploadedViews = 0; // bit per view whose FrameUBO this frame already uploaded
     const CameraView* _configuredView = nullptr; // view whose matrices ConfigureMainShaders last uploaded
     FramePasses::Stats _stats;
 };

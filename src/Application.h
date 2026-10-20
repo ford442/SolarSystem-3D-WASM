@@ -264,6 +264,8 @@ private:
     void PlaceSceneComponents();
     /** Simulate once, then draw the scene into `viewCount` views (1 mono, 2 XR) — see FramePasses.h. */
     void RenderFrame(int viewCount);
+    /** Debug: the previous frame's FramePasses::Stats and glUniform* count (SOLARSYSTEM_FRAME_STATS=N). */
+    void ReportFrameStats();
     /** After UpdateScene: fill _frameScene, _frameViews and _frameHud for this frame's passes. */
     void BuildFrameSnapshot(int viewCount);
     /** The passes' view of frame state for view `view`; valid until the next BuildFrameSnapshot. */

@@ -6,19 +6,16 @@ in vec3 vTangentViewPos;
 in vec3 vTangentFragPos;
 in vec4 vFragPosLightSpace;
 
-uniform sampler2D mainDiffuseTexture;
-uniform sampler2D cloudTexture;
-uniform sampler2D nightTexture;
-uniform sampler2D normalMap;
-uniform sampler2D specularMap;
-uniform sampler2D ringDiffuse;
-uniform sampler2D shadowMap;
+layout(binding = TU_DIFFUSE) uniform sampler2D mainDiffuseTexture;
+layout(binding = TU_CLOUDS) uniform sampler2D cloudTexture;
+layout(binding = TU_NIGHT) uniform sampler2D nightTexture;
+layout(binding = TU_NORMAL) uniform sampler2D normalMap;
+layout(binding = TU_SPECULAR) uniform sampler2D specularMap;
+layout(binding = TU_RING) uniform sampler2D ringDiffuse;
+layout(binding = TU_SHADOW_MAP) uniform sampler2D shadowMap;
 
-uniform vec3 lightPos;
-uniform vec3 viewPos;
 uniform vec3 starGlowTint;
 
-uniform float farPlane;
 uniform float ambientFactor;
 uniform float bias; // For shadows
 uniform float yRotation; // For fake cloud shadows
@@ -37,7 +34,7 @@ uniform float parentPlanetRadiusSquared;
 // Eclipse umbra decal: one sphere occluding the star, projected onto this surface in the
 // lighting pass. No extra FBO and no geometry shader — see Application::ConfigureMainPlanetShader.
 uniform bool hasEclipseCaster;
-uniform vec3 eclipseCasterCenter; // Same space as vFragPos / lightPos
+uniform vec3 eclipseCasterCenter; // Same space as vFragPos / frame.sunPos.xyz
 uniform float eclipseCasterRadius;
 uniform float eclipseStarRadius;  // 0.0 => hard-edged disc (Low quality preset)
 
@@ -47,6 +44,7 @@ uniform vec2 ringInnerOuterRadiuses; // x = Inner, y = Outer
 
 out vec4 fragColor;
 
+#include "common/frame.glsl"
 #include "common/raytrace.glsl"
 #include "common/ring.glsl"
 #include "common/eclipse.glsl"
@@ -55,7 +53,7 @@ out vec4 fragColor;
 float EclipseVisibility() {
     if (!hasEclipseCaster)
         return 1.0;
-    return EclipseVisibilityAt(vFragPos, lightPos, eclipseCasterCenter, eclipseCasterRadius, eclipseStarRadius);
+    return EclipseVisibilityAt(vFragPos, frame.sunPos.xyz, eclipseCasterCenter, eclipseCasterRadius, eclipseStarRadius);
 }
 
 float CalculateShadow(vec4 fragPosLightSpace) {
@@ -70,7 +68,7 @@ float CalculateShadow(vec4 fragPosLightSpace) {
 
     // Get depth of current fragment from light's perspective
     float currentDepth = projCoords.z;
-    vec3 lightDir = lightPos - vFragPos;
+    vec3 lightDir = frame.sunPos.xyz - vFragPos;
     vec3 lightDirNorm = normalize(lightDir);
 
     float shadow = currentDepth - bias > closestDepth ? 1.0 : 0.0;
@@ -83,7 +81,7 @@ float CalculateShadow(vec4 fragPosLightSpace) {
         float u;
         if (RingCrossing(vFragPos, lightDirNorm, lightDirNorm, ringCenter, ringNormal, ringInnerOuterRadiuses, u)) {
             // If some planet obscures the ring
-            if (shadow > 0.0 && length(lightPos - ringCenter) - closestDepth * farPlane > ringInnerOuterRadiuses.y) {
+            if (shadow > 0.0 && length(frame.sunPos.xyz - ringCenter) - closestDepth * frame.farPlane > ringInnerOuterRadiuses.y) {
                 // PCF won't work, because physically in the place where the penumbra from the PCF should be, there will be a shadow from the ring, and not from the planet
                 return 1.0 - shadow;
             }

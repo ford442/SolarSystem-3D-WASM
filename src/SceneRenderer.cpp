@@ -3,6 +3,7 @@
 // camera and the scene comes in through its FrameContext (FrameContext.h).
 #include "Solar_System/TexturePaths.h"
 #include "Renderer.h"
+#include "gfx/TextureUnits.h"
 #include "JsBridge.h"
 #include "QualitySettings.h"
 #include "ResourceManifest.h"
@@ -163,12 +164,30 @@ void Renderer::ApplyEffectQuality(const QualityTierSettings& settings) {
 
 void Renderer::BeginFrame() {
     _configuredView = nullptr;
+    _uploadedViews = 0;
     _stats = FramePasses::Stats{};
 }
 
 void Renderer::BeginView(const FrameContext& ctx) {
     const glm::ivec4& viewport = ctx.view.viewport;
     glViewport(viewport.x, viewport.y, viewport.z, viewport.w);
+    const std::size_t viewIndex = ctx.view.eye < 0 ? 0 : static_cast<std::size_t>(ctx.view.eye);
+    if ((_uploadedViews & (1u << viewIndex)) == 0) {
+        // Once per view per frame; XR comes back to each eye for every component.
+        FrameUniformData data;
+        data.view = ctx.view.view;
+        data.proj = ctx.view.projection;
+        data.viewProj = ctx.view.projection * ctx.view.view;
+        data.cameraPos = glm::vec4(ctx.view.eyePosition, 1.0f);
+        data.sunPos = glm::vec4(ctx.scene.sun ? ctx.scene.sun->GetPosition() : glm::vec3(0.0f), 1.0f);
+        data.farPlane = ctx.view.farPlane;
+        data.zCoef = ctx.view.zCoef;
+        data.time = static_cast<float>(glfwGetTime());
+        data.exposure = _starTuning.exposure;
+        _frameUniforms.Upload(viewIndex, data);
+        _uploadedViews |= 1u << viewIndex;
+    }
+    _frameUniforms.Bind(viewIndex);
     // The per-view uniforms only change with the view; a shadow pass in between leaves them.
     if (&ctx.view != _configuredView) {
         ConfigureMainShaders(ctx);
@@ -353,8 +372,7 @@ void Renderer::RenderOneilAtmosphere(const FrameContext& ctx, const RenderableAt
         _mainAtmosphereShader->SetVec3("ringCenter", ring->GetPosition());
         _mainAtmosphereShader->SetVec3("ringNormal", ring->GetRingNormal());
         _mainAtmosphereShader->SetVec2("ringInnerOuterRadiuses", glm::vec2(ring->GetInnerRadius(), ring->GetOuterRadius()));
-        _mainAtmosphereShader->SetInt("ringDiffuse", 9);
-        glBindTextureUnit(9, ring->GetRingTexture());
+        glBindTextureUnit(Unit(TextureUnit::Ring), ring->GetRingTexture());
     }
 
     atmosphere.SetShader(*_mainAtmosphereShader);
@@ -398,10 +416,8 @@ void Renderer::RenderPbrAtmosphere(const FrameContext& ctx, const RenderableAtmo
     shader.SetFloat("uAtmosphere.absorptionCenter", static_cast<float>(params.absorptionCenter));
     shader.SetFloat("uAtmosphere.absorptionHalfWidth", static_cast<float>(params.absorptionHalfWidth));
 
-    shader.SetInt("transmittanceLut", 12);
-    glBindTextureUnit(12, atmosphere.GetTransmittanceLut());
-    shader.SetInt("multiScatteringLut", 13);
-    glBindTextureUnit(13, atmosphere.GetMultiScatteringLut());
+    glBindTextureUnit(Unit(TextureUnit::TransmittanceLut), atmosphere.GetTransmittanceLut());
+    glBindTextureUnit(Unit(TextureUnit::MultiScatteringLut), atmosphere.GetMultiScatteringLut());
 
     shader.SetBool("isNearbyPlanetaryRing", ring != nullptr);
     if (ring) {
@@ -414,8 +430,7 @@ void Renderer::RenderPbrAtmosphere(const FrameContext& ctx, const RenderableAtmo
         shader.SetVec3("ringCenter", ring->GetPosition());
         shader.SetVec3("ringNormal", ring->GetRingNormal());
         shader.SetVec2("ringInnerOuterRadiuses", glm::vec2(ring->GetInnerRadius(), ring->GetOuterRadius()));
-        shader.SetInt("ringDiffuse", 9);
-        glBindTextureUnit(9, ring->GetRingTexture());
+        glBindTextureUnit(Unit(TextureUnit::Ring), ring->GetRingTexture());
     }
 
     // A moon's umbra darkens the air above it as well as the ground. Only the primary's
@@ -580,9 +595,6 @@ void Renderer::RenderStarCoronaVolume(const FrameContext& ctx) const {
 
     Shader& shader = *_coronaVolumeShader;
     shader.Use();
-    shader.SetMat4("projection", ctx.view.projection);
-    shader.SetMat4("view", ctx.view.view);
-    shader.SetFloat("zCoef", ctx.view.zCoef);
     shader.SetVec3("sunCenter", sunCenter);
     shader.SetFloat("sunRadius", sunRadius);
     shader.SetVec3("sliceForward", forward);
@@ -597,7 +609,6 @@ void Renderer::RenderStarCoronaVolume(const FrameContext& ctx) const {
     shader.SetFloat("sliceSpacing", (depthMax - depthMin) / static_cast<float>(_coronaSlices));
     shader.SetVec3("coronaColor", ctx.scene.sun->GetShiftColor());
     shader.SetFloat("coronaIntensity", kCoronaIntensity);
-    shader.SetFloat("time", static_cast<float>(glfwGetTime() * 0.004));
     ctx.scene.sun->DrawCoronaSlices(_coronaSlices);
 
     glEnable(GL_CULL_FACE);
@@ -610,6 +621,9 @@ void Renderer::RenderStar(const FrameContext& ctx) const {
     glBlendFunc(GL_SRC_ALPHA, GL_ONE);
 
     _mainStarShader->Use();
+    // Bound here, not with the per-view uniforms: the planets drawn before the star reuse
+    // the Diffuse unit, and the photosphere colour used to come from the last moon's map.
+    glBindTextureUnit(Unit(TextureUnit::Diffuse), ctx.scene.sun->GetStarSpectrumTexture());
     ctx.scene.sun->TakeStarSystemCenter();
     ctx.scene.sun->Render();
 
@@ -940,7 +954,9 @@ void Renderer::RenderTextureLoadingProgress(const FrameContext& ctx) const {
 }
 
 void Renderer::ConfigureMainShaders(const FrameContext& ctx) {
-    const float zCoef = ctx.view.zCoef;
+    // Matrices, eye position, Sun position, far plane, zCoef and time are in the FrameUBO
+    // (BeginView). What is left here is per-view state of programs that do not read it, and
+    // per-frame constants; Shader drops a Set* that repeats the value already there.
 
     // Skybox uses the active view's rotation; projection matches the eye frustum in XR.
     const glm::mat4 skyBoxProjection = ctx.xr ? ctx.view.projection : glm::perspective(glm::radians(45.0f), ctx.view.aspect, ctx.view.nearPlane, ctx.view.farPlane);
@@ -952,93 +968,54 @@ void Renderer::ConfigureMainShaders(const FrameContext& ctx) {
     _mainTextShader->Use();
     _mainTextShader->SetMat4("projection", ctx.view.projection);
     _mainTextShader->SetMat4("view", ctx.view.view);
-    _mainTextShader->SetInt("text", 0);
 
+    const Star& sun = *ctx.scene.sun;
     _mainStarShader->Use();
-    _mainStarShader->SetMat4("projection", ctx.view.projection);
-    _mainStarShader->SetMat4("view", ctx.view.view);
-    _mainStarShader->SetVec3("viewPos", ctx.view.eyePosition);
-    _mainStarShader->SetVec3("shiftStarColor", ctx.scene.sun->GetShiftColor());
-    _mainStarShader->SetVec3("colorMult", glm::vec3(0.96862745, 0.58039215, 0.235294117) * ctx.scene.sun->GetShiftColor());
-    _mainStarShader->SetFloat("starRadiusInKilometers", ctx.scene.sun->GetStarRadius());
-    _mainStarShader->SetFloat("zCoef", zCoef);
-    _mainStarShader->SetFloat("uColorMap", ctx.scene.sun->GetTemperatureColorUCoordinate());
-    _mainStarShader->SetBool("isVisible", ctx.scene.sun->GetVisibility() == 1.0);
-    _mainStarShader->SetInt("colorMap", 0);
-    glBindTextureUnit(0, ctx.scene.sun->GetStarSpectrumTexture());
+    _mainStarShader->SetVec3("shiftStarColor", sun.GetShiftColor());
+    _mainStarShader->SetVec3("colorMult", glm::vec3(0.96862745, 0.58039215, 0.235294117) * sun.GetShiftColor());
+    _mainStarShader->SetFloat("starRadiusInKilometers", sun.GetStarRadius());
+    _mainStarShader->SetFloat("uColorMap", sun.GetTemperatureColorUCoordinate());
+    _mainStarShader->SetBool("isVisible", sun.GetVisibility() == 1.0);
 
     _mainCoronaStarShader->Use();
-    _mainCoronaStarShader->SetMat4("projection", ctx.view.projection);
-    _mainCoronaStarShader->SetMat4("view", ctx.view.view);
-    _mainCoronaStarShader->SetVec3("center", ctx.scene.sun->GetPosition());
+    _mainCoronaStarShader->SetVec3("center", sun.GetPosition());
     // The eye's axes, not the head's (the billboard faces each XR eye).
     const glm::mat4 inverseView = glm::inverse(ctx.view.view);
     _mainCoronaStarShader->SetVec3("cameraRight", glm::normalize(glm::vec3(inverseView[0])));
     _mainCoronaStarShader->SetVec3("cameraUp", glm::normalize(glm::vec3(inverseView[1])));
-    _mainCoronaStarShader->SetVec3("starShiftColor", ctx.scene.sun->GetShiftColor());
-    _mainCoronaStarShader->SetFloat("zCoef", zCoef);
+    _mainCoronaStarShader->SetVec3("starShiftColor", sun.GetShiftColor());
     _mainCoronaStarShader->SetFloat("maxSize", 7.1);
-    _mainCoronaStarShader->SetFloat("starRadius", ctx.scene.sun->GetStarRadius());
-    _mainCoronaStarShader->SetFloat("deltaTime", glfwGetTime() * 0.002);
+    _mainCoronaStarShader->SetFloat("starRadius", sun.GetStarRadius());
 
     const float surfaceDim = _magneticFieldsEnabled ? 0.28f : 1.0f;
     const float atmosphereDim = _magneticFieldsEnabled ? 0.40f : 1.0f;
     const float ringDim = _magneticFieldsEnabled ? 0.35f : 1.0f;
 
     _mainPlanetShader->Use();
-    _mainPlanetShader->SetMat4("projection", ctx.view.projection);
-    _mainPlanetShader->SetMat4("view", ctx.view.view);
-    _mainPlanetShader->SetVec3("viewPos", ctx.view.headPosition);
-    _mainPlanetShader->SetVec3("lightPos", ctx.scene.sun->GetPosition());
-    _mainPlanetShader->SetVec3("starGlowTint", ctx.scene.sun->GetGlowTintMult());
-    _mainPlanetShader->SetFloat("farPlane", ctx.view.farPlane);
-    _mainPlanetShader->SetFloat("zCoef", zCoef);
+    _mainPlanetShader->SetVec3("starGlowTint", sun.GetGlowTintMult());
     _mainPlanetShader->SetFloat("bias", 0.0005);
     _mainPlanetShader->SetFloat("uSurfaceDim", surfaceDim);
-    _mainPlanetShader->SetInt("shadowMap", 6);
-    glBindTextureUnit(6, _shadowMapFBO->GetShadowMap());
 
     _mainAtmosphereShader->Use();
-    _mainAtmosphereShader->SetMat4("projection", ctx.view.projection);
-    _mainAtmosphereShader->SetMat4("view", ctx.view.view);
-    _mainAtmosphereShader->SetFloat("farPlane", ctx.view.farPlane);
-    _mainAtmosphereShader->SetFloat("zCoef", zCoef);
     _mainAtmosphereShader->SetFloat("bias", 0.001);
     _mainAtmosphereShader->SetFloat("uSurfaceDim", atmosphereDim);
-    _mainAtmosphereShader->SetInt("shadowMap", 11);
-    glBindTextureUnit(11, _shadowMapFBO->GetShadowMap());
 
     if (_pbrAtmosphereShader) {
         _pbrAtmosphereShader->Use();
-        _pbrAtmosphereShader->SetMat4("projection", ctx.view.projection);
-        _pbrAtmosphereShader->SetMat4("view", ctx.view.view);
-        _pbrAtmosphereShader->SetFloat("zCoef", zCoef);
         _pbrAtmosphereShader->SetFloat("uSurfaceDim", atmosphereDim);
     }
 
     _mainCloudsShader->Use();
-    _mainCloudsShader->SetMat4("projection", ctx.view.projection);
-    _mainCloudsShader->SetMat4("view", ctx.view.view);
-    _mainCloudsShader->SetVec3("viewPos", ctx.view.headPosition);
-    _mainCloudsShader->SetVec3("lightPos", ctx.scene.sun->GetPosition());
-    _mainCloudsShader->SetFloat("farPlane", ctx.view.farPlane);
-    _mainCloudsShader->SetFloat("zCoef", zCoef);
     _mainCloudsShader->SetFloat("bias", 0.001);
     _mainCloudsShader->SetFloat("uSurfaceDim", surfaceDim);
-    _mainCloudsShader->SetInt("shadowMap", 8);
-    glBindTextureUnit(8, _shadowMapFBO->GetShadowMap());
 
     _mainRingShader->Use();
-    _mainRingShader->SetMat4("projection", ctx.view.projection);
-    _mainRingShader->SetMat4("view", ctx.view.view);
-    _mainRingShader->SetVec3("lightPos", ctx.scene.sun->GetPosition());
-    _mainRingShader->SetVec3("camPos", ctx.view.headPosition);
-    _mainRingShader->SetVec3("starGlowTint", ctx.scene.sun->GetGlowTintMult());
-    _mainRingShader->SetFloat("zCoef", zCoef);
+    _mainRingShader->SetVec3("starGlowTint", sun.GetGlowTintMult());
     _mainRingShader->SetFloat("bias", 0.001);
     _mainRingShader->SetFloat("uSurfaceDim", ringDim);
-    _mainRingShader->SetInt("shadowMap", 5);
-    glBindTextureUnit(5, _shadowMapFBO->GetShadowMap());
+
+    // Every lit program samples the shadow map from the same unit (TU_SHADOW_MAP).
+    glBindTextureUnit(Unit(TextureUnit::ShadowMap), _shadowMapFBO->GetShadowMap());
 }
 
 Renderer::EclipseUmbra Renderer::ComputeEclipseUmbra(const FrameContext& ctx, const RenderableSceneComponent& renderableComponent) const {
@@ -1141,7 +1118,6 @@ void Renderer::ConfigureMainPlanetShader(const FrameContext& ctx, const Renderab
         _mainPlanetShader->SetVec3("ringCenter", renderableComponent.planetaryRing->GetPosition());
         _mainPlanetShader->SetVec3("ringNormal", renderableComponent.planetaryRing->GetRingNormal());
         _mainPlanetShader->SetVec2("ringInnerOuterRadiuses", glm::vec2(renderableComponent.planetaryRing->GetInnerRadius(), renderableComponent.planetaryRing->GetOuterRadius()));
-        _mainPlanetShader->SetInt("ringDiffuse", 7);
-        glBindTextureUnit(7, renderableComponent.planetaryRing->GetRingTexture());
+        glBindTextureUnit(Unit(TextureUnit::Ring), renderableComponent.planetaryRing->GetRingTexture());
     }
 }

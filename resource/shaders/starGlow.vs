@@ -14,7 +14,7 @@ uniform vec3 cameraPosition;
 uniform vec3 ringCenter; // Center of disk in eye space
 uniform vec3 ringNormal; // Disk plane normal in eye space
 uniform vec2 ringInnerOuterRadiuses; // x = Inner, y = Outer
-uniform sampler2D ringDiffuse; // Ring diffuse map
+layout(binding = TU_RING) uniform sampler2D ringDiffuse; // Ring diffuse map
 
 out vec2 fPosition;
 out vec3 ringTint;

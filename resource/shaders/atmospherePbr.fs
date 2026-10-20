@@ -29,8 +29,8 @@ out vec4 fragColor;
 #include "common/atmosphere_lut.glsl"
 
 uniform AtmosphereParams uAtmosphere;  // km, thicknessScale already applied
-uniform sampler2D transmittanceLut;
-uniform sampler2D multiScatteringLut;
+layout(binding = TU_TRANSMITTANCE_LUT) uniform sampler2D transmittanceLut;
+layout(binding = TU_MULTI_SCATTERING_LUT) uniform sampler2D multiScatteringLut;
 
 uniform vec3 camPosition;      // camera relative to the atmosphere centre, scene units
 uniform vec3 lightPos;         // Sun relative to the atmosphere centre, scene units
@@ -58,7 +58,7 @@ uniform float ringParentPlanetRadiusSquared;
 uniform vec3 ringCenter;               // world space
 uniform vec3 ringNormal;
 uniform vec2 ringInnerOuterRadiuses;
-uniform sampler2D ringDiffuse;
+layout(binding = TU_RING) uniform sampler2D ringDiffuse;
 
 uniform bool hasEclipseCaster;
 uniform vec3 eclipseCasterCenter;      // relative to the atmosphere centre, scene units

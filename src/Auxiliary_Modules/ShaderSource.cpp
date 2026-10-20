@@ -1,7 +1,10 @@
 #include "ShaderSource.h"
+#include "../gfx/TextureUnits.h"
 
+#include <algorithm>
 #include <cctype>
 #include <fstream>
+#include <regex>
 #include <sstream>
 #include <unordered_set>
 
@@ -107,8 +110,43 @@ struct Context {
     std::unordered_set<std::string> included;
     std::vector<std::string> stack;
     std::string code;
+    std::vector<SamplerBinding> samplerBindings;
     std::string error;
 };
+
+// `layout(binding = UNIT) uniform [precision] samplerX name;` → the line without the layout,
+// recording (name, UNIT). UNIT is a TU_* name from TextureUnits.h or a literal. Returns false
+// (with `error`) for a binding that is not on a sampler or names an unknown unit.
+bool StripSamplerBinding(std::string& line, std::vector<SamplerBinding>& bindings, std::string& error) {
+    const size_t first = line.find_first_not_of(" \t");
+    if (first == std::string::npos || line.compare(first, 6, "layout") != 0 || line.find("binding") == std::string::npos) {
+        return true;
+    }
+    static const std::regex pattern(
+        R"(^(\s*)layout\s*\(\s*binding\s*=\s*(\w+)\s*\)\s*(uniform\s+(?:(?:lowp|mediump|highp)\s+)?(\w+)\s+(\w+)\s*;.*)$)");
+    std::smatch match;
+    if (!std::regex_match(line, match, pattern)) {
+        return true; // some other layout(binding…) form; leave it for the GLSL compiler to judge
+    }
+    const std::string unitName = match[2];
+    const std::string type = match[4];
+    if (type.rfind("sampler", 0) != 0 && type.rfind("isampler", 0) != 0 && type.rfind("usampler", 0) != 0) {
+        error = "layout(binding = …) is only for samplers here (uniform blocks are bound by Shader)";
+        return false;
+    }
+    int unit = -1;
+    if (std::all_of(unitName.begin(), unitName.end(), [](char c) { return std::isdigit(static_cast<unsigned char>(c)); })) {
+        unit = std::stoi(unitName);
+    } else if (const std::optional<TextureUnit> named = TextureUnitFromGlslName(unitName)) {
+        unit = static_cast<int>(*named);
+    } else {
+        error = "unknown texture unit " + unitName + " (see src/gfx/TextureUnits.h)";
+        return false;
+    }
+    bindings.push_back({match[5], unit});
+    line = std::string(match[1]) + std::string(match[3]);
+    return true;
+}
 
 bool Expand(Context& ctx, const std::vector<std::string>& lines, int sourceId, size_t firstLine, int depth) {
     for (size_t i = firstLine; i < lines.size(); ++i) {
@@ -122,7 +160,13 @@ bool Expand(Context& ctx, const std::vector<std::string>& lines, int sourceId, s
             return false;
         }
         if (directive != "include") {
-            ctx.code += line;
+            std::string out = line;
+            std::string bindingError;
+            if (directive.empty() && !StripSamplerBinding(out, ctx.samplerBindings, bindingError)) {
+                ctx.error = where + ": " + bindingError;
+                return false;
+            }
+            ctx.code += out;
             ctx.code += '\n';
             continue;
         }
@@ -196,7 +240,7 @@ Result Preprocess(const std::string& path, Stage stage, Dialect dialect, const F
         return result;
     }
 
-    Context ctx{reader, DirectoryOf(top), {}, {}, {}, {}, {}};
+    Context ctx{reader, DirectoryOf(top), {}, {}, {}, {}, {}, {}};
     ctx.names.push_back(top);
     ctx.included.insert(top);
     ctx.stack.push_back(top);
@@ -240,6 +284,7 @@ Result Preprocess(const std::string& path, Stage stage, Dialect dialect, const F
     result.ok = true;
     result.code = std::move(ctx.code);
     result.sourceNames = std::move(ctx.names);
+    result.samplerBindings = std::move(ctx.samplerBindings);
     return result;
 }
 

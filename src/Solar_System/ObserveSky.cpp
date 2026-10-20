@@ -1,4 +1,5 @@
 #include "ObserveSky.h"
+#include "../gfx/TextureUnits.h"
 
 #include <algorithm>
 #include <cmath>
@@ -14,7 +15,7 @@ constexpr float kKindSun = 1.0f;
 constexpr float kKindMoon = 2.0f;
 constexpr float kKindStar = 3.0f;
 
-constexpr int kMoonTextureUnit = 1;
+constexpr unsigned int kMoonTextureUnit = Unit(TextureUnit::Moon);
 
 constexpr const char* kStarCatalogPath = "resource/sky/bright_stars.json";
 
@@ -288,7 +289,6 @@ void ObserveSky::Render(const Observer::Sky& sky, const Frame& frame, unsigned i
     }
     _spriteShader->SetMat3("moonBodyFromHorizon", moonBodyFromHorizon);
     _spriteShader->SetBool("hasMoonTexture", moonTexture != 0);
-    _spriteShader->SetInt("moonTexture", kMoonTextureUnit);
     if (moonTexture != 0) {
         glActiveTexture(GL_TEXTURE0 + kMoonTextureUnit);
         glBindTexture(GL_TEXTURE_2D, moonTexture);

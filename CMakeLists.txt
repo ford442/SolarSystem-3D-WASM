@@ -70,6 +70,7 @@ set(SOLARSYSTEM_SOURCES_AUX
     src/Auxiliary_Modules/MagneticFieldParams.cpp
     src/Auxiliary_Modules/MagneticFieldModel.cpp
     src/Auxiliary_Modules/MagneticFieldTracer.cpp
+    src/gfx/FrameUniforms.cpp
     src/gfx/LineStripBatch.cpp
     src/Auxiliary_Modules/MagneticFieldLineRenderer.cpp
     src/Auxiliary_Modules/MagneticFieldBloom.cpp

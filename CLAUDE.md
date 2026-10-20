@@ -174,6 +174,9 @@ Ceres, Vesta, Eris/Haumea/Makemake, 1P/Halley (kind `comet`), Mercury–Pluto, t
 - Changes are reflected immediately in web (dev mode with Vite)
 - Every shader is authored once as `#version 300 es`; native `Shader.cpp` rewrites the directive to `#version 460 core` at load (ARCHITECTURE §9.1)
 - Shared helpers live in `resource/shaders/common/` and are pulled in with `#include "common/x.glsl"` (expanded once per stage by `ShaderSource`, with `#line` so errors name the right file); `common/preamble.glsl` supplies the precision defaults. Don't paste a helper into a shader that can include it — `test_shader_source.cpp` fails on duplicate definitions
+- Samplers name their unit: `layout(binding = TU_SHADOW_MAP) uniform sampler2D shadowMap;`. The `TU_*` names come from `src/gfx/TextureUnits.h` via the generated `common/texture_units.glsl` (`npm run generate:texture-units`, checked in CI). ShaderSource strips the qualifier and Shader sets the unit once at link, so C++ never `SetInt`s a sampler; bind with `glBindTextureUnit(Unit(TextureUnit::X), tex)`
+- Per-view values (view/proj matrices, eye and Sun position, far plane, zCoef, time) live in `FrameUBO` (`#include "common/frame.glsl"`, read as `frame.view` etc.), uploaded once per view by `Renderer::BeginView`. Don't add `uniform mat4 projection/view` or `zCoef` to a lit shader
+- `Shader::Set*` takes a `string_view`, looks up a link-time location table, and skips the GL call when the value is unchanged. `SOLARSYSTEM_FRAME_STATS=N` prints pass counts and `glUniform*` calls every N frames
 - `SOLARSYSTEM_SHADER_SELFTEST=1 ./build/SolarSystem` compiles every stage as both `460 core` and `300 es` and exits (under Mesa/Xvfb also set `MESA_GLSL_VERSION_OVERRIDE=460`)
 - Native reads `resource/shaders/` from disk at runtime — restart the app, no recompile needed
 

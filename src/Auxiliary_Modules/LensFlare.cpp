@@ -1,4 +1,5 @@
 #include "LensFlare.h"
+#include "../gfx/TextureUnits.h"
 
 LensFlare::LensFlare(const Shader& shader, TextureImage2D lensTexture, const FlaresInfo& properties) : _lensFlareShader(&shader), _lensTexture(std::move(lensTexture)) {
     _numSprites = properties.sprites.size();
@@ -95,9 +96,7 @@ void LensFlare::Render(const glm::mat4& projection, const glm::mat4& view, const
     _lensFlareShader->SetVec3("color", color);
     _lensFlareShader->SetVec2("dims", dims);
     _lensFlareShader->SetFloat("intensity", intensity);
-    _lensFlareShader->SetInt("lensTexture", 0);
-    _lensFlareShader->SetInt("ringDiffuse", 1);
-    glBindTextureUnit(0, _lensTexture.GetTexture());
+    glBindTextureUnit(Unit(TextureUnit::Diffuse), _lensTexture.GetTexture());
 
     _lensFlareShader->SetBool("isPlanetaryRingInView", ringCameraInfo.has_value());
     if (ringCameraInfo) {
@@ -105,7 +104,7 @@ void LensFlare::Render(const glm::mat4& projection, const glm::mat4& view, const
         _lensFlareShader->SetVec3("ringCenter", ringCameraInfo->ringCenter);
         _lensFlareShader->SetVec3("ringNormal", ringCameraInfo->ringNormal);
         _lensFlareShader->SetVec2("ringInnerOuterRadiuses", ringCameraInfo->ringInnerOuterRadiuses);
-        glBindTextureUnit(1, ringCameraInfo->ringDiffuse);
+        glBindTextureUnit(Unit(TextureUnit::Ring), ringCameraInfo->ringDiffuse);
     }
 
     glBindVertexArray(_vao.get());

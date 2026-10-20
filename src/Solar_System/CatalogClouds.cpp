@@ -1,4 +1,5 @@
 #include "CatalogClouds.h"
+#include "../gfx/TextureUnits.h"
 #include "BodyShape.h"
 #include "TexturePaths.h"
 #include "SatelliteOrbit.h"
@@ -33,11 +34,8 @@ void CatalogClouds::AdjustToParent() {
 
 void CatalogClouds::Render() const {
     GetShader().SetFloat("ambientFactor", _parentEntry.cloudLayer.ambientFactor);
-    GetShader().SetInt("mainDiffuseTexture", 0);
-    GetShader().SetInt("cloudsNormalMap", 1);
-
-    glBindTextureUnit(0, _diffuse.GetTexture());
-    glBindTextureUnit(1, _normal.GetTexture());
+    glBindTextureUnit(Unit(TextureUnit::Diffuse), _diffuse.GetTexture());
+    glBindTextureUnit(Unit(TextureUnit::Normal), _normal.GetTexture());
 
     SpaceObject::Render();
 }

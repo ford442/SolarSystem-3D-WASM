@@ -13,12 +13,14 @@
 namespace {
     Application* activeApplication = nullptr;
 
+#ifdef __EMSCRIPTEN__
     // Settings written before the Application exists (or after it is gone) land here and
     // are dropped, as they were with the old global fallback.
     SimState& Sim() {
         static SimState fallback;
         return activeApplication ? activeApplication->GetSimState() : fallback;
     }
+#endif
 
     float g_touchForward = 0.0f;
     float g_touchRight = 0.0f;

@@ -23,6 +23,7 @@ struct Stats {
     int viewBinds = 0;      // per-view uniform uploads (1 mono; XR re-binds each eye per component)
     int shadowPasses = 0;   // shadow maps actually rendered (0 with shadows off)
     int componentDraws = 0; // component colour passes, summed over views
+    unsigned long long uniformCalls = 0; // glUniform* calls over the whole previous frame (HUD included)
 };
 
 struct Hooks {

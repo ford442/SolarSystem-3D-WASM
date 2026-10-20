@@ -94,7 +94,6 @@ void MagneticFieldBloom::BlurAndComposite(int passes, float intensity) {
     glDisable(GL_BLEND);
 
     _blurShader->Use();
-    _blurShader->SetInt("uImage", 0);
 
     for (int i = 0; i < iterations; ++i) {
         glBindFramebuffer(GL_FRAMEBUFFER, _ping.fbo.get());
@@ -117,7 +116,6 @@ void MagneticFieldBloom::BlurAndComposite(int passes, float intensity) {
     glDisable(GL_DEPTH_TEST);
 
     _compositeShader->Use();
-    _compositeShader->SetInt("uImage", 0);
     _compositeShader->SetFloat("uIntensity", std::max(0.0f, intensity));
     glBindTextureUnit(0, src);
     DrawQuad();

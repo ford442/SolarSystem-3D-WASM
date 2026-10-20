@@ -16,13 +16,8 @@ class Shader;
  */
 namespace CatalogMaterial {
 
-// Fixed planetLighting sampler units. 6 (shadowMap) and 7 (ringDiffuse) are bound by
-// SceneRenderer per pass and must stay clear of these.
-constexpr int kDiffuseUnit = 0;
-constexpr int kNormalUnit = 1;
-constexpr int kSpecularUnit = 2;
-constexpr int kNightUnit = 3;
-constexpr int kCloudUnit = 4;
+// Sampler units are TextureUnit (gfx/TextureUnits.h): Diffuse/Normal/Specular/Night/Clouds
+// here, ShadowMap and Ring bound by the Renderer per view and per component.
 
 struct Material {
     bool hasNight;

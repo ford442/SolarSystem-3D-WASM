@@ -3,11 +3,11 @@
 #include "../gfx/GlHandle.h"
 #include "ShaderSource.h"
 #include <glm/glm.hpp>
-#include <string>
-#include <fstream>
-#include <sstream>
 #include <iostream>
-#include <unordered_map>
+#include <string>
+#include <string_view>
+#include <utility>
+#include <vector>
 
 class Shader {
 public:
@@ -28,29 +28,26 @@ public:
     Shader& operator=(Shader&& other) noexcept = default;
     
     void Use() const;
-    void SetBool(const std::string& name, bool value) const;
-    void SetInt(const std::string& name, int value) const;
-    void SetFloat(const std::string& name, float value) const;
-    void SetDouble(const std::string& name, double value) const;
-    void SetVec2(const std::string& name, const glm::vec2& value) const;
-    void SetVec2(const std::string& name, float x, float y) const;
-    void SetVec3(const std::string& name, const glm::vec3& value) const;
-    void SetVec3(const std::string& name, float x, float y, float z) const;
-    void SetVec4(const std::string& name, const glm::vec4& value) const;
-    void SetVec4(const std::string& name, float x, float y, float z, float w) const;
-    void SetMat2(const std::string& name, const glm::mat2& mat) const;
-    void SetMat3(const std::string& name, const glm::mat3& mat) const;
-    void SetMat4(const std::string& name, const glm::mat4& mat) const;
-    void SetVec2Double(const std::string& name, const glm::dvec2& value) const;
-    void SetVec2Double(const std::string& name, double x, double y) const;
-    void SetVec3Double(const std::string& name, const glm::dvec3& value) const;
-    void SetVec3Double(const std::string& name, double x, double y, double z) const;
-    void SetVec4Double(const std::string& name, const glm::dvec4& value) const;
-    void SetVec4Double(const std::string& name, double x, double y, double z, double w) const;
-    void SetMat2Double(const std::string& name, const glm::dmat2& mat) const;
-    void SetMat3Double(const std::string& name, const glm::dmat3& mat) const;
-    void SetMat4Double(const std::string& name, const glm::dmat4& mat) const;
-    size_t GetProgramId() const;
+    // Names are looked up in the table Build() fills from the linked program's active
+    // uniforms: no GL query and no allocation per call. A name the program does not use
+    // (optimised out, or not declared) is a silent no-op, as glUniform* with -1 would be;
+    // so is setting the value the uniform already has.
+    void SetBool(std::string_view name, bool value) const;
+    void SetInt(std::string_view name, int value) const;
+    void SetFloat(std::string_view name, float value) const;
+    void SetVec2(std::string_view name, const glm::vec2& value) const;
+    void SetVec2(std::string_view name, float x, float y) const;
+    void SetVec3(std::string_view name, const glm::vec3& value) const;
+    void SetVec3(std::string_view name, float x, float y, float z) const;
+    void SetVec4(std::string_view name, const glm::vec4& value) const;
+    void SetMat3(std::string_view name, const glm::mat3& mat) const;
+    void SetMat4(std::string_view name, const glm::mat4& mat) const;
+    /** Whether the program reads FrameUBO (common/frame.glsl), bound at FrameUniformBuffer::kBinding. */
+    bool UsesFrameUniforms() const { return _usesFrameUniforms; }
+
+    /** glUniform* calls issued by every Shader since the last reset (frame stats). */
+    static unsigned long long UniformCallCount() { return s_uniformCalls; }
+    static void ResetUniformCallCount() { s_uniformCalls = 0; }
 
 #ifndef __EMSCRIPTEN__
     // SOLARSYSTEM_SHADER_SELFTEST=1: compile every .vs/.fs under `directory` as its own
@@ -69,11 +66,30 @@ private:
     };
 
     GlProgram _program;
-    // Lazy cache: first Set*/lookup resolves glGetUniformLocation; -1 misses are cached too.
-    mutable std::unordered_map<std::string, GLint> _uniformLocationCache;
+    // One per active default-block uniform: its location and the last value this Shader
+    // gave it. A program's uniforms only change through these setters, so a Set* with the
+    // value already there skips the GL call (bodies sharing a program mostly repeat their
+    // flags, and every label repeats the text state).
+    struct UniformSlot {
+        GLint location = -1;
+        unsigned char size = 0; // bytes of `value` in use; 0 = never set
+        alignas(16) unsigned char value[64] = {};
+    };
+    mutable std::vector<UniformSlot> _slots;
+    // Name → slot, sorted by name; arrays are listed under "name" and "name[0]" (same slot).
+    std::vector<std::pair<std::string, unsigned int>> _uniformIndex;
+    bool _usesFrameUniforms = false;
+    static inline unsigned long long s_uniformCalls = 0;
+    static inline GLuint s_currentProgram = 0; // what the last Use() bound
 
-    GLint GetUniformLocation(const std::string& name) const;
+    /** The slot for `name`, or null when the program has no such active uniform. */
+    UniformSlot* FindSlot(std::string_view name) const;
+    /** Records `value` in `slot`; false when it already held exactly that value. */
+    template <class T>
+    static bool Store(UniformSlot& slot, const T& value);
     void Build(const std::string& vertexPath, const std::string& fragmentPath, const std::string& geometryPath);
+    /** After linking: the location table, sampler units from `binding =`, and FrameUBO's binding. */
+    void Introspect(const std::vector<ShaderSource::SamplerBinding>& samplerBindings);
 
     static void CheckCompileErrors(size_t shader, ShaderType type, const std::string& path = "",
                                    const ShaderSource::Result* source = nullptr);
