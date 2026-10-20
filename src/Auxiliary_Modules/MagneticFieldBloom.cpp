@@ -30,18 +30,6 @@ MagneticFieldBloom::MagneticFieldBloom(uint16_t width, uint16_t height, bool ena
     }
 }
 
-MagneticFieldBloom::~MagneticFieldBloom() {
-    DestroyTargets();
-    if (_quadVbo) {
-        glDeleteBuffers(1, &_quadVbo);
-        _quadVbo = 0;
-    }
-    if (_quadVao) {
-        glDeleteVertexArrays(1, &_quadVao);
-        _quadVao = 0;
-    }
-}
-
 void MagneticFieldBloom::SetEnabled(bool enabled, uint16_t width, uint16_t height) {
     if (enabled == _enabled && (!_enabled || (width == _fullWidth && height == _fullHeight))) {
         return;
@@ -71,35 +59,35 @@ void MagneticFieldBloom::Resize(uint16_t width, uint16_t height) {
 }
 
 void MagneticFieldBloom::BeginCapture() {
-    if (!_enabled || _capture.fbo == 0) {
+    if (!_enabled || _capture.fbo.get() == 0) {
         return;
     }
 
     glGetIntegerv(GL_FRAMEBUFFER_BINDING, &_prevFbo);
     glGetIntegerv(GL_VIEWPORT, _prevViewport);
 
-    glBindFramebuffer(GL_FRAMEBUFFER, _capture.fbo);
+    glBindFramebuffer(GL_FRAMEBUFFER, _capture.fbo.get());
     glViewport(0, 0, _width, _height);
     glClearColor(0.0f, 0.0f, 0.0f, 0.0f);
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
-    if (_capture.depth != 0 && _prevViewport[2] > 0 && _prevViewport[3] > 0) {
+    if (_capture.depth.get() != 0 && _prevViewport[2] > 0 && _prevViewport[3] > 0) {
         glBindFramebuffer(GL_READ_FRAMEBUFFER, static_cast<GLuint>(_prevFbo));
-        glBindFramebuffer(GL_DRAW_FRAMEBUFFER, _capture.fbo);
+        glBindFramebuffer(GL_DRAW_FRAMEBUFFER, _capture.fbo.get());
         glBlitFramebuffer(_prevViewport[0], _prevViewport[1], _prevViewport[0] + _prevViewport[2],
                           _prevViewport[1] + _prevViewport[3], 0, 0, _width, _height, GL_DEPTH_BUFFER_BIT,
                           GL_NEAREST);
-        glBindFramebuffer(GL_FRAMEBUFFER, _capture.fbo);
+        glBindFramebuffer(GL_FRAMEBUFFER, _capture.fbo.get());
     }
 }
 
 void MagneticFieldBloom::BlurAndComposite(int passes, float intensity) {
-    if (!_enabled || _capture.color == 0 || !_blurShader || !_compositeShader) {
+    if (!_enabled || _capture.color.get() == 0 || !_blurShader || !_compositeShader) {
         return;
     }
 
     const int iterations = std::max(1, passes);
-    unsigned int src = _capture.color;
+    unsigned int src = _capture.color.get();
 
     glDisable(GL_DEPTH_TEST);
     glDepthMask(GL_FALSE);
@@ -109,17 +97,17 @@ void MagneticFieldBloom::BlurAndComposite(int passes, float intensity) {
     _blurShader->SetInt("uImage", 0);
 
     for (int i = 0; i < iterations; ++i) {
-        glBindFramebuffer(GL_FRAMEBUFFER, _ping.fbo);
+        glBindFramebuffer(GL_FRAMEBUFFER, _ping.fbo.get());
         glViewport(0, 0, _width, _height);
         glBindTextureUnit(0, src);
         _blurShader->SetVec2("uDirection", glm::vec2(1.0f / static_cast<float>(_width), 0.0f));
         DrawQuad();
 
-        glBindFramebuffer(GL_FRAMEBUFFER, _pong.fbo);
-        glBindTextureUnit(0, _ping.color);
+        glBindFramebuffer(GL_FRAMEBUFFER, _pong.fbo.get());
+        glBindTextureUnit(0, _ping.color.get());
         _blurShader->SetVec2("uDirection", glm::vec2(0.0f, 1.0f / static_cast<float>(_height)));
         DrawQuad();
-        src = _pong.color;
+        src = _pong.color.get();
     }
 
     glBindFramebuffer(GL_FRAMEBUFFER, static_cast<GLuint>(_prevFbo));
@@ -136,10 +124,10 @@ void MagneticFieldBloom::BlurAndComposite(int passes, float intensity) {
 }
 
 void MagneticFieldBloom::InitQuad() {
-    glGenVertexArrays(1, &_quadVao);
-    glGenBuffers(1, &_quadVbo);
-    glBindVertexArray(_quadVao);
-    glBindBuffer(GL_ARRAY_BUFFER, _quadVbo);
+    _quadVao = GlVertexArray::Create();
+    _quadVbo = GlBuffer::Create();
+    glBindVertexArray(_quadVao.get());
+    glBindBuffer(GL_ARRAY_BUFFER, _quadVbo.get());
     glBufferData(GL_ARRAY_BUFFER, sizeof(kQuadVertices), kQuadVertices, GL_STATIC_DRAW);
     glEnableVertexAttribArray(0);
     glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 5 * sizeof(float), nullptr);
@@ -164,7 +152,7 @@ void MagneticFieldBloom::InitTargets(uint16_t width, uint16_t height) {
     CreateColorTarget(_ping, _width, _height, false);
     CreateColorTarget(_pong, _width, _height, false);
 
-    if (_capture.fbo == 0 || _ping.fbo == 0 || _pong.fbo == 0) {
+    if (_capture.fbo.get() == 0 || _ping.fbo.get() == 0 || _pong.fbo.get() == 0) {
         std::cout << "[MagneticField] Bloom FBOs incomplete; disabling bloom" << std::endl;
         DestroyTargets();
         _enabled = false;
@@ -187,9 +175,9 @@ void MagneticFieldBloom::CreateColorTarget(Target& target, uint16_t width, uint1
     GLint previousFbo = 0;
     glGetIntegerv(GL_FRAMEBUFFER_BINDING, &previousFbo);
 
-    glGenFramebuffers(1, &target.fbo);
-    glGenTextures(1, &target.color);
-    glBindTexture(GL_TEXTURE_2D, target.color);
+    target.fbo = GlFramebuffer::Create();
+    target.color = GlTexture::Create();
+    glBindTexture(GL_TEXTURE_2D, target.color.get());
 #ifdef __EMSCRIPTEN__
     glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA16F, width, height, 0, GL_RGBA, GL_HALF_FLOAT, nullptr);
 #else
@@ -200,18 +188,18 @@ void MagneticFieldBloom::CreateColorTarget(Target& target, uint16_t width, uint1
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
 
-    glBindFramebuffer(GL_FRAMEBUFFER, target.fbo);
-    glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, target.color, 0);
+    glBindFramebuffer(GL_FRAMEBUFFER, target.fbo.get());
+    glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, target.color.get(), 0);
 
     if (withDepth) {
-        glGenRenderbuffers(1, &target.depth);
-        glBindRenderbuffer(GL_RENDERBUFFER, target.depth);
+        target.depth = GlRenderbuffer::Create();
+        glBindRenderbuffer(GL_RENDERBUFFER, target.depth.get());
 #ifdef __EMSCRIPTEN__
         glRenderbufferStorage(GL_RENDERBUFFER, GL_DEPTH_COMPONENT24, width, height);
 #else
         glRenderbufferStorage(GL_RENDERBUFFER, GL_DEPTH_COMPONENT, width, height);
 #endif
-        glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_RENDERBUFFER, target.depth);
+        glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_RENDERBUFFER, target.depth.get());
     }
 
     const GLenum status = glCheckFramebufferStatus(GL_FRAMEBUFFER);
@@ -222,22 +210,11 @@ void MagneticFieldBloom::CreateColorTarget(Target& target, uint16_t width, uint1
 }
 
 void MagneticFieldBloom::DestroyTarget(Target& target) {
-    if (target.depth) {
-        glDeleteRenderbuffers(1, &target.depth);
-        target.depth = 0;
-    }
-    if (target.color) {
-        glDeleteTextures(1, &target.color);
-        target.color = 0;
-    }
-    if (target.fbo) {
-        glDeleteFramebuffers(1, &target.fbo);
-        target.fbo = 0;
-    }
+    target = Target{};
 }
 
 void MagneticFieldBloom::DrawQuad() const {
-    glBindVertexArray(_quadVao);
+    glBindVertexArray(_quadVao.get());
     glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
     glBindVertexArray(0);
 }

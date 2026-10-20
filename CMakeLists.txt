@@ -71,7 +71,7 @@ set(SOLARSYSTEM_SOURCES_AUX
     src/Auxiliary_Modules/MagneticFieldParams.cpp
     src/Auxiliary_Modules/MagneticFieldModel.cpp
     src/Auxiliary_Modules/MagneticFieldTracer.cpp
-    src/Auxiliary_Modules/MagneticFieldLineMesh.cpp
+    src/gfx/LineStripBatch.cpp
     src/Auxiliary_Modules/MagneticFieldLineRenderer.cpp
     src/Auxiliary_Modules/MagneticFieldBloom.cpp
     src/Auxiliary_Modules/Ephemeris.cpp

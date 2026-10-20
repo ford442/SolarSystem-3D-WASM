@@ -10,18 +10,6 @@ HDR::HDR(const Shader& shader, uint16_t width, uint16_t height, bool enabled)
     }
 }
 
-HDR::~HDR() {
-    if (_quadVao != 0) {
-        glDeleteVertexArrays(1, &_quadVao);
-        _quadVao = 0;
-    }
-    if (_quadVbo != 0) {
-        glDeleteBuffers(1, &_quadVbo);
-        _quadVbo = 0;
-    }
-    DestroyFBO();
-}
-
 void HDR::SetEnabled(bool enabled, uint16_t width, uint16_t height) {
     if (enabled == _enabled && (!_enabled || (width == _width && height == _height))) {
         return;
@@ -56,39 +44,30 @@ void HDR::Resize(uint16_t width, uint16_t height) {
 }
 
 void HDR::Render(float exposure, float gamma) const {
-    if (!_enabled || _colorBuffer == 0) {
+    if (!_enabled || !_colorBuffer) {
         return;
     }
 
     _hdrShader->Use();
     _hdrShader->SetInt("hdrBuffer", 0);
-    glBindTextureUnit(0, _colorBuffer);
+    glBindTextureUnit(0, _colorBuffer.get());
     _hdrShader->SetBool("hdr", true);
     _hdrShader->SetFloat("exposure", exposure);
     _hdrShader->SetFloat("gamma", gamma);
 
-    glBindVertexArray(_quadVao);
+    glBindVertexArray(_quadVao.get());
     glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
     glBindVertexArray(0);
 }
 
 GLuint HDR::GetHdrFBO() const {
-    return _hdrFrameBuffer;
+    return _hdrFrameBuffer.get();
 }
 
 void HDR::DestroyFBO() {
-    if (_hdrFrameBuffer != 0) {
-        glDeleteFramebuffers(1, &_hdrFrameBuffer);
-        _hdrFrameBuffer = 0;
-    }
-    if (_colorBuffer != 0) {
-        glDeleteTextures(1, &_colorBuffer);
-        _colorBuffer = 0;
-    }
-    if (_rboDepth != 0) {
-        glDeleteRenderbuffers(1, &_rboDepth);
-        _rboDepth = 0;
-    }
+    _hdrFrameBuffer.reset();
+    _colorBuffer.reset();
+    _rboDepth.reset();
 }
 
 void HDR::InitQuadBuffers() {
@@ -100,11 +79,11 @@ void HDR::InitQuadBuffers() {
              1.0f, -1.0f, 0.0f,     1.0f, 0.0f
     };
 
-    glGenVertexArrays(1, &_quadVao);
-    glGenBuffers(1, &_quadVbo);
+    _quadVao = GlVertexArray::Create();
+    _quadVbo = GlBuffer::Create();
 
-    glBindVertexArray(_quadVao);
-    glBindBuffer(GL_ARRAY_BUFFER, _quadVbo);
+    glBindVertexArray(_quadVao.get());
+    glBindBuffer(GL_ARRAY_BUFFER, _quadVbo.get());
     glBufferData(GL_ARRAY_BUFFER, sizeof(quadVertices), &quadVertices, GL_STATIC_DRAW);
 
     glEnableVertexAttribArray(0);
@@ -129,10 +108,10 @@ void HDR::InitFBO(uint16_t width, uint16_t height) {
     GLint previousFbo = 0;
     glGetIntegerv(GL_FRAMEBUFFER_BINDING, &previousFbo);
 
-    glGenFramebuffers(1, &_hdrFrameBuffer);
+    _hdrFrameBuffer = GlFramebuffer::Create();
 
-    glGenTextures(1, &_colorBuffer);
-    glBindTexture(GL_TEXTURE_2D, _colorBuffer);
+    _colorBuffer = GlTexture::Create();
+    glBindTexture(GL_TEXTURE_2D, _colorBuffer.get());
 #ifdef __EMSCRIPTEN__
     glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA16F, width, height, 0, GL_RGBA, GL_HALF_FLOAT, nullptr);
 #else
@@ -141,17 +120,17 @@ void HDR::InitFBO(uint16_t width, uint16_t height) {
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
 
-    glGenRenderbuffers(1, &_rboDepth);
-    glBindRenderbuffer(GL_RENDERBUFFER, _rboDepth);
+    _rboDepth = GlRenderbuffer::Create();
+    glBindRenderbuffer(GL_RENDERBUFFER, _rboDepth.get());
 #ifdef __EMSCRIPTEN__
     glRenderbufferStorage(GL_RENDERBUFFER, GL_DEPTH_COMPONENT24, width, height);
 #else
     glRenderbufferStorage(GL_RENDERBUFFER, GL_DEPTH_COMPONENT, width, height);
 #endif
 
-    glBindFramebuffer(GL_FRAMEBUFFER, _hdrFrameBuffer);
-    glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, _colorBuffer, 0);
-    glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_RENDERBUFFER, _rboDepth);
+    glBindFramebuffer(GL_FRAMEBUFFER, _hdrFrameBuffer.get());
+    glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, _colorBuffer.get(), 0);
+    glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_RENDERBUFFER, _rboDepth.get());
 
     const GLenum status = glCheckFramebufferStatus(GL_FRAMEBUFFER);
     glBindFramebuffer(GL_FRAMEBUFFER, static_cast<GLuint>(previousFbo));

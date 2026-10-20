@@ -1,22 +1,6 @@
 #ifndef SOLARSYSTEM_SHADER_H
 #define SOLARSYSTEM_SHADER_H
-#include <GL/glew.h>
-#ifdef __EMSCRIPTEN__
-// Emscripten's glew/SDL_opengl declare DSA entry points that WebGL 2 does not
-// implement. Macro (not inline) so -flto cannot emit an unresolved import.
-//
-// NOTE: this polyfill is GL_TEXTURE_2D ONLY, while the native glBindTextureUnit it
-// stands in for is target-agnostic. A cube map (or any other target) bound through it
-// works natively and silently binds nothing on web — see SkyBox::Render, which guards
-// the call with #ifndef __EMSCRIPTEN__ and binds GL_TEXTURE_CUBE_MAP by hand. Treat this
-// as `BindTexture2D` at every call site. Mirrored in src/SystemModules.h.
-#undef glBindTextureUnit
-#define glBindTextureUnit(unit, texture) \
-    do { \
-        glActiveTexture(GL_TEXTURE0 + (unit)); \
-        glBindTexture(GL_TEXTURE_2D, (texture)); \
-    } while (0)
-#endif
+#include "../gfx/GlHandle.h"
 #include "ShaderSource.h"
 #include <glm/glm.hpp>
 #include <string>
@@ -34,15 +18,14 @@ public:
     // there is a compile error rather than a shader that silently fails to link.
     Shader(const std::string& vertexPath, const std::string& fragmentPath, const std::string& geometryPath);
 #endif
-    ~Shader();
     
     // Delete copy to prevent double-free
     Shader(const Shader&) = delete;
     Shader& operator=(const Shader&) = delete;
     
     // Move semantics for proper ownership transfer
-    Shader(Shader&& other) noexcept;
-    Shader& operator=(Shader&& other) noexcept;
+    Shader(Shader&& other) noexcept = default;
+    Shader& operator=(Shader&& other) noexcept = default;
     
     void Use() const;
     void SetBool(const std::string& name, bool value) const;
@@ -85,12 +68,11 @@ private:
         ShaderProgram
     };
 
-    size_t _shaderProgramID = 0;
+    GlProgram _program;
     // Lazy cache: first Set*/lookup resolves glGetUniformLocation; -1 misses are cached too.
     mutable std::unordered_map<std::string, GLint> _uniformLocationCache;
 
     GLint GetUniformLocation(const std::string& name) const;
-    void Release();
     void Build(const std::string& vertexPath, const std::string& fragmentPath, const std::string& geometryPath);
 
     static void CheckCompileErrors(size_t shader, ShaderType type, const std::string& path = "",

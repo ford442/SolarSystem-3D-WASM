@@ -51,11 +51,11 @@ ObserveSky::ObserveSky() {
     _spriteShader = std::make_unique<Shader>("resource/shaders/observeSprite.vs", "resource/shaders/observeSprite.fs");
 
     // A core-profile draw needs a bound VAO even when every vertex comes from gl_VertexID.
-    glGenVertexArrays(1, &_emptyVao);
+    _emptyVao = GlVertexArray::Create();
 
     const float quad[] = {-1.0f, -1.0f, 1.0f, -1.0f, -1.0f, 1.0f, 1.0f, 1.0f};
-    glGenBuffers(1, &_quadVbo);
-    glBindBuffer(GL_ARRAY_BUFFER, _quadVbo);
+    _quadVbo = GlBuffer::Create();
+    glBindBuffer(GL_ARRAY_BUFFER, _quadVbo.get());
     glBufferData(GL_ARRAY_BUFFER, sizeof(quad), quad, GL_STATIC_DRAW);
     glBindBuffer(GL_ARRAY_BUFFER, 0);
 
@@ -63,27 +63,18 @@ ObserveSky::ObserveSky() {
     InitBatch(_moonBatch, 1);
 }
 
-ObserveSky::~ObserveSky() {
-    for (SpriteBatch* batch : {&_additiveBatch, &_moonBatch, &_starBatch}) {
-        if (batch->vbo) glDeleteBuffers(1, &batch->vbo);
-        if (batch->vao) glDeleteVertexArrays(1, &batch->vao);
-    }
-    if (_quadVbo) glDeleteBuffers(1, &_quadVbo);
-    if (_emptyVao) glDeleteVertexArrays(1, &_emptyVao);
-}
-
 void ObserveSky::InitBatch(SpriteBatch& batch, int capacity) const {
     batch.capacity = capacity;
     batch.count = 0;
-    glGenVertexArrays(1, &batch.vao);
-    glGenBuffers(1, &batch.vbo);
-    glBindVertexArray(batch.vao);
+    batch.vao = GlVertexArray::Create();
+    batch.vbo = GlBuffer::Create();
+    glBindVertexArray(batch.vao.get());
 
-    glBindBuffer(GL_ARRAY_BUFFER, _quadVbo);
+    glBindBuffer(GL_ARRAY_BUFFER, _quadVbo.get());
     glEnableVertexAttribArray(0);
     glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, 2 * sizeof(float), nullptr);
 
-    glBindBuffer(GL_ARRAY_BUFFER, batch.vbo);
+    glBindBuffer(GL_ARRAY_BUFFER, batch.vbo.get());
     glBufferData(GL_ARRAY_BUFFER, static_cast<GLsizeiptr>(capacity * sizeof(SpriteInstance)), nullptr,
                  GL_DYNAMIC_DRAW);
     const GLsizei stride = static_cast<GLsizei>(sizeof(SpriteInstance));
@@ -102,7 +93,7 @@ void ObserveSky::UploadBatch(SpriteBatch& batch, const std::vector<SpriteInstanc
     if (batch.count == 0) {
         return;
     }
-    glBindBuffer(GL_ARRAY_BUFFER, batch.vbo);
+    glBindBuffer(GL_ARRAY_BUFFER, batch.vbo.get());
     glBufferSubData(GL_ARRAY_BUFFER, 0, static_cast<GLsizeiptr>(batch.count * sizeof(SpriteInstance)),
                     instances.data());
     glBindBuffer(GL_ARRAY_BUFFER, 0);
@@ -112,7 +103,7 @@ void ObserveSky::DrawBatch(const SpriteBatch& batch, int count) const {
     if (count <= 0) {
         return;
     }
-    glBindVertexArray(batch.vao);
+    glBindVertexArray(batch.vao.get());
     glDrawArraysInstanced(GL_TRIANGLE_STRIP, 0, 4, count);
     glBindVertexArray(0);
 }
@@ -199,7 +190,7 @@ void ObserveSky::Render(const Observer::Sky& sky, const Frame& frame, unsigned i
     _skyShader->SetMat4("invProjection", glm::inverse(frame.projection));
     _skyShader->SetVec3("sunDir", sunDir);
     _skyShader->SetFloat("eclipse", static_cast<float>(sky.sunCoverage));
-    glBindVertexArray(_emptyVao);
+    glBindVertexArray(_emptyVao.get());
     glDrawArrays(GL_TRIANGLES, 0, 3);
     glBindVertexArray(0);
 

@@ -72,7 +72,12 @@ target_include_directories(SolarSystemTests PRIVATE
 if(EXISTS "${CMAKE_SOURCE_DIR}/external/glm")
     target_include_directories(SolarSystemTests PRIVATE ${CMAKE_SOURCE_DIR}/external/glm)
 endif()
-target_link_libraries(SolarSystemTests PRIVATE GTest::gtest_main)
+# GL-owning types (TextureImage2D, LineStripBatch) hold gfx/GlHandle members whose inline
+# destructors reference glDelete*, so the test binary links GL even though these tests never
+# create a context: a default-constructed handle is empty and deletes nothing.
+find_package(OpenGL REQUIRED)
+find_package(GLEW REQUIRED)
+target_link_libraries(SolarSystemTests PRIVATE GTest::gtest_main OpenGL::GL GLEW::GLEW)
 
 include(GoogleTest)
 gtest_discover_tests(SolarSystemTests)

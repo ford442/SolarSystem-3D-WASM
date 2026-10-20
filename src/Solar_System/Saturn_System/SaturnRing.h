@@ -4,7 +4,7 @@
 
 class SaturnRing : public PlanetaryRing {
 public:
-    explicit SaturnRing(const PlanetaryRingInfo& planetaryRingInfo, std::shared_ptr<Planet> parent);
+    explicit SaturnRing(PlanetaryRingInfo&& planetaryRingInfo, std::shared_ptr<Planet> parent);
     void AdjustToParent() override;
     void Render() const override;
 };

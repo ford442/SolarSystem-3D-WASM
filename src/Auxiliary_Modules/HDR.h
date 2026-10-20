@@ -1,11 +1,11 @@
 #ifndef SOLARSYSTEM_HDR_H
 #define SOLARSYSTEM_HDR_H
 #include "Shader.h"
+#include "../gfx/GlHandle.h"
 
 class HDR {
 public:
     explicit HDR(const Shader& shader, uint16_t width, uint16_t height, bool enabled = true);
-    ~HDR();
     void SetEnabled(bool enabled, uint16_t width, uint16_t height);
     bool IsEnabled() const;
     void Resize(uint16_t width, uint16_t height);
@@ -17,7 +17,11 @@ private:
     bool _enabled = true;
     uint16_t _width = 0;
     uint16_t _height = 0;
-    GLuint _quadVao = 0, _quadVbo = 0, _hdrFrameBuffer = 0, _colorBuffer = 0, _rboDepth = 0;
+    GlVertexArray _quadVao;
+    GlBuffer _quadVbo;
+    GlFramebuffer _hdrFrameBuffer;
+    GlTexture _colorBuffer;
+    GlRenderbuffer _rboDepth;
 
     void InitQuadBuffers();
     void DestroyFBO();

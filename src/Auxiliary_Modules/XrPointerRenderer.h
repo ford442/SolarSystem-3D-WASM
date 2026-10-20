@@ -2,6 +2,7 @@
 #define SOLARSYSTEM_XRPOINTERRENDERER_H
 
 #include "Shader.h"
+#include "../gfx/LineStripBatch.h"
 #include <glm/glm.hpp>
 #include <memory>
 
@@ -15,7 +16,6 @@ public:
     };
 
     XrPointerRenderer();
-    ~XrPointerRenderer();
 
     XrPointerRenderer(const XrPointerRenderer&) = delete;
     XrPointerRenderer& operator=(const XrPointerRenderer&) = delete;
@@ -33,16 +33,8 @@ public:
               float zCoef) const;
 
 private:
-    struct Vertex {
-        glm::vec3 position{0.0f};
-        glm::vec3 tangent{0.0f, 0.0f, -1.0f};
-        float arcLength = 0.0f;
-        float lineUV = 0.0f;
-    };
-
     Ray _rays[2];
-    mutable GLuint _vao = 0;
-    mutable GLuint _vbo = 0;
+    mutable LineStripBatch _ray;
     std::unique_ptr<Shader> _shader;
 };
 

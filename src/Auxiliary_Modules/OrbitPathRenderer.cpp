@@ -17,10 +17,10 @@ OrbitPathRenderer::OrbitPathRenderer() {
         verts.push_back(std::sin(t));
     }
 
-    glGenVertexArrays(1, &_vao);
-    glGenBuffers(1, &_vbo);
-    glBindVertexArray(_vao);
-    glBindBuffer(GL_ARRAY_BUFFER, _vbo);
+    _vao = GlVertexArray::Create();
+    _vbo = GlBuffer::Create();
+    glBindVertexArray(_vao.get());
+    glBindBuffer(GL_ARRAY_BUFFER, _vbo.get());
     glBufferData(GL_ARRAY_BUFFER, static_cast<GLsizeiptr>(verts.size() * sizeof(float)), verts.data(), GL_STATIC_DRAW);
     glEnableVertexAttribArray(0);
     glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(float), reinterpret_cast<void*>(0));
@@ -29,20 +29,9 @@ OrbitPathRenderer::OrbitPathRenderer() {
     _shader = std::make_unique<Shader>("resource/shaders/orbitPath.vs", "resource/shaders/orbitPath.fs");
 }
 
-OrbitPathRenderer::~OrbitPathRenderer() {
-    if (_vbo) {
-        glDeleteBuffers(1, &_vbo);
-        _vbo = 0;
-    }
-    if (_vao) {
-        glDeleteVertexArrays(1, &_vao);
-        _vao = 0;
-    }
-}
-
 void OrbitPathRenderer::Draw(const glm::mat4& projection, const glm::mat4& view, const glm::mat4& model,
                              const glm::vec4& color) const {
-    if (!_shader || _vao == 0) {
+    if (!_shader || !_vao) {
         return;
     }
 
@@ -52,7 +41,7 @@ void OrbitPathRenderer::Draw(const glm::mat4& projection, const glm::mat4& view,
     _shader->SetMat4("model", model);
     _shader->SetVec4("color", color);
 
-    glBindVertexArray(_vao);
+    glBindVertexArray(_vao.get());
     glDrawArrays(GL_LINE_LOOP, 0, kSegmentCount);
     glBindVertexArray(0);
 }

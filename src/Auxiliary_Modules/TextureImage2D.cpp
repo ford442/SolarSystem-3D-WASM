@@ -226,8 +226,8 @@ void TextureImage2D::LoadTextureFromFile(const std::string& path, GLint wrapPara
     // a miss falls through to CreateFallbackTexture() below.
     WebResourceFetcher::RequireResident(path, "TextureImage2D");
 
-    glGenTextures(1, &_textureID);
-    glBindTexture(GL_TEXTURE_2D, _textureID);
+    _texture = GlTexture::Create();
+    glBindTexture(GL_TEXTURE_2D, _texture.get());
 
     bool canGenerateMipmaps = false;
     bool hasEmbeddedMipmaps = false;
@@ -272,10 +272,7 @@ void TextureImage2D::LoadTextureFromFile(const std::string& path, GLint wrapPara
     }
     catch (const std::runtime_error& error) {
 #ifdef __EMSCRIPTEN__
-        if (_textureID != 0) {
-            glDeleteTextures(1, &_textureID);
-            _textureID = 0;
-        }
+        _texture.reset();
         if (!allowFallback) {
             throw;
         }
@@ -375,9 +372,8 @@ void TextureImage2D::LoadTextureFromFile(const std::string& path, GLint wrapPara
     }
 #endif
 
-    if (!IsGpuTextureValid(_textureID, _width, _height)) {
-        glDeleteTextures(1, &_textureID);
-        _textureID = 0;
+    if (!IsGpuTextureValid(_texture.get(), _width, _height)) {
+        _texture.reset();
         if (!allowFallback) {
             throw std::runtime_error("GPU upload produced an incomplete texture (check GL errors / MAX_TEXTURE_SIZE)");
         }
@@ -391,7 +387,7 @@ void TextureImage2D::LoadTextureFromFile(const std::string& path, GLint wrapPara
 }
 
 GLuint TextureImage2D::GetTexture() const {
-    return _textureID;
+    return _texture.get();
 }
 
 GLuint TextureImage2D::GetWidth() const {
@@ -403,19 +399,18 @@ GLuint TextureImage2D::GetHeight() const {
 }
 
 void TextureImage2D::ReloadTexture(const std::string& path, GLint wrapParam, GLint minFilter, GLint magFilter) {
-    GLuint oldTextureID = _textureID;
-    _textureID = 0;
+    // The old texture stays alive until the new one is bound and ready, then goes with `previous`.
+    GlTexture previous = std::move(_texture);
+    const GLuint previousWidth = _width, previousHeight = _height;
 
     try {
         LoadTextureFromFile(path, wrapParam, minFilter, magFilter, false);
-        // Success: safe to delete the old one now (new one is bound and ready)
-        if (oldTextureID != 0) {
-            glDeleteTextures(1, &oldTextureID);
-        }
     } catch (...) {
         // On any failure during reload (rare on web now that Load catches), restore old texture
-        _textureID = oldTextureID;
-        if (_textureID == 0) {
+        _texture = std::move(previous);
+        _width = previousWidth;
+        _height = previousHeight;
+        if (!_texture) {
             // Last resort: at least have *something* so we don't bind 0
             CreateFallbackTexture(wrapParam, minFilter, magFilter);
         }
@@ -423,8 +418,8 @@ void TextureImage2D::ReloadTexture(const std::string& path, GLint wrapParam, GLi
 }
 
 void TextureImage2D::CreateFallbackTexture(GLint wrapParam, GLint minFilter, GLint magFilter) {
-    glGenTextures(1, &_textureID);
-    glBindTexture(GL_TEXTURE_2D, _textureID);
+    _texture = GlTexture::Create();
+    glBindTexture(GL_TEXTURE_2D, _texture.get());
 
     // 4x4 high-contrast checker (gray / dark) so missing textures are obvious but
     // the object still renders and receives lighting instead of solid black.

@@ -1,12 +1,12 @@
 #ifndef SOLARSYSTEM_SHADOWMAPFBO_H
 #define SOLARSYSTEM_SHADOWMAPFBO_H
-#include <GL/glew.h>
+#include "../gfx/GlHandle.h"
+#include <cstdint>
 #include <vector>
 
 class ShadowMapFBO {
 public:
     explicit ShadowMapFBO(uint16_t shadowMapWidth, uint16_t shadowMapHeight);
-    ~ShadowMapFBO();
     void Resize(uint16_t shadowMapWidth, uint16_t shadowMapHeight);
     uint16_t GetShadowMapWidth() const;
     uint16_t GetShadowMapHeight() const;
@@ -15,7 +15,8 @@ public:
 
 private:
     uint16_t _shadowMapWidth, _shadowMapHeight;
-    GLuint _shadowMap = 0, _frameBuffer = 0;
+    GlTexture _shadowMap;
+    GlFramebuffer _frameBuffer;
 
     void DestroyFBO();
     void InitFBO();

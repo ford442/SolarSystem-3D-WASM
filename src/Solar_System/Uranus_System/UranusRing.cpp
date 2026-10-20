@@ -3,7 +3,7 @@
 #include "../BodyCatalog.generated.h"
 #include "../OrbitLayout.h"
 
-UranusRing::UranusRing(const PlanetaryRingInfo& planetaryRingInfo, std::shared_ptr<Planet> parent) : PlanetaryRing(planetaryRingInfo, std::move(parent))
+UranusRing::UranusRing(PlanetaryRingInfo&& planetaryRingInfo, std::shared_ptr<Planet> parent) : PlanetaryRing(std::move(planetaryRingInfo), std::move(parent))
 {
     ConfigureDiffuseLOD(TexturePaths::Resolve("resource/textures_low/Uranus_Rings_Low.dds"),
                         TexturePaths::Resolve("resource/textures_mid/Uranus_Rings_Mid.dds"),

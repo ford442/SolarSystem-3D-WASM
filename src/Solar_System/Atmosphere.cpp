@@ -22,19 +22,9 @@ Atmosphere::Atmosphere(MeshHolder model, const Shader& shader, const BodyCatalog
     }
 }
 
-Atmosphere::~Atmosphere() {
-    SetLuts(0, 0);
-}
-
-void Atmosphere::SetLuts(unsigned int transmittance, unsigned int multiScattering) {
-    if (_transmittanceLut != 0) {
-        glDeleteTextures(1, &_transmittanceLut);
-    }
-    if (_multiScatteringLut != 0) {
-        glDeleteTextures(1, &_multiScatteringLut);
-    }
-    _transmittanceLut = transmittance;
-    _multiScatteringLut = multiScattering;
+void Atmosphere::SetLuts(GlTexture transmittance, GlTexture multiScattering) {
+    _transmittanceLut = std::move(transmittance);
+    _multiScatteringLut = std::move(multiScattering);
     if (!HasLuts()) {
         _physicalPathActive = false;
     }

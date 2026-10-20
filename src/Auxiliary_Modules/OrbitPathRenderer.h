@@ -9,7 +9,6 @@
 class OrbitPathRenderer {
 public:
     OrbitPathRenderer();
-    ~OrbitPathRenderer();
 
     OrbitPathRenderer(const OrbitPathRenderer&) = delete;
     OrbitPathRenderer& operator=(const OrbitPathRenderer&) = delete;
@@ -19,8 +18,8 @@ public:
 
 private:
     static constexpr int kSegmentCount = 128;
-    GLuint _vao = 0;
-    GLuint _vbo = 0;
+    GlVertexArray _vao;
+    GlBuffer _vbo;
     std::unique_ptr<Shader> _shader;
 };
 

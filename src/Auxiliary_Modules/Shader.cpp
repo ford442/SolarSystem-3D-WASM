@@ -34,8 +34,6 @@ Shader::Shader(const std::string& vertexPath, const std::string& fragmentPath, c
 #endif
 
 void Shader::Build(const std::string& vertexPath, const std::string& fragmentPath, const std::string& geometryPath) {
-    _shaderProgramID = 0;
-
 #ifdef __EMSCRIPTEN__
     // Defence in depth behind the missing 3-arg constructor: nothing in the web build can
     // reach a geometry stage, because WebGL 2 does not have one.
@@ -48,78 +46,49 @@ void Shader::Build(const std::string& vertexPath, const std::string& fragmentPat
     const char* vShaderCode = vertexSource.code.c_str();
     const char* fShaderCode = fragmentSource.code.c_str();
 
-    const GLuint vertex = glCreateShader(GL_VERTEX_SHADER);
-    glShaderSource(vertex, 1, &vShaderCode, nullptr);
-    glCompileShader(vertex);
-    CheckCompileErrors(vertex, ShaderType::VertexShader, vertexPath, &vertexSource);
+    // Stages are owned handles, so a CheckCompileErrors throw no longer leaks them.
+    const GlShaderStage vertex = GlShaderStage::Create(GL_VERTEX_SHADER);
+    glShaderSource(vertex.get(), 1, &vShaderCode, nullptr);
+    glCompileShader(vertex.get());
+    CheckCompileErrors(vertex.get(), ShaderType::VertexShader, vertexPath, &vertexSource);
 
-    const GLuint fragment = glCreateShader(GL_FRAGMENT_SHADER);
-    glShaderSource(fragment, 1, &fShaderCode, nullptr);
-    glCompileShader(fragment);
-    CheckCompileErrors(fragment, ShaderType::FragmentShader, fragmentPath, &fragmentSource);
+    const GlShaderStage fragment = GlShaderStage::Create(GL_FRAGMENT_SHADER);
+    glShaderSource(fragment.get(), 1, &fShaderCode, nullptr);
+    glCompileShader(fragment.get());
+    CheckCompileErrors(fragment.get(), ShaderType::FragmentShader, fragmentPath, &fragmentSource);
 
 #ifndef __EMSCRIPTEN__
-    GLuint geometry = 0;
+    GlShaderStage geometry;
     const bool hasGeometry = !geometryPath.empty();
     if (hasGeometry) {
         const ShaderSource::Result geometrySource = AssembleShader(geometryPath, ShaderSource::Stage::Geometry);
         const char* gShaderCode = geometrySource.code.c_str();
-        geometry = glCreateShader(GL_GEOMETRY_SHADER);
-        glShaderSource(geometry, 1, &gShaderCode, nullptr);
-        glCompileShader(geometry);
-        CheckCompileErrors(geometry, ShaderType::GeometryShader, geometryPath, &geometrySource);
+        geometry = GlShaderStage::Create(GL_GEOMETRY_SHADER);
+        glShaderSource(geometry.get(), 1, &gShaderCode, nullptr);
+        glCompileShader(geometry.get());
+        CheckCompileErrors(geometry.get(), ShaderType::GeometryShader, geometryPath, &geometrySource);
     }
 #endif
 
-    _shaderProgramID = glCreateProgram();
-    glAttachShader(_shaderProgramID, vertex);
-    glAttachShader(_shaderProgramID, fragment);
+    _program = GlProgram::Create();
+    const GLuint program = _program.get();
+    glAttachShader(program, vertex.get());
+    glAttachShader(program, fragment.get());
 #ifndef __EMSCRIPTEN__
     if (hasGeometry) {
-        glAttachShader(_shaderProgramID, geometry);
+        glAttachShader(program, geometry.get());
     }
 #endif
-    glLinkProgram(_shaderProgramID);
-    CheckCompileErrors(_shaderProgramID, ShaderType::ShaderProgram, fragmentPath);
+    glLinkProgram(program);
+    CheckCompileErrors(program, ShaderType::ShaderProgram, fragmentPath);
 
-    glDetachShader(_shaderProgramID, vertex);
-    glDeleteShader(vertex);
-    glDetachShader(_shaderProgramID, fragment);
-    glDeleteShader(fragment);
+    glDetachShader(program, vertex.get());
+    glDetachShader(program, fragment.get());
 #ifndef __EMSCRIPTEN__
     if (hasGeometry) {
-        glDetachShader(_shaderProgramID, geometry);
-        glDeleteShader(geometry);
+        glDetachShader(program, geometry.get());
     }
 #endif
-}
-
-Shader::~Shader() {
-    Release();
-}
-
-Shader::Shader(Shader&& other) noexcept
-    : _shaderProgramID(other._shaderProgramID)
-    , _uniformLocationCache(std::move(other._uniformLocationCache)) {
-    other._shaderProgramID = 0;
-}
-
-Shader& Shader::operator=(Shader&& other) noexcept {
-    if (this != &other) {
-        Release();
-        _shaderProgramID = other._shaderProgramID;
-        _uniformLocationCache = std::move(other._uniformLocationCache);
-        other._shaderProgramID = 0;
-    }
-    return *this;
-}
-
-void Shader::Release() {
-    if (_shaderProgramID != 0) {
-        glDeleteProgram(static_cast<GLuint>(_shaderProgramID));
-        _shaderProgramID = 0;
-    }
-    _uniformLocationCache.clear();
 }
 
 GLint Shader::GetUniformLocation(const std::string& name) const {
@@ -127,13 +96,13 @@ GLint Shader::GetUniformLocation(const std::string& name) const {
     if (it != _uniformLocationCache.end()) {
         return it->second;
     }
-    const GLint location = glGetUniformLocation(static_cast<GLuint>(_shaderProgramID), name.c_str());
+    const GLint location = glGetUniformLocation(_program.get(), name.c_str());
     _uniformLocationCache.emplace(name, location);
     return location;
 }
 
 void Shader::Use() const {
-    glUseProgram(_shaderProgramID);
+    glUseProgram(_program.get());
 }
 
 void Shader::SetBool(const std::string& name, bool value) const {
@@ -343,7 +312,7 @@ void Shader::SetMat4Double(const std::string& name, const glm::dmat4& mat) const
 }
 
 size_t Shader::GetProgramId() const {
-    return _shaderProgramID;
+    return _program.get();
 }
 
 #ifndef __EMSCRIPTEN__
@@ -372,17 +341,11 @@ int Shader::SelfTestDirectory(const std::string& directory) {
                 const ShaderSource::Result source =
                     AssembleShader(path, vertex ? ShaderSource::Stage::Vertex : ShaderSource::Stage::Fragment, dialect);
                 const char* code = source.code.c_str();
-                const GLuint shader = glCreateShader(vertex ? GL_VERTEX_SHADER : GL_FRAGMENT_SHADER);
-                glShaderSource(shader, 1, &code, nullptr);
-                glCompileShader(shader);
-                try {
-                    CheckCompileErrors(shader, vertex ? ShaderType::VertexShader : ShaderType::FragmentShader,
-                                       path + " (" + dialectName + ")", &source);
-                } catch (...) {
-                    glDeleteShader(shader);
-                    throw;
-                }
-                glDeleteShader(shader);
+                const GlShaderStage shader = GlShaderStage::Create(vertex ? GL_VERTEX_SHADER : GL_FRAGMENT_SHADER);
+                glShaderSource(shader.get(), 1, &code, nullptr);
+                glCompileShader(shader.get());
+                CheckCompileErrors(shader.get(), vertex ? ShaderType::VertexShader : ShaderType::FragmentShader,
+                                   path + " (" + dialectName + ")", &source);
                 ++compiled;
             } catch (const std::exception&) {
                 ++failures; // already printed by AssembleShader / CheckCompileErrors

@@ -1,6 +1,6 @@
 #include "LensFlare.h"
 
-LensFlare::LensFlare(const Shader& shader, const TextureImage2D& lensTexture, const FlaresInfo& properties) : _lensFlareShader(&shader), _lensTexture(lensTexture) {
+LensFlare::LensFlare(const Shader& shader, TextureImage2D lensTexture, const FlaresInfo& properties) : _lensFlareShader(&shader), _lensTexture(std::move(lensTexture)) {
     _numSprites = properties.sprites.size();
 
     constexpr glm::vec2 positions[4] = {
@@ -55,15 +55,15 @@ LensFlare::LensFlare(const Shader& shader, const TextureImage2D& lensTexture, co
         }
     }
 
-    glGenVertexArrays(1, &_vao);
-    glGenBuffers(1, &_vbo);
-    glGenBuffers(1, &_ebo);
+    _vao = GlVertexArray::Create();
+    _vbo = GlBuffer::Create();
+    _ebo = GlBuffer::Create();
 
-    glBindVertexArray(_vao); // Связывание с вершинным массивом
-    glBindBuffer(GL_ARRAY_BUFFER, _vbo); // Связывание с вершинным буфером
+    glBindVertexArray(_vao.get()); // Связывание с вершинным массивом
+    glBindBuffer(GL_ARRAY_BUFFER, _vbo.get()); // Связывание с вершинным буфером
     glBufferData(GL_ARRAY_BUFFER, vertices.size() * sizeof(FlareVertex), vertices.data(), GL_STATIC_DRAW);
 
-    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, _ebo); // Связывание с элементным буфером (копируем индексы)
+    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, _ebo.get()); // Связывание с элементным буфером (копируем индексы)
     glBufferData(GL_ELEMENT_ARRAY_BUFFER, indices.size() * sizeof(uint16_t), indices.data(), GL_STATIC_DRAW);
 
     // Установка указателей вершинных атрибутов (указание параметров доступа вершинных атрибутов к VBO)
@@ -108,7 +108,7 @@ void LensFlare::Render(const glm::mat4& projection, const glm::mat4& view, const
         glBindTextureUnit(1, ringCameraInfo->ringDiffuse);
     }
 
-    glBindVertexArray(_vao);
+    glBindVertexArray(_vao.get());
     glDrawElements(GL_TRIANGLES, INDICES_PER_QUAD * _numSprites, GL_UNSIGNED_SHORT, nullptr);
     glBindVertexArray(0);
 }

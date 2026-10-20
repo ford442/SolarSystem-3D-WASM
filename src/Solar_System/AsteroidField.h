@@ -27,7 +27,6 @@ public:
 
     explicit AsteroidField(uint32_t seed = kDefaultSeed, int instanceCount = 1800,
                            Population population = Population::MainBelt);
-    ~AsteroidField();
 
     AsteroidField(const AsteroidField&) = delete;
     AsteroidField& operator=(const AsteroidField&) = delete;
@@ -71,14 +70,14 @@ private:
     std::vector<OrbitalElements> _comets;
     std::vector<InstanceGPU> _instanceData;
 
-    GLuint _rockVao = 0;
-    GLuint _rockVbo = 0;
-    GLuint _rockEbo = 0;
-    GLuint _instanceVbo = 0;
+    GlVertexArray _rockVao;
+    GlBuffer _rockVbo;
+    GlBuffer _rockEbo;
+    GlBuffer _instanceVbo;
     GLsizei _rockIndexCount = 0;
 
-    GLuint _tailVao = 0;
-    GLuint _tailVbo = 0;
+    GlVertexArray _tailVao;
+    GlBuffer _tailVbo;
 
     std::unique_ptr<Shader> _asteroidShader;
     std::unique_ptr<Shader> _cometTailShader;

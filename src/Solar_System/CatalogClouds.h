@@ -9,7 +9,7 @@
  */
 class CatalogClouds : public Clouds {
 public:
-    CatalogClouds(const CloudsInfo& cloudsInfo, std::shared_ptr<SpaceObject> parent,
+    CatalogClouds(CloudsInfo&& cloudsInfo, std::shared_ptr<SpaceObject> parent,
                   const BodyCatalog::Entry& parentEntry);
 
     void AdjustToParent(float timeScale) override;

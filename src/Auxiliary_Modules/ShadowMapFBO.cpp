@@ -5,10 +5,6 @@ ShadowMapFBO::ShadowMapFBO(uint16_t shadowMapWidth, uint16_t shadowMapHeight) : 
     InitFBO();
 }
 
-ShadowMapFBO::~ShadowMapFBO() {
-    DestroyFBO();
-}
-
 void ShadowMapFBO::Resize(uint16_t shadowMapWidth, uint16_t shadowMapHeight) {
     if (shadowMapWidth == _shadowMapWidth && shadowMapHeight == _shadowMapHeight) {
         return;
@@ -20,14 +16,8 @@ void ShadowMapFBO::Resize(uint16_t shadowMapWidth, uint16_t shadowMapHeight) {
 }
 
 void ShadowMapFBO::DestroyFBO() {
-    if (_frameBuffer != 0) {
-        glDeleteFramebuffers(1, &_frameBuffer);
-        _frameBuffer = 0;
-    }
-    if (_shadowMap != 0) {
-        glDeleteTextures(1, &_shadowMap);
-        _shadowMap = 0;
-    }
+    _frameBuffer.reset();
+    _shadowMap.reset();
 }
 
 uint16_t ShadowMapFBO::GetShadowMapWidth() const {
@@ -39,18 +29,18 @@ uint16_t ShadowMapFBO::GetShadowMapHeight() const {
 }
 
 GLuint ShadowMapFBO::GetShadowMap() const {
-    return _shadowMap;
+    return _shadowMap.get();
 }
 
 GLuint ShadowMapFBO::GetFBO() const {
-    return _frameBuffer;
+    return _frameBuffer.get();
 }
 
 void ShadowMapFBO::InitFBO() {
-    glGenFramebuffers(1, &_frameBuffer);
+    _frameBuffer = GlFramebuffer::Create();
 
-    glGenTextures(1, &_shadowMap);
-    glBindTexture(GL_TEXTURE_2D, _shadowMap);
+    _shadowMap = GlTexture::Create();
+    glBindTexture(GL_TEXTURE_2D, _shadowMap.get());
 #ifdef __EMSCRIPTEN__
     glTexImage2D(GL_TEXTURE_2D, 0, GL_DEPTH_COMPONENT24, _shadowMapWidth, _shadowMapHeight, 0, GL_DEPTH_COMPONENT, GL_UNSIGNED_INT, nullptr);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
@@ -71,8 +61,8 @@ void ShadowMapFBO::InitFBO() {
     GLint previousFbo = 0;
     glGetIntegerv(GL_FRAMEBUFFER_BINDING, &previousFbo);
 
-    glBindFramebuffer(GL_FRAMEBUFFER, _frameBuffer);
-    glFramebufferTexture2D(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_TEXTURE_2D, _shadowMap, 0);
+    glBindFramebuffer(GL_FRAMEBUFFER, _frameBuffer.get());
+    glFramebufferTexture2D(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_TEXTURE_2D, _shadowMap.get(), 0);
 #ifdef __EMSCRIPTEN__
     GLenum drawBuffers[] = { GL_NONE };
     glDrawBuffers(1, drawBuffers);

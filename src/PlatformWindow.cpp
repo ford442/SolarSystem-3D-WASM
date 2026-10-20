@@ -238,6 +238,10 @@ void Application::InitSystems() {
     // would keep SDL's audio subsystem (a deprecated ScriptProcessorNode device) linked in.
     // IMG_Init below does not need it.
 #else
+    // SDL's default SIGINT/SIGTERM handlers turn the signal into an SDL_QUIT event, but the
+    // frame loop is GLFW's and never polls SDL events — so Ctrl-C and `timeout` were
+    // swallowed and the process had to be SIGKILLed. Keep the default (terminating) handlers.
+    SDL_SetHint(SDL_HINT_NO_SIGNAL_HANDLERS, "1");
     if (SDL_Init(SDL_INIT_EVERYTHING)) {
         Dispose();
         throw runtime_error("Failed to init SDL");

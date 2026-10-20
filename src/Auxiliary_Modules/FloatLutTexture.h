@@ -1,7 +1,7 @@
 #ifndef SOLARSYSTEM_FLOAT_LUT_TEXTURE_H
 #define SOLARSYSTEM_FLOAT_LUT_TEXTURE_H
 
-#include <GL/glew.h>
+#include "../gfx/GlHandle.h"
 
 #include <optional>
 #include <string>
@@ -17,7 +17,7 @@
  * EXT_color_buffer_float). Never throws; logs to stdout and returns nullopt instead.
  */
 struct FloatLut {
-    GLuint texture = 0;
+    GlTexture texture;
     std::string paramsHash;  // KTX2 key/value written by the baker, "" if absent
     int mappingVersion = -1;
 };

@@ -1,17 +1,13 @@
 #pragma once
 
 #include "MagneticFieldTracer.h"
+#include "../gfx/LineStripBatch.h"
 #include <glm/geometric.hpp>
 #include <glm/vec3.hpp>
 #include <vector>
 
 /** Centerline sample expanded to a camera-facing ribbon vertex (CPU). */
-struct MagneticFieldRibbonVertex {
-    glm::vec3 position{0.0f};
-    glm::vec3 tangent{0.0f, 1.0f, 0.0f};
-    float arcLength = 0.0f;
-    float lineUV = 0.0f; // -1…1 across ribbon width
-};
+using MagneticFieldRibbonVertex = RibbonVertex;
 
 /**
  * GPU mesh for precomputed magnetic field lines.
@@ -19,29 +15,19 @@ struct MagneticFieldRibbonVertex {
  */
 class MagneticFieldLineMesh {
 public:
-    MagneticFieldLineMesh() = default;
-    ~MagneticFieldLineMesh();
-
-    MagneticFieldLineMesh(const MagneticFieldLineMesh&) = delete;
-    MagneticFieldLineMesh& operator=(const MagneticFieldLineMesh&) = delete;
-    MagneticFieldLineMesh(MagneticFieldLineMesh&& other) noexcept;
-    MagneticFieldLineMesh& operator=(MagneticFieldLineMesh&& other) noexcept;
-
     /** Expand each polyline segment into two triangles (six vertices). */
     static std::vector<MagneticFieldRibbonVertex> Expand(const std::vector<MagneticFieldLine>& lines);
 
-    void Upload(const std::vector<MagneticFieldLine>& lines);
-    void UploadVertices(const std::vector<MagneticFieldRibbonVertex>& verts);
-    void Destroy();
-    void Draw() const;
+    void Upload(const std::vector<MagneticFieldLine>& lines) { _batch.Upload(Expand(lines)); }
+    void UploadVertices(const std::vector<MagneticFieldRibbonVertex>& verts) { _batch.Upload(verts); }
+    void Destroy() { _batch.Clear(); }
+    void Draw() const { _batch.Draw(); }
 
-    bool Empty() const { return _vertexCount <= 0; }
-    int VertexCount() const { return _vertexCount; }
+    bool Empty() const { return _batch.Empty(); }
+    int VertexCount() const { return _batch.VertexCount(); }
 
 private:
-    unsigned int _vao = 0;
-    unsigned int _vbo = 0;
-    int _vertexCount = 0;
+    LineStripBatch _batch;
 };
 
 inline std::vector<MagneticFieldRibbonVertex> MagneticFieldLineMesh::Expand(
@@ -61,19 +47,7 @@ inline std::vector<MagneticFieldRibbonVertex> MagneticFieldLineMesh::Expand(
             }
             tangent /= tlen;
 
-            const MagneticFieldRibbonVertex corners[4] = {
-                {a.position, tangent, a.arcLength, -1.0f},
-                {a.position, tangent, a.arcLength, 1.0f},
-                {b.position, tangent, b.arcLength, -1.0f},
-                {b.position, tangent, b.arcLength, 1.0f},
-            };
-            // two triangles: 0-1-2, 1-3-2
-            verts.push_back(corners[0]);
-            verts.push_back(corners[1]);
-            verts.push_back(corners[2]);
-            verts.push_back(corners[1]);
-            verts.push_back(corners[3]);
-            verts.push_back(corners[2]);
+            LineStripBatch::AppendSegment(verts, a.position, b.position, tangent, a.arcLength, b.arcLength);
         }
     }
     return verts;

@@ -1,15 +1,15 @@
 #include "CatalogSatellite.h"
 #include "SatelliteOrbit.h"
 
-CatalogSatellite::CatalogSatellite(const SatelliteInfo& satelliteInfo,
+CatalogSatellite::CatalogSatellite(SatelliteInfo&& satelliteInfo,
                                    std::shared_ptr<SpaceObject> parent,
                                    const BodyCatalog::Entry& entry)
     : Satellite(satelliteInfo, std::move(parent)),
       _entry(entry),
       _material(CatalogMaterial::Material::FromEntry(entry)),
-      _diffuses(satelliteInfo.diffuseTextures),
-      _normalMap(satelliteInfo.normalMap),
-      _specular(satelliteInfo.specularTexture) {
+      _diffuses(std::move(satelliteInfo.diffuseTextures)),
+      _normalMap(std::move(satelliteInfo.normalMap)),
+      _specular(std::move(satelliteInfo.specularTexture)) {
     const TexturePaths::Paths diffuse = TexturePaths::ForTextureId(entry.lod.diffuse);
     ConfigureDiffuseLOD(_diffuses.at(0), diffuse.low, diffuse.mid, diffuse.high, entry.lod.diffuse);
 }

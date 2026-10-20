@@ -3,7 +3,7 @@
 #include "../BodyCatalog.generated.h"
 #include "../OrbitLayout.h"
 
-SaturnRing::SaturnRing(const PlanetaryRingInfo& planetaryRingInfo, std::shared_ptr<Planet> parent) : PlanetaryRing(planetaryRingInfo, std::move(parent)) {
+SaturnRing::SaturnRing(PlanetaryRingInfo&& planetaryRingInfo, std::shared_ptr<Planet> parent) : PlanetaryRing(std::move(planetaryRingInfo), std::move(parent)) {
     ConfigureDiffuseLOD(TexturePaths::Resolve("resource/textures_low/Saturn_Rings_Low.dds"),
                         TexturePaths::Resolve("resource/textures_mid/Saturn_Rings_Mid.dds"),
                         TexturePaths::Resolve("resource/textures/Saturn_Rings.dds"), "SaturnRing");

@@ -15,7 +15,7 @@
  */
 class CatalogSatellite : public Satellite {
 public:
-    CatalogSatellite(const SatelliteInfo& satelliteInfo, std::shared_ptr<SpaceObject> parent,
+    CatalogSatellite(SatelliteInfo&& satelliteInfo, std::shared_ptr<SpaceObject> parent,
                      const BodyCatalog::Entry& entry);
 
     void AdjustToParent(float timeScale) override;

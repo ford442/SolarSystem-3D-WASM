@@ -1,6 +1,7 @@
 #pragma once
 
 #include "Shader.h"
+#include "../gfx/GlHandle.h"
 #include <cstdint>
 #include <memory>
 
@@ -15,7 +16,6 @@
 class MagneticFieldBloom {
 public:
     MagneticFieldBloom(uint16_t width, uint16_t height, bool enabled);
-    ~MagneticFieldBloom();
 
     MagneticFieldBloom(const MagneticFieldBloom&) = delete;
     MagneticFieldBloom& operator=(const MagneticFieldBloom&) = delete;
@@ -31,9 +31,9 @@ public:
 
 private:
     struct Target {
-        unsigned int fbo = 0;
-        unsigned int color = 0;
-        unsigned int depth = 0;
+        GlFramebuffer fbo;
+        GlTexture color;
+        GlRenderbuffer depth;
     };
 
     void InitQuad();
@@ -51,8 +51,8 @@ private:
     Target _capture;
     Target _ping;
     Target _pong;
-    unsigned int _quadVao = 0;
-    unsigned int _quadVbo = 0;
+    GlVertexArray _quadVao;
+    GlBuffer _quadVbo;
     int _prevFbo = 0;
     int _prevViewport[4] = {0, 0, 0, 0};
     std::unique_ptr<Shader> _blurShader;

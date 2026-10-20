@@ -9,14 +9,14 @@ struct PlanetaryRingInfo {
     const Shader* ringShader;
     TextureImage2D ringDiffuse;
 
-    explicit PlanetaryRingInfo(MeshHolder model, float innerRadius, float outerRadius, const Shader& shader, const TextureImage2D& diffuse) :
+    explicit PlanetaryRingInfo(MeshHolder model, float innerRadius, float outerRadius, const Shader& shader, TextureImage2D diffuse) :
                                ringModel(std::move(model)), ringInnerRadius(innerRadius), ringOuterRadius(outerRadius), ringShader(&shader),
-                               ringDiffuse(diffuse) {}
+                               ringDiffuse(std::move(diffuse)) {}
 };
 
 class PlanetaryRing : public SpaceObject {
 public:
-    explicit PlanetaryRing(const PlanetaryRingInfo& planetaryRingInfo, std::shared_ptr<Planet> parent);
+    explicit PlanetaryRing(PlanetaryRingInfo&& planetaryRingInfo, std::shared_ptr<Planet> parent);
     virtual void AdjustToParent() = 0;
     std::shared_ptr<Planet> GetParent() const;
     float GetInnerRadius() const;

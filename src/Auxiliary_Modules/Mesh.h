@@ -1,6 +1,7 @@
 #ifndef SOLARSYSTEM_MESH_H
 #define SOLARSYSTEM_MESH_H
 #include "Shader.h"
+#include "../gfx/GlHandle.h"
 #include <glm/glm.hpp>
 #include <glm/gtc/matrix_transform.hpp>
 #include <assimp/types.h>
@@ -25,15 +26,13 @@ struct Texture {
 class Mesh {
 public:
     explicit Mesh(std::vector<Vertex> vertices, std::vector<GLuint> indices, std::vector<Texture> textures);
-    ~Mesh();
-    
+
     // Deep copy (creates new GL buffers)
     Mesh(const Mesh& other);
     Mesh& operator=(const Mesh& other);
-    
-    // Move semantics for proper ownership transfer
-    Mesh(Mesh&& other) noexcept;
-    Mesh& operator=(Mesh&& other) noexcept;
+
+    Mesh(Mesh&& other) noexcept = default;
+    Mesh& operator=(Mesh&& other) noexcept = default;
     
     void Draw(const Shader& shader) const; // Отрисовка (рендеринг) меша
 
@@ -41,9 +40,9 @@ private:
     std::vector<Vertex> _vertices; // Вершины
     std::vector<GLuint> _indices; // Индексы
     std::vector<Texture> _textures; // Текстуры
-    GLuint _vbo; // Объект вершинного буфера (VBO)
-    GLuint _vao; // Объект вершинного массива (VAO)
-    GLuint _ebo; // Объект элементного буфера (EBO)
+    GlBuffer _vbo; // Объект вершинного буфера (VBO)
+    GlVertexArray _vao; // Объект вершинного массива (VAO)
+    GlBuffer _ebo; // Объект элементного буфера (EBO)
 
     // Инициализация всех буферных объектов / массивов
     void SetupMesh();

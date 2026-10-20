@@ -10,13 +10,13 @@ struct CloudsInfo {
     float scaleFactor;
     TextureImage2D diffuseMap, normalMap;
 
-    explicit CloudsInfo(MeshHolder model, const Shader& shader, float earthScaleFactor, const TextureImage2D& diffuse, const TextureImage2D& normal)
-        : cloudsModel(std::move(model)), cloudsShader(&shader), scaleFactor(earthScaleFactor), diffuseMap(diffuse), normalMap(normal) {}
+    explicit CloudsInfo(MeshHolder model, const Shader& shader, float earthScaleFactor, TextureImage2D diffuse, TextureImage2D normal)
+        : cloudsModel(std::move(model)), cloudsShader(&shader), scaleFactor(earthScaleFactor), diffuseMap(std::move(diffuse)), normalMap(std::move(normal)) {}
 };
 
 class Clouds : public OuterShell {
 public:
-    explicit Clouds(const CloudsInfo& cloudsInfo, std::shared_ptr<SpaceObject> parent);
+    explicit Clouds(CloudsInfo&& cloudsInfo, std::shared_ptr<SpaceObject> parent);
     void AdjustToParent(float timeScale) = 0;
     void LoadHighResIfClose(const glm::vec3& cameraPosition);
 

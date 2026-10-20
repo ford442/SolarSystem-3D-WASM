@@ -35,7 +35,9 @@ PlanetInfo MakePlanetInfo(const MeshHolder& sphereModel, const BodyCatalog::Entr
 }
 
 SatelliteInfo MakeSatelliteInfo(const MeshHolder& model, const BodyCatalog::Entry& entry, Shader& shader) {
-    return SatelliteInfo(model, entry.earthRadiusScale, shader, {LoadLodTexture(entry.lod.diffuse)},
+    std::vector<TextureImage2D> diffuses;
+    diffuses.push_back(LoadLodTexture(entry.lod.diffuse));
+    return SatelliteInfo(model, entry.earthRadiusScale, shader, std::move(diffuses),
                          LoadLodTexture(entry.lod.normal), entry.displayNameEn, entry.displayNameRu,
                          LoadLodTexture(entry.lod.specular));
 }
@@ -51,22 +53,14 @@ void LoadAtmosphereLuts(Atmosphere& atmosphere) {
                                         AtmosphereModel::kTransmittanceWidth, AtmosphereModel::kTransmittanceHeight);
     auto multiScattering = LoadRgba16fLut(AtmosphereModel::MultiScatteringLutPath(row.bodyId),
                                           AtmosphereModel::kMultiScatteringSize, AtmosphereModel::kMultiScatteringSize);
-    const auto release = [](std::optional<FloatLut>& lut) {
-        if (lut) {
-            glDeleteTextures(1, &lut->texture);
-            lut.reset();
-        }
-    };
     for (auto* lut : {&transmittance, &multiScattering}) {
         if (*lut && (*lut)->mappingVersion != AtmosphereModel::kLutMappingVersion) {
             std::cout << "[Atmosphere] " << row.bodyId << ": LUT mapping version " << (*lut)->mappingVersion
                       << " != " << AtmosphereModel::kLutMappingVersion << " (rebake); using the O'Neil shell" << std::endl;
-            release(*lut);
+            lut->reset();
         }
     }
     if (!transmittance || !multiScattering) {
-        release(transmittance);
-        release(multiScattering);
         return;
     }
     const std::string expected = AtmosphereModel::ParamsHashHex(row.physical);
@@ -77,7 +71,7 @@ void LoadAtmosphereLuts(Atmosphere& atmosphere) {
                   << transmittance->paramsHash << ", the catalog is " << expected
                   << " — rerun atmosphere_lut_baker" << std::endl;
     }
-    atmosphere.SetLuts(transmittance->texture, multiScattering->texture);
+    atmosphere.SetLuts(std::move(transmittance->texture), std::move(multiScattering->texture));
 }
 
 RenderableAtmosphere MakeAtmosphere(const MeshHolder& sphereModel, Shader& atmosphereShader,
@@ -99,7 +93,7 @@ void Application::InitStarSystem() {
     _renderer.starGlowShader = make_unique<Shader>("resource/shaders/starGlow.vs", "resource/shaders/starGlow.fs");
     StarInfo sunInfo(*_sphereModel, *_renderer.mainStarShader, *_renderer.starGlowShader, TextureImage2D(TexturePaths::Resolve("resource/textures_low/Star_Spectrum_Low.dds")),
                      _renderer.starTemperatureInKelvin, 696342.0, glm::vec3(0.99607843, 0.890196078, 0.725490196), L"Sun", L"Солнце");
-    _sun = make_shared<Sun>(sunInfo);
+    _sun = make_shared<Sun>(std::move(sunInfo));
     _sun->SetMagneticField(MagneticFieldCatalog::IntrinsicParamsForBody(OrbitLayout::Body::Sun));
 
 #ifdef __EMSCRIPTEN__
@@ -138,7 +132,7 @@ void Application::InitCatalogSystem(const MeshHolder& sphereModel, const std::st
     }
 
     PlanetInfo info = MakePlanetInfo(sphereModel, *primary, *_renderer.mainPlanetShader);
-    shared_ptr<Planet> planet = make_shared<CatalogBody>(info, _sun, *primary);
+    shared_ptr<Planet> planet = make_shared<CatalogBody>(std::move(info), _sun, *primary);
     planet->SetMagneticField(
         MagneticFieldCatalog::IntrinsicParamsForBody(static_cast<OrbitLayout::Body>(primary->index)));
 
@@ -154,14 +148,14 @@ void Application::InitCatalogSystem(const MeshHolder& sphereModel, const std::st
         if (entry.meshPath) {
             MeshHolder mesh(entry.meshPath);
             SatelliteInfo satInfo = MakeSatelliteInfo(mesh, entry, *_renderer.mainPlanetShader);
-            auto sat = make_shared<CatalogSatellite>(satInfo, planet, entry);
+            auto sat = make_shared<CatalogSatellite>(std::move(satInfo), planet, entry);
             if (const auto* row = BodyCatalog::FindAtmosphere(entry.id)) {
                 satelliteAtmospheres.emplace_back(sat, row);
             }
             satellites.push_back(std::move(sat));
         } else {
             SatelliteInfo satInfo = MakeSatelliteInfo(sphereModel, entry, *_renderer.mainPlanetShader);
-            auto sat = make_shared<CatalogSatellite>(satInfo, planet, entry);
+            auto sat = make_shared<CatalogSatellite>(std::move(satInfo), planet, entry);
             if (const auto* row = BodyCatalog::FindAtmosphere(entry.id)) {
                 satelliteAtmospheres.emplace_back(sat, row);
             }
@@ -186,7 +180,7 @@ void Application::InitCatalogSystem(const MeshHolder& sphereModel, const std::st
         CloudsInfo cloudsInfo(sphereModel, *_renderer.mainCloudsShader, primary->cloudLayer.scaleFactor,
                               TextureImage2D(GetTexturePath(cloudDiffuse.low, cloudDiffuse.high)),
                               TextureImage2D(GetTexturePath(cloudNormal.low, cloudNormal.high)));
-        component.clouds = make_unique<CatalogClouds>(cloudsInfo, planet, *primary);
+        component.clouds = make_unique<CatalogClouds>(std::move(cloudsInfo), planet, *primary);
     }
 
     if (primary->hasRings) {
@@ -197,9 +191,9 @@ void Application::InitCatalogSystem(const MeshHolder& sphereModel, const std::st
                                        *_renderer.mainPlanetShader,
                                        TextureImage2D(GetTexturePath(ringTex.low, ringTex.high)));
             if (BodyCatalog::StrEq(primary->id, "saturn")) {
-                component.planetaryRing = make_unique<SaturnRing>(ringInfo, planet);
+                component.planetaryRing = make_unique<SaturnRing>(std::move(ringInfo), planet);
             } else if (BodyCatalog::StrEq(primary->id, "uranus")) {
-                component.planetaryRing = make_unique<UranusRing>(ringInfo, planet);
+                component.planetaryRing = make_unique<UranusRing>(std::move(ringInfo), planet);
             }
         }
     }

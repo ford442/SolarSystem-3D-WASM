@@ -19,7 +19,7 @@
  */
 class CatalogBody : public Planet {
 public:
-    CatalogBody(const PlanetInfo& planetInfo, std::shared_ptr<Star> parentStar,
+    CatalogBody(PlanetInfo&& planetInfo, std::shared_ptr<Star> parentStar,
                 const BodyCatalog::Entry& entry);
 
     void AdjustToParent(float timeScale) override;

@@ -5,35 +5,14 @@ TextRenderer::TextRenderer(FT_Library ft, const std::string& fontPath) : _ft(ft)
     InitBuffers();
 }
 
-TextRenderer::~TextRenderer() {
-    // Delete all character textures
-    for (auto& pair : _characters) {
-        if (pair.second.textureID != 0) {
-            glDeleteTextures(1, &pair.second.textureID);
-            pair.second.textureID = 0;
-        }
-    }
-    _characters.clear();
-    
-    // Delete quad buffers
-    if (_vao != 0) {
-        glDeleteVertexArrays(1, &_vao);
-        _vao = 0;
-    }
-    if (_vbo != 0) {
-        glDeleteBuffers(1, &_vbo);
-        _vbo = 0;
-    }
-}
-
 void TextRenderer::Render(const Shader& shader, const std::wstring& text, float x, float y, float scale, const glm::vec3& color) {
     shader.Use();
     shader.SetVec3("textColor", color);
     glActiveTexture(GL_TEXTURE0);
-    glBindVertexArray(_vao);
+    glBindVertexArray(_vao.get());
 
     for (const auto& c : text) {
-        Character character = _characters.at(c);
+        const Character& character = _characters.at(c);
 
         float xPos = x + character.bearing.x * scale;
         float yPos = y - (character.glyphSize.y - character.bearing.y) * scale;
@@ -53,10 +32,10 @@ void TextRenderer::Render(const Shader& shader, const std::wstring& text, float 
         };
 
 
-        glBindTexture(GL_TEXTURE_2D, character.textureID);
+        glBindTexture(GL_TEXTURE_2D, character.texture.get());
 
 
-        glBindBuffer(GL_ARRAY_BUFFER, _vbo);
+        glBindBuffer(GL_ARRAY_BUFFER, _vbo.get());
         glBufferSubData(GL_ARRAY_BUFFER, 0, sizeof(vertices), vertices);
         glBindBuffer(GL_ARRAY_BUFFER, 0);
 
@@ -76,10 +55,10 @@ void TextRenderer::Render(const Shader& shader, const std::deque<wchar_t>& text,
     shader.Use();
     shader.SetVec3("textColor", color);
     glActiveTexture(GL_TEXTURE0);
-    glBindVertexArray(_vao);
+    glBindVertexArray(_vao.get());
 
     for (const auto& c : text) {
-        Character character = _characters.at(c);
+        const Character& character = _characters.at(c);
 
         float xPos = x + character.bearing.x * scale;
         float yPos = y - (character.glyphSize.y - character.bearing.y) * scale;
@@ -98,9 +77,9 @@ void TextRenderer::Render(const Shader& shader, const std::deque<wchar_t>& text,
                 { xPos + w, yPos + h, 1.0f, 0.0f }
         };
 
-        glBindTexture(GL_TEXTURE_2D, character.textureID);
+        glBindTexture(GL_TEXTURE_2D, character.texture.get());
 
-        glBindBuffer(GL_ARRAY_BUFFER, _vbo);
+        glBindBuffer(GL_ARRAY_BUFFER, _vbo.get());
         glBufferSubData(GL_ARRAY_BUFFER, 0, sizeof(vertices), vertices);
         glBindBuffer(GL_ARRAY_BUFFER, 0);
 
@@ -119,11 +98,11 @@ void TextRenderer::Render(const Shader &shader, const std::deque<std::wstring> &
     shader.SetVec3("textColor", color);
 
     glActiveTexture(GL_TEXTURE0);
-    glBindVertexArray(_vao);
+    glBindVertexArray(_vao.get());
 
     for (const auto& string : text) {
         for (const auto& c : string) {
-            Character character = _characters.at(c);
+            const Character& character = _characters.at(c);
 
             float xPos = x + character.bearing.x * scale;
             float yPos = y - (character.glyphSize.y - character.bearing.y) * scale;
@@ -142,9 +121,9 @@ void TextRenderer::Render(const Shader &shader, const std::deque<std::wstring> &
                     {xPos + w, yPos + h, 1.0f, 0.0f}
             };
 
-            glBindTexture(GL_TEXTURE_2D, character.textureID);
+            glBindTexture(GL_TEXTURE_2D, character.texture.get());
 
-            glBindBuffer(GL_ARRAY_BUFFER, _vbo);
+            glBindBuffer(GL_ARRAY_BUFFER, _vbo.get());
             glBufferSubData(GL_ARRAY_BUFFER, 0, sizeof(vertices), vertices);
             glBindBuffer(GL_ARRAY_BUFFER, 0);
 
@@ -164,11 +143,11 @@ void TextRenderer::ReverseRender(const Shader& shader, const std::deque<std::wst
     shader.SetVec3("textColor", color);
 
     glActiveTexture(GL_TEXTURE0);
-    glBindVertexArray(_vao);
+    glBindVertexArray(_vao.get());
 
     for (const auto& string : text) {
         for (const auto& c : std::wstring(string.rbegin(), string.rend())) {
-            Character character = _characters.at(c);
+            const Character& character = _characters.at(c);
 
             float xPos = x + (character.bearing.x - character.glyphSize.x) * scale;
             float yPos = y - (character.glyphSize.y - character.bearing.y) * scale;
@@ -187,9 +166,9 @@ void TextRenderer::ReverseRender(const Shader& shader, const std::deque<std::wst
                     {xPos + w, yPos + h, 1.0f, 0.0f}
             };
 
-            glBindTexture(GL_TEXTURE_2D, character.textureID);
+            glBindTexture(GL_TEXTURE_2D, character.texture.get());
 
-            glBindBuffer(GL_ARRAY_BUFFER, _vbo);
+            glBindBuffer(GL_ARRAY_BUFFER, _vbo.get());
             glBufferSubData(GL_ARRAY_BUFFER, 0, sizeof(vertices), vertices);
             glBindBuffer(GL_ARRAY_BUFFER, 0);
 
@@ -217,9 +196,8 @@ void TextRenderer::LoadFont(const std::string& fontPath) {
         if (FT_Load_Char(face, c, FT_LOAD_RENDER))
             throw std::runtime_error("ERROR::FREETYTPE: Failed to load Glyph");
 
-        GLuint texture;
-        glGenTextures(1, &texture);
-        glBindTexture(GL_TEXTURE_2D, texture);
+        GlTexture texture = GlTexture::Create();
+        glBindTexture(GL_TEXTURE_2D, texture.get());
         glTexImage2D(GL_TEXTURE_2D, 0, GL_R8, face->glyph->bitmap.width, face->glyph->bitmap.rows, 0, GL_RED, GL_UNSIGNED_BYTE, face->glyph->bitmap.buffer);
 
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
@@ -228,24 +206,24 @@ void TextRenderer::LoadFont(const std::string& fontPath) {
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
 
         Character character = {
-                texture,
+                std::move(texture),
                 glm::ivec2(face->glyph->bitmap.width, face->glyph->bitmap.rows),
                 glm::ivec2(face->glyph->bitmap_left, face->glyph->bitmap_top),
                 face->glyph->advance.x
         };
 
-        _characters.emplace(c, character);
+        _characters.emplace(c, std::move(character));
     }
 
     FT_Done_Face(face);
 }
 
 void TextRenderer::InitBuffers() {
-    glGenVertexArrays(1, &_vao);
-    glGenBuffers(1, &_vbo);
+    _vao = GlVertexArray::Create();
+    _vbo = GlBuffer::Create();
 
-    glBindVertexArray(_vao);
-    glBindBuffer(GL_ARRAY_BUFFER, _vbo);
+    glBindVertexArray(_vao.get());
+    glBindBuffer(GL_ARRAY_BUFFER, _vbo.get());
     glBufferData(GL_ARRAY_BUFFER, sizeof(float) * 6 * 4, nullptr, GL_DYNAMIC_DRAW);
 
     glEnableVertexAttribArray(0);

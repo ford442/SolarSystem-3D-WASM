@@ -3,15 +3,15 @@
 
 #include <glm/glm.hpp>
 
-CatalogBody::CatalogBody(const PlanetInfo& planetInfo, std::shared_ptr<Star> parentStar,
+CatalogBody::CatalogBody(PlanetInfo&& planetInfo, std::shared_ptr<Star> parentStar,
                          const BodyCatalog::Entry& entry)
     : Planet(planetInfo, std::move(parentStar)),
       _entry(entry),
       _body(static_cast<OrbitLayout::Body>(entry.index)),
       _material(CatalogMaterial::Material::FromEntry(entry)),
-      _diffuses(planetInfo.diffuseTextures),
-      _normalMap(planetInfo.normalMap),
-      _specular(planetInfo.specularTexture) {
+      _diffuses(std::move(planetInfo.diffuseTextures)),
+      _normalMap(std::move(planetInfo.normalMap)),
+      _specular(std::move(planetInfo.specularTexture)) {
     Translate(OrbitLayout::GetRenderPosition(_body));
 
     const TexturePaths::Paths diffuse = TexturePaths::ForTextureId(entry.lod.diffuse);

@@ -61,8 +61,8 @@ std::optional<FloatLut> LoadRgba16fLut(const std::string& path, int expectedWidt
     while (glGetError() != GL_NO_ERROR) {}
     GLint previous = 0;
     glGetIntegerv(GL_TEXTURE_BINDING_2D, &previous);
-    glGenTextures(1, &lut.texture);
-    glBindTexture(GL_TEXTURE_2D, lut.texture);
+    lut.texture = GlTexture::Create();
+    glBindTexture(GL_TEXTURE_2D, lut.texture.get());
     glPixelStorei(GL_UNPACK_ALIGNMENT, 4);
     glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA16F, expectedWidth, expectedHeight, 0, GL_RGBA, GL_HALF_FLOAT,
                  bytes.data() + level.byteOffset);
@@ -75,7 +75,6 @@ std::optional<FloatLut> LoadRgba16fLut(const std::string& path, int expectedWidt
     const GLenum error = glGetError();
     glBindTexture(GL_TEXTURE_2D, static_cast<GLuint>(previous));
     if (error != GL_NO_ERROR) {
-        glDeleteTextures(1, &lut.texture);
         return Reject(path, "GL rejected the upload (error " + std::to_string(error) + ")");
     }
     return lut;

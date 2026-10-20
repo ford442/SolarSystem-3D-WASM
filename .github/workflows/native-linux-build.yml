@@ -32,6 +32,9 @@ jobs:
             libfreetype-dev libassimp-dev libglm-dev \
             xvfb
 
+      - name: Check GL object ownership (no raw glGen*/glDelete* outside gfx/GlHandle.h)
+        run: scripts/check-gl-handles.sh
+
       - name: Build native binary
         run: ./build.sh
 

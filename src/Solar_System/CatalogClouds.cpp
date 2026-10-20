@@ -3,9 +3,9 @@
 #include "TexturePaths.h"
 #include "SatelliteOrbit.h"
 
-CatalogClouds::CatalogClouds(const CloudsInfo& cloudsInfo, std::shared_ptr<SpaceObject> parent,
+CatalogClouds::CatalogClouds(CloudsInfo&& cloudsInfo, std::shared_ptr<SpaceObject> parent,
                              const BodyCatalog::Entry& parentEntry)
-    : Clouds(cloudsInfo, std::move(parent)), _parentEntry(parentEntry) {
+    : Clouds(std::move(cloudsInfo), std::move(parent)), _parentEntry(parentEntry) {
     const TexturePaths::Paths diffuse =
         TexturePaths::ForTextureId(parentEntry.cloudLayer.diffuse ? parentEntry.cloudLayer.diffuse : "");
     ConfigureDiffuseLOD(diffuse.low, diffuse.mid, diffuse.high,
