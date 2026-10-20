@@ -731,10 +731,27 @@ terms** (the Moon has them: see above). Frames: Triton's is genuinely ecliptic; 
 fits of Horizons ecliptic osculating elements, so their inclinations carry the parent's
 obliquity (2.2° for Jupiter, 27.7° for Saturn) rather than being Laplace-plane values.
 
-**Earth's rotation** is GMST at the epoch, not an accumulator, so a given UTC always gives the
-same terminator and scrubbing backwards is exact. The texture's prime meridian is aligned by an
-art constant that has not been calibrated against a reference image — the rate and the epoch
-behaviour are the honest parts.
+**Spins are functions of the date** (`OrbitLayout::GetAxialSpinDegrees`); there is no per-frame
+accumulator, so a date jump and a return reproduce every body's spin exactly.
+
+- **Earth** is calibrated so the drawn map has the real sub-solar *longitude*. Scene axes are
+  (ecliptic x, z, y) — a reflection — and the drawn pole is art (`Rz(axialTiltDegrees)`), so GMST
+  plus any constant cannot do it: with the old GMST spin the texture's sub-solar longitude was
+  off by up to ~180° depending on the season. Instead the spin is solved each date: the Sun's
+  true Earth-fixed longitude (Observer: GMST, precession) is turned toward the scene's Sun
+  through CatalogBody's tilt chain and the Blender `sphere.obj` UVs (map longitude =
+  −atan2(z, x) in model space, u = 0.5 on +X). The reference is the map convention:
+  `kEarthTextureCentreLonDeg` = 0 for the Greenwich-centred Blue Marble / Solar System Scope
+  maps. `test_orbit_layout.cpp` checks the drawn sub-solar longitude against Observer all year
+  (both scale modes, residual below 0.01°) and against almanac equation-of-time anchors at noon
+  UTC. The sub-solar **latitude is not** calibrated: the art pole leans along scene X, not toward
+  the mirrored true pole, so the drawn seasons are off by up to ~33° of latitude (a quarter-year
+  phase error). Fixing that means moving Earth's pole (and its clouds/atmosphere frame), not
+  the spin.
+- **Every other primary** turns from `orbit.primeMeridianDegJ2000` (IAU WGCCRE 2015 W0; 0 for
+  Eris, Haumea, Makemake and Halley, which have none) at 360° per catalog sidereal day. Their
+  poles and textures are art, so W0 only fixes a reproducible epoch, not which feature faces a
+  real direction. Moons use `SatelliteOrbit::SpinDegreesAt`.
 
 **Time scale.** Julian dates are treated as UTC (≈ UT1) throughout, which is exactly right for
 Earth rotation (GMST) and good enough for the planets: UTC↔TT (~69 s) and UT1↔UTC (< 0.9 s) are
