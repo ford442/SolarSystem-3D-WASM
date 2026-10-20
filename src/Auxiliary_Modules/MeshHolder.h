@@ -19,11 +19,14 @@ class MeshHolder {
 public:
     explicit MeshHolder(const std::string& path);
     void Draw(const Shader& shader) const; // Отрисовка модели (мешей)
+    /** Largest vertex distance from the model origin, in model units (culling bounds). */
+    float BoundingRadius() const { return _boundingRadius; }
 
 private:
     std::vector<Texture> _loadedTextures;
     std::vector<Mesh> _meshes;
     std::string _directory;
+    float _boundingRadius = 0.0f;
 
     // Обрабатывает узел рекурсивно. Обрабатывает каждую отдельную сетку, расположенную в узле, и повторяет этот процесс на своих дочерних узлах (если есть).
     void ProcessNode(aiNode* node, const aiScene* scene);

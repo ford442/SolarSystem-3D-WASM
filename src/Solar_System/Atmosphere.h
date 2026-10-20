@@ -17,7 +17,7 @@
  */
 class Atmosphere : public OuterShell {
 public:
-    Atmosphere(MeshHolder model, const Shader& shader, const BodyCatalog::AtmosphereRow& row,
+    Atmosphere(MeshHolder model, const BodyCatalog::AtmosphereRow& row,
                std::shared_ptr<SpaceObject> parent, float parentRadius);
     Atmosphere(const Atmosphere&) = delete;
     Atmosphere& operator=(const Atmosphere&) = delete;

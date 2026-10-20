@@ -41,8 +41,7 @@ struct CameraView {
 
 /** The scene as this frame's passes see it. Placement already happened in UpdateScene. */
 struct SceneSnapshot {
-    // Non-const: passes still bind their shader on the object and read back the Sun's
-    // occlusion query. They do not move anything.
+    // Non-const for the Sun's occlusion query, which a pass reads back. Nothing moves.
     Star* sun = nullptr;
     std::vector<RenderableSceneComponent>* components = nullptr;
     int nearestComponent = -1; // into *components; -1 none

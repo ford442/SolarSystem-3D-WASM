@@ -14,7 +14,8 @@ in vec4 fragPosLightSpace;
 
 layout(binding = TU_RING) uniform sampler2D ringDiffuse;
 layout(binding = TU_SHADOW_MAP) uniform sampler2D shadowMap;
-uniform float bias; // For shadows
+uniform float bias; // For shadows, in shadow-map depth units
+uniform vec2 shadowDepthRange; // this component's light frustum: near, far - near (scene units)
 uniform float uSurfaceDim;
 uniform float earthSizeCoefficient;
 uniform bool isUseToneMapping;
@@ -152,7 +153,7 @@ float CalculateShadow(vec4 fragPosLightSpace) {
         float u;
         if (RingCrossing(fWorldPosition, lightDir, lightDir, ringCenter, ringNormal, ringInnerOuterRadiuses, u)) {
             // If some planet obscures the ring
-            if (shadow > 0.0 && length(lightPos - ringCenter) - (closestDepth - bias) * frame.farPlane > ringInnerOuterRadiuses.y) {
+            if (shadow > 0.0 && length(lightPos - ringCenter) - (shadowDepthRange.x + (closestDepth - bias) * shadowDepthRange.y) > ringInnerOuterRadiuses.y) {
                 return shadow;
             }
 

@@ -7,9 +7,9 @@ glm::vec3 ToVec3(const BodyCatalog::Rgb& rgb) {
 }
 } // namespace
 
-Atmosphere::Atmosphere(MeshHolder model, const Shader& shader, const BodyCatalog::AtmosphereRow& row,
+Atmosphere::Atmosphere(MeshHolder model, const BodyCatalog::AtmosphereRow& row,
                        std::shared_ptr<SpaceObject> parent, float parentRadius)
-    : OuterShell(std::move(model), shader, std::move(parent), row.oneil.shellScale),
+    : OuterShell(std::move(model), std::move(parent), row.oneil.shellScale),
       _row(&row),
       _body(BodyCatalog::FindById(row.bodyId)),
       _parentRadius(parentRadius),

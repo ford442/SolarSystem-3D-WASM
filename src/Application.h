@@ -266,6 +266,13 @@ private:
     void RenderFrame(int viewCount);
     /** Debug: the previous frame's FramePasses::Stats and glUniform* count (SOLARSYSTEM_FRAME_STATS=N). */
     void ReportFrameStats();
+    /**
+     * Frustum culling after the views are known: marks every scene object and component
+     * visible or not in any of the `viewCount` views, and fills _drawOrder with the visible
+     * components front to back (plus the nearest one, which draws the star).
+     */
+    void CullScene(int viewCount);
+    std::vector<std::size_t> _drawOrder; // into _renderableSceneComponents, this frame
 #ifndef __EMSCRIPTEN__
     /** Native shader hot reload: every ~0.5 s, rebuild programs whose files changed (off with SOLARSYSTEM_SHADER_HOT_RELOAD=0). */
     void PollShaderHotReload(double now);

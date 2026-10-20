@@ -80,6 +80,7 @@ public:
     /** This frame's pass counts (reset by BeginFrame). */
     const FramePasses::Stats& Stats() const { return _stats; }
     void CountSceneUpdate() { ++_stats.sceneUpdates; }
+    void CountCulledComponents(int count) { _stats.culledComponents = count; }
 
     /** Re-upload every mission path in the render frame (origin move, scale or quality change). */
     void RebuildMissionPaths(const MissionCatalog::Catalog& catalog, int qualityPreset);
@@ -96,16 +97,6 @@ public:
     XrPointerRenderer* GetXrPointers() { return _xrPointerRenderer.get(); }
     /** Brightest catalog stars Observe draws right now (0 without its shaders). */
     int ObserveStarsDrawn() const;
-
-    // Programs the scene objects draw with. Bodies keep a reference (SetShader), so these
-    // must exist (Init) before StarSystemFactory builds anything. PlanetShader() is the
-    // planetLighting variant without material defines; each draw switches to the body's own
-    // variant (PlanetProgram).
-    Shader& StarShader() { return *_mainStarShader; }
-    Shader& StarGlowShader() { return *_starGlowShader; }
-    Shader& PlanetShader() { return *_mainPlanetShader; }
-    Shader& AtmosphereShader() { return *_mainAtmosphereShader; }
-    Shader& CloudsShader() { return *_mainCloudsShader; }
 
 private:
     void ConfigureMainShaders(const FrameContext& ctx);
@@ -136,8 +127,8 @@ private:
                                const RenderableSceneComponent& component) const;
     void RenderPbrAtmosphere(const FrameContext& ctx, const RenderableAtmosphere& renderableAtmosphere,
                              const RenderableSceneComponent& component) const;
-    void RenderClouds(Clouds* renderableClouds, const glm::mat4& lightSpaceMatrix) const;
-    void RenderPlanetaryRing(const Shader& shader, PlanetaryRing* planetaryRing, const glm::mat4& lightSpaceMatrix) const;
+    void RenderClouds(const RenderableSceneComponent& component) const;
+    void RenderPlanetaryRing(const Shader& shader, const RenderableSceneComponent& component) const;
     void RenderStar(const FrameContext& ctx) const;
     void RenderSpaceObjectDistance(const FrameContext& ctx, const SpaceObject* spaceObject) const;
     void UpdateOcclusionQuery(Star& sun);
@@ -157,7 +148,7 @@ private:
     void ConfigurePlanetProgram(const FrameContext& ctx, const Shader& program,
                                 const RenderableSceneComponent& component, const EclipseUmbra& umbra) const;
     /** Draw one body (planet or moon) with its own material variant. */
-    void DrawLitBody(const FrameContext& ctx, SpaceObject& body, const RenderableSceneComponent& component,
+    void DrawLitBody(const FrameContext& ctx, const SpaceObject& body, const RenderableSceneComponent& component,
                      const EclipseUmbra& umbra);
 
     // First, so it is destroyed last: everything below may hold a Shader& from it.

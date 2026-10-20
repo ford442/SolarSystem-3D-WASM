@@ -22,12 +22,14 @@ struct Stats {
     int sceneUpdates = 0;
     int viewBinds = 0;      // per-view uniform uploads (1 mono; XR re-binds each eye per component)
     int shadowPasses = 0;   // shadow maps actually rendered (0 with shadows off)
-    int componentDraws = 0; // component colour passes, summed over views
+    int componentDraws = 0; // colour passes of visible components, summed over views
+    int bodyDraws = 0;      // planets and moons drawn in colour passes, summed over views
+    int culledComponents = 0; // components no view could see (no shadow or colour pass)
     unsigned long long uniformCalls = 0; // glUniform* calls over the whole previous frame (HUD included)
 };
 
 struct Hooks {
-    /** Simulate the frame; returns how many scene components to draw. */
+    /** Simulate (and cull) the frame; returns how many scene components to draw, in draw order. */
     std::function<std::size_t()> updateScene;
     /** Bind view `view` (viewport, scissor, per-view uniforms). Called before each block of view work. */
     std::function<void(int view)> beginView;

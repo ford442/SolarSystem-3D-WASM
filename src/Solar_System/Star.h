@@ -9,8 +9,6 @@
 
 struct StarInfo {
     MeshHolder starModel;
-    const Shader* starShader;
-    const Shader* glowStarShader;
     TextureImage2D starSpectrum;
     float starTemperature;
     float starRadius;
@@ -18,9 +16,9 @@ struct StarInfo {
     std::wstring otherLangName;
     glm::vec3 glowTintMult;
 
-    explicit StarInfo(MeshHolder model, const Shader& shader, const Shader& glowShader, TextureImage2D spectrum, float temperature,
+    explicit StarInfo(MeshHolder model, TextureImage2D spectrum, float temperature,
                       float radius, const glm::vec3& glowTintMult, std::wstring engName = L"", std::wstring otherLangName = L"") :
-                      starModel(std::move(model)), starShader(&shader), glowStarShader(&glowShader), starSpectrum(std::move(spectrum)),
+                      starModel(std::move(model)), starSpectrum(std::move(spectrum)),
                       starTemperature(temperature), starRadius(radius), engName(std::move(engName)), otherLangName(std::move(otherLangName)),
                       glowTintMult(glowTintMult) {}
 };
@@ -37,7 +35,7 @@ class Star : public SpaceObject {
 public:
     explicit Star(StarInfo&& starInfo);
     virtual void TakeStarSystemCenter() = 0;
-    void RenderGlow(const glm::mat4& projection, const glm::mat4& view, const glm::vec3& vs, float aspect, float distance,
+    void RenderGlow(const Shader& glowShader, const glm::mat4& projection, const glm::mat4& view, const glm::vec3& vs, float aspect, float distance,
                     const std::optional<RingCameraInfo>& ringCameraInfo, float starTemperature = 5778.0f);
     void SetVisibility(float visibility);
     float GetStarTemperatureInKelvin() const;
@@ -65,7 +63,6 @@ private:
     std::array<GlQuery, 2> _starOcclusion; // native only: WebGL 2 has no GL_SAMPLES_PASSED
     GlVertexArray _glowVao;
     GlBuffer _glowVbo, _glowEbo;
-    const Shader* _glowShader;
 
     void InitBuffers();
     void CalculateShiftColor();

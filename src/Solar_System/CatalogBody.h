@@ -23,7 +23,7 @@ public:
                 const BodyCatalog::Entry& entry);
 
     void AdjustToParent() override;
-    void Render() const override;
+    void Draw(const Shader& shader) const override;
     unsigned ShaderVariant() const override { return CatalogMaterial::Variant(_material, CurrentTextures()); }
     void LoadHighResIfClose(const glm::vec3& cameraPos, const TextureLodPolicy& policy) override;
 

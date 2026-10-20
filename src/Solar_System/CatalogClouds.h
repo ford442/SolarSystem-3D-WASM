@@ -13,7 +13,7 @@ public:
                   const BodyCatalog::Entry& parentEntry);
 
     void AdjustToParent() override;
-    void Render() const override;
+    void Draw(const Shader& shader) const override;
 
 private:
     const BodyCatalog::Entry& _parentEntry;

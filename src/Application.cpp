@@ -161,9 +161,20 @@ void Application::UpdateScene(double julianDate) {
     PlaceSceneComponents();
 
     for (auto& component : _renderableSceneComponents) {
-        // Shadow frustum tracks the planet's current heliocentric position.
+        // Shadow frustum tracks the planet's current heliocentric position. Its depth range
+        // is fitted to the component's own bodies — the only casters drawn into its map and
+        // the only receivers that read it — instead of the camera's 0.001–20000, which
+        // wasted precision and clipped everything past 20000 units from the Sun (Uranus and
+        // beyond on realistic scale).
         const float extent = component.planet->GetRadius() * 3.0f;
-        const glm::mat4 lightProjection = glm::ortho(-extent, extent, -extent, extent, _camera.GetNear(), _camera.GetFar());
+        std::vector<BoundingSphere> bodies;
+        component.ForEachObject([&](const SpaceObject& object) { bodies.push_back(object.GetBoundingSphere()); });
+        const glm::vec3 toPlanet = component.planet->GetPosition() - _sun->GetPosition();
+        const DepthRange depth = FitDepthRange(_sun->GetPosition(), glm::normalize(toPlanet), bodies,
+                                               0.01f * extent + 0.05f, _camera.GetNear());
+        component.shadowDepthRange = glm::vec2(depth.nearPlane, depth.farPlane - depth.nearPlane);
+        const glm::mat4 lightProjection =
+            glm::ortho(-extent, extent, -extent, extent, depth.nearPlane, depth.farPlane);
         // Built in double: the eye is the Sun, tens of thousands of units from the render
         // origin on realistic scale, and a float lookAt folds that into the light-space x/y
         // the shadow lookup reads. In double those reduce to the planet's own small offset.
@@ -227,6 +238,7 @@ void Application::ReportFrameStats() {
         const FramePasses::Stats& stats = _renderer.Stats();
         std::cerr << "[FrameStats] updates=" << stats.sceneUpdates << " viewBinds=" << stats.viewBinds
                   << " shadowPasses=" << stats.shadowPasses << " componentDraws=" << stats.componentDraws
+                  << " bodyDraws=" << stats.bodyDraws << " culled=" << stats.culledComponents
                   << " uniformCalls=" << uniformCalls << std::endl;
     }
 }
@@ -252,15 +264,16 @@ void Application::RenderFrame(int viewCount) {
         _renderer.BeginFrame();
         UpdateScene(OrbitLayout::GetJulianDate());
         BuildFrameSnapshot(viewCount);
-        return _observe.active ? 0 : _renderableSceneComponents.size();
+        CullScene(viewCount);
+        return _observe.active ? 0 : _drawOrder.size();
     };
     hooks.beginView = [this](int view) { _renderer.BeginView(FrameContextFor(view)); };
     hooks.background = [this](int view) { _renderer.RenderBackground(FrameContextFor(view)); };
-    hooks.shadowPass = [this](std::size_t component) {
-        _renderer.ShadowMapPass(FrameContextFor(0), _renderableSceneComponents[component]);
+    hooks.shadowPass = [this](std::size_t draw) {
+        _renderer.ShadowMapPass(FrameContextFor(0), _renderableSceneComponents[_drawOrder[draw]]);
     };
-    hooks.drawComponent = [this](int view, std::size_t component) {
-        _renderer.RenderPass(FrameContextFor(view), _renderableSceneComponents[component]);
+    hooks.drawComponent = [this](int view, std::size_t draw) {
+        _renderer.RenderPass(FrameContextFor(view), _renderableSceneComponents[_drawOrder[draw]]);
     };
     hooks.foreground = [this](int view) {
         const FrameContext ctx = FrameContextFor(view);
@@ -270,6 +283,44 @@ void Application::RenderFrame(int viewCount) {
         }
     };
     FramePasses::Run(viewCount, hooks);
+}
+
+void Application::CullScene(int viewCount) {
+    std::vector<Frustum> frusta;
+    for (int view = 0; view < viewCount; ++view) {
+        frusta.emplace_back(_frameViews[static_cast<size_t>(view)].projection * _frameViews[static_cast<size_t>(view)].view);
+    }
+    const auto seen = [&](const SpaceObject& object) {
+        const BoundingSphere sphere = object.GetBoundingSphere();
+        return std::any_of(frusta.begin(), frusta.end(), [&](const Frustum& f) { return f.Intersects(sphere); });
+    };
+
+    _drawOrder.clear();
+    int culled = 0;
+    for (size_t i = 0; i < _renderableSceneComponents.size(); ++i) {
+        RenderableSceneComponent& component = _renderableSceneComponents[i];
+        bool any = false;
+        component.ForEachObject([&](SpaceObject& object) {
+            const bool visible = seen(object);
+            object.SetVisible(visible);
+            any = any || visible;
+        });
+        component.visible = any;
+        culled += any ? 0 : 1;
+        if (any || static_cast<int>(i) == _nearestPlanetIndex) {
+            _drawOrder.push_back(i);
+        }
+    }
+    _renderer.CountCulledComponents(culled);
+
+    // Opaque surfaces front to back, so early depth rejects what is behind. Within a
+    // component the order (planet, moons, shells, ring) stays as RenderPass has it.
+    const glm::vec3 eye = _camera.GetPosition();
+    const auto distance = [&](size_t index) {
+        return glm::distance(eye, _renderableSceneComponents[index].planet->GetPosition());
+    };
+    std::stable_sort(_drawOrder.begin(), _drawOrder.end(),
+                     [&](size_t a, size_t b) { return distance(a) < distance(b); });
 }
 
 void Application::BuildFrameSnapshot(int viewCount) {

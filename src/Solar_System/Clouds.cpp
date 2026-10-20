@@ -1,6 +1,6 @@
 #include "Clouds.h"
 
-Clouds::Clouds(CloudsInfo&& cloudsInfo, std::shared_ptr<SpaceObject> parent) : OuterShell(cloudsInfo.cloudsModel, *cloudsInfo.cloudsShader, std::move(parent),
+Clouds::Clouds(CloudsInfo&& cloudsInfo, std::shared_ptr<SpaceObject> parent) : OuterShell(cloudsInfo.cloudsModel, std::move(parent),
     cloudsInfo.scaleFactor), _diffuse(std::move(cloudsInfo.diffuseMap)), _normal(std::move(cloudsInfo.normalMap))
 {
 }

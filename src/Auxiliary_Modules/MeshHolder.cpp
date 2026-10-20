@@ -1,4 +1,5 @@
 #include "MeshHolder.h"
+#include <algorithm>
 #include "WebResourceFetcher.h"
 
 MeshHolder::MeshHolder(const std::string& path) {
@@ -50,6 +51,7 @@ Mesh MeshHolder::ProcessMesh(aiMesh* mesh, const aiScene* scene) {
         vector.y = mesh->mVertices[i].y;
         vector.z = mesh->mVertices[i].z;
         vertex.position = vector;
+        _boundingRadius = std::max(_boundingRadius, glm::length(vector));
         //std::cout << "_position: " << vertex.position.x << " " << vertex.position.y << " " << vertex.position.z << std::endl;
 
         if (mesh->HasNormals()) {

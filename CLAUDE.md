@@ -74,7 +74,8 @@ The CMakeLists.txt has separate configurations for EMSCRIPTEN vs native builds, 
   `SimState`, display size, XR flag), which `Application::BuildFrameSnapshot` fills after
   `UpdateScene`. The renderer has no reference back to `Application`, and there is no global
   `SimState`: anything a pass needs goes into the snapshot.
-  - `FramePasses.h` — the GL-free frame order: simulate once, then per-component shadow pass followed by every view's colour pass (unit-tested)
+  - `FramePasses.h` — the GL-free frame order: simulate once, then per-component shadow pass followed by every view's colour pass (unit-tested). `Application::CullScene` drops components no view sees (bounding spheres vs `gfx/Frustum.h`) and orders the rest front to back; each light frustum's depth range is fitted to its component's bodies (ARCHITECTURE §7.5)
+  - Scene objects hold no shader: a pass calls `SpaceObject::Draw(shader)` with the program it bound
   - `SceneRenderer.cpp` — shadow/color passes for planets, atmospheres, rings, clouds, text overlays
   - `SceneOverlayRenderer.cpp` — magnetic field ribbons, orbit paths, mission paths, asteroid belt
 - `SystemModules.h` — Convenience headers bundling system includes

@@ -25,6 +25,16 @@ using namespace std;
 
 namespace {
 
+// Shadow-test biases in scene units along the light. Each pass divides by its component's
+// depth range (Renderer::ShadowBias). These are the values the shaders always had: they used
+// to be fractions of the camera's 0.001–20000 range, which the shadow frustum borrowed.
+constexpr float kSurfaceShadowBias = 10.0f;
+constexpr float kShellShadowBias = 20.0f; // atmospheres, clouds, rings
+
+float ShadowBias(const RenderableSceneComponent& component, float sceneUnits) {
+    return sceneUnits / component.shadowDepthRange.y;
+}
+
 ShaderSpec Program(const char* vertex, const char* fragment, vector<string> defines = {}) {
     return ShaderSpec(string("resource/shaders/") + vertex, string("resource/shaders/") + fragment, std::move(defines));
 }
@@ -108,8 +118,8 @@ void Renderer::Init(const SimState& sim, FT_Library ft, glm::ivec2 display) {
     if (!_coronaVolumeShader) {
         std::cerr << "[Corona] volumetric corona shader unavailable; using the flat corona" << std::endl;
     }
-    // The base variant must build (bodies hold it from construction); the others fall back
-    // to it in PlanetProgram if their own compile failed.
+    // The base variant must build; the others fall back to it in PlanetProgram if their own
+    // compile failed.
     _planetVariants.fill(nullptr);
     _mainPlanetShader = &_shaders.Get(PlanetSpec(0));
     for (const unsigned variant : planetVariants) {
@@ -306,6 +316,9 @@ void Renderer::ShadowMapPass(const FrameContext& ctx, const RenderableSceneCompo
         return;
     }
 #endif
+    if (!component.visible) {
+        return; // only the nearest component is drawn while hidden, and only for the star
+    }
     glBindFramebuffer(GL_FRAMEBUFFER, _shadowMapFBO->GetFBO());
     glClear(GL_DEPTH_BUFFER_BIT);
     glViewport(0, 0, _shadowMapFBO->GetShadowMapWidth(), _shadowMapFBO->GetShadowMapHeight());
@@ -322,21 +335,22 @@ void Renderer::ShadowMapPass(const FrameContext& ctx, const RenderableSceneCompo
     _shadowMapShader->Use();
     _shadowMapShader->SetMat4("lightSpaceMatrix", component.lightSpaceMatrix);
 
-    component.planet->SetShader(*_shadowMapShader);
-    component.planet->Render();
-
+    component.planet->Draw(*_shadowMapShader);
     for (const auto& satellite : component.satellites) {
-        satellite->SetShader(*_shadowMapShader);
-        satellite->Render();
+        satellite->Draw(*_shadowMapShader);
     }
 
-    RenderPlanetaryRing(*_shadowMapShader, component.planetaryRing.get(), component.lightSpaceMatrix);
+    if (component.planetaryRing) {
+        component.planetaryRing->Draw(*_shadowMapShader);
+    }
     glBindFramebuffer(GL_FRAMEBUFFER, ctx.defaultFramebuffer);
 }
 
 void Renderer::RenderPass(const FrameContext& ctx, const RenderableSceneComponent& component) {
     // BeginView set this view's viewport after the shadow pass changed it.
-    ++_stats.componentDraws;
+    if (component.visible) {
+        ++_stats.componentDraws;
+    }
     if (component.planetaryRing) {
         glBindTextureUnit(Unit(TextureUnit::Ring), component.planetaryRing->GetRingTexture());
     }
@@ -357,13 +371,13 @@ void Renderer::RenderPass(const FrameContext& ctx, const RenderableSceneComponen
         std::any_of(component.atmospheres.begin(), component.atmospheres.end(),
                     [](const RenderableAtmosphere& a) { return a.atmosphere->IsPhysicalPathActive(); });
     if (physicalAtmosphere) {
-        RenderClouds(component.clouds.get(), component.lightSpaceMatrix);
+        RenderClouds(component);
         RenderAtmospheres(ctx, component);
     } else {
         RenderAtmospheres(ctx, component);
-        RenderClouds(component.clouds.get(), component.lightSpaceMatrix);
+        RenderClouds(component);
     }
-    RenderPlanetaryRing(*_mainRingShader, component.planetaryRing.get(), component.lightSpaceMatrix);
+    RenderPlanetaryRing(*_mainRingShader, component);
 }
 
 void Renderer::RenderAtmospheres(const FrameContext& ctx, const RenderableSceneComponent& component) const {
@@ -374,6 +388,9 @@ void Renderer::RenderAtmospheres(const FrameContext& ctx, const RenderableSceneC
     glEnable(GL_BLEND);
 
     for (const auto& renderableAtmosphere : component.atmospheres) {
+        if (!renderableAtmosphere.atmosphere->IsVisible()) {
+            continue;
+        }
         // Inside the shell, draw its far side (the near side is behind the camera).
         const bool inside = renderableAtmosphere.atmosphere->Contains(ctx.view.eyePosition);
         if (inside) {
@@ -399,6 +416,8 @@ void Renderer::RenderOneilAtmosphere(const FrameContext& ctx, const RenderableAt
 
     _mainAtmosphereShader->Use();
     _mainAtmosphereShader->SetMat4("lightSpaceMatrix", component.lightSpaceMatrix);
+    _mainAtmosphereShader->SetVec2("shadowDepthRange", component.shadowDepthRange);
+    _mainAtmosphereShader->SetFloat("bias", ShadowBias(component, kShellShadowBias));
     // Per-shell constants are set here, after Use(): Saturn and Titan share a component,
     // so setting them at placement time let the last shell's values win for both.
     _mainAtmosphereShader->SetVec3("C_R", atmosphere.GetAtmosphereColor());
@@ -425,8 +444,7 @@ void Renderer::RenderOneilAtmosphere(const FrameContext& ctx, const RenderableAt
         glBindTextureUnit(Unit(TextureUnit::Ring), ring->GetRingTexture());
     }
 
-    atmosphere.SetShader(*_mainAtmosphereShader);
-    atmosphere.Render();
+    atmosphere.Draw(*_mainAtmosphereShader);
 }
 
 void Renderer::RenderPbrAtmosphere(const FrameContext& ctx, const RenderableAtmosphere& renderableAtmosphere,
@@ -494,20 +512,21 @@ void Renderer::RenderPbrAtmosphere(const FrameContext& ctx, const RenderableAtmo
         shader.SetFloat("eclipseStarRadius", umbra.starRadius);
     }
 
-    atmosphere.SetShader(shader);
-    atmosphere.Render();
+    atmosphere.Draw(shader);
 }
 
-void Renderer::RenderClouds(Clouds* renderableClouds, const glm::mat4& lightSpaceMatrix) const {
-    if (renderableClouds) {
+void Renderer::RenderClouds(const RenderableSceneComponent& component) const {
+    const Clouds* renderableClouds = component.clouds.get();
+    if (renderableClouds && renderableClouds->IsVisible()) {
         glDepthMask(GL_FALSE);
         glEnable(GL_BLEND);
         glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_COLOR);
         glDisable(GL_CULL_FACE);
 
         _mainCloudsShader->Use();
-        _mainCloudsShader->SetMat4("lightSpaceMatrix", lightSpaceMatrix);
-        renderableClouds->Render();
+        _mainCloudsShader->SetMat4("lightSpaceMatrix", component.lightSpaceMatrix);
+        _mainCloudsShader->SetFloat("bias", ShadowBias(component, kShellShadowBias));
+        renderableClouds->Draw(*_mainCloudsShader);
 
         glEnable(GL_CULL_FACE);
         glDisable(GL_BLEND);
@@ -515,15 +534,16 @@ void Renderer::RenderClouds(Clouds* renderableClouds, const glm::mat4& lightSpac
     }
 }
 
-void Renderer::RenderPlanetaryRing(const Shader& shader, PlanetaryRing* planetaryRing, const glm::mat4& lightSpaceMatrix) const {
-    if (planetaryRing) {
+void Renderer::RenderPlanetaryRing(const Shader& shader, const RenderableSceneComponent& component) const {
+    const PlanetaryRing* planetaryRing = component.planetaryRing.get();
+    if (planetaryRing && planetaryRing->IsVisible()) {
         glEnable(GL_BLEND);
         glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
 
         shader.Use();
-        shader.SetMat4("lightSpaceMatrix", lightSpaceMatrix);
-        planetaryRing->SetShader(shader);
-        planetaryRing->Render();
+        shader.SetMat4("lightSpaceMatrix", component.lightSpaceMatrix);
+        shader.SetFloat("bias", ShadowBias(component, kShellShadowBias));
+        planetaryRing->Draw(shader);
 
         glDisable(GL_BLEND);
     }
@@ -583,10 +603,7 @@ void Renderer::RenderStarCorona(const FrameContext& ctx) const {
     glBlendFunc(GL_ONE, GL_ONE);
 
     _mainCoronaStarShader->Use();
-    ctx.scene.sun->SetShader(*_mainCoronaStarShader);
-    ctx.scene.sun->TakeStarSystemCenter();
-    ctx.scene.sun->Render();
-    ctx.scene.sun->SetShader(*_mainStarShader);
+    ctx.scene.sun->Draw(*_mainCoronaStarShader);
 
     glDepthMask(GL_TRUE);
     glDisable(GL_BLEND);
@@ -674,8 +691,7 @@ void Renderer::RenderStar(const FrameContext& ctx) const {
     // Bound here, not with the per-view uniforms: the planets drawn before the star reuse
     // the Diffuse unit, and the photosphere colour used to come from the last moon's map.
     glBindTextureUnit(Unit(TextureUnit::Diffuse), ctx.scene.sun->GetStarSpectrumTexture());
-    ctx.scene.sun->TakeStarSystemCenter();
-    ctx.scene.sun->Render();
+    ctx.scene.sun->Draw(*_mainStarShader);
 
     glDisable(GL_BLEND);
 }
@@ -696,14 +712,16 @@ void Renderer::RenderStarEffects(const FrameContext& ctx) const {
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
         glEnable(GL_BLEND);
         glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
-        ctx.scene.sun->RenderGlow(ctx.view.projection, ctx.view.view, ctx.view.front - ctx.view.right, ctx.view.aspect,
-                         glm::distance(ctx.view.headPosition, ctx.scene.sun->GetPosition()), ringCameraInfo, _starTuning.temperatureKelvin);
+        ctx.scene.sun->RenderGlow(*_starGlowShader, ctx.view.projection, ctx.view.view, ctx.view.front - ctx.view.right,
+                                  ctx.view.aspect, glm::distance(ctx.view.headPosition, ctx.scene.sun->GetPosition()),
+                                  ringCameraInfo, _starTuning.temperatureKelvin);
     } else {
         glBindFramebuffer(GL_FRAMEBUFFER, ctx.defaultFramebuffer);
         glEnable(GL_BLEND);
         glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
-        ctx.scene.sun->RenderGlow(ctx.view.projection, ctx.view.view, ctx.view.front - ctx.view.right, ctx.view.aspect,
-                         glm::distance(ctx.view.headPosition, ctx.scene.sun->GetPosition()), ringCameraInfo, _starTuning.temperatureKelvin);
+        ctx.scene.sun->RenderGlow(*_starGlowShader, ctx.view.projection, ctx.view.view, ctx.view.front - ctx.view.right,
+                                  ctx.view.aspect, glm::distance(ctx.view.headPosition, ctx.scene.sun->GetPosition()),
+                                  ringCameraInfo, _starTuning.temperatureKelvin);
     }
 
     glBindFramebuffer(GL_FRAMEBUFFER, ctx.defaultFramebuffer);
@@ -1045,7 +1063,6 @@ void Renderer::ConfigureMainShaders(const FrameContext& ctx) {
     // draw this view is only known per body.
 
     _mainAtmosphereShader->Use();
-    _mainAtmosphereShader->SetFloat("bias", 0.001);
     _mainAtmosphereShader->SetFloat("uSurfaceDim", atmosphereDim);
 
     if (_pbrAtmosphereShader) {
@@ -1054,12 +1071,10 @@ void Renderer::ConfigureMainShaders(const FrameContext& ctx) {
     }
 
     _mainCloudsShader->Use();
-    _mainCloudsShader->SetFloat("bias", 0.001);
     _mainCloudsShader->SetFloat("uSurfaceDim", surfaceDim);
 
     _mainRingShader->Use();
     _mainRingShader->SetVec3("starGlowTint", sun.GetGlowTintMult());
-    _mainRingShader->SetFloat("bias", 0.001);
     _mainRingShader->SetFloat("uSurfaceDim", ringDim);
 
     // Every lit program samples the shadow map from the same unit (TU_SHADOW_MAP).
@@ -1167,9 +1182,10 @@ void Renderer::ConfigurePlanetProgram(const FrameContext& ctx, const Shader& pro
     // Every variant gets the full set; the value cache turns the repeats into lookups.
     program.Use();
     program.SetVec3("starGlowTint", ctx.scene.sun->GetGlowTintMult());
-    program.SetFloat("bias", 0.0005f);
     program.SetFloat("uSurfaceDim", _magneticFieldsEnabled ? 0.28f : 1.0f);
     program.SetMat4("lightSpaceMatrix", component.lightSpaceMatrix);
+    program.SetVec2("shadowDepthRange", component.shadowDepthRange);
+    program.SetFloat("bias", ShadowBias(component, kSurfaceShadowBias));
 
     program.SetBool("hasEclipseCaster", umbra.active);
     if (umbra.active) {
@@ -1191,10 +1207,13 @@ void Renderer::ConfigurePlanetProgram(const FrameContext& ctx, const Shader& pro
     }
 }
 
-void Renderer::DrawLitBody(const FrameContext& ctx, SpaceObject& body, const RenderableSceneComponent& component,
+void Renderer::DrawLitBody(const FrameContext& ctx, const SpaceObject& body, const RenderableSceneComponent& component,
                            const EclipseUmbra& umbra) {
+    if (!body.IsVisible()) {
+        return;
+    }
+    ++_stats.bodyDraws;
     const Shader& program = PlanetProgram(body.ShaderVariant());
     ConfigurePlanetProgram(ctx, program, component, umbra);
-    body.SetShader(program);
-    body.Render();
+    body.Draw(program);
 }

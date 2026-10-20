@@ -392,10 +392,11 @@ See [README.md § Runtime asset hosting](../README.md#runtime-asset-hosting) for
 
 | Module | Role |
 |--------|------|
-| `Application` | Scene graph, render passes, loading orchestration, quality presets |
+| `Application` | Scene graph, simulation (`UpdateScene`, once per frame), culling, loading orchestration, quality presets |
+| `Renderer` / `FrameContext` / `FramePasses` | Draw passes and the GPU resources they own; each pass reads only its `FrameContext`; `FramePasses` is the GL-free frame order (§7.5) |
 | `SystemModules.h` | Platform-conditional OpenGL/audio includes; `glBindTextureUnit` polyfill on WASM |
-| `Shader` | GLSL compile/link; lazy uniform-location cache; `Set*Double` casts to float on WASM |
-| `ShaderSource` | GL-free source assembly: `#version` rewrite, `common/preamble.glsl`, `#include`, `#line` bookkeeping (§9.1) |
+| `Shader` / `ShaderLibrary` | Deferred compile/link (`KHR_parallel_shader_compile`), link-time uniform table with a value cache, hot reload; programs keyed by `ShaderSpec` (files + permutation defines) (§9.1) |
+| `ShaderSource` | GL-free source assembly: `#version` rewrite, `common/preamble.glsl`, permutation `#define`s, `#include`, sampler bindings, `#line` bookkeeping (§9.1) |
 
 ### 7.2 Auxiliary
 
@@ -424,7 +425,14 @@ Inheritance: `SpaceObject` → `Transformable` → `Planet` / `Satellite` / `Sta
 
 Each planet system lives in `src/Solar_System/<Name>_System/`. `SolarSystem.h` aggregates includes. Atmospheres, clouds, and rings are separate render components. `Atmosphere` is configured from its catalog row and owns its LUTs; `AtmosphereModel` is the GL-free physics behind them, shared with the baker and the tests (§9.2).
 
-**Magnetic field params:** `MagneticFieldParams` on `SpaceObject` (set in `StarSystemFactory.cpp` via `MagneticFieldCatalog::IntrinsicParamsForBody`). Values are visual/educational — not SI magnetosphere physics. `ParamsForBody(body, quality)` adds seed/sample scaling and quality enable gates for the ribbon renderer. `Application::ForEachEnabledMagneticField` walks the Sun, loaded planets, and satellites whose `enabled` flag is set. Satellites default to disabled. Magnetic mode (`SetMagneticFields` / alias `SetMagneticFieldMode`, settings **M**) dims planet/cloud/atmosphere/ring shaders via `uSurfaceDim` and fades orbit paths; the Sun is left at full brightness.
+**Drawing.** A scene object holds no program: a pass `Use()`s one, sets its own uniforms
+and calls `SpaceObject::Draw(shader)`, which adds `model` and the object's material maps.
+So the shadow pass and the colour pass draw the same body with different programs, and a
+catalog body's colour pass uses its own planetLighting permutation (§9.1).
+`GetBoundingSphere()` is the mesh's radius (`MeshHolder::BoundingRadius`) under the current
+model matrix, in the render frame.
+
+**Magnetic field params:** `MagneticFieldParams` on `SpaceObject` (set in `StarSystemFactory.cpp` via `MagneticFieldCatalog::IntrinsicParamsForBody`). Values are visual/educational — not SI magnetosphere physics. `ParamsForBody(body, quality)` adds seed/sample scaling and quality enable gates for the ribbon renderer. `Renderer::RenderMagneticFields` walks the Sun, loaded planets, and satellites whose `enabled` flag is set. Satellites default to disabled. Magnetic mode (`SetMagneticFields` / alias `SetMagneticFieldMode`, settings **M**) dims planet/cloud/atmosphere/ring shaders via `uSurfaceDim` and fades orbit paths; the Sun is left at full brightness.
 
 ### 7.4 Observe mode
 
@@ -448,6 +456,33 @@ The epoch is still `OrbitLayout::GetJulianDate()`, so the date controls and `Set
 Web: `web/src/observe.ts` (panel, sites, rates, 2017 preset, eyepieces and the telescope overlay, `ObserveState` parsing), `deepLink.ts` (`mode`, `lat`, `lon`, `az`, `el`, `fov` 0.25–120, `rate`; Observe angles keep 0.01° so a telescope link still lands on its target; an Observe share link omits the fly-through pose), exports `SetObserveMode`/`SetObserverSite`/`SetObserveView`/`SetObserveFov`/`SetObserveTimeRate`/`GetObserveStateJson`. Accuracy is visualizer-grade (§11): UTC is fed straight into GMST, nutation and refraction are ignored, and the Moon comes from the Meeus ch. 47 series (§11), so eclipses land within seconds of NASA's circumstances.
 
 ---
+
+### 7.5 Frame pipeline
+
+One frame (`Application::RenderFrame` → `FramePasses::Run`):
+
+1. **Simulate once** (`UpdateScene`): orbit placement, light frusta, belts, mission probes,
+   LOD, the nearest-planet search, sky events. XR does this once for both eyes.
+2. **Snapshot** (`BuildFrameSnapshot`): one `CameraView` per view and a `SceneSnapshot`; the
+   passes see the frame only through a `FrameContext` built from them.
+3. **Cull** (`CullScene`): each object's bounding sphere against the side planes of every
+   view's frustum (`gfx/Frustum.h`). A component no view sees gets neither a shadow nor a
+   colour pass — its shadow map only shades its own bodies — except the nearest one, whose
+   colour pass is where the star is drawn. Visible components are drawn front to back.
+4. **Draw**: background per view; then per component, its shadow pass followed by each
+   view's colour pass (one shadow FBO); then the foreground per view.
+
+**Shadow frustum.** Each component's light frustum is an ortho box of ±3 planet radii
+looking from the Sun at the planet, with its depth range fitted to the component's own
+bodies (`FitDepthRange`): the only casters drawn into that map and the only receivers that
+read it. `shadowDepthRange` (near, far − near) goes to the shaders that turn a stored depth
+back into a distance (the ring tests), and each pass's `bias` is a fixed scene-unit bias
+divided by that range, which keeps the comparisons the shaders always made. (The frustum
+used to borrow the camera's 0.001–20000, which also clipped every body more than 20000
+units from the Sun — Uranus and beyond on realistic scale.)
+
+`SOLARSYSTEM_FRAME_STATS=N` prints, every N frames, the previous frame's simulate count,
+view binds, shadow passes, component and body draws, culled components and `glUniform*` calls.
 
 ## 8. Web frontend (`web/`)
 

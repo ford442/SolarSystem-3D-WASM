@@ -26,7 +26,8 @@ layout(binding = TU_SHADOW_MAP) uniform sampler2D shadowMap;
 uniform vec3 starGlowTint;
 
 uniform float ambientFactor;
-uniform float bias; // For shadows
+uniform float bias; // For shadows, in shadow-map depth units
+uniform vec2 shadowDepthRange; // this component's light frustum: near, far - near (scene units)
 uniform float yRotation; // For fake cloud shadows
 uniform float uSurfaceDim;
 
@@ -90,7 +91,7 @@ float CalculateShadow(vec4 fragPosLightSpace) {
         float u;
         if (RingCrossing(vFragPos, lightDirNorm, lightDirNorm, ringCenter, ringNormal, ringInnerOuterRadiuses, u)) {
             // If some planet obscures the ring
-            if (shadow > 0.0 && length(frame.sunPos.xyz - ringCenter) - closestDepth * frame.farPlane > ringInnerOuterRadiuses.y) {
+            if (shadow > 0.0 && length(frame.sunPos.xyz - ringCenter) - (shadowDepthRange.x + closestDepth * shadowDepthRange.y) > ringInnerOuterRadiuses.y) {
                 // PCF won't work, because physically in the place where the penumbra from the PCF should be, there will be a shadow from the ring, and not from the planet
                 return 1.0 - shadow;
             }

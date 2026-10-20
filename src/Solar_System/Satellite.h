@@ -11,16 +11,15 @@
 struct SatelliteInfo {
     MeshHolder satelliteModel;
     float earthSizeCoefficient;
-    const Shader* satelliteShader;
     std::vector<TextureImage2D> diffuseTextures;
     TextureImage2D normalMap;
     TextureImage2D specularTexture;
     std::wstring engName;
     std::wstring otherLangName;
 
-    explicit SatelliteInfo(MeshHolder model, float earthSizeCoefficient, const Shader& shader, std::vector<TextureImage2D> diffuses, TextureImage2D normalMap,
+    explicit SatelliteInfo(MeshHolder model, float earthSizeCoefficient, std::vector<TextureImage2D> diffuses, TextureImage2D normalMap,
                        std::wstring engName = L"", std::wstring otherLangName = L"", TextureImage2D specular = TextureImage2D()) :
-                       satelliteModel(std::move(model)), earthSizeCoefficient(earthSizeCoefficient), satelliteShader(&shader),
+                       satelliteModel(std::move(model)), earthSizeCoefficient(earthSizeCoefficient),
                        diffuseTextures(std::move(diffuses)), normalMap(std::move(normalMap)), specularTexture(std::move(specular)), engName(std::move(engName)),
                        otherLangName(std::move(otherLangName)) {}
 };

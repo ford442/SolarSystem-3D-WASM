@@ -1,9 +1,9 @@
 #include "Star.h"
 #include "../gfx/TextureUnits.h"
 
-Star::Star(StarInfo&& starInfo) : SpaceObject(starInfo.starModel, *starInfo.starShader, starInfo.engName, starInfo.otherLangName),
+Star::Star(StarInfo&& starInfo) : SpaceObject(starInfo.starModel, starInfo.engName, starInfo.otherLangName),
     _starTemperature(starInfo.starTemperature), _starRadius(starInfo.starRadius), _glowTintMult(starInfo.glowTintMult),
-    _starSpectrumTexture(std::move(starInfo.starSpectrum)), _glowShader(starInfo.glowStarShader)
+    _starSpectrumTexture(std::move(starInfo.starSpectrum))
 {
     InitBuffers();
 #ifndef __EMSCRIPTEN__
@@ -15,7 +15,7 @@ Star::Star(StarInfo&& starInfo) : SpaceObject(starInfo.starModel, *starInfo.star
     CalculateShiftColor();
 }
 
-void Star::RenderGlow(const glm::mat4& projection, const glm::mat4& view, const glm::vec3& vs, float aspect, float distance,
+void Star::RenderGlow(const Shader& glowShader, const glm::mat4& projection, const glm::mat4& view, const glm::vec3& vs, float aspect, float distance,
                       const std::optional<RingCameraInfo>& ringCameraInfo, float starTemperature)
 {
     if (starTemperature != _starTemperature) {
@@ -29,22 +29,22 @@ void Star::RenderGlow(const glm::mat4& projection, const glm::mat4& view, const 
     _currentGlowSize = glm::max(0.0001f, _currentGlowSize);
     const glm::vec2 glowDimensions(_currentGlowSize, _currentGlowSize * aspect);
 
-    _glowShader->Use();
-    _glowShader->SetMat4("projection", projection);
-    _glowShader->SetMat4("view", view);
-    _glowShader->SetVec3("center", GetPosition());
-    _glowShader->SetVec3("colorMult", _glowTintMult);
-    _glowShader->SetVec2("dims", glowDimensions * 0.5f);
-    _glowShader->SetFloat("uColorMap", _starTemperatureColorUCoordinate);
-    _glowShader->SetFloat("noiseZ", (vs.x + vs.y - vs.z) * 0.25f);
+    glowShader.Use();
+    glowShader.SetMat4("projection", projection);
+    glowShader.SetMat4("view", view);
+    glowShader.SetVec3("center", GetPosition());
+    glowShader.SetVec3("colorMult", _glowTintMult);
+    glowShader.SetVec2("dims", glowDimensions * 0.5f);
+    glowShader.SetFloat("uColorMap", _starTemperatureColorUCoordinate);
+    glowShader.SetFloat("noiseZ", (vs.x + vs.y - vs.z) * 0.25f);
     glBindTextureUnit(Unit(TextureUnit::Diffuse), _starSpectrumTexture.GetTexture());
 
-    _glowShader->SetBool("isPlanetaryRingInView", ringCameraInfo.has_value());
+    glowShader.SetBool("isPlanetaryRingInView", ringCameraInfo.has_value());
     if (ringCameraInfo) {
-        _glowShader->SetVec3("cameraPosition", ringCameraInfo->cameraPosition);
-        _glowShader->SetVec3("ringCenter", ringCameraInfo->ringCenter);
-        _glowShader->SetVec3("ringNormal", ringCameraInfo->ringNormal);
-        _glowShader->SetVec2("ringInnerOuterRadiuses", ringCameraInfo->ringInnerOuterRadiuses);
+        glowShader.SetVec3("cameraPosition", ringCameraInfo->cameraPosition);
+        glowShader.SetVec3("ringCenter", ringCameraInfo->ringCenter);
+        glowShader.SetVec3("ringNormal", ringCameraInfo->ringNormal);
+        glowShader.SetVec2("ringInnerOuterRadiuses", ringCameraInfo->ringInnerOuterRadiuses);
         glBindTextureUnit(Unit(TextureUnit::Ring), ringCameraInfo->ringDiffuse);
     }
 

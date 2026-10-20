@@ -6,20 +6,15 @@
 
 class Transformable {
 public:
-    explicit Transformable(const Shader& shader);
+    Transformable() = default;
     void Translate(const glm::vec3& position);
     void Scale(const glm::vec3& scale);
     void Rotate(float angle, const glm::vec3& axisRotation);
     void LoadIdentityModelMatrix();
-    void SetShader(const Shader& shader);
-    const Shader& GetShader() const;
     const glm::mat4& GetModelMatrix() const;
     glm::mat4 GetRotationMatrix() const;
     glm::vec3 GetPosition() const;
     float GetLastRotationAngle() const;
-
-protected:
-    const Shader* _shader;
 
 private:
     glm::mat4 _matrixModel = glm::mat4(1.0f), _rotationMatrix = glm::mat4(1.0f); // rotationMatrix is separately needed for the correct ring normal for ray casting

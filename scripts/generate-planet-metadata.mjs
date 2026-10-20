@@ -536,8 +536,7 @@ function buildBodyCatalogHeader(catalog) {
       `{${cppNullableString(cloud.diffuse)}, ${cppNullableString(cloud.normal)}, ` +
       `${cppFloat(cloud.scaleFactor)}, ${cppFloat(cloud.spinDegPerSimSecond)}, ` +
       `${cppFloat(cloud.ambientFactor)}}, ` +
-      `${!!body.system?.hasCloudLayer}, ${!!body.system?.hasRings}, ` +
-      `${!!body.system?.lightFarUsesPlanetDistance}}, // ${body.id}`
+      `${!!body.system?.hasCloudLayer}, ${!!body.system?.hasRings}}, // ${body.id}`
     );
   });
 
@@ -641,7 +640,6 @@ function buildBodyCatalogHeader(catalog) {
     '    CloudLayer cloudLayer;',
     '    bool hasCloudLayer;',
     '    bool hasRings;',
-    '    bool lightFarUsesPlanetDistance;',
     '};',
     '',
     'inline constexpr Entry kEntries[] = {',

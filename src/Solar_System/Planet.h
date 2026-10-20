@@ -13,16 +13,15 @@
 struct PlanetInfo {
     MeshHolder planetModel;
     float earthSizeCoefficient;
-    const Shader* planetShader;
     std::vector<TextureImage2D> diffuseTextures;
     TextureImage2D normalMap;
     TextureImage2D specularTexture;
     std::wstring engName;
     std::wstring otherLangName;
 
-    explicit PlanetInfo(MeshHolder model, float earthSizeCoefficient, const Shader& shader, std::vector<TextureImage2D> diffuses, TextureImage2D normalMap,
+    explicit PlanetInfo(MeshHolder model, float earthSizeCoefficient, std::vector<TextureImage2D> diffuses, TextureImage2D normalMap,
                         std::wstring engName = L"", std::wstring otherLangName = L"", TextureImage2D specular = TextureImage2D()) :
-                        planetModel(std::move(model)), earthSizeCoefficient(earthSizeCoefficient), planetShader(&shader), diffuseTextures(std::move(diffuses)),
+                        planetModel(std::move(model)), earthSizeCoefficient(earthSizeCoefficient), diffuseTextures(std::move(diffuses)),
                         normalMap(std::move(normalMap)), specularTexture(std::move(specular)), engName(std::move(engName)), otherLangName(std::move(otherLangName)) {}
 };
 

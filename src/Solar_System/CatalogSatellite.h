@@ -19,7 +19,7 @@ public:
                      const BodyCatalog::Entry& entry);
 
     void AdjustToParent() override;
-    void Render() const override;
+    void Draw(const Shader& shader) const override;
     unsigned ShaderVariant() const override { return CatalogMaterial::Variant(_material, CurrentTextures()); }
 
     bool IsEphemerisPlaced() const override { return _ephemerisPlaced; }

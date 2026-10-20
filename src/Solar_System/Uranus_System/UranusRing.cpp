@@ -25,9 +25,9 @@ void UranusRing::AdjustToParent() {
     UpdateRingNormal();
 }
 
-void UranusRing::Render() const {
-    GetShader().SetVec3("planetPos", _parentPlanet->GetPosition());
-    GetShader().SetFloat("planetRadius", _parentPlanet->GetRadius());
+void UranusRing::Draw(const Shader& shader) const {
+    shader.SetVec3("planetPos", _parentPlanet->GetPosition());
+    shader.SetFloat("planetRadius", _parentPlanet->GetRadius());
     glBindTextureUnit(Unit(TextureUnit::Diffuse), _ringTexture.GetTexture()); // ringTexture
-    SpaceObject::Render();
+    SpaceObject::Draw(shader);
 }

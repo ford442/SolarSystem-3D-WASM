@@ -20,7 +20,7 @@ TextureImage2D LoadLodTexture(const char* textureId) {
     return TextureImage2D(GetTexturePath(paths.low, paths.high));
 }
 
-PlanetInfo MakePlanetInfo(const MeshHolder& sphereModel, const BodyCatalog::Entry& entry, Shader& shader) {
+PlanetInfo MakePlanetInfo(const MeshHolder& sphereModel, const BodyCatalog::Entry& entry) {
     std::vector<TextureImage2D> diffuses;
     diffuses.push_back(LoadLodTexture(entry.lod.diffuse));
     if (entry.lod.clouds) {
@@ -29,15 +29,15 @@ PlanetInfo MakePlanetInfo(const MeshHolder& sphereModel, const BodyCatalog::Entr
     if (entry.lod.night) {
         diffuses.push_back(LoadLodTexture(entry.lod.night));
     }
-    return PlanetInfo(sphereModel, entry.earthRadiusScale, shader, std::move(diffuses),
+    return PlanetInfo(sphereModel, entry.earthRadiusScale, std::move(diffuses),
                       LoadLodTexture(entry.lod.normal), entry.displayNameEn, entry.displayNameRu,
                       LoadLodTexture(entry.lod.specular));
 }
 
-SatelliteInfo MakeSatelliteInfo(const MeshHolder& model, const BodyCatalog::Entry& entry, Shader& shader) {
+SatelliteInfo MakeSatelliteInfo(const MeshHolder& model, const BodyCatalog::Entry& entry) {
     std::vector<TextureImage2D> diffuses;
     diffuses.push_back(LoadLodTexture(entry.lod.diffuse));
-    return SatelliteInfo(model, entry.earthRadiusScale, shader, std::move(diffuses),
+    return SatelliteInfo(model, entry.earthRadiusScale, std::move(diffuses),
                          LoadLodTexture(entry.lod.normal), entry.displayNameEn, entry.displayNameRu,
                          LoadLodTexture(entry.lod.specular));
 }
@@ -74,12 +74,11 @@ void LoadAtmosphereLuts(Atmosphere& atmosphere) {
     atmosphere.SetLuts(std::move(transmittance->texture), std::move(multiScattering->texture));
 }
 
-RenderableAtmosphere MakeAtmosphere(const MeshHolder& sphereModel, Shader& atmosphereShader,
-                                    const BodyCatalog::AtmosphereRow& row,
+RenderableAtmosphere MakeAtmosphere(const MeshHolder& sphereModel, const BodyCatalog::AtmosphereRow& row,
                                     const std::shared_ptr<SpaceObject>& parent,
                                     float parentRadius, float parentEarthSize) {
     RenderableAtmosphere renderable;
-    renderable.atmosphere = std::make_unique<Atmosphere>(sphereModel, atmosphereShader, row, parent, parentRadius);
+    renderable.atmosphere = std::make_unique<Atmosphere>(sphereModel, row, parent, parentRadius);
     renderable.parentEarthSizeCoefficient = parentEarthSize;
     LoadAtmosphereLuts(*renderable.atmosphere);
     return renderable;
@@ -90,7 +89,7 @@ RenderableAtmosphere MakeAtmosphere(const MeshHolder& sphereModel, Shader& atmos
 void Application::InitStarSystem() {
     _sphereModel = std::make_unique<MeshHolder>("resource/models/sphere.obj");
 
-    StarInfo sunInfo(*_sphereModel, _renderer.StarShader(), _renderer.StarGlowShader(), TextureImage2D(TexturePaths::Resolve("resource/textures_low/Star_Spectrum_Low.dds")),
+    StarInfo sunInfo(*_sphereModel, TextureImage2D(TexturePaths::Resolve("resource/textures_low/Star_Spectrum_Low.dds")),
                      _renderer.GetStarTuning().temperatureKelvin, 696342.0, glm::vec3(0.99607843, 0.890196078, 0.725490196), L"Sun", L"Солнце");
     _sun = make_shared<Sun>(std::move(sunInfo));
     _sun->SetMagneticField(MagneticFieldCatalog::IntrinsicParamsForBody(OrbitLayout::Body::Sun));
@@ -130,7 +129,7 @@ void Application::InitCatalogSystem(const MeshHolder& sphereModel, const std::st
         return;
     }
 
-    PlanetInfo info = MakePlanetInfo(sphereModel, *primary, _renderer.PlanetShader());
+    PlanetInfo info = MakePlanetInfo(sphereModel, *primary);
     shared_ptr<Planet> planet = make_shared<CatalogBody>(std::move(info), _sun, *primary);
     planet->SetMagneticField(
         MagneticFieldCatalog::IntrinsicParamsForBody(static_cast<OrbitLayout::Body>(primary->index)));
@@ -146,14 +145,14 @@ void Application::InitCatalogSystem(const MeshHolder& sphereModel, const std::st
         }
         if (entry.meshPath) {
             MeshHolder mesh(entry.meshPath);
-            SatelliteInfo satInfo = MakeSatelliteInfo(mesh, entry, _renderer.PlanetShader());
+            SatelliteInfo satInfo = MakeSatelliteInfo(mesh, entry);
             auto sat = make_shared<CatalogSatellite>(std::move(satInfo), planet, entry);
             if (const auto* row = BodyCatalog::FindAtmosphere(entry.id)) {
                 satelliteAtmospheres.emplace_back(sat, row);
             }
             satellites.push_back(std::move(sat));
         } else {
-            SatelliteInfo satInfo = MakeSatelliteInfo(sphereModel, entry, _renderer.PlanetShader());
+            SatelliteInfo satInfo = MakeSatelliteInfo(sphereModel, entry);
             auto sat = make_shared<CatalogSatellite>(std::move(satInfo), planet, entry);
             if (const auto* row = BodyCatalog::FindAtmosphere(entry.id)) {
                 satelliteAtmospheres.emplace_back(sat, row);
@@ -164,11 +163,11 @@ void Application::InitCatalogSystem(const MeshHolder& sphereModel, const std::st
 
     RenderableSceneComponent component;
     if (const auto* row = BodyCatalog::FindAtmosphere(primary->id)) {
-        component.atmospheres.push_back(MakeAtmosphere(sphereModel, _renderer.AtmosphereShader(), *row, planet,
+        component.atmospheres.push_back(MakeAtmosphere(sphereModel, *row, planet,
                                                        planet->GetRadius(), planet->GetEarthSizeCoefficient()));
     }
     for (const auto& [satellite, row] : satelliteAtmospheres) {
-        component.atmospheres.push_back(MakeAtmosphere(sphereModel, _renderer.AtmosphereShader(), *row, satellite,
+        component.atmospheres.push_back(MakeAtmosphere(sphereModel, *row, satellite,
                                                        satellite->GetRadius(), satellite->GetEarthSizeCoefficient()));
     }
 
@@ -176,7 +175,7 @@ void Application::InitCatalogSystem(const MeshHolder& sphereModel, const std::st
         const TexturePaths::Paths cloudDiffuse = TexturePaths::ForTextureId(primary->cloudLayer.diffuse);
         const TexturePaths::Paths cloudNormal = TexturePaths::ForTextureId(
             primary->cloudLayer.normal ? primary->cloudLayer.normal : primary->cloudLayer.diffuse);
-        CloudsInfo cloudsInfo(sphereModel, _renderer.CloudsShader(), primary->cloudLayer.scaleFactor,
+        CloudsInfo cloudsInfo(sphereModel, primary->cloudLayer.scaleFactor,
                               TextureImage2D(GetTexturePath(cloudDiffuse.low, cloudDiffuse.high)),
                               TextureImage2D(GetTexturePath(cloudNormal.low, cloudNormal.high)));
         component.clouds = make_unique<CatalogClouds>(std::move(cloudsInfo), planet, *primary);
@@ -187,7 +186,6 @@ void Application::InitCatalogSystem(const MeshHolder& sphereModel, const std::st
             MeshHolder ringModel(ringSpec->modelPath);
             const TexturePaths::Paths ringTex = TexturePaths::ForTextureId(ringSpec->textureId);
             PlanetaryRingInfo ringInfo(ringModel, ringSpec->innerRadius, ringSpec->outerRadius,
-                                       _renderer.PlanetShader(),
                                        TextureImage2D(GetTexturePath(ringTex.low, ringTex.high)));
             if (BodyCatalog::StrEq(primary->id, "saturn")) {
                 component.planetaryRing = make_unique<SaturnRing>(std::move(ringInfo), planet);
@@ -197,18 +195,7 @@ void Application::InitCatalogSystem(const MeshHolder& sphereModel, const std::st
         }
     }
 
-    const float lightFar = primary->lightFarUsesPlanetDistance
-                               ? glm::length(_sun->GetPosition() - planet->GetPosition()) + 50.0f
-                               : _camera.GetFar();
-    const glm::mat4 lightProjection =
-        glm::ortho(-planet->GetRadius() * 3.0f, planet->GetRadius() * 3.0f,
-                   -planet->GetRadius() * 3.0f, planet->GetRadius() * 3.0f, _camera.GetNear(), lightFar);
-    // Same frame as the per-frame matrix in ProcessSceneComponentsRendering, which replaces
-    // this one before the first shadow pass.
-    const glm::mat4 lightView(glm::lookAt(glm::dvec3(_sun->GetPosition()), glm::dvec3(planet->GetPosition()),
-                                          glm::dvec3(0.0, 1.0, 0.0)));
-
-    component.lightSpaceMatrix = lightProjection * lightView;
+    // The light frustum is fitted per frame in UpdateScene, before the first shadow pass.
     component.planet = std::move(planet);
     component.satellites = std::move(satellites);
     _renderableSceneComponents.push_back(std::move(component));

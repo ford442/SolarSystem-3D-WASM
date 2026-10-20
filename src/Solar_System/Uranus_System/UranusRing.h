@@ -6,7 +6,7 @@ class UranusRing : public PlanetaryRing {
 public:
     explicit UranusRing(PlanetaryRingInfo&& planetaryRingInfo, std::shared_ptr<Planet> parent);
     void AdjustToParent() override;
-    void Render() const override;
+    void Draw(const Shader& shader) const override;
 };
 
 #endif //SOLARSYSTEM_URANUSRING_H

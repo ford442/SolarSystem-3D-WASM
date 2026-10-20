@@ -32,10 +32,10 @@ void CatalogClouds::AdjustToParent() {
     Rotate(spinDegrees, glm::vec3(0.0f, 1.0f, 0.0f));
 }
 
-void CatalogClouds::Render() const {
-    GetShader().SetFloat("ambientFactor", _parentEntry.cloudLayer.ambientFactor);
+void CatalogClouds::Draw(const Shader& shader) const {
+    shader.SetFloat("ambientFactor", _parentEntry.cloudLayer.ambientFactor);
     glBindTextureUnit(Unit(TextureUnit::Diffuse), _diffuse.GetTexture());
     glBindTextureUnit(Unit(TextureUnit::Normal), _normal.GetTexture());
 
-    SpaceObject::Render();
+    SpaceObject::Draw(shader);
 }
