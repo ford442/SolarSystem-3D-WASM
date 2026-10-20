@@ -100,6 +100,7 @@ void Renderer::ApplyEffectQuality(const QualityTierSettings& settings) {
     observeStarCount = settings.observeStarCount;
     if (observeSky) {
         observeSky->SetStarLimit(observeStarCount);
+        observeSky->SetCoreConstellationsOnly(settings.observeCoreConstellationsOnly);
     }
 }
 

@@ -57,10 +57,10 @@ ScaleMode GetScaleMode();
 void SetJulianDate(double julianDate);
 double GetJulianDate();
 
-/** Advance ephemeris epoch and axial spin by scaled wall-clock seconds. */
+/** Advance the ephemeris epoch by scaled wall-clock seconds (spins follow from the date). */
 void Advance(float scaledDtSeconds);
 
-/** Reset to J2000.0, zero axial spin, compressed scale, render origin at the Sun (tests). */
+/** Reset to J2000.0, compressed scale, render origin at the Sun (tests). */
 void ResetForTests();
 
 /**
@@ -160,7 +160,11 @@ float GetSceneDistance(Body body);
 /** Compressed-scene offset baked into the original art direction (phase-0 reference). */
 glm::vec3 GetCompressedOffset(Body body);
 
-/** Accumulated axial spin in degrees (linear in sim time; negative = retrograde). */
+/**
+ * Axial spin in degrees at the current Julian date, applied as Ry after the catalog tilt.
+ * Earth: solved so the map shows the real sub-solar longitude. Others: catalog W0 at J2000
+ * plus 360 deg per sidereal day (negative period = retrograde), wrapped to [0, 360).
+ */
 float GetAxialSpinDegrees(Body body);
 
 /** Orbital period in Earth days (NASA averages). Sun returns 0. */

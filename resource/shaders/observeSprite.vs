@@ -14,6 +14,8 @@ uniform mat3 starRotation;  // equatorial J2000 → horizon frame, applied to st
 uniform float limitMag;     // faintest star that stands out against the current sky
 uniform vec2 viewportPx;    // render target size in pixels
 
+#include "common/refraction.glsl"
+
 const float KIND_SUN = 0.5;
 const float KIND_STAR = 2.5;
 
@@ -38,9 +40,10 @@ void main() {
     bool culled = false;
     if (isStar) {
         // Stars are static J2000 vectors; their size and brightness follow the sky glow, so
-        // they fade in through twilight and are gone by day.
-        d = normalize(starRotation * d);
-        float margin = limitMag - iParams.y;
+        // they fade in through twilight and are gone by day. Like the bodies placed on the CPU
+        // they are drawn where refraction puts them and dimmed by the air they are seen through.
+        d = RefractDirection(normalize(starRotation * d));
+        float margin = limitMag - iParams.y - ExtinctionMagnitudes(degrees(asin(clamp(d.y, -1.0, 1.0))));
         culled = margin < -0.2;
         halfExtent = 1.1 + 0.3 * clamp(margin, 0.0, 9.0);
         color.a = clamp(0.35 + 0.1 * margin, 0.0, 1.0);

@@ -154,3 +154,87 @@ TEST(StarCatalogTest, PolarisAltitudeIsRoughlyTheLatitude) {
         }
     }
 }
+
+// --- Constellation lines --------------------------------------------------------------------
+
+namespace {
+
+const std::string kConstellationPath = std::string(SOLARSYSTEM_SOURCE_DIR) + "/resource/sky/constellation_lines.json";
+
+double separationDeg(const StarCatalog::Star& a, const StarCatalog::Star& b) {
+    const double cosSep = std::sin(a.decDeg * kDegToRad) * std::sin(b.decDeg * kDegToRad) +
+                          std::cos(a.decDeg * kDegToRad) * std::cos(b.decDeg * kDegToRad) *
+                              std::cos((a.raDeg - b.raDeg) * kDegToRad);
+    return std::acos(std::fmin(1.0, std::fmax(-1.0, cosSep))) / kDegToRad;
+}
+
+bool hasSegment(const std::vector<StarCatalog::Constellation>& figures, const char* id, int a, int b) {
+    for (const auto& figure : figures) {
+        if (figure.id != id) {
+            continue;
+        }
+        for (size_t i = 0; i + 1 < figure.lines.size(); i += 2) {
+            if ((figure.lines[i] == a && figure.lines[i + 1] == b) || (figure.lines[i] == b && figure.lines[i + 1] == a)) {
+                return true;
+            }
+        }
+    }
+    return false;
+}
+
+} // namespace
+
+TEST(ConstellationLinesTest, ParsesTheGeneratorShapeAndRejectsMisjoinedFiles) {
+    const std::string tiny = R"({"v":1,"starCount":3,"constellations":[
+  {"id":"Ori","name":"Orion","core":true,"lines":[0,1,1,2]},
+  {"id":"CMi","name":"Canis Minor","core":false,"lines":[2,0]}
+]})";
+    std::vector<StarCatalog::Constellation> figures;
+    std::string error;
+    ASSERT_TRUE(StarCatalog::ParseConstellations(tiny, 3, figures, error)) << error;
+    ASSERT_EQ(figures.size(), 2u);
+    EXPECT_EQ(figures[0].id, "Ori");
+    EXPECT_TRUE(figures[0].core);
+    EXPECT_EQ(figures[0].lines, (std::vector<int>{0, 1, 1, 2}));
+    EXPECT_FALSE(figures[1].core);
+
+    EXPECT_FALSE(StarCatalog::ParseConstellations(tiny, 4, figures, error)); // star file regenerated alone
+    EXPECT_TRUE(figures.empty());
+    const std::string outOfRange = R"({"starCount":3,"constellations":[{"id":"X","core":true,"lines":[0,3]}]})";
+    EXPECT_FALSE(StarCatalog::ParseConstellations(outOfRange, 3, figures, error));
+    const std::string odd = R"({"starCount":3,"constellations":[{"id":"X","core":true,"lines":[0,1,2]}]})";
+    EXPECT_FALSE(StarCatalog::ParseConstellations(odd, 3, figures, error));
+    EXPECT_FALSE(StarCatalog::ParseConstellations("{}", 3, figures, error));
+}
+
+TEST(ConstellationLinesTest, ShippedFiguresJoinTheShippedStars) {
+    StarCatalog::Catalog catalog;
+    std::string error;
+    ASSERT_TRUE(StarCatalog::LoadFromFile(kCatalogPath, catalog, error)) << error;
+    std::vector<StarCatalog::Constellation> figures;
+    ASSERT_TRUE(StarCatalog::LoadConstellationsFromFile(kConstellationPath, static_cast<int>(catalog.stars.size()),
+                                                        figures, error)) << error;
+
+    int core = 0, segments = 0, coreSegmentsOnLow = 0;
+    for (const auto& figure : figures) {
+        core += figure.core ? 1 : 0;
+        for (size_t i = 0; i + 1 < figure.lines.size(); i += 2) {
+            const auto& a = catalog.stars[static_cast<size_t>(figure.lines[i])];
+            const auto& b = catalog.stars[static_cast<size_t>(figure.lines[i + 1])];
+            EXPECT_LT(separationDeg(a, b), 32.0) << figure.id;
+            EXPECT_LT(std::fmax(a.vmag, b.vmag), 5.5f) << figure.id; // naked-eye figures only
+            ++segments;
+            if (figure.core && figure.lines[i] < 500 && figure.lines[i + 1] < 500) {
+                ++coreSegmentsOnLow; // Low draws 500 stars; a line needs both of its stars drawn
+            }
+        }
+    }
+    EXPECT_EQ(core, 20);
+    EXPECT_GE(segments, 150);
+    EXPECT_GE(coreSegmentsOnLow, 60);
+
+    // Orion's belt and the Big Dipper's pointers, by their catalog names.
+    EXPECT_TRUE(hasSegment(figures, "Ori", indexOfName(catalog, "Alnitak"), indexOfName(catalog, "Alnilam")));
+    EXPECT_TRUE(hasSegment(figures, "Ori", indexOfName(catalog, "Alnilam"), indexOfName(catalog, "Mintaka")));
+    EXPECT_TRUE(hasSegment(figures, "UMa", indexOfName(catalog, "Dubhe"), indexOfName(catalog, "Merak")));
+}

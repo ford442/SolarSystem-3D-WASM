@@ -238,6 +238,14 @@ function validateCatalog(catalog) {
     if (body.render?.atmosphere) {
       validateAtmosphere(body);
     }
+    // Spin is evaluated from this epoch angle (OrbitLayout::GetAxialSpinDegrees), so every
+    // focus body needs one; there is no accumulator to fall back on.
+    if (isFocusBody(body)) {
+      const w0 = body.orbit?.primeMeridianDegJ2000;
+      if (!Number.isFinite(w0) || w0 < 0 || w0 >= 360) {
+        throw new Error(`Body ${body.id} requires orbit.primeMeridianDegJ2000 in [0, 360)`);
+      }
+    }
     // render.oblateness flattens the surface, cloud and atmosphere meshes along the pole
     // (CatalogBody / CatalogClouds / Atmosphere via BodyShape.h); satellites stay spheres.
     const oblateness = body.render?.oblateness;
@@ -417,7 +425,7 @@ function cppFloat(n) {
 /**
  * Generates the body-physics table OrbitLayout::kBodies[] (see OrbitLayout.cpp):
  * heliocentric compressed-art offset, AU distance, orbital period, inclination, and
- * sidereal rotation, one row per *focus* body in index order (Sun=0 … Halley=15).
+ * sidereal rotation, prime-meridian angle at J2000, one row per *focus* body in index order (Sun=0 … Halley=15).
  * Satellites are excluded — their scene orbits live on BodyCatalog::Entry.
  *
  * Axial tilt is applied by CatalogBody from BodyCatalog::Entry.axialTiltDegrees
@@ -432,7 +440,8 @@ function buildOrbitLayoutBodiesInc(catalog) {
     return (
       `    {glm::vec3(${cppFloat(ox)}, ${cppFloat(oy)}, ${cppFloat(oz)}), ` +
       `${cppFloat(o.distanceAu)}, ${cppFloat(o.orbitalPeriodDays)}, ` +
-      `${cppFloat(o.inclinationDeg)}, ${cppFloat(o.siderealRotationDays)}}, // ${body.id}`
+      `${cppFloat(o.inclinationDeg)}, ${cppFloat(o.siderealRotationDays)}, ` +
+      `${cppFloat(o.primeMeridianDegJ2000)}}, // ${body.id}`
     );
   });
   return [

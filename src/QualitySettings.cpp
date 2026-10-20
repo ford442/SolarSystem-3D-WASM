@@ -35,15 +35,15 @@ QualityTierSettings GetQualitySettings(int preset, bool mobile) {
     // rather than shader cost decides.
     if (mobile) {
         switch (preset) {
-            case 0: return {1024, 0, 0, false, false, 0, 400, 0, TextureLodTier::Low, false, 0, false, 0, 500, "low"};
-            case 1: return {2048, 2, 0, true, true, 1, 900, 400, TextureLodTier::Mid, true, 8, false, 0, 1500, "medium"};
-            default: return {3000, 2, 0, true, true, 1, 1400, 800, TextureLodTier::High, true, 12, true, 16, 2500, "full"};
+            case 0: return {1024, 0, 0, false, false, 0, 400, 0, TextureLodTier::Low, false, 0, false, 0, 500, true, "low"};
+            case 1: return {2048, 2, 0, true, true, 1, 900, 400, TextureLodTier::Mid, true, 8, false, 0, 1500, false, "medium"};
+            default: return {3000, 2, 0, true, true, 1, 1400, 800, TextureLodTier::High, true, 12, true, 16, 2500, false, "full"};
         }
     }
     switch (preset) {
-        case 0: return {1024, 0, 0, false, false, 0, 600, 0, TextureLodTier::Low, false, 0, false, 0, 500, "low"};
-        case 1: return {2048, 2, 0, true, true, 1, 1800, 800, TextureLodTier::Mid, true, 8, true, 16, 2000, "medium"};
-        default: return {3000, 4, 4, true, true, 2, 4000, 2000, TextureLodTier::High, true, 16, true, 32, 5000, "full"};
+        case 0: return {1024, 0, 0, false, false, 0, 600, 0, TextureLodTier::Low, false, 0, false, 0, 500, true, "low"};
+        case 1: return {2048, 2, 0, true, true, 1, 1800, 800, TextureLodTier::Mid, true, 8, true, 16, 2000, false, "medium"};
+        default: return {3000, 4, 4, true, true, 2, 4000, 2000, TextureLodTier::High, true, 16, true, 32, 5000, false, "full"};
     }
 }
 
@@ -73,6 +73,7 @@ void LogQualityTier(const QualityTierSettings& settings, bool hdrEnabled, int sh
               << " | corona="
               << (settings.enableVolumetricCorona ? std::to_string(settings.coronaSlices) + " slices" : "billboard")
               << " | observe stars=" << settings.observeStarCount
+              << (settings.observeCoreConstellationsOnly ? " (20 figures)" : "")
               << std::defaultfloat << std::endl;
 #ifdef __EMSCRIPTEN__
     std::cout << "[Quality] WebGL MSAA is fixed when the context is created; reload with ?quality="
