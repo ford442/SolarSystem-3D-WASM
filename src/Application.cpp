@@ -11,6 +11,7 @@
 #include "WasmExports.h"
 #include "assets/TextureLoadingQueue.h"
 #include "Solar_System/OrbitLayout.h"
+#include "Solar_System/SceneScale.h"
 #include "core/Log.h"
 #include "render/XrPointerRenderer.h"
 #include <algorithm>
@@ -104,10 +105,15 @@ void Application::RunOneFrame() {
         _simState.simDeltaSeconds = _simState.timePaused ? 0.0f : static_cast<float>(_deltaTime) * _simState.timeScale;
         OrbitLayout::Advance(_simState.simDeltaSeconds);
     }
+    // Bodies at this frame's date before the camera reads them (UpdateScene places them again
+    // once the render origin has followed the camera, and catches systems loaded meanwhile).
+    PlaceBodies();
+    CarryCameraWithAnchor();
     _camera.UpdateTransition(_deltaTime);
     UpdateMissionFollow();
 
     ProcessInput(_mainWindow);
+    ConstrainCamera();
     // After everything that moves the camera this frame, before anything reads positions.
     UpdateRenderOrigin();
     UpdatePlanetSystemLoading();
@@ -203,6 +209,13 @@ void Application::UpdateScene(double julianDate) {
     if (_observe.active) {
         CurrentObserveSky();
     }
+}
+
+void Application::PlaceBodies() {
+    if (_sun) {
+        _sun->TakeStarSystemCenter();
+    }
+    PlaceSceneComponents();
 }
 
 void Application::PlaceSceneComponents() {
@@ -317,7 +330,7 @@ void Application::CullScene(int viewCount) {
 
     // Opaque surfaces front to back, so early depth rejects what is behind. Within a
     // component the order (planet, moons, shells, ring) stays as RenderPass has it.
-    const glm::vec3 eye = _camera.GetPosition();
+    const glm::vec3 eye = CameraRenderPosition();
     const auto distance = [&](size_t index) {
         return glm::distance(eye, _renderableSceneComponents[index].planet->GetPosition());
     };
@@ -345,8 +358,9 @@ void Application::BuildFrameSnapshot(int viewCount) {
     // The head: the mono camera, and the axes every eye shares.
     CameraView head;
     head.projection = _camera.GetProjectionMatrix();
-    head.view = _camera.GetViewMatrix();
-    head.headPosition = _camera.GetPosition();
+    head.headPosition = CameraRenderPosition();
+    head.view = _camera.GetViewMatrix(head.headPosition);
+    head.renderOrigin = OrbitLayout::GetRenderOrigin();
     head.front = _camera.GetFrontVector();
     head.right = _camera.GetRightVector();
     head.up = _camera.GetUpVector();
@@ -356,7 +370,8 @@ void Application::BuildFrameSnapshot(int viewCount) {
     head.zoomDeg = _camera.GetZoom();
     head.yawDeg = _camera.GetYaw();
     head.pitchDeg = _camera.GetPitch();
-    head.zCoef = static_cast<float>(2.0 / glm::log2(_camera.GetFar() + 1.0));
+    head.logDepthC = _logDepthC;
+    head.zCoef = static_cast<float>(2.0 / glm::log2(static_cast<double>(_logDepthC) * _camera.GetFar() + 1.0));
     head.viewport = glm::ivec4(0, 0, _displayWidth, _displayHeight);
 
     const int views = std::clamp(viewCount, 1, static_cast<int>(_frameViews.size()));
@@ -446,8 +461,26 @@ void Application::InitSceneObjects() {
 
     StartSearchNearestPlanet();
     StartPlayBackgroundMusic();
+    ApplyScaleEnvOverride();
     ApplyCameraPoseEnvOverride();
     ApplyObserveEnvOverride();
+}
+
+void Application::ApplyScaleEnvOverride() {
+    // Runs the same toggle as the web UI on the scene just built, before a pose override, so
+    // SOLARSYSTEM_CAMERA_POSE takes realistic world coordinates when this asks for them.
+    const char* spec = std::getenv("SOLARSYSTEM_SCALE");
+    if (!spec || !*spec) {
+        return;
+    }
+    const std::string mode(spec);
+    if (mode == "realistic" || mode == "1") {
+        ApplyOrbitScaleMode(1);
+    } else if (mode == "compressed" || mode == "0") {
+        ApplyOrbitScaleMode(0);
+    } else {
+        LOG_WARN("OrbitScale", "Unrecognized SOLARSYSTEM_SCALE=\"%s\"; use compressed or realistic", spec);
+    }
 }
 
 void Application::ApplyCameraPoseEnvOverride() {
@@ -472,8 +505,8 @@ void Application::ApplyCameraPoseEnvOverride() {
         OrbitLayout::SetJulianDate(values[5]);
         _simState.timePaused = true;
     }
-    _camera.SetPosition(glm::vec3(values[0], values[1], values[2]));
-    _camera.SetYawPitch(static_cast<float>(values[3]), static_cast<float>(values[4]));
+    SetCameraHeliocentricPose(glm::dvec3(values[0], values[1], values[2]), static_cast<float>(values[3]),
+                              static_cast<float>(values[4]));
 }
 
 void Application::FocusPlanetByIndex(int idx) {
@@ -482,19 +515,25 @@ void Application::FocusPlanetByIndex(int idx) {
     idx = std::clamp(idx, 0, OrbitLayout::kBodyCount - 1);
     _focusedPlanetIndex = idx;
 
-    glm::vec3 target(0.0f);
+    glm::dvec3 target(0.0);
     float focusRadius = 10.0f;
+    // The art distances below are compressed-scale numbers; realistic scales them with the
+    // body, so a focus frames it the same either way.
+    float sizeFactor = 1.0f;
+    std::shared_ptr<const SpaceObject> anchor;
 
     if (idx == 0) {
         if (_sun) {
-            target = _sun->GetPosition();
+            target = _sun->GetWorldPosition();
+            sizeFactor = _sun->SizeFactor();
+            anchor = _sun;
         }
         focusRadius = 40.0f;
     } else {
         // Match on the planet's own name rather than position in the vector: staged loading
         // pushes components in camera-approach order, so the Nth component is not body N.
         const auto body = static_cast<OrbitLayout::Body>(idx);
-        const Planet* found = nullptr;
+        std::shared_ptr<const Planet> found;
         for (const auto& component : _renderableSceneComponents) {
             if (!component.planet) {
                 continue;
@@ -502,29 +541,37 @@ void Application::FocusPlanetByIndex(int idx) {
             const std::wstring& wideName = component.planet->GetEngName();
             const std::string name(wideName.begin(), wideName.end());
             if (OrbitLayout::BodyFromName(name) == body) {
-                found = component.planet.get();
+                found = component.planet;
                 break;
             }
         }
 
         if (found) {
-            target = found->GetPosition();
-            focusRadius = std::max(found->GetRadius() * 4.0f, 2.0f);
+            target = found->GetWorldPosition();
+            sizeFactor = found->SizeFactor();
+            focusRadius = std::max(found->GetRadius() * 4.0f, 2.0f * sizeFactor) / sizeFactor;
+            anchor = found;
         } else {
             // Not loaded yet (web staged loading): fly to where the ephemeris says it is, and
             // start its download now rather than when the camera arrives.
-            target = OrbitLayout::GetRenderPosition(body);
+            target = OrbitLayout::GetHeliocentricScenePosition(body);
+            if (const BodyCatalog::Entry* entry = BodyCatalog::FindByIndex(idx)) {
+                sizeFactor = SceneScale::BodySizeFactor(*entry);
+            }
             focusRadius = 20.0f;
             ActivatePlanetSystem(body);
         }
     }
 
-    const glm::vec3 offset = glm::normalize(glm::vec3(0.7f, 0.3f, 0.7f)) * (focusRadius + 30.0f);
-    const glm::vec3 cameraPos = target + offset;
-    const glm::vec3 lookDir = glm::normalize(target - cameraPos);
+    const glm::vec3 direction = glm::normalize(glm::vec3(0.7f, 0.3f, 0.7f));
+    const glm::dvec3 cameraPos = target + glm::dvec3(direction) * static_cast<double>((focusRadius + 30.0f) * sizeFactor);
+    const glm::vec3 lookDir = -direction;
     const float yaw = glm::degrees(std::atan2(lookDir.z, lookDir.x));
     const float pitch = glm::degrees(std::asin(lookDir.y));
     _camera.StartTransitionTo(cameraPos, yaw, pitch, 2.0f);
+    // Ride along with the body during the flight and after it lands, even from outside the
+    // distance at which the camera would pick it up by itself.
+    SetCameraAnchor(anchor, true);
 
 #ifdef __EMSCRIPTEN__
     NotifyPlanetFocused(idx);
@@ -567,21 +614,21 @@ bool Application::SampleMissionScenePosition(int idx, glm::vec3& outScene) const
 }
 
 void Application::SetCameraHeliocentricPose(const glm::dvec3& position, float yaw, float pitch) {
-    if (OrbitLayout::GetScaleMode() == OrbitLayout::ScaleMode::Realistic) {
-        // Rebase onto the pose itself: the camera then stores an exact zero instead of a
-        // position tens of thousands of units out, rounded to that distance's float grid.
-        MoveRenderOrigin(position);
-    }
-    _camera.SetPosition(OrbitLayout::ToRenderFrame(position));
+    _camera.CancelTransition();
+    _camera.SetWorldPosition(position);
     _camera.SetYawPitch(yaw, pitch);
+    // A jump: whatever the camera rode along with is somewhere else now. ConstrainCamera
+    // picks the body it arrived next to on the next frame.
+    SetCameraAnchor(nullptr, false);
+    MoveRenderOrigin(position);
 }
 
 glm::dvec3 Application::GetCameraHeliocentricPosition() const {
-    return OrbitLayout::ToHeliocentricScene(_camera.GetPosition());
+    return _camera.GetWorldPosition();
 }
 
 void Application::UpdateRenderOrigin() {
-    MoveRenderOrigin(OrbitLayout::ChooseRenderOrigin(_camera.GetPosition()));
+    MoveRenderOrigin(_camera.GetWorldPosition());
 }
 
 void Application::MoveRenderOrigin(const glm::dvec3& origin) {
@@ -591,11 +638,9 @@ void Application::MoveRenderOrigin(const glm::dvec3& origin) {
     }
     OrbitLayout::SetRenderOrigin(origin);
 
-    // Bodies, overlays and uniforms are re-derived from the ephemeris every frame and need
-    // nothing here. What follows is everything that holds a render-frame position across
-    // frames, moved so it stays put in the heliocentric frame.
+    // Everything that holds a render-frame position across frames, moved so it stays put in
+    // the heliocentric frame. Uniforms, the belts and the probes are re-derived every frame.
     const glm::vec3 shift(origin - previous);
-    _camera.ShiftOrigin(shift);
 #ifdef __EMSCRIPTEN__
     // webxr.ts composed this frame's eye views from the camera before the shift.
     const glm::mat4 undoShift = glm::translate(glm::mat4(1.0f), shift);
@@ -606,14 +651,16 @@ void Application::MoveRenderOrigin(const glm::dvec3& origin) {
     if (XrPointerRenderer* pointers = _renderer.GetXrPointers()) {
         pointers->ShiftOrigin(shift);
     }
+    // Re-derive the bodies' translations now rather than in UpdateScene: staged loading and
+    // the LOD manager compare them with the camera before this frame's UpdateScene runs.
     if (_sun) {
-        _sun->TakeStarSystemCenter();
+        _sun->Rebase();
     }
-    // Re-place the bodies now rather than in UpdateScene: staged loading compares them with
-    // the (already shifted) camera before this frame's UpdateScene runs.
-    PlaceSceneComponents();
+    for (auto& component : _renderableSceneComponents) {
+        component.ForEachObject([](SpaceObject& object) { object.Rebase(); });
+    }
     RefreshPlanetProxyPositions();
-    _renderer.RebuildMissionPaths(_missionCatalog, _simState.qualityPreset);
+    _renderer.FollowMissionPathOrigin(_missionCatalog, _simState.qualityPreset);
 }
 
 void Application::FocusMissionByIndex(int idx) {
@@ -630,13 +677,13 @@ void Application::FocusMissionByIndex(int idx) {
     _missionFollowActive = true;
     NotifyMissionFocused(idx);
 
-    glm::vec3 target(0.0f);
-    if (!SampleMissionScenePosition(idx, target)) {
+    glm::dvec3 target(0.0);
+    if (!SampleMissionHeliocentricPosition(idx, target)) {
         return;
     }
-    const glm::vec3 offset = glm::normalize(glm::vec3(0.7f, 0.3f, 0.7f)) * 45.0f;
-    const glm::vec3 cameraPos = target + offset;
-    const glm::vec3 lookDir = glm::normalize(target - cameraPos);
+    const glm::vec3 direction = glm::normalize(glm::vec3(0.7f, 0.3f, 0.7f));
+    const glm::dvec3 cameraPos = target + glm::dvec3(direction) * 45.0;
+    const glm::vec3 lookDir = -direction;
     const float yaw = glm::degrees(std::atan2(lookDir.z, lookDir.x));
     const float pitch = glm::degrees(std::asin(glm::clamp(lookDir.y, -1.0f, 1.0f)));
     _camera.StartTransitionTo(cameraPos, yaw, pitch, 2.0f);
@@ -686,16 +733,15 @@ void Application::UpdateMissionFollow() {
     if (!_missionFollowActive || _focusedMissionIndex < 0 || _camera.IsTransitionActive()) {
         return;
     }
-    glm::vec3 target(0.0f);
-    if (!SampleMissionScenePosition(_focusedMissionIndex, target)) {
+    glm::dvec3 target(0.0);
+    if (!SampleMissionHeliocentricPosition(_focusedMissionIndex, target)) {
         return;
     }
-    const glm::vec3 offset = glm::normalize(glm::vec3(0.7f, 0.3f, 0.7f)) * 45.0f;
-    const glm::vec3 cameraPos = target + offset;
-    const glm::vec3 lookDir = glm::normalize(target - cameraPos);
+    const glm::vec3 direction = glm::normalize(glm::vec3(0.7f, 0.3f, 0.7f));
+    const glm::vec3 lookDir = -direction;
     const float yaw = glm::degrees(std::atan2(lookDir.z, lookDir.x));
     const float pitch = glm::degrees(std::asin(glm::clamp(lookDir.y, -1.0f, 1.0f)));
-    _camera.SetPosition(cameraPos);
+    _camera.SetWorldPosition(target + glm::dvec3(direction) * 45.0);
     _camera.SetYawPitch(yaw, pitch);
 }
 
@@ -801,7 +847,7 @@ void Application::UpdateSearchNearestPlanet() {
 }
 
 float Application::CalculateSpaceObjectDistance(const SpaceObject* spaceObject) const {
-    return glm::distance(_camera.GetPosition(), spaceObject->GetPosition());
+    return static_cast<float>(glm::distance(_camera.GetWorldPosition(), spaceObject->GetWorldPosition()));
 }
 
 glm::vec3 Application::CurrentFpsColor() const {

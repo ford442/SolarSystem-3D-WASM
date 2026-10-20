@@ -10,7 +10,6 @@ uniform mat4 view;
 uniform mat4 projection;
 uniform vec3 cameraPos;
 uniform float ribbonWidth;
-uniform float zCoef;
 
 out float vArcLength;
 out float vEdgeFade;
@@ -51,5 +50,5 @@ void main() {
     vEdgeFade = 1.0 - abs(aLineUV);
 
     gl_Position = projection * view * vec4(worldPos, 1.0);
-    gl_Position = ApplyLogDepth(gl_Position, zCoef);
+    gl_Position = ApplyLogDepth(gl_Position);
 }

@@ -8,6 +8,10 @@
 // Copyright (c) 2004 Sean O'Neil
 //
 
+// NEAR_SURFACE: the camera is in or near the shell, whose triangles then cross the eye
+// plane; depth is written per fragment (log_depth.glsl).
+// permutations: NEAR_SURFACE
+
 layout (location = 0) in vec3 aPos;
 
 out vec3 fWorldPosition;
@@ -17,6 +21,9 @@ out vec4 fragPosLightSpace;
 
 uniform mat4 model;
 uniform mat4 lightSpaceMatrix;
+#ifdef NEAR_SURFACE
+out float vLogDepth;
+#endif
 
 
 #include "common/frame.glsl"
@@ -30,5 +37,9 @@ void main() {
 
     gl_Position = frame.proj * frame.view * vec4(fWorldPosition, 1);
 
-    gl_Position = ApplyLogDepth(gl_Position, frame.zCoef);
+#ifdef NEAR_SURFACE
+    vLogDepth = PrepareLogFragDepth(gl_Position);
+#else
+    gl_Position = ApplyLogDepth(gl_Position);
+#endif
 }

@@ -32,6 +32,9 @@ set(SOLARSYSTEM_TEST_SOURCES
     ${CMAKE_SOURCE_DIR}/src/3rdparty/ktx2_reader.cpp
     ${CMAKE_SOURCE_DIR}/src/gfx/ShaderSource.cpp
     ${CMAKE_SOURCE_DIR}/src/core/Log.cpp
+    ${CMAKE_SOURCE_DIR}/src/core/Camera.cpp
+    ${CMAKE_SOURCE_DIR}/src/core/CameraNavigation.cpp
+    ${CMAKE_SOURCE_DIR}/src/gfx/SurfacePatch.cpp
     ${CMAKE_SOURCE_DIR}/src/Solar_System/CatalogMaterialVariants.cpp
     ${CMAKE_SOURCE_DIR}/src/Solar_System/AtmosphereModel.cpp
     ${CMAKE_SOURCE_DIR}/src/3rdparty/ktx2_writer.cpp
@@ -40,6 +43,9 @@ set(SOLARSYSTEM_TEST_SOURCES
 add_executable(SolarSystemTests
     test_orbit_layout.cpp
     test_render_origin.cpp
+    test_camera_navigation.cpp
+    test_mesh_anchor.cpp
+    test_surface_patch.cpp
     test_ephemeris.cpp
     test_quality_settings.cpp
     test_planet_manifest_loader.cpp

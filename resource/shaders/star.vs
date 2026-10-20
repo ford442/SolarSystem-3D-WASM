@@ -17,5 +17,5 @@ void main() {
     fNormal = normalize(mat3(model) * aPos); // a sphere about its centre
     gl_Position = frame.proj * frame.view * vec4(fWorldPosition, 1.0);
 
-    gl_Position = ApplyLogDepth(gl_Position, frame.zCoef);
+    gl_Position = ApplyLogDepth(gl_Position);
 }

@@ -19,5 +19,5 @@ void main() {
     vColor = aInstanceColor.rgb;
 
     gl_Position = frame.proj * frame.view * worldPos;
-    gl_Position = ApplyLogDepth(gl_Position, frame.zCoef);
+    gl_Position = ApplyLogDepth(gl_Position);
 }

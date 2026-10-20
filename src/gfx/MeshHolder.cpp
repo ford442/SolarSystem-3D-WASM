@@ -93,6 +93,22 @@ Mesh MeshHolder::ProcessMesh(aiMesh* mesh, const aiScene* scene) {
             indices.push_back(face.mIndices[j]);
     }
 
+    const auto base = static_cast<unsigned>(_triangles->positions.size());
+    for (const Vertex& vertex : vertices) {
+        _triangles->positions.push_back(vertex.position);
+        _triangles->vertices.push_back(vertex);
+    }
+    for (const GLuint index : indices) {
+        _triangles->indices.push_back(base + index);
+    }
+    for (size_t i = 0; i + 2 < indices.size(); i += 3) {
+        const glm::vec3& a = vertices[indices[i]].position;
+        const glm::vec3& b = vertices[indices[i + 1]].position;
+        const glm::vec3& c = vertices[indices[i + 2]].position;
+        _triangles->maxEdge =
+            std::max({_triangles->maxEdge, glm::distance(a, b), glm::distance(b, c), glm::distance(c, a)});
+    }
+
     aiMaterial* material = scene->mMaterials[mesh->mMaterialIndex];
     // 1. Диффузные карты
     std::vector<Texture> diffuseMaps = LoadMaterialTextures(material, aiTextureType_DIFFUSE, "texture_diffuse");

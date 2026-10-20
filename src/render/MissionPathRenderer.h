@@ -16,14 +16,16 @@ public:
     MissionPathRenderer& operator=(const MissionPathRenderer&) = delete;
 
     void Clear();
+    /** Positions relative to an upload origin; Draw's `pathOffset` is that origin in the render frame. */
     void Upload(const std::vector<glm::vec3>& scenePositions);
     bool Empty() const { return _path.Empty(); }
 
     void Draw(const glm::mat4& projection, const glm::mat4& view, const glm::vec3& cameraPos,
-              float zCoef, const glm::vec3& color, float opacity, bool focused) const;
+              const glm::vec3& pathOffset, const glm::vec3& color, float opacity, bool focused) const;
 
+    /** `probePos` in the render frame. */
     void DrawProbe(const glm::mat4& projection, const glm::mat4& view, const glm::vec3& cameraPos,
-                   const glm::vec3& cameraRight, const glm::vec3& cameraUp, float zCoef,
+                   const glm::vec3& cameraRight, const glm::vec3& cameraUp,
                    const glm::vec3& probePos, const glm::vec3& color) const;
 
 private:

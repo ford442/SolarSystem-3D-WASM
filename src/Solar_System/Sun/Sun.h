@@ -6,6 +6,8 @@ class Sun : public Star {
 public:
     explicit Sun(StarInfo&& starInfo);
     void TakeStarSystemCenter() override;
+    float SizeFactor() const override;
+    float GetSceneRadius() const override;
 };
 
 

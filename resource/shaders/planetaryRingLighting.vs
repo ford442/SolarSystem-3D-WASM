@@ -38,7 +38,7 @@ void main() {
     texCoords = aTexCoords;
     gl_Position = frame.proj * frame.view * model * vec4(aPos.x, 0.0, aPos.z, 1.0);
 
-    gl_Position = ApplyLogDepth(gl_Position, frame.zCoef);
+    gl_Position = ApplyLogDepth(gl_Position);
 
-    fLogZ = 1.0 + gl_Position.w;
+    fLogZ = LogDepthArgument(gl_Position.w);
 }

@@ -29,8 +29,7 @@ public:
     void Clear();
     bool AnyVisible() const { return _rays[0].visible || _rays[1].visible; }
 
-    void Draw(const glm::mat4& projection, const glm::mat4& view, const glm::vec3& cameraPos,
-              float zCoef) const;
+    void Draw(const glm::mat4& projection, const glm::mat4& view, const glm::vec3& cameraPos) const;
 
 private:
     Ray _rays[2];

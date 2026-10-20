@@ -1,4 +1,9 @@
 #version 300 es
+// NEAR_SURFACE (planetLighting.vs) writes depth per fragment.
+// permutations: NEAR_SURFACE
+#ifdef NEAR_SURFACE
+in float vLogDepth;
+#endif
 in vec3 vFragPos;
 in vec2 vTexCoords;
 in vec3 vTangentLightPos;
@@ -20,6 +25,7 @@ out vec4 fragColor;
 
 #define PCF_NUM_SAMPLES 2.0 // lower to increase fps, higher to increase softening
 #include "common/frame.glsl"
+#include "common/log_depth.glsl"
 #include "common/shadow_pcf.glsl"
 
 float CalculateShadow(vec4 fragPosLightSpace) {
@@ -39,6 +45,9 @@ float CalculateShadow(vec4 fragPosLightSpace) {
 }
 
 void main() {
+#ifdef NEAR_SURFACE
+    gl_FragDepth = LogFragDepth(vLogDepth); // first: every path that is not discarded writes it
+#endif
     vec3 diffuseColor = texture(mainDiffuseTexture, vTexCoords).rgb;
 
     vec3 normal = texture(cloudsNormalMap, vTexCoords).rgb;

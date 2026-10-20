@@ -47,7 +47,7 @@ void MissionPathRenderer::Upload(const std::vector<glm::vec3>& scenePositions) {
 }
 
 void MissionPathRenderer::Draw(const glm::mat4& projection, const glm::mat4& view, const glm::vec3& cameraPos,
-                              float zCoef, const glm::vec3& color, float opacity, bool focused) const {
+                              const glm::vec3& pathOffset, const glm::vec3& color, float opacity, bool focused) const {
     if (!_shader || _path.Empty()) {
         return;
     }
@@ -56,7 +56,7 @@ void MissionPathRenderer::Draw(const glm::mat4& projection, const glm::mat4& vie
     _shader->SetMat4("view", view);
     _shader->SetVec3("cameraPos", cameraPos);
     _shader->SetFloat("ribbonWidth", focused ? 2.8f : 1.6f);
-    _shader->SetFloat("zCoef", zCoef);
+    _shader->SetVec3("pathOffset", pathOffset);
     _shader->SetVec3("lineColor", color);
     _shader->SetFloat("uBaseOpacity", opacity);
     _shader->SetInt("uFocused", focused ? 1 : 0);
@@ -65,7 +65,7 @@ void MissionPathRenderer::Draw(const glm::mat4& projection, const glm::mat4& vie
 
 void MissionPathRenderer::DrawProbe(const glm::mat4& projection, const glm::mat4& view,
                                     const glm::vec3& cameraPos, const glm::vec3& cameraRight,
-                                    const glm::vec3& cameraUp, float zCoef, const glm::vec3& probePos,
+                                    const glm::vec3& cameraUp, const glm::vec3& probePos,
                                     const glm::vec3& color) const {
     if (!_shader) {
         return;
@@ -85,7 +85,7 @@ void MissionPathRenderer::DrawProbe(const glm::mat4& projection, const glm::mat4
     _shader->SetMat4("view", view);
     _shader->SetVec3("cameraPos", cameraPos);
     _shader->SetFloat("ribbonWidth", 0.15f);
-    _shader->SetFloat("zCoef", zCoef);
+    _shader->SetVec3("pathOffset", glm::vec3(0.0f)); // the quad is streamed in the render frame
     _shader->SetVec3("lineColor", color);
     _shader->SetFloat("uBaseOpacity", 0.95f);
     _shader->SetInt("uFocused", 1);

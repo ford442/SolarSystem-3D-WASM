@@ -115,13 +115,14 @@ public:
     bool GetMagneticFieldsEnabled() const;
     /**
      * Place the fly camera at a heliocentric scene position (deep links, tours, leaving
-     * Observe). On realistic scale the render origin moves onto the pose first, so a link to
-     * Neptune does not land on a float grid tens of thousands of units from the origin.
+     * Observe). It stops co-moving with whatever body it was riding along with.
      */
     void SetCameraHeliocentricPose(const glm::dvec3& position, float yaw, float pitch);
-    /** The camera's heliocentric scene position: render origin + camera, in double. */
+    /** The camera's heliocentric scene position (Camera::GetWorldPosition). */
     glm::dvec3 GetCameraHeliocentricPosition() const;
-    // The Camera's own position is in the render frame (see OrbitLayout's render origin).
+    /** The camera in the render frame: zero once MoveRenderOrigin has put the origin on it. */
+    glm::vec3 CameraRenderPosition() const;
+    // The Camera's own position is a world (heliocentric scene) position in double.
     Camera& GetCamera() { return _camera; }
     const Camera& GetCamera() const { return _camera; }
     SimState& GetSimState() { return _simState; }
@@ -129,7 +130,23 @@ public:
 
 private:
     SimState _simState;
-    Camera _camera{0.001f, 20000.f, 5.0f, 0.05f, glm::vec3(-134.0f, 0.0f, 0.0f)};
+    Camera _camera{0.001f, 20000.f, 5.0f, 0.05f, glm::dvec3(-134.0, 0.0, 0.0)};
+    // C of the log-depth curve this frame (CameraNavigation::ChooseClipPlanes).
+    float _logDepthC = 1.0f;
+
+    // Co-moving camera (CameraController.cpp): the body the camera rides along with while the
+    // orrery clock carries it round its orbit, and where that body was when last carried.
+    struct CameraAnchor {
+        std::shared_ptr<const SpaceObject> body;
+        glm::dvec3 lastWorld{0.0};
+        bool pinned = false; // a focus flight to this body: hold it until the flight lands
+    };
+    CameraAnchor _cameraAnchor;
+    // Where the camera sits relative to a body, in that body's radii (scale toggles keep it).
+    struct CameraBodyFrame {
+        std::shared_ptr<const SpaceObject> body;
+        glm::dvec3 offsetInRadii{0.0};
+    };
 
     float _lastX = 0.f;
     float _lastY = 0.f;
@@ -240,12 +257,13 @@ private:
     const char* ObserveEventVisibility() const; // "above" / "below" / "unknown" / "none" for the next sky event
     void UpdateObserveFrame();          // Observe: park the camera above Earth so loading/LOD follow it
     void ApplyObserveEnvOverride();     // SOLARSYSTEM_OBSERVE=lat,lon[,jd[,az,el,fov]] for headless captures
+    void ApplyScaleEnvOverride();       // SOLARSYSTEM_SCALE=compressed|realistic: the web's scale toggle, natively
     void ApplyCameraPoseEnvOverride();  // SOLARSYSTEM_CAMERA_POSE=x,y,z,yaw,pitch[,jd]: web setCameraPose, natively
     void StopMissionFollow();
     bool SampleMissionHeliocentricPosition(int idx, glm::dvec3& outScene) const;
     /** SampleMissionHeliocentricPosition in the render frame. */
     bool SampleMissionScenePosition(int idx, glm::vec3& outScene) const;
-    /** Once per frame, after input: rebase the render origin if the camera strayed from it. */
+    /** Once per frame, after everything that moves the camera: put the render origin on it. */
     void UpdateRenderOrigin();
     /** Move the render origin and carry every render-frame position cached across frames. */
     void MoveRenderOrigin(const glm::dvec3& origin);
@@ -264,6 +282,21 @@ private:
     void UpdateScene(double julianDate);
     /** Re-derive every body's render-frame placement from the ephemeris (no drawing). */
     void PlaceSceneComponents();
+    /** The Sun and every component, placed for the current date (PlaceSceneComponents + Sun). */
+    void PlaceBodies();
+
+    // --- Camera navigation (CameraController.cpp; math in core/CameraNavigation.h) --------
+    /** Every body the camera can fly near or collide with: the Sun, planets and moons. */
+    std::vector<std::shared_ptr<const SpaceObject>> NavigationBodies() const;
+    /** Before input: move the camera with its anchor body; set the fly speed for its altitude. */
+    void CarryCameraWithAnchor();
+    /** After input: keep the camera above the surface, pick its anchor, set the clip planes. */
+    void ConstrainCamera();
+    void SetCameraAnchor(std::shared_ptr<const SpaceObject> body, bool pinned);
+    /** The nearest body in its own radii, and the camera's offset from it in those radii. */
+    CameraBodyFrame CaptureCameraBodyFrame() const;
+    /** Put the camera back at `frame`'s offset from its body (after a scale change resized it). */
+    void RestoreCameraBodyFrame(const CameraBodyFrame& frame);
     /** Simulate once, then draw the scene into `viewCount` views (1 mono, 2 XR) — see FramePasses.h. */
     void RenderFrame(int viewCount);
     /** Debug: the previous frame's FramePasses::Stats and glUniform* count (SOLARSYSTEM_FRAME_STATS=N). */
