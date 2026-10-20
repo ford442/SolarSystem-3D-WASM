@@ -43,13 +43,11 @@ public:
     void Update(double julianDate);
 
     /**
-     * Draw belt (one instanced call) then comet nuclei + tails.
+     * Draw belt (one instanced call) then comet nuclei + tails, inside a view bound by
+     * Renderer::BeginView: matrices, eye, Sun and zCoef come from FrameUBO.
      * No self-shadowing — depth writes enabled for rock meshes only.
      */
-    void Render(const glm::mat4& projection, const glm::mat4& view,
-                const glm::vec3& sunPos, const glm::vec3& viewPos,
-                const glm::vec3& cameraRight, const glm::vec3& cameraUp,
-                float zCoef) const;
+    void Render(const glm::vec3& cameraRight) const;
 
     const std::vector<OrbitalElements>& GetAsteroids() const { return _asteroids; }
     const std::vector<OrbitalElements>& GetComets() const { return _comets; }

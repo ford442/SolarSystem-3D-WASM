@@ -264,17 +264,10 @@ void Renderer::RenderAsteroidField(const FrameContext& ctx) const {
         return;
     }
 
-    // Advanced once per frame by Application::UpdateScene; this pass only draws.
-    const float zCoef = ctx.view.zCoef;
-    ctx.scene.asteroidField->Render(ctx.view.projection, ctx.view.view,
-                           ctx.scene.sun->GetPosition(), ctx.view.headPosition,
-                           ctx.view.right, ctx.view.up,
-                           zCoef);
-
+    // Advanced once per frame by Application::UpdateScene; this pass only draws, with the
+    // view's FrameUBO (BeginView) supplying matrices, eye, Sun and zCoef.
+    ctx.scene.asteroidField->Render(ctx.view.right);
     if (ctx.scene.kuiperField) {
-        ctx.scene.kuiperField->Render(ctx.view.projection, ctx.view.view,
-                                  ctx.scene.sun->GetPosition(), ctx.view.headPosition,
-                                  ctx.view.right, ctx.view.up,
-                                  zCoef);
+        ctx.scene.kuiperField->Render(ctx.view.right);
     }
 }

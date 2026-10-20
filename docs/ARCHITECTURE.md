@@ -654,7 +654,10 @@ Moon 9), so the shadow map is bound once per view, not per program.
 log-depth `zCoef`, time and exposure are one std140 block, `FrameUBO`
 (`common/frame.glsl`, read as `frame.view` etc.; C++ layout `gfx/FrameUniforms.h`).
 `Renderer::BeginView` uploads it once per view (per eye in XR) to binding 0; `Shader` binds
-the block of every program that declares it at link.
+the block of every program that declares it at link. Every lit program reads it (planets,
+moons, clouds, rings, atmospheres, the Sun, the asteroid belt and comet tails); the
+screen-space and overlay programs (HUD text, lens flare, skybox, orbit/mission/field-line
+ribbons) still take their own matrices.
 
 Special cases that stay outside the catalog material path:
 - `Sun`: star, corona, and glow programs.

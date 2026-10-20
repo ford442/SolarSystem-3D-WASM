@@ -259,10 +259,7 @@ void AsteroidField::Update(double julianDate) {
     UploadInstances();
 }
 
-void AsteroidField::Render(const glm::mat4& projection, const glm::mat4& view,
-                           const glm::vec3& sunPos, const glm::vec3& viewPos,
-                           const glm::vec3& cameraRight, const glm::vec3& /*cameraUp*/,
-                           float zCoef) const {
+void AsteroidField::Render(const glm::vec3& cameraRight) const {
     if (!_asteroidShader || !_rockVao) {
         return;
     }
@@ -277,11 +274,6 @@ void AsteroidField::Render(const glm::mat4& projection, const glm::mat4& view,
     glCullFace(GL_BACK);
 
     _asteroidShader->Use();
-    _asteroidShader->SetMat4("projection", projection);
-    _asteroidShader->SetMat4("view", view);
-    _asteroidShader->SetVec3("lightPos", sunPos);
-    _asteroidShader->SetVec3("viewPos", viewPos);
-    _asteroidShader->SetFloat("zCoef", zCoef);
     _asteroidShader->SetFloat("ambientFactor", 0.12f);
 
     if (_activeCount > 0) {
@@ -321,11 +313,7 @@ void AsteroidField::Render(const glm::mat4& projection, const glm::mat4& view,
         glDisable(GL_CULL_FACE);
 
         _cometTailShader->Use();
-        _cometTailShader->SetMat4("projection", projection);
-        _cometTailShader->SetMat4("view", view);
-        _cometTailShader->SetVec3("lightPos", sunPos);
         _cometTailShader->SetVec3("cameraRight", cameraRight);
-        _cometTailShader->SetFloat("zCoef", zCoef);
 
         glBindVertexArray(_tailVao.get());
         for (const auto& comet : _comets) {
