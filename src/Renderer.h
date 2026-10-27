@@ -59,6 +59,8 @@ public:
         bool hints = true;
         bool planetStarDistances = true;
         bool satelliteDistances = true;
+        /** Web staged loading: "Jupiter (approach to load)" at systems not loaded yet. */
+        bool stagingLabels = true;
     };
 
     /**
@@ -119,6 +121,7 @@ public:
 
     StarTuning& GetStarTuning() { return _starTuning; }
     OverlayToggles& GetOverlayToggles() { return _overlayToggles; }
+    const OverlayToggles& GetOverlayToggles() const { return _overlayToggles; }
     /** Null before Init() and after Release(). */
     XrPointerRenderer* GetXrPointers() { return _xrPointerRenderer.get(); }
     /** Brightest catalog stars Observe draws right now (0 without its shaders). */

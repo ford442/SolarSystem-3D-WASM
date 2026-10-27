@@ -38,6 +38,24 @@ struct QualityTierSettings {
     const char* name;
 };
 
+/**
+ * Samples to ask the GL context for. A tier that renders through the HDR target gets none:
+ * the colour pass draws into HDR's single-sampled texture, so default-framebuffer MSAA would
+ * only resolve an image that is already resolved. Those tiers antialias in the tone-map
+ * pass instead (hdr.fs). Native applies this with GLFW_SAMPLES; web mirrors it in
+ * web/src/webglContext.ts, which owns the context attributes.
+ */
+int ContextMsaaSamples(const QualityTierSettings& settings);
+
+/** What actually antialiases the final image. */
+enum class AntialiasPath : uint8_t {
+    None,
+    ContextMsaa, // multisampled default framebuffer, drawn into directly (HDR off)
+    HdrResolve,  // FXAA inside the tone-map pass
+};
+AntialiasPath ResolveAntialiasPath(bool hdrEnabled, int contextSamples);
+const char* AntialiasPathName(AntialiasPath path);
+
 std::string GetTexturePath(const std::string& lowRes, const std::string& highRes);
 QualityTierSettings GetQualitySettings(int preset, bool mobile);
 /**
@@ -50,13 +68,14 @@ struct TextureLodPolicy {
 };
 TextureLodPolicy GetTextureLodPolicy(int preset, bool mobile);
 const char* TextureLodTierName(TextureLodTier tier);
-void LogQualityTier(const QualityTierSettings& settings, bool hdrEnabled, int shadowQuality);
+/** `contextSamples` is what GL_SAMPLES reported, not what the tier asked for. */
+void LogQualityTier(const QualityTierSettings& settings, bool hdrEnabled, int shadowQuality, int contextSamples);
 
 /**
  * Quality tier to build the GL context from, before any UI exists. Web reads
  * window.__solarSystemInit (set from the ?quality= query parameter); native reads the
  * SOLARSYSTEM_QUALITY environment variable ("low"/"medium"/"full" or 0/1/2). Defaults to
- * 2 ("full"). This is the only point where MSAA can still be chosen — see LogQualityTier.
+ * 2 ("full"). This is the only point where context MSAA can still be chosen — see ContextMsaaSamples.
  */
 int ReadInitialQualityPreset();
 

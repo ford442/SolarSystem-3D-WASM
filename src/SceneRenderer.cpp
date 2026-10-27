@@ -114,7 +114,7 @@ void Renderer::Init(const SimState& sim, FT_Library ft, glm::ivec2 display) {
     // HDR turns itself off when the GPU cannot give it a complete float FBO; follow it,
     // otherwise the composite path would keep sampling an empty buffer.
     _hdrEnabled = _hdr->IsEnabled();
-    LogQualityTier(qualitySettings, _hdrEnabled, sim.shadowQuality);
+    LogQualityTier(qualitySettings, _hdrEnabled, sim.shadowQuality, sim.contextSamples);
 
     _mainTextShader = &_shaders.Get(textSpec);
     _textRenderer = make_unique<TextRenderer>(ft, "resource/fonts/Arial.ttf");
@@ -273,7 +273,7 @@ void Renderer::BeginView(const FrameContext& ctx) {
         data.zCoef = ctx.view.zCoef;
         data.logDepthC = ctx.view.logDepthC;
         data.nearPlane = ctx.view.nearPlane;
-        data.time = static_cast<float>(glfwGetTime());
+        data.time = static_cast<float>(ctx.sim.animationSeconds);
         data.exposure = _starTuning.exposure;
         _frameUniforms.Upload(viewIndex, data);
         _uploadedViews |= 1u << viewIndex;
@@ -787,7 +787,7 @@ void Renderer::RenderStarEffects(const FrameContext& ctx) const {
 
 void Renderer::RenderPlanetProxyMarkers(const FrameContext& ctx) const {
     // Web staged loading: a label at the orbital position of every system not READY yet.
-    if (!ctx.scene.stagedSystems || ctx.scene.stagedSystems->empty()) return;
+    if (!_overlayToggles.stagingLabels || !ctx.scene.stagedSystems || ctx.scene.stagedSystems->empty()) return;
 
     glDisable(GL_DEPTH_TEST);
     glEnable(GL_BLEND);

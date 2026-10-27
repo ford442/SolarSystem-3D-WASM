@@ -69,6 +69,7 @@ add_executable(SolarSystemTests
     test_giant_atmospheres.cpp
     test_frame_passes.cpp
     test_frustum.cpp
+    test_shadow_fit.cpp
     test_log.cpp
     stub_texture_image2d.cpp
     ${SOLARSYSTEM_TEST_SOURCES}

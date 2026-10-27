@@ -360,6 +360,27 @@ window.__solarSystemAssetBase = runtimeAssetBase;  // consumed by WebResourceFet
 {VITE_ASSET_BASE or page base URL} + resource/...
 ```
 
+### 6.1.1 Fetched assets are cached in the page
+
+`WebResourceFetcher` normally downloads with `emscripten_async_wget2`. When
+`window['__solarSystemFetchAsset']` exists (`web/src/assetCache.ts`, installed by `bootstrap.ts`
+before `Module()` runs), `StartTransfer` calls it instead and only writes the returned bytes into
+MEMFS. The hook resolves a cached body or fetches it and stores it in the **Cache API**:
+
+- Cache name `solarsystem-assets:<asset base URL>`: a deploy that moves to a new base starts
+  clean, and caches of other bases are deleted. A deploy that replaces files *in place* at the
+  same base must change the base (a versioned path, as in the S3 layout above) or the old bytes
+  are served.
+- Hit: no network request. Miss: fetch, and store only a complete `200` body — not an HTTP error,
+  a `206`, a body shorter than its `Content-Length`, or a `text/html` body (Vite's SPA fallback
+  answers a missing file with `index.html` and a 200).
+- Core preloads in `SolarSystem.data` never come through here; neither does anything prefetch.
+  What gets requested is still decided by the texture LOD tier, so a Low preset never pulls high tiers.
+- Off in `npm run dev` (edited textures would be pinned); `?assetcache=1` / `?assetcache=0`
+  overrides either way. Without the Cache API (insecure origin) it fetches uncached.
+
+It is not a service worker and not an offline shell. Quadtree terrain tiles will use the same storage.
+
 ### 6.1 Dev, preview, and production (single rule)
 
 | Mode | Command | Default asset origin | Notes |
@@ -381,7 +402,8 @@ The value is the directory **containing** `resource/`, with a trailing slash. It
 
 | Asset class | WASM `.data` preload | Runtime fetch |
 |-------------|---------------------|---------------|
-| Shaders, fonts, icons | Yes | — |
+| Shaders, fonts, missions, sky | Yes | — |
+| `resource/icons/` (14 MB, native window icon only) | **No** | — |
 | Atmosphere LUTs (`resource/atmosphere/`, ~560 KB RGBA16F KTX2) | Yes | — |
 | Low-res placeholders | Partial (via build copy to `web/public/`) | Core + staged + LOD |
 | High-res textures | No | LOD queue + skybox core load |
@@ -500,10 +522,29 @@ One frame (`Application::RenderFrame` → `FramePasses::Run`):
 4. **Draw**: background per view; then per component, its shadow pass followed by each
    view's colour pass (one shadow FBO); then the foreground per view.
 
-**Shadow frustum.** Each component's light frustum is an ortho box of ±3 planet radii
-looking from the Sun at the planet, with its depth range fitted to the component's own
-bodies (`FitDepthRange`): the only casters drawn into that map and the only receivers that
-read it. `shadowDepthRange` (near, far − near) goes to the shaders that turn a stored depth
+**Shadow frustum.** Each component's light frustum is an ortho box looking from the Sun at
+the planet, with its depth range fitted to the component's own bodies (`FitDepthRange`): the
+only casters drawn into that map and the only receivers that read it. The sideways extent is
+±3 planet radii from orbit, which holds a full-disk view's terminator and the rings and moons
+that receive the planet's shadow. One map has one texel size, so on realistic scale near the
+ground that box is a texel of kilometres. Inside 3 radii of the planet's centre (released
+past 4, so the resolution does not pump on the boundary) with shadows on and no XR session,
+`Application::FitShadowBox` fits the box to the **visible cap** instead (`gfx/ShadowFit.h`,
+GL-free, double): the part of the planet's sphere the camera's frustum sees. Camera rays
+along the frustum's rim and across a grid give the visible surface; each line of rays that
+turns from hitting to missing is bisected to the grazing ray, which is the horizon; the
+horizon circle is included where it lies inside the view; the point under the camera is
+always in; a ring or moon whose bounding sphere is in the frustum (and inside the old box)
+is added. The square around that, plus 10 %, is rounded up to a quarter octave with its
+centre snapped to a 1/1024 grid of the box, so it does not swim as the camera turns, and is
+never tighter than 1e-4 radii (0.64 km half-extent on Earth, a 0.3 m texel at 4096). It is
+only used when it is smaller than the ±3-radii box. The light still looks from the Sun at the
+planet; the box is off-centre in that view (`glm::ortho` with asymmetric bounds), and the
+depth fit, `shadowDepthRange` and the bias-over-range path are unchanged. The cap is the
+analytic sphere, not terrain, and a camera floored on the facets just under it (they sag
+kilometres on realistic Earth) is given a ground a hair under its own radius. There is one
+map and one pass: no cascades. `[ShadowFit]` at debug level logs the half-extent in scene
+units whenever it changes. `shadowDepthRange` (near, far − near) goes to the shaders that turn a stored depth
 back into a distance (the ring tests), and each pass's `bias` is a fixed scene-unit bias
 divided by that range, which keeps the comparisons the shaders always made. (The frustum
 used to borrow the camera's 0.001–20000, which also clipped every body more than 20000
@@ -540,6 +581,10 @@ test's error filter. Use `LOG_*` rather than `std::cout`/`std::cerr`. The parser
 | `index.html` | Canvas, loading overlay, settings panel, streaming progress bar, tour caption, XR HUD |
 | `src/main.ts` | Module init, `updateLoadingProgress`, `updateStreamingProgress`, `setCameraPose`, settings persistence |
 | `src/tourPlayer.ts` | Guided-tour playlist over `SolarSystemRuntime` |
+| `src/timeline.ts` | Cinematic timeline schema, parser and evaluator (pure; §11.2) |
+| `src/timelinePlayer.ts` | Plays a timeline through the engine; shipped timeline list, `?timeline=` URL rule |
+| `src/timelineEditor.ts` | Timeline dock: play/scrub, keys at the current pose, import/export, record |
+| `src/capture.ts` | Deterministic video capture (WebCodecs + mp4-muxer; MediaRecorder fallback) |
 | `src/educationalLayer.ts` | Mission list + tour controls |
 | `src/observe.ts` | Explore/Observe switch, site + UTC time + rate controls, 2017 eclipse preset, telescope eyepieces + overlay, `ObserveState` parsing |
 | `vite.config.ts` | Base path `/solar-system/` |
@@ -816,6 +861,34 @@ std::string GetTexturePath(const std::string& lowRes, const std::string& highRes
 | Frame counters | `[FrameStats]` at debug level (§7.5) | same |
 | Uncompressed DDS upload | Sized internal format (`GL_R8`/`GL_RGB8`/`GL_RGBA8`); core profile rejects the legacy component count | `GL_R8`/`GL_RGBA8` (RGB expanded to RGBA for mipmapping) |
 
+### 9.6 Antialiasing and the context attributes
+
+Context attributes are fixed for the life of the page and chosen once from the initial quality
+tier: native with `GLFW_SAMPLES` (`PlatformWindow.cpp`), web in `web/src/webglContext.ts`
+(`Module.contextAttributes` and GLFW hints are ignored by the Emscripten port; the context is
+created in TypeScript and handed in as `preinitializedWebGLContext`). Everything else about them
+(`alpha: false`, `stencil: false`, `preserveDrawingBuffer: false` because capture reads the canvas
+in the same turn as `StepCaptureFrame`, `xrCompatible: true`, `powerPreference`) stays there too.
+
+With HDR on, the colour pass draws into `gfx/HDR`'s single-sampled texture and `hdr.fs` writes the
+default framebuffer. Default-framebuffer MSAA would resolve an image that was already resolved, so
+**a tier with HDR asks the context for no samples** (`ContextMsaaSamples()`), and the tone-map pass
+antialiases instead: `hdr.fs` runs FXAA on the *tone-mapped* value (so an HDR sun many times
+brighter than its neighbours does not decide every edge test), with the HDR texture clamped to
+edge. Only a tier without HDR (low) may keep a multisampled context. Startup logs
+`[Quality] Context samples: requested N, GL_SAMPLES=M` and the `Active tier` line prints
+`AA=<path>` from `ResolveAntialiasPath(hdrEnabled, GL_SAMPLES)`. If `HDR::InitFBO` refuses (no
+float render targets) the path becomes `none`: the context was created without samples.
+
+### 9.7 Web link flags
+
+Release: `-O3 -flto --closure 1 --emit-symbol-map` (minified stacks map back through
+`SolarSystem.js.symbols`); Debug: `-O0 -g -gsource-map`. Both: `-msimd128`, `-sENVIRONMENT=web`,
+`-sSTACK_SIZE=1MB`, `-fwasm-exceptions`. `GROWABLE_ARRAYBUFFERS=0` (Chrome's WebGL/DOM APIs reject
+views over a resizable `ArrayBuffer`) and no pthread / `SHARED_MEMORY` flags. `--preload-file`
+directories and `scripts/wasm-exports.json` are `LINK_DEPENDS` in `CMakeLists.txt`.
+`SDL2`/`SDL2_image` are native-only.
+
 ## 10. Adding a new planet
 
 **Catalog-only bodies first:** if the world needs nothing but a diffuse/normal (optional
@@ -893,10 +966,36 @@ terms** (the Moon has them: see above). Frames: Triton's is genuinely ecliptic; 
 fits of Horizons ecliptic osculating elements, so their inclinations carry the parent's
 obliquity (2.2° for Jupiter, 27.7° for Saturn) rather than being Laplace-plane values.
 
-**Earth's rotation** is GMST at the epoch, not an accumulator, so a given UTC always gives the
-same terminator and scrubbing backwards is exact. The texture's prime meridian is aligned by an
-art constant that has not been calibrated against a reference image — the rate and the epoch
-behaviour are the honest parts.
+**Spins are functions of the date** (`OrbitLayout::AxialSpinDegreesAt(body, jd)`, double, wrapped to
+[0, 360)); there is no per-frame accumulator, so a reload, a shared `?date=` link, a timeline that
+starts at a keyframe, or a scrub away and back reproduces every body's spin exactly.
+
+- **Every primary but Earth** turns from the IAU WGCCRE 2015 prime-meridian angle,
+  W = W0 + Wdot · (days since J2000) (Archinal et al. 2018), generated from the catalog's
+  `orbit.primeMeridianDegJ2000` and `orbit.primeMeridianRateDegPerDay` into
+  `OrbitLayoutBodies.generated.inc`. Venus and Uranus have a negative Wdot and need no special
+  case. Eris, Haumea, Makemake and Halley have no IAU frame: W0 = 0 and the rate follows
+  `siderealRotationDays`. The generator checks each rate against the sidereal day (1.5 %, which
+  is what Neptune's fact-sheet day and the 2015 rate differ by). Poles and textures are art, not
+  IAU frames, so W0 fixes a reproducible epoch; it does not put a named feature at a real
+  longitude. Moons use `SatelliteOrbit::SpinDegreesAt`.
+- **Earth** is solved so the drawn map has the real sub-solar *longitude*. It cannot be GMST plus
+  a constant: scene axes are (ecliptic x, z, y), a reflection, and the drawn pole is art
+  (`Rz(axialTiltDegrees)`), so about the drawn pole the Sun circles the year the wrong way
+  round, and a texture turned at the GMST rate with any fixed offset is right at one instant and
+  then off by ~2° a day (a full turn over a year). So each date the Sun's true Earth-fixed
+  longitude (`Observer`: GMST, precession, J2000 ecliptic) is turned toward the scene's Sun through
+  `CatalogBody`'s tilt chain and the Blender `sphere.obj` UVs (map longitude = −atan2(z, x) in
+  model space, u = 0.5 on +X; checked against the upstream mesh). The named constant is
+  `kEarthTextureCentreLonDeg` = 0, the Greenwich-centred Blue Marble / Solar System Scope map
+  convention; the catalog's Earth W0/Wdot are the IAU values and only validate the sidereal day.
+  `test_orbit_layout.cpp` checks the drawn sub-solar longitude against `Observer` on 16 dates
+  across 2024 in both scale modes (residual < 0.01°) and against USNO equation-of-time anchors at
+  the 2024 equinox and solstice (measured 0.005° and 0.10°, locked at 0.25°). Changing the constant without recentring the texture
+  fails there. The **latitude is not calibrated**: the art pole leans along scene X, not toward
+  the mirrored true pole, so the drawn seasons are off by up to ~33° of latitude; fixing that
+  means moving Earth's pole (and its clouds/atmosphere frame), not the spin. The solved spin
+  turns at the sidereal rate less the Sun's own ~1°/day twice over (~359.0°/day).
 
 **Time scale.** Julian dates are treated as UTC (≈ UT1) throughout, which is exactly right for
 Earth rotation (GMST) and good enough for the planets: UTC↔TT (~69 s) and UT1↔UTC (< 0.9 s) are
@@ -1002,8 +1101,21 @@ it) can see the same holes in that shell for the moment it takes.
 - *Co-moving anchor:* the camera carries the motion of the body it is near (engage within
   64 radii, release past 80, hand over to a body twice as close), so a planet does not run
   off at 30 km/s and a date jump keeps it in view. A focus flight pins its target; mission
-  follow and Observe pose the camera themselves and suspend the anchor. It carries
-  translation, not spin: with time running, the ground slides under a hovering camera.
+  follow and Observe pose the camera themselves and suspend the anchor, and so does a
+  timeline (`setCameraPose` clears it every frame).
+- *Co-rotation, only while hovering:* inside `kHoverRadii` (0.05 radii of altitude, the same
+  distance the floor starts ray-casting facets; released past 0.06) the anchor also carries
+  the body's spin, so the camera stays over the same ground point at the same altitude with
+  time running. Outside it the anchor is translation-only and a fly-around sees the body
+  turn. The camera keeps its offset in the body's *drawn* frame: `CameraNavigation::CarryEye`
+  puts the eye at `after.center + after.shape · (before.shape⁻¹ · (eye − before.center))`
+  from the model matrix's 3×3, in double, so it needs no spin law (planets, moons and the
+  Sun alike), follows the axis the mesh is really drawn about, never drifts from the
+  surface that is drawn whatever the float matrix's rounding does, and `Camera::Reorient`
+  turns the view by the same rotation. The render origin rebases afterwards as always; no
+  rotation is stored in a render-frame offset. A focus flight (`IsTransitionActive`), Observe,
+  mission follow and a timeline's `setCameraPose` are authored motion and suspend co-rotation
+  with the anchor: the engine never adds a second rotation to a timeline's.
 - *Speed:* on realistic scale movement is scaled by the altitude above the nearest surface,
   altitude per second at the default speed, from 1 mm/s to 1 AU/s. Compressed keeps its
   constant speed.
@@ -1018,8 +1130,10 @@ doubles, and deep links keep 1e-9-unit coordinates on realistic scale (8 cm).
 Native `SOLARSYSTEM_SCALE=compressed|realistic` runs the toggle at start-up, before
 `SOLARSYSTEM_CAMERA_POSE`, so a pose can be given in realistic coordinates.
 
-**Known limits.** No co-rotation (above). Shadow maps keep their ±3-radii light frustum, so
-near the ground on realistic scale a shadow texel is kilometres wide.
+**Known limits.** The shadow fit (§7.5) is against the analytic sphere until a DEM exists, one
+map with no cascades: a view that takes in the horizon from a kilometre up still spans ~100
+km. Co-rotation holds the camera to the drawn float model matrix, whose own spin rounds to
+~3e-5° (a few metres at Earth's radius) per step.
 
 **Tests.** `test_render_origin.cpp`: a flyby 90 AU out stays on its exact track to 0.01 px
 with the origin on the camera, while the float-only control is over 10 px off; compressed
@@ -1027,7 +1141,107 @@ positions match the float computation they replaced. `test_camera_navigation.cpp
 the floor from above and beneath a facet, clip planes, speed, anchor hysteresis, the camera
 moving in double. `test_mesh_anchor.cpp`: millimetre placement and both depth curves.
 `test_surface_patch.cpp`: the pieces tile their facet in place to the millimetre and meet
-the size rule.
+the size rule. Co-rotation (`test_camera_navigation.cpp`): at 1 km a sidereal day, a quarter
+day or ten years leave the camera's offset in the drawn Earth frame unchanged to 1e-10, at 2
+radii the carry is translation only, the engage/release hysteresis, `RotationBetween` under
+a scale change, `Camera::Reorient`. Shadow fit (`test_shadow_fit.cpp`): the cap is metres to
+tens of kilometres where ±3 radii is thousands, reaches the horizon, holds every visible
+surface point across pitches and altitudes, stays put under a metre of drift, and still fits a
+camera floored below the analytic sphere.
+
+### 11.2 Cinematic timelines and capture
+
+A timeline (`web/public/timelines/*.json`, issue #151 phase 3) is a keyframed camera and
+date track that the web front end evaluates and the engine only draws. `web/src/timeline.ts`
+is pure (parsing, splines, the date track; unit-tested in `timeline.test.ts`),
+`timelinePlayer.ts` drives the engine with it, `timelineEditor.ts` is the dock (play, scrub,
+add a key at the current pose, import/export JSON, copy a link, record), and `capture.ts`
+writes the video. `?timeline=<id or http(s) URL>` deep-links one (`&tt=` starts it part
+way). Shipped: Voyager 2's Grand Tour (compressed scale, along the mission path), the
+2024-04-08 eclipse seen from the Moon, and a seamless descent to 1 m above Earth (both
+realistic). The "descent to Olympus Mons" in the issue waits for terrain (phase 2).
+
+**Schema.** `{id, title, description?, durationSec, view?, keyframes[]}`. `view` is a
+tour step's view (`tourPlayer.ts`: scale, overlays, quality…) applied once when the
+timeline takes the camera, without its camera, planet or mission. A keyframe is
+`{t, jd?, dateEase?, focus?, camera, path?, tension?, continuity?, bias?, fov?, timeScale?,
+overlays?, caption?}`:
+- *Where:* `focus` is a catalog body id or `mission:<id>` (a probe on its path), and
+  `camera.position` an offset from it in `units`: `scene`, `radii` (drawn radius, so a shot
+  holds on both scales) or `km` (true km scaled body-relatively). `camera.altitudeKm`
+  instead puts the camera that far above the drawn surface along `position`'s direction.
+  `camera.frame: <body>` turns the offset into a frame with +Z toward that body from the
+  focus and +Y toward ecliptic north (right-handed), so "sunward of Jupiter" stays sunward
+  as the date moves. Each key is resolved at the date being drawn, so a key on a moving body
+  moves with it.
+- *Path:* Kochanek–Bartels (Catmull-Rom at tension = continuity = bias = 0) through the
+  resolved points, with tangents scaled for uneven key spacing so the speed is continuous.
+  `path: "polar"` between two keys on the same focus splines the direction instead, and
+  log(height above the surface) with a monotone cubic: a descent from 1.5 million km to a
+  metre is exponential and never dips below its lowest key.
+- *Look:* a fixed quaternion `rotation` ([x, y, z, w]; −Z forward, +Y up; consecutive
+  quaternion keys use squad), or `lookAt` (body id or offset point) with `up`
+  `ecliptic` | `radial`, or `horizon {azimuthDeg, elevationDeg}` (azimuth 0 = the Sun's
+  bearing, clockwise from above), else the focus centre. Look-at and horizon keys are
+  re-aimed from wherever the camera is on the spline and slerped with smoothstep. Radial up
+  turns from the radial direction to the normal of the drawn facet below between 0.02 and
+  0.002 radii (`GetSurfaceJson` returns both radius and normal, `CameraNavigation::FacetAlong`):
+  near the ground the horizon is that flat facet, a few degrees off radial.
+- *Date:* `jd` anchors a key; a key without one follows from the previous key at
+  `timeScale` (orrery rate, 365.25/120 days per second at 1×) or, without a rate in force,
+  is interpolated between its dated neighbours. A monotone cubic runs through the dates;
+  `dateEase` (`smooth`, `linear`, `ease-in`, `ease-out`, `ease-in-out`, `step`) shapes the
+  segment that starts at the key. FOV is a monotone cubic (default 45°, clamped 1–45° by the
+  engine); `overlays {orbitLines, magneticFields, hud}` and `caption` are steps carried
+  forward.
+
+**Playback.** While a timeline holds the camera the orrery clock is paused, Observe and
+mission follow are off, and each frame does `AdvanceSimulationTo(jd)` (no UI notification),
+`GetSceneStateJson` (every body's position and drawn radius, and each probe's position, in
+%.17g after `PlaceBodies`), evaluates, then `setCameraPose` / `SetCameraRoll` /
+`SetCameraFov`. Overlay setters run only on a change. A focus whose system is not loaded
+yet (staged loading) returns null and the player holds the last pose; taking the camera
+preloads every referenced system. Releasing it restores clock, FOV, HUD and overlays and
+reports the date the timeline left. Every spin is a function of the date (§ above:
+planets' `AxialSpinDegreesAt`, moons' and cloud layers' `SpinDegreesAt`), so which longitude
+of Jupiter faces the camera at a keyframe's date does not depend on how the session got
+there, and `AdvanceSimulationTo` is the same as `SetSimulationEpoch` without the settings
+notification. Earth's map longitude is calibrated to the true sub-solar point, so the
+eclipse's umbra lands on the right continents.
+
+**Camera roll and HUD.** `Camera::SetRoll` turns right/up about the view direction (the
+engine camera is otherwise yaw/pitch); the player converts each quaternion to
+yaw/pitch/roll, with heading from the up vector within 0.1° of straight up or down.
+`SetHudOverlays` is a mask: bit 0 hints, 1 planet/star distances, 2 moon distances, 3 the
+staged-loading "(approach to load)" labels; `hud: false` clears all four.
+
+**Capture.** Offline and deterministic:
+- `BeginCapture(w, h)` pauses the Emscripten main loop (as WebXR does) and sets the canvas
+  backing store and every render target to the output size. Window and GLFW resize callbacks
+  are ignored until `EndCapture` fits the canvas to the page again.
+- Frame i puts the timeline at t = i / fps. `StepCaptureFrame(1/fps)` then runs one frame
+  with exactly that delta, re-asserting the size first, and `new VideoFrame(canvas)` is taken
+  in the same task, while the drawing buffer holds the frame.
+- Animated shaders read `SimState::animationSeconds`, the sum of frame deltas, not
+  `glfwGetTime()`, so the corona and the field ribbons advance by exactly 1/fps per frame.
+- Before a frame is encoded, pending textures and manifests (`GetPendingAssetCount`) get up
+  to 5 s to arrive, redrawing at the same instant. After one timeout, later frames wait only
+  for focus bodies that are not loaded at all, so a missing file does not cost every frame.
+- Encoding: WebCodecs `VideoEncoder` (H.264 High → Baseline, then AV1, then VP9, picked by
+  `isConfigSupported`, ~0.12 bits per pixel, keyframe every 2 s) and mp4-muxer into an
+  in-memory fast-start MP4.
+- Without WebCodecs, `MediaRecorder` records `canvas.captureStream()` while the timeline
+  plays in real time, at the canvas size and with no determinism. It waits for the
+  recorder's `start` event and fails on an empty recording.
+
+**Tests.** `timeline.test.ts` (Vitest, `npm run test:unit`, run in CI): splines through
+their keys, linear motion under uneven spacing, C1 continuity, tension, a moving focus, frame
+axes, polar descent (lands at 1 m, monotone, exponential, facet surface, facet-normal
+horizon), squad and slerp, yaw/pitch/roll round trips including straight down, the date
+track (anchors, rates, interpolation, eases), steps, `keyframeFromPose` round trip, parse
+errors, and every shipped timeline parses and evaluates. Native: spins are date functions
+and survive a fresh start (`test_orbit_layout.cpp`), roll keeps the view direction, and `FacetAlong`
+gives the hit facet's outward normal (`test_camera_navigation.cpp`).
 
 ## 12. Common pitfalls
 

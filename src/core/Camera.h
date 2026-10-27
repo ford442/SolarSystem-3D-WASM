@@ -76,11 +76,23 @@ public:
         _transitionStartPos += delta;
         _transitionTargetPos += delta;
     }
+    // Turns the view by `rotation` (a world-frame rotation, columns orthonormal), keeping its
+    // roll: how a camera hovering over a spinning body turns with it. Yaw, pitch and roll are
+    // re-derived from the turned front and up vectors.
+    void Reorient(const glm::dmat3& rotation);
     // Scene units per second per unit of movement speed. 1 keeps the historical constant
     // speed; Application's navigation scales it with altitude on realistic scale.
     void SetSpeedScale(double scale) { _speedScale = scale; }
     double GetSpeedScale() const { return _speedScale; }
     void SetYawPitch(float yaw, float pitch) { _yaw = yaw; _pitch = pitch; UpdateCameraVectors(); }
+    /**
+     * Roll about the view direction in degrees, right-handed about the front vector; 0 keeps
+     * up in the plane of front and world up. Mouse look and flying keep it. Only timelines
+     * set it (web/src/timeline.ts: a keyframe's quaternion, or a horizon held level next to
+     * the ground), and they put it back to 0 when they stop.
+     */
+    void SetRoll(float roll) { _roll = roll; UpdateCameraVectors(); }
+    float GetRoll() const { return _roll; }
 
     // Processes input received from any keyboard-like input system. Accepts input parameter in the form of camera defined ENUM (to abstract it from windowing systems)
     void ProcessKeyboard(CameraVector direction, float deltaTime);
@@ -106,6 +118,7 @@ private:
     glm::vec3 _worldUpVector;
     float _yaw;
     float _pitch;
+    float _roll = 0.0f;
     float _movementSpeed;
     double _speedScale = 1.0;
     float _mouseSensitivity;

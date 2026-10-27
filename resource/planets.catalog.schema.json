@@ -49,6 +49,16 @@
                 "type": "number",
                 "description": "IAU-style tilt SSOT. CatalogBody applies Rotate(Z); the Three.js companion uses the same value."
               },
+              "primeMeridianDegJ2000": {
+                "type": "number",
+                "minimum": 0,
+                "exclusiveMaximum": 360,
+                "description": "IAU WGCCRE prime-meridian angle W0 at J2000, degrees. OrbitLayout::GetAxialSpinDegrees turns the body from it; omitted (0) for bodies with no IAU frame."
+              },
+              "primeMeridianRateDegPerDay": {
+                "type": "number",
+                "description": "IAU Wdot, degrees per day (negative = retrograde). Omitted: 360 / siderealRotationDays."
+              },
               "keplerian": {
                 "type": "object",
                 "description": "Osculating elements for satellites (stored for the eclipse follow-up; runtime still uses circular sceneOrbitRadius until then).",

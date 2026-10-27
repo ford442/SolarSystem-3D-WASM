@@ -19,6 +19,26 @@ std::string GetTexturePath(const std::string& lowRes, const std::string& highRes
 #endif
 }
 
+int ContextMsaaSamples(const QualityTierSettings& settings) {
+    return settings.enableHdr ? 0 : settings.requestedMsaaSamples;
+}
+
+AntialiasPath ResolveAntialiasPath(bool hdrEnabled, int contextSamples) {
+    if (hdrEnabled) {
+        return AntialiasPath::HdrResolve;
+    }
+    return contextSamples > 1 ? AntialiasPath::ContextMsaa : AntialiasPath::None;
+}
+
+const char* AntialiasPathName(AntialiasPath path) {
+    switch (path) {
+        case AntialiasPath::None: return "none";
+        case AntialiasPath::ContextMsaa: return "context MSAA";
+        case AntialiasPath::HdrResolve: return "FXAA in HDR tone-map";
+    }
+    return "unknown";
+}
+
 const char* TextureLodTierName(TextureLodTier tier) {
     switch (tier) {
         case TextureLodTier::Low: return "low";
@@ -59,7 +79,7 @@ TextureLodPolicy GetTextureLodPolicy(int preset, bool mobile) {
     return policy;
 }
 
-void LogQualityTier(const QualityTierSettings& settings, bool hdrEnabled, int shadowQuality) {
+void LogQualityTier(const QualityTierSettings& settings, bool hdrEnabled, int shadowQuality, int contextSamples) {
     const double shadowMemoryMiB =
         static_cast<double>(settings.shadowResolution) * settings.shadowResolution * 4.0 / (1024.0 * 1024.0);
     const std::string shadows =
@@ -73,19 +93,20 @@ void LogQualityTier(const QualityTierSettings& settings, bool hdrEnabled, int sh
         settings.enableVolumetricCorona ? std::to_string(settings.coronaSlices) + " slices" : "billboard";
     LOG_INFO("Quality",
              "Active tier: %s | shadows=%s (~%.1f MiB depth) | HDR=%s | field bloom=%s | high-res concurrency=%d"
-             " | max texture LOD=%s | LOD distance multiplier=%g | MSAA=%dx | asteroids=%d | kuiper=%d"
+             " | max texture LOD=%s | LOD distance multiplier=%g | AA=%s (context samples=%d) | asteroids=%d | kuiper=%d"
              " | atmosphere=%s | corona=%s | observe stars=%d",
              settings.name, shadows.c_str(), shadowMemoryMiB, hdrEnabled ? "on" : "off (direct composite)",
              bloom.c_str(), settings.maxConcurrentTextureLoads,
              TextureLodTierName(settings.maxTextureLodTier), std::strcmp(settings.name, "medium") == 0 ? 1.5 : 1.0,
-             settings.requestedMsaaSamples, settings.asteroidInstanceCount,
+             AntialiasPathName(ResolveAntialiasPath(hdrEnabled, contextSamples)), contextSamples,
+             settings.asteroidInstanceCount,
              settings.kuiperInstanceCount, atmosphere.c_str(), corona.c_str(),
              settings.observeStarCount);
 #ifdef __EMSCRIPTEN__
-    LOG_INFO("Quality", "WebGL MSAA is fixed when the context is created; reload with ?quality=%s to change it.",
+    LOG_INFO("Quality", "WebGL context samples are fixed when the context is created; reload with ?quality=%s to change them.",
              settings.name);
 #else
-    LOG_INFO("Quality", "MSAA is fixed when the GL context is created; restart with "
+    LOG_INFO("Quality", "Context samples are fixed when the GL context is created; restart with "
                         "SOLARSYSTEM_QUALITY=low|medium|full to change the sample count.");
 #endif
 }

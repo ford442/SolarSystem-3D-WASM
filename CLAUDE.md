@@ -42,7 +42,7 @@ The build script:
 3. Builds with `emmake make`
 4. Deploys artifacts: `SolarSystem.js` → `web/src/`, `SolarSystem.wasm` and `SolarSystem.data` → `web/public/`
 
-The CMakeLists.txt has separate configurations for EMSCRIPTEN vs native builds, using Emscripten ports for GLFW, SDL2, SDL2_image, and FreeType (no SDL_mixer).
+The CMakeLists.txt has separate configurations for EMSCRIPTEN vs native builds, using Emscripten ports for GLFW and FreeType only (no SDL, SDL_image or SDL_mixer on web — `SDL_image.h`, `IMG_Init` and `LoadWindowIcon` are native-only).
 
 ### Native Build (Windows)
 
@@ -68,6 +68,7 @@ The CMakeLists.txt has separate configurations for EMSCRIPTEN vs native builds, 
   - `RenderSettings.cpp` — quality/shadow presets, orbit scale mode, texture LOD manager
   - `StarSystemFactory.cpp` / `PlanetSystemLoader.cpp` — scene construction and staged web loading
   - `XrSession.cpp` — WebXR eye state and the stereo render pass (web only)
+  - `Cinematics.cpp` — what web timelines and capture call: body catalog / scene state JSON, surface queries, system preload, HUD mask, `BeginCapture`/`StepCaptureFrame`/`EndCapture` (ARCHITECTURE §11.2)
 - `Renderer.h` — The `Renderer` class: shadow/color/overlay/HDR draw passes and the GPU
   resources they own (shaders, shadow FBO, HDR, skybox, lens flare, text renderer, orbit/
   mission/magnetic-field overlay meshes), all private. `Application` holds one (`_renderer`).
@@ -121,6 +122,7 @@ The CMakeLists.txt has separate configurations for EMSCRIPTEN vs native builds, 
   3. Exposes `updateLoadingProgress()` for C++ to call
   4. Configures module locateFile() to resolve WASM/data files under Vite's base path
   5. Initializes the module with canvas and callbacks
+- `src/timeline.ts` / `timelinePlayer.ts` / `timelineEditor.ts` / `capture.ts` — cinematic timelines (`public/timelines/*.json`, `?timeline=`), their dock, and deterministic WebCodecs + mp4-muxer capture (ARCHITECTURE §11.2). `timeline.ts` is pure and unit-tested: `npm run test:unit` (Vitest, `src/**/*.test.ts`)
 - `src/style.css` — Loading screen and UI styling
 - `vite.config.ts` — Vite configuration for module/ES6 export compatibility
 - `tsconfig.json` — TypeScript configuration
@@ -134,7 +136,7 @@ The CMakeLists.txt has separate configurations for EMSCRIPTEN vs native builds, 
 - Web receives `WebResourceFetcher` events and updates progress bar
 
 **Asset Resolution**
-- Shaders, fonts, icons, and the baked atmosphere LUTs (`resource/atmosphere/`) preloaded into Emscripten virtual filesystem via `--preload-file`
+- Shaders, fonts, missions, sky and the baked atmosphere LUTs (`resource/atmosphere/`) preloaded into Emscripten virtual filesystem via `--preload-file`
 - Textures lazy-loaded at runtime via `WebResourceFetcher`
 - Web sets `window.__solarSystemAssetBase` for runtime asset fetch base URL
 
@@ -147,7 +149,11 @@ The CMakeLists.txt has separate configurations for EMSCRIPTEN vs native builds, 
 - **Catalog-driven celestial bodies**: planets and moons are `CatalogBody`/`CatalogSatellite` rows from `planets.catalog.json`, and all of them bind their material through `CatalogMaterial::BindMaterial`. The only dedicated classes left are for the Sun, the ring meshes, cloud shells, and atmospheres (list in ARCHITECTURE §9.1). Atmosphere numbers are catalog data too (`render.atmosphere`, ARCHITECTURE §9.2).
 - **Baked atmosphere LUTs**: `render.atmosphere.physical` is baked by `tools/atmosphere_lut_baker` into `resource/atmosphere/*.ktx2`, which are committed. After editing it, rerun the generator and the baker; the `AtmosphereLutsFresh` ctest fails on a stale bake.
 - **Precision and scale** (ARCHITECTURE §11.1): world positions are heliocentric doubles (`GetWorldPosition`, `Camera::GetWorldPosition`); the render origin sits on the camera every frame in both modes, so scene floats are world minus camera taken in double (`OrbitLayout::ToRenderFrame`) and the view matrix has no translation. Realistic scale is true scale (Earth 0.081 units); compressed is a per-body remap, and art lengths tied to a body multiply by `SpaceObject::SizeFactor()`. Don't keep a render-frame position across frames (shift it in `Application::MoveRenderOrigin`, or better store the world position). Close to a body its programs use the `NEAR_SURFACE` permutation (fragment log depth, relative-to-eye vertices, `gfx/SurfacePatch` under a camera metres up). Native `SOLARSYSTEM_SCALE=realistic` switches scale at start-up.
-- **Poses are functions of the date**: planets (`OrbitLayout`), moons (`SatelliteOrbit::EphemerisOffset` / `MeanAnomalyAt`), and spins (`SpinDegreesAt`) derive from `OrbitLayout::GetJulianDate()`. Do not add per-frame accumulators — they break date-scrubber jumps.
+- **Poses are functions of the date**: planets (`OrbitLayout`), moons (`SatelliteOrbit::EphemerisOffset` / `MeanAnomalyAt`), and spins (`SpinDegreesAt`) derive from `OrbitLayout::GetJulianDate()`. Do not add per-frame accumulators — they break date-scrubber jumps. Planet spins are date functions too: `OrbitLayout::AxialSpinDegreesAt(body, jd)` evaluates the catalog's IAU `primeMeridianDegJ2000` + `primeMeridianRateDegPerDay` (Earth is solved for the true sub-solar longitude, ARCHITECTURE §11), and there is no `g_axialSpinDeg`. A hovering camera (inside `CameraNavigation::kHoverRadii`) co-rotates with its anchor via `CarryEye`; the light box fits the visible cap near a planet (`gfx/ShadowFit.h`, ARCHITECTURE §7.5).
+- **Animation time is the frame-delta sum**: animated shaders and overlays read `SimState::animationSeconds` (FrameUBO `time`), not `glfwGetTime()`, so a capture that steps a fixed 1/fps per frame is deterministic. Don't read wall-clock time in a pass.
+- **Context is MSAA-free when HDR is on; the tone-map pass antialiases**: `ContextMsaaSamples()` returns 0 for any tier with HDR, and `hdr.fs` runs FXAA on the tone-mapped value (ARCHITECTURE §9.6). `web/src/webglContext.ts` is the only place web context attributes are set — don't add a second table in C++.
+- **Fetched assets are cached by the page, not by C++**: `WebResourceFetcher` calls `window['__solarSystemFetchAsset']` (`web/src/assetCache.ts`, Cache API, named by asset base) when present and only writes the bytes to MEMFS (ARCHITECTURE §6.1.1). Preloaded `.data` is unaffected. Off under `npm run dev`; `?assetcache=0|1` overrides.
+- **Preload edits relink**: `--preload-file` dirs and `scripts/wasm-exports.json` are `LINK_DEPENDS`. A directory added to the preload list also needs adding to `SOLAR_EM_PRELOAD_DIRS` in `CMakeLists.txt`.
 - **Lazy texture loading**: Large DDS textures are not preloaded; `WebResourceFetcher` fetches them on-demand to avoid blocking initialization.
 - **No blocking fetches**: every download goes through callback-based `WebResourceFetcher::DownloadFile` (`emscripten_async_wget2`), and C++ only ever reads files that are already resident in MEMFS. That keeps the build free of `ASYNCIFY`/`JSPI` and lets it use native `-fwasm-exceptions`. Anything that needs a new asset must stage it through `DownloadFile` (core resources, a planet manifest, or `TextureLoadingQueue`) before the code that reads it runs — see `docs/plans/PORTING_GUIDE.md` §3b.
 - **Separate build paths**: CMakeLists.txt uses `if(EMSCRIPTEN)` to toggle library linking and compiler flags, avoiding duplication of core logic.
@@ -197,7 +203,10 @@ cd web
 npm run dev
 # Browser opens; changes to TypeScript auto-reload
 # For C++ changes, rebuild via build-web.sh and refresh
+npm run test:unit    # Vitest (timeline interpolation); no WASM build needed
 ```
+
+To check a timeline shot without real-time playback, `window.solarSystemTimeline.load('<id>')` then `snapshot(t, width, height)` returns a PNG data URL drawn through the capture path.
 
 ## Debugging Notes
 
@@ -211,7 +220,7 @@ npm run dev
 ## Dependencies & Third-Party
 
 **C++ Libraries**
-- GLFW, SDL2, SDL2_image — Window/input management (Emscripten ports provide these)
+- GLFW — Window/input management (Emscripten port on web); SDL2/SDL2_image are native-only (window icon)
 - Assimp — 3D model loading (pre-built WASM version in `external/assimp/build-wasm/`)
 - GLM — Math library (header-only, in `external/glm/`)
 - FreeType — Font rendering (Emscripten port)

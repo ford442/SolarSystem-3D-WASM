@@ -15,6 +15,10 @@ export interface DeepLinkViewState {
     mission?: string;
     tour?: string;
     tourStep?: number;
+    /** `?timeline=`: a shipped cinematic id (public/timelines/<id>.json) or an http(s) URL of one. */
+    timeline?: string;
+    /** `?tt=`: seconds into the timeline to start from. */
+    timelineTime?: number;
     /** `?mode=observe` opens straight into Observe mode (camera on Earth). */
     mode?: 'explore' | 'observe';
     /** Observe-mode site, view, field of view and time rate (`lat`, `lon`, `az`, `el`, `fov`, `rate`). */
@@ -165,6 +169,19 @@ function parseTourId(value: string | null): string | undefined {
     return parseMissionId(value);
 }
 
+/** A timeline id like a tour's, or a URL; timelinePlayer.ts resolves it and the page fetches only http(s). */
+function parseTimelineSource(value: string | null): string | undefined {
+    if (!value || value.length > 2048) return undefined;
+    const trimmed = value.trim();
+    if (/^[a-z][a-z0-9-]{0,47}$/.test(trimmed)) return trimmed;
+    try {
+        const url = new URL(trimmed, window.location.href);
+        return url.protocol === 'https:' || url.protocol === 'http:' ? trimmed : undefined;
+    } catch {
+        return undefined;
+    }
+}
+
 function parseMode(value: string | null): 'explore' | 'observe' | undefined {
     if (!value) return undefined;
     const normalized = value.toLowerCase();
@@ -231,6 +248,8 @@ export function parseDeepLinkFromUrl(search = window.location.search): DeepLinkV
     const mission = parseMissionId(params.get('mission') ?? params.get('probe'));
     const tour = parseTourId(params.get('tour'));
     const tourStep = parseFiniteNumber(params.get('step'));
+    const timeline = parseTimelineSource(params.get('timeline'));
+    const timelineTime = parseFiniteNumber(params.get('tt'));
     const mode = parseMode(params.get('mode'));
     const observer = parseObserver(params);
 
@@ -260,6 +279,8 @@ export function parseDeepLinkFromUrl(search = window.location.search): DeepLinkV
         tourStep: tourStep !== undefined && Number.isInteger(tourStep) && tourStep >= 0
             ? tourStep
             : undefined,
+        timeline,
+        timelineTime: timeline && timelineTime !== undefined && timelineTime >= 0 ? timelineTime : undefined,
         mode,
         observer,
         camera,

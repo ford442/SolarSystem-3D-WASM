@@ -8,8 +8,8 @@
 #include "gfx/GlPlatform.h"
 #include <GLFW/glfw3.h>
 
+// Audio: web has none in C++ (web/src/music.ts) and links no SDL at all.
 #ifdef __EMSCRIPTEN__
-    #include <SDL2/SDL.h>
 #elif defined(SOLARSYSTEM_USE_SDL_MIXER)
     #include <SDL2/SDL_mixer.h>
 #else

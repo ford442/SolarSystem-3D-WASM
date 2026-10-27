@@ -16,7 +16,8 @@ endif()
 # For Emscripten build:
 # 1. Use emcmake cmake -DCMAKE_BUILD_TYPE=Release|Debug ...
 # 2. Port/link flags are applied once via target_compile_options / target_link_options below.
-# 3. irrKlang and SDL_mixer are not used on web: music is an HTMLAudioElement in web/src/music.ts.
+# 3. irrKlang and SDL_mixer are not used on web: music is an HTMLAudioElement in web/src/music.ts,
+#    and SDL2 / SDL2_image are not linked either (the only SDL_image use is the native window icon).
 # 4. Exclude unsupported libs (glew32, OpenGL32, mingw32) in if(EMSCRIPTEN) block.
 # See docs/plans/PORTING_GUIDE.md for Wasm exceptions fallback.
 
@@ -37,6 +38,7 @@ set(SOLARSYSTEM_SOURCES_CORE
     src/ResourceManifest.cpp
     src/PlanetSystemLoader.cpp
     src/CameraController.cpp
+    src/Cinematics.cpp
     src/SceneRenderer.cpp
     src/SceneOverlayRenderer.cpp
     src/StarSystemFactory.cpp
@@ -155,9 +157,6 @@ if(EMSCRIPTEN)
     # Anything emcc reports as "linker setting ignored during compilation" belongs in
     # SOLAR_EM_LINK_FLAGS instead, or -Wall drowns in -Wunused-command-line-argument.
     set(SOLAR_EM_PORT_FLAGS
-        "SHELL:-sUSE_SDL=2"
-        "SHELL:-sUSE_SDL_IMAGE=2"
-        "SHELL:-sSDL2_IMAGE_FORMATS=['png','jpg']"
         "SHELL:-sUSE_FREETYPE=1"
         # No ASYNCIFY / JSPI: every download goes through the callback-based
         # emscripten_async_wget2 path in WebResourceFetcher::DownloadFile, and the
@@ -170,11 +169,18 @@ if(EMSCRIPTEN)
         "SHELL:-fwasm-exceptions"
     )
 
+    # Codegen: WebAssembly SIMD (Chrome 91+, Firefox 89+, Safari 16.4+). It has to be on
+    # the compile and the link line, or LTO drops the vector ops. The users are the CPU DXT
+    # decode (BlockCompression.cpp), the magnetic-field tracer and the belt update.
+    set(SOLAR_EM_CODEGEN_FLAGS -msimd128)
+
     # Compile-only: warnings would just be dead arguments on the link line.
     set(SOLAR_EM_WARNING_FLAGS -Wall -Wextra)
 
     # Link-only: memory, preloads, module shape, JS interop.
-    # textures_low (~124 KB) preloaded so planets stay visible without a live asset server.
+    # textures_low (~408 KB) preloaded so planets stay visible without a live asset server.
+    # Preload only what the page samples or parses: resource/icons (14 MB) is read by the
+    # native window icon alone, so it stays out of SolarSystem.data.
     # Sounds are LFS-excluded — do not preload (CI/sandbox).
     set(SOLAR_EM_LINK_FLAGS
         "SHELL:-sUSE_GLFW=3"
@@ -182,6 +188,10 @@ if(EMSCRIPTEN)
         "SHELL:-sMAX_WEBGL_VERSION=2"
         "SHELL:-sMIN_WEBGL_VERSION=2"
         "SHELL:-sGL_ENABLE_GET_PROC_ADDRESS=1"
+        # This target is only ever a page: no Node / shell / worker branches in the glue.
+        "SHELL:-sENVIRONMENT=web"
+        # The default 64 KB stack is small for recursive JSON parsing and Assimp.
+        "SHELL:-sSTACK_SIZE=1MB"
         "SHELL:-sALLOW_MEMORY_GROWTH=1"
         # Explicit default: fixed-buffer growth (new ArrayBuffer + view refresh on
         # grow), not resizable-ArrayBuffer growth. Current Chrome WebGL/DOM APIs
@@ -194,7 +204,6 @@ if(EMSCRIPTEN)
         "SHELL:--preload-file ${CMAKE_SOURCE_DIR}/resource/missions@/resource/missions"
         "SHELL:--preload-file ${CMAKE_SOURCE_DIR}/resource/sky@/resource/sky"
         "SHELL:--preload-file ${CMAKE_SOURCE_DIR}/resource/fonts@/resource/fonts"
-        "SHELL:--preload-file ${CMAKE_SOURCE_DIR}/resource/icons@/resource/icons"
         "SHELL:--preload-file ${CMAKE_SOURCE_DIR}/resource/textures_low@/resource/textures_low"
         # Baked atmosphere LUTs (~1.1 MB, 8 bodies): tools/atmosphere_lut_baker, ARCHITECTURE §9.2.
         "SHELL:--preload-file ${CMAKE_SOURCE_DIR}/resource/atmosphere@/resource/atmosphere"
@@ -219,7 +228,8 @@ if(EMSCRIPTEN)
         set(SOLAR_EM_COMPILE_OPT_FLAGS -O0 -g)
         # GL_ASSERTIONS validates GL enum/handle arguments in the JS GL layer.
         # Add "SHELL:-sGL_DEBUG=1" temporarily to also trace every GL call.
-        set(SOLAR_EM_LINK_OPT_FLAGS -O0 -g "SHELL:-sASSERTIONS=1" "SHELL:-sGL_ASSERTIONS=1")
+        # -gsource-map: DevTools shows C++ sources and names in Wasm stacks.
+        set(SOLAR_EM_LINK_OPT_FLAGS -O0 -g -gsource-map "SHELL:-sASSERTIONS=1" "SHELL:-sGL_ASSERTIONS=1")
     else()
         # Release (default) and RelWithDebInfo / empty CMAKE_BUILD_TYPE.
         # --closure 1 halves the JS glue (183 380 B -> 87 678 B). The old blocker was
@@ -230,21 +240,40 @@ if(EMSCRIPTEN)
         # read is silently renamed and the callback simply never fires in Release.
         # See the "--closure 1" section of docs/plans/PORTING_GUIDE.md §3b.
         set(SOLAR_EM_COMPILE_OPT_FLAGS -O3 -flto)
-        set(SOLAR_EM_LINK_OPT_FLAGS -O3 -flto "SHELL:--closure 1")
+        # --emit-symbol-map writes SolarSystem.js.symbols (minified name -> original), so a
+        # Closure-renamed stack can still be read. Keep --closure 1 on.
+        set(SOLAR_EM_LINK_OPT_FLAGS -O3 -flto "SHELL:--closure 1" "SHELL:--emit-symbol-map")
     endif()
 
     target_compile_options(${PROJECT_NAME} PRIVATE
         ${SOLAR_EM_PORT_FLAGS}
+        ${SOLAR_EM_CODEGEN_FLAGS}
         ${SOLAR_EM_WARNING_FLAGS}
         ${SOLAR_EM_COMPILE_OPT_FLAGS}
     )
     target_link_options(${PROJECT_NAME} PRIVATE
         ${SOLAR_EM_PORT_FLAGS}
+        ${SOLAR_EM_CODEGEN_FLAGS}
         ${SOLAR_EM_LINK_FLAGS}
         ${SOLAR_EM_LINK_OPT_FLAGS}
     )
 
-    # Emscripten provides GLFW, SDL2, SDL_image, and FreeType via ports
+    # --preload-file paths and the export list are link *options*, not inputs, so make does
+    # not see them change. Declare them as link dependencies: editing a shader, a font, a
+    # mission JSON or scripts/wasm-exports.json then relinks and rebuilds SolarSystem.data.
+    # CONFIGURE_DEPENDS re-globs at build time, so a file added to a preloaded directory
+    # is picked up too.
+    set(SOLAR_EM_PRELOAD_DIRS shaders missions sky fonts textures_low atmosphere)
+    set(SOLAR_EM_LINK_INPUTS
+        ${CMAKE_SOURCE_DIR}/scripts/wasm-exports.json
+        ${CMAKE_SOURCE_DIR}/resource/planet_manifest.json)
+    foreach(preloadDir IN LISTS SOLAR_EM_PRELOAD_DIRS)
+        file(GLOB_RECURSE preloadFiles CONFIGURE_DEPENDS "${CMAKE_SOURCE_DIR}/resource/${preloadDir}/*")
+        list(APPEND SOLAR_EM_LINK_INPUTS ${preloadFiles})
+    endforeach()
+    set_property(TARGET ${PROJECT_NAME} APPEND PROPERTY LINK_DEPENDS ${SOLAR_EM_LINK_INPUTS})
+
+    # Emscripten provides GLFW and FreeType via ports
     target_link_libraries(${PROJECT_NAME}
         ${CMAKE_SOURCE_DIR}/external/assimp/build-wasm/lib/libassimp.a
         z

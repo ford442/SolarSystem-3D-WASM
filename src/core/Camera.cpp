@@ -137,6 +137,26 @@ void Camera::UpdateCameraVectors() {
     _frontVector = glm::normalize(front);
     _rightVector = glm::normalize(glm::cross(_frontVector, _worldUpVector));  // normalize the vectors, because their length gets closer to 0 the more you look up or down which results in slower movement.
     _upVector    = glm::normalize(glm::cross(_rightVector, _frontVector));
+    if (_roll != 0.0f) {
+        const glm::mat3 roll(glm::rotate(glm::mat4(1.0f), glm::radians(_roll), _frontVector));
+        _rightVector = roll * _rightVector;
+        _upVector = roll * _upVector;
+    }
+}
+
+void Camera::Reorient(const glm::dmat3& rotation) {
+    const glm::dvec3 front = glm::normalize(rotation * glm::dvec3(_frontVector));
+    const glm::dvec3 up = glm::normalize(rotation * glm::dvec3(_upVector));
+    // Straight up or down has no yaw of its own: keep the one it had.
+    if (std::abs(front.y) < 0.999999) {
+        _yaw = static_cast<float>(glm::degrees(std::atan2(front.z, front.x)));
+    }
+    _pitch = static_cast<float>(glm::degrees(std::asin(glm::clamp(front.y, -1.0, 1.0))));
+    // Roll is the angle from the roll-free up (in the plane of front and world up), about front.
+    const glm::dvec3 rightFree = glm::normalize(glm::cross(front, glm::dvec3(_worldUpVector)));
+    const glm::dvec3 upFree = glm::cross(rightFree, front);
+    _roll = static_cast<float>(glm::degrees(std::atan2(glm::dot(glm::cross(upFree, up), front), glm::dot(upFree, up))));
+    UpdateCameraVectors();
 }
 
 void Camera::StartTransitionTo(const glm::dvec3& targetPos, float targetYaw, float targetPitch, float durationSeconds) {

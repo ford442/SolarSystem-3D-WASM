@@ -68,7 +68,7 @@ void Renderer::RenderMagneticFields(const FrameContext& ctx) {
         return;
     }
 
-    const float now = static_cast<float>(glfwGetTime());
+    const float now = static_cast<float>(ctx.sim.animationSeconds);
     const glm::vec3 camPos = ctx.view.headPosition;
 
     auto drawBodies = [&](float ribbonWidthScale, float opacityScale) {

@@ -1,5 +1,8 @@
 #include "WebResourceFetcher.h"
 #include "../core/Log.h"
+#ifdef __EMSCRIPTEN__
+#include <emscripten/eventloop.h>
+#endif
 #include <cstdlib>
 #include <fstream>
 #include <memory>
@@ -115,23 +118,90 @@ void EnsureDirectoryExists(const std::string& path) {
     }
 }
 
-// Callback wrappers for emscripten_async_wget2
-void OnLoad2(unsigned int /*handle*/, void* arg, const char* /*file*/) {
-    auto* context = static_cast<DownloadContext*>(arg);
-    LOG_DEBUG("WebResourceFetcher", "Successfully downloaded: %s -> %s", context->resolvedUrl.c_str(),
-              context->virtualPath.c_str());
+// Shared completion for both web transfer paths (the cache hook and emscripten_async_wget2).
+void FinishDownload(DownloadContext* context, bool success, int status) {
+    if (success) {
+        LOG_DEBUG("WebResourceFetcher", "Successfully downloaded: %s -> %s", context->resolvedUrl.c_str(),
+                  context->virtualPath.c_str());
+    } else {
+        LOG_WARN("WebResourceFetcher", "Failed to download %s -> %s. Status: %d", context->resolvedUrl.c_str(),
+                 context->virtualPath.c_str(), status);
+    }
     const std::string virtualPath = context->virtualPath;
     delete context;
-    CompleteTransfer(virtualPath, true);
+    CompleteTransfer(virtualPath, success);
+}
+
+// Callback wrappers for emscripten_async_wget2
+void OnLoad2(unsigned int /*handle*/, void* arg, const char* /*file*/) {
+    FinishDownload(static_cast<DownloadContext*>(arg), true, 0);
 }
 
 void OnError2(unsigned int /*handle*/, void* arg, int status) {
-    auto* context = static_cast<DownloadContext*>(arg);
-    LOG_WARN("WebResourceFetcher", "Failed to download %s -> %s. Status: %d", context->resolvedUrl.c_str(),
-             context->virtualPath.c_str(), status);
-    const std::string virtualPath = context->virtualPath;
-    delete context;
-    CompleteTransfer(virtualPath, false);
+    FinishDownload(static_cast<DownloadContext*>(arg), false, status);
+}
+
+// The Cache API path: web/src/assetCache.ts, installed as window['__solarSystemFetchAsset']
+// before the module starts. It answers from the cache or the network; this side only writes
+// the body into MEMFS exactly as emscripten_async_wget2 would (replace a resident file, make
+// the directory) and reports back. Bracket access on window / the hook is load-bearing under
+// --closure 1. The hook is absent in embedders that do not install it; those use wget2.
+EM_JS_DEPS(assetFetchDeps, "$getWasmTableEntry,$PATH,$PATH_FS");
+
+EM_JS(int, HasAssetFetchHook, (), {
+    return typeof window !== 'undefined' && typeof window['__solarSystemFetchAsset'] === 'function' ? 1 : 0;
+});
+
+// EM_JS copies its parameter list into JavaScript, so a function pointer needs a typedef.
+using HookedLoadFn = void (*)(void*);
+using HookedErrorFn = void (*)(void*, int);
+
+EM_JS(void, StartHookedDownload, (const char* urlPtr, const char* pathPtr, void* userdata,
+                                  HookedLoadFn onLoad, HookedErrorFn onError), {
+    const url = UTF8ToString(urlPtr);
+    const file = PATH_FS.resolve(UTF8ToString(pathPtr));
+    const fail = (status) => getWasmTableEntry(onError)(userdata, status);
+    let pending;
+    try {
+        pending = window['__solarSystemFetchAsset'](url);
+    } catch (error) {
+        console.warn('[WebResourceFetcher] asset hook threw for ' + url, error);
+        fail(0);
+        return;
+    }
+    Promise.resolve(pending).then((result) => {
+        if (typeof result === 'number') {
+            fail(result);
+            return;
+        }
+        try {
+            // Same as emscripten_async_wget2: replace whatever is resident, create the directory.
+            try { FS.unlink(file); } catch (error) {}
+            const directory = PATH.dirname(file);
+            FS.mkdirTree(directory);
+            FS.createDataFile(directory, PATH.basename(file), result, true, true, false);
+        } catch (error) {
+            console.warn('[WebResourceFetcher] could not write ' + file, error);
+            fail(0);
+            return;
+        }
+        getWasmTableEntry(onLoad)(userdata);
+    }, (error) => {
+        console.warn('[WebResourceFetcher] asset hook failed for ' + url, error);
+        fail(0);
+    });
+});
+
+// A pending hook download holds the runtime open the way wget2's own request does: main()
+// can return while the staged downloads are still in flight.
+void OnHookedLoad(void* arg) {
+    emscripten_runtime_keepalive_pop();
+    FinishDownload(static_cast<DownloadContext*>(arg), true, 0);
+}
+
+void OnHookedError(void* arg, int status) {
+    emscripten_runtime_keepalive_pop();
+    FinishDownload(static_cast<DownloadContext*>(arg), false, status);
 }
 
 // Matching the signature emscripten_async_wget2 expects: void (*)(unsigned int, void *, int)
@@ -148,6 +218,12 @@ void StartTransfer(const std::string& url, const std::string& virtualPath) {
     LOG_DEBUG("WebResourceFetcher", "Starting download: %s to %s", resolvedUrl.c_str(), virtualPath.c_str());
 
     auto* context = new DownloadContext{resolvedUrl, virtualPath};
+
+    if (HasAssetFetchHook()) {
+        emscripten_runtime_keepalive_push();
+        StartHookedDownload(resolvedUrl.c_str(), virtualPath.c_str(), context, OnHookedLoad, OnHookedError);
+        return;
+    }
 
     // emscripten_async_wget2(url, file, requesttype, param, userdata, onload, onerror, onprogress)
     emscripten_async_wget2(resolvedUrl.c_str(), virtualPath.c_str(), "GET", nullptr, context, OnLoad2, OnError2, OnProgress2);

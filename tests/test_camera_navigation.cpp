@@ -46,6 +46,25 @@ CameraNavigation::Body RealisticEarth() {
     return earth;
 }
 
+/**
+ * Earth at `julianDate` as CatalogBody draws it: the model matrix is float, built as
+ * Rz(tilt) · Scale · Ry(spin), and the camera sees only its 3×3.
+ */
+CameraNavigation::Body DrawnEarthAt(double julianDate, const glm::dvec3& center) {
+    CameraNavigation::Body earth;
+    earth.center = center;
+    const double scale = SceneScale::KmToScene(6371.0) / 2.0;
+    glm::mat4 model(1.0f);
+    model = glm::rotate(model, glm::radians(-23.4f), glm::vec3(0.0f, 0.0f, 1.0f));
+    model = glm::scale(model, glm::vec3(static_cast<float>(scale)));
+    model = glm::rotate(model,
+                        glm::radians(static_cast<float>(OrbitLayout::AxialSpinDegreesAt(OrbitLayout::Body::Earth, julianDate))),
+                        glm::vec3(0.0f, 1.0f, 0.0f));
+    earth.shape = glm::dmat3(glm::mat3(model));
+    earth.meshRadius = 2.0;
+    return earth;
+}
+
 } // namespace
 
 TEST(CameraNavigation, AltitudeIsMeasuredAboveTheDrawnFigure) {
@@ -127,6 +146,30 @@ TEST(CameraNavigation, FloorFindsTheFacetFromAboveAndFromBeneathIt) {
     }
 }
 
+TEST(CameraNavigation, FacetAlongGivesTheHitFacetsOutwardNormal) {
+    std::vector<glm::vec3> positions;
+    std::vector<unsigned> indices;
+    MakeSphere(2.0, 64, 32, positions, indices);
+    const glm::dvec3 a(positions[indices[600]]), b(positions[indices[601]]), c(positions[indices[602]]);
+    // Off the facet's centre, so the radial direction and the facet normal differ.
+    const glm::dvec3 toward = glm::normalize(0.6 * a + 0.3 * b + 0.1 * c);
+    const auto hit = CameraNavigation::FacetAlong(toward, 2.0, positions, indices);
+    ASSERT_TRUE(hit.has_value());
+    EXPECT_NEAR(hit->radius, *CameraNavigation::FacetRadius(toward, 2.0, positions, indices), 1e-15);
+    EXPECT_NEAR(glm::length(hit->normal), 1.0, 1e-12);
+    EXPECT_NEAR(glm::dot(hit->normal, b - a), 0.0, 1e-6);
+    EXPECT_NEAR(glm::dot(hit->normal, c - a), 0.0, 1e-6);
+    EXPECT_GT(glm::dot(hit->normal, toward), 0.99);
+    EXPECT_LT(glm::dot(hit->normal, toward), 1.0 - 1e-6);
+
+    // A squashed body tilts world normals toward its poles, as the inverse transpose does.
+    CameraNavigation::Body oblate;
+    oblate.shape = glm::dmat3(1.0, 0.0, 0.0, 0.0, 0.5, 0.0, 0.0, 0.0, 1.0);
+    const glm::dvec3 world = CameraNavigation::NormalToWorld(oblate, glm::normalize(glm::dvec3(1.0, 1.0, 0.0)));
+    EXPECT_NEAR(world.x, 1.0 / std::sqrt(5.0), 1e-12);
+    EXPECT_NEAR(world.y, 2.0 / std::sqrt(5.0), 1e-12);
+}
+
 TEST(CameraNavigation, CompressedClipPlanesAreTheHistoricalOnes) {
     for (const double altitude : {1.0e-6, 0.5, 300.0}) {
         const CameraNavigation::ClipPlanes clip = CameraNavigation::ChooseClipPlanes(false, altitude, kKmPerUnit);
@@ -184,6 +227,102 @@ TEST(CameraNavigation, CameraCarriesItsTransitionWithIt) {
     EXPECT_EQ(camera.GetWorldPosition(), glm::dvec3(10.0, 0.0, 0.0) + drift);
     camera.UpdateTransition(2.0f);
     EXPECT_EQ(camera.GetWorldPosition(), glm::dvec3(20.0, 0.0, 0.0) + drift);
+}
+
+TEST(CameraNavigation, RollTurnsUpAboutTheViewDirectionAndLookKeepsIt) {
+    // Yaw 0 looks down +X; with world up +Y, roll 0 has up +Y and right +Z.
+    Camera camera(0.001f, 20000.0f, 5.0f, 0.05f, glm::dvec3(0.0), glm::vec3(0.0f, 1.0f, 0.0f), 0.0f, 0.0f);
+    EXPECT_NEAR(glm::distance(camera.GetUpVector(), glm::vec3(0.0f, 1.0f, 0.0f)), 0.0f, 1e-6f);
+    // Right-handed about +X: +Y turns towards +Z (the convention web/src/timeline.ts inverts).
+    camera.SetRoll(90.0f);
+    EXPECT_NEAR(glm::distance(camera.GetFrontVector(), glm::vec3(1.0f, 0.0f, 0.0f)), 0.0f, 1e-6f);
+    EXPECT_NEAR(glm::distance(camera.GetUpVector(), glm::vec3(0.0f, 0.0f, 1.0f)), 0.0f, 1e-6f);
+    EXPECT_NEAR(glm::distance(camera.GetRightVector(), glm::vec3(0.0f, -1.0f, 0.0f)), 0.0f, 1e-6f);
+    // The view matrix maps up to screen +Y.
+    const glm::vec3 screenUp = glm::mat3(camera.GetViewMatrix()) * glm::vec3(0.0f, 0.0f, 1.0f);
+    EXPECT_NEAR(screenUp.y, 1.0f, 1e-6f);
+    camera.SetYawPitch(30.0f, 10.0f);
+    EXPECT_FLOAT_EQ(camera.GetRoll(), 90.0f);
+    EXPECT_NEAR(glm::dot(camera.GetUpVector(), camera.GetFrontVector()), 0.0f, 1e-6f);
+}
+
+TEST(CameraNavigation, HoveringCoRotatesAndOrbitOnlyFollows) {
+    const double jd = 2460408.5; // 2024-04-08
+    const glm::dvec3 centre(-1650.0, 12.0, 940.0);
+    const glm::dvec3 drift = glm::dvec3(3.2e-3, 0.0, -1.1e-3); // a day of Earth's orbit, scene units
+    const CameraNavigation::Body before = DrawnEarthAt(jd, centre);
+    const double radius = before.meshRadius * glm::length(before.shape[0]);
+
+    // 1 km up, over some point of the ground.
+    const glm::dvec3 up = glm::normalize(glm::dvec3(0.3, 0.8, -0.5));
+    const glm::dvec3 hover = centre + up * (radius + SceneScale::KmToScene(1.0));
+    const double altitudeRadii = CameraNavigation::AnalyticAltitude(before, hover) / radius;
+    EXPECT_LT(altitudeRadii, CameraNavigation::kHoverRadii);
+    EXPECT_TRUE(CameraNavigation::CoRotates(false, altitudeRadii));
+
+    // A sidereal day, a quarter of one, and a date jump of years: the camera's offset in the
+    // drawn body frame is the same, so is its altitude, and it moved in the world.
+    for (const double days : {0.99726968, 0.25, 4380.123}) {
+        const CameraNavigation::Body after = DrawnEarthAt(jd + days, centre + drift * days);
+        glm::dmat3 turn(1.0);
+        const glm::dvec3 carried = CameraNavigation::CarryEye(before, after, hover, true, &turn);
+        const glm::dvec3 was = CameraNavigation::ToModel(before, hover);
+        const glm::dvec3 now = CameraNavigation::ToModel(after, carried);
+        EXPECT_LT(glm::distance(was, now), 1e-10 * glm::length(was)) << days; // ~0.3 mm at Earth's radius
+        EXPECT_NEAR(CameraNavigation::AnalyticAltitude(after, carried), SceneScale::KmToScene(1.0),
+                    SceneScale::KmToScene(0.001))
+            << days;
+        // The turn is a proper rotation: the camera's orientation keeps its handedness.
+        EXPECT_NEAR(glm::determinant(turn), 1.0, 1e-12);
+        EXPECT_NEAR(glm::length(turn * glm::dvec3(0.0, 0.0, 1.0)), 1.0, 1e-12);
+        if (days == 0.25) {
+            EXPECT_GT(glm::distance(carried - after.center, hover - before.center), 0.5 * radius) << "a quarter day";
+        }
+    }
+
+    // At 2 radii it does not: the anchor carries the body's translation and the camera's
+    // inertial offset from the body is unchanged (the surface turns underneath).
+    const glm::dvec3 orbit = centre + up * 2.0 * radius;
+    EXPECT_FALSE(CameraNavigation::CoRotates(false, CameraNavigation::AnalyticAltitude(before, orbit) / radius));
+    const CameraNavigation::Body after = DrawnEarthAt(jd + 0.99726968 / 3.0, centre + drift);
+    glm::dmat3 turn(1.0);
+    const glm::dvec3 carried = CameraNavigation::CarryEye(before, after, orbit, false, &turn);
+    EXPECT_EQ(carried - after.center, orbit - before.center);
+    EXPECT_EQ(turn, glm::dmat3(1.0));
+}
+
+TEST(CameraNavigation, CoRotationEngagesAndReleasesWithHysteresis) {
+    using CameraNavigation::CoRotates;
+    EXPECT_FALSE(CoRotates(false, 0.055)); // inside the release distance but not yet engaged
+    EXPECT_TRUE(CoRotates(false, 0.049));
+    EXPECT_TRUE(CoRotates(true, 0.055)); // engaged: holds through the gap
+    EXPECT_FALSE(CoRotates(true, 0.061));
+}
+
+TEST(CameraNavigation, RotationBetweenDividesOutScaleAndKeepsTheTurn) {
+    const glm::dmat3 tilt(glm::rotate(glm::dmat4(1.0), glm::radians(-23.4), glm::dvec3(0.0, 0.0, 1.0)));
+    const auto spin = [&](double degrees, double scale) {
+        return tilt * glm::dmat3(glm::rotate(glm::dmat4(1.0), glm::radians(degrees), glm::dvec3(0.0, 1.0, 0.0))) * scale;
+    };
+    // A scale toggle between the two poses must not turn into a spurious rotation.
+    const glm::dmat3 turn = CameraNavigation::RotationBetween(spin(10.0, 1.0), spin(70.0, 5.0e3));
+    const glm::dmat3 expected = tilt * glm::dmat3(glm::rotate(glm::dmat4(1.0), glm::radians(60.0), glm::dvec3(0.0, 1.0, 0.0))) *
+                                glm::transpose(tilt);
+    for (int c = 0; c < 3; ++c) {
+        EXPECT_NEAR(glm::distance(turn[c], expected[c]), 0.0, 1e-12) << c;
+    }
+}
+
+TEST(CameraNavigation, ReorientTurnsFrontAndUpTogetherAndKeepsRoll) {
+    Camera camera(0.001f, 20000.0f, 5.0f, 0.05f, glm::dvec3(0.0), glm::vec3(0.0f, 1.0f, 0.0f), 30.0f, 10.0f);
+    camera.SetRoll(25.0f);
+    const glm::vec3 front = camera.GetFrontVector();
+    const glm::vec3 up = camera.GetUpVector();
+    const glm::dmat3 turn(glm::rotate(glm::dmat4(1.0), glm::radians(37.0), glm::normalize(glm::dvec3(0.2, 1.0, -0.3))));
+    camera.Reorient(turn);
+    EXPECT_NEAR(glm::distance(camera.GetFrontVector(), glm::vec3(turn * glm::dvec3(front))), 0.0f, 2e-6f);
+    EXPECT_NEAR(glm::distance(camera.GetUpVector(), glm::vec3(turn * glm::dvec3(up))), 0.0f, 2e-6f);
+    EXPECT_NEAR(glm::dot(camera.GetUpVector(), camera.GetFrontVector()), 0.0f, 1e-6f);
 }
 
 TEST(CameraNavigation, CameraMovesInDoubleAtTheSpeedScale) {

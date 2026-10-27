@@ -256,3 +256,43 @@ test('Losing the WebGL context shows a reload panel that keeps the view', async 
   await page.locator('#fatal-panel-reload').click();
   await page.waitForURL(/[?&]quality=/, { timeout: 10_000 });
 });
+
+test('Context is single-sampled (HDR resolves it) and a reload reads fetched assets from the Cache API', async ({ page, baseURL }) => {
+  const textureRequests: string[] = [];
+  const consoleLogs: string[] = [];
+  page.on('request', (request) => {
+    if (/\/resource\/textures[^/]*\/Main_SkyBox\//.test(request.url())) textureRequests.push(request.url());
+  });
+  page.on('console', (message) => consoleLogs.push(message.text()));
+
+  const load = async () => {
+    await page.goto(baseURL ?? '/', { waitUntil: 'domcontentloaded' });
+    await page.waitForFunction(() => typeof window.setCameraPose === 'function', undefined, { timeout: 45_000 });
+  };
+
+  await load();
+  const attributes = await page.evaluate(() => {
+    const gl = document.querySelector('canvas')!.getContext('webgl2')!;
+    return { ...gl.getContextAttributes(), samples: gl.getParameter(gl.SAMPLES) as number };
+  });
+  // HDR tiers antialias in the tone-map pass; a multisampled default framebuffer would be wasted.
+  expect(attributes.antialias).toBe(false);
+  expect(attributes.samples).toBe(0);
+  await expect.poll(() => consoleLogs.some((line) => line.includes('AA=FXAA in HDR tone-map')), { timeout: 15_000 }).toBe(true);
+  expect(textureRequests.length).toBeGreaterThan(0);
+  // Downloads are still landing after the module is up; reload only once the six skybox faces are stored.
+  await expect.poll(() => page.evaluate(async () => {
+    let stored = 0;
+    for (const name of await caches.keys()) {
+      stored += (await (await caches.open(name)).keys()).filter((request) => request.url.includes('/Main_SkyBox/')).length;
+    }
+    return stored;
+  }), { timeout: 30_000 }).toBeGreaterThanOrEqual(6);
+
+  textureRequests.length = 0;
+  consoleLogs.length = 0;
+  await load();
+  await expect.poll(() => consoleLogs.filter((line) => line.includes('[AssetCache] hit')).length, { timeout: 15_000 })
+    .toBeGreaterThanOrEqual(6);
+  expect(textureRequests).toEqual([]);
+});

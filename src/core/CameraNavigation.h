@@ -31,6 +31,15 @@ constexpr double kAnchorSwitchRatio = 0.5;
 /** Below this altitude (in body radii) a body draws with the NEAR_SURFACE permutation. */
 constexpr double kNearSurfaceRadii = 0.5;
 
+/**
+ * Hovering: under this altitude (in body radii) the floor ray-casts the drawn facets and the
+ * camera co-rotates with the body, so the ground it hovers over stays under it with time
+ * running. In orbit the anchor carries translation only and the body turns beneath. The
+ * camera lets go a little higher up, so the mode does not flip on the boundary.
+ */
+constexpr double kHoverRadii = 0.05;
+constexpr double kHoverReleaseRadii = 0.06;
+
 /** A body the camera can fly near, as its mesh is drawn. */
 struct Body {
     glm::dvec3 center{0.0};  // world position
@@ -79,6 +88,37 @@ std::optional<double> RaycastTriangles(const glm::dvec3& origin, const glm::dvec
  */
 std::optional<double> FacetRadius(const glm::dvec3& modelDirection, double boundingRadius,
                                   const std::vector<glm::vec3>& positions, const std::vector<unsigned>& indices);
+
+/** The facet FacetRadius finds, with its outward unit normal (model space). */
+struct FacetHit {
+    double radius;
+    glm::dvec3 normal;
+};
+
+/** FacetRadius plus the hit facet's normal: the plane a level horizon lies in near the ground. */
+std::optional<FacetHit> FacetAlong(const glm::dvec3& modelDirection, double boundingRadius,
+                                   const std::vector<glm::vec3>& positions, const std::vector<unsigned>& indices);
+
+/** A model-space normal in the world frame (unit length; `shape` may squash or stretch). */
+glm::dvec3 NormalToWorld(const Body& body, const glm::dvec3& modelNormal);
+
+/** Whether to co-rotate with the body this frame: engage under kHoverRadii, release past kHoverReleaseRadii. */
+bool CoRotates(bool current, double altitudeRadii);
+
+/** The rotation that takes the body's drawn orientation `before` to `after` (scale divided out). */
+glm::dmat3 RotationBetween(const glm::dmat3& before, const glm::dmat3& after);
+
+/**
+ * Where `eye` goes when `body` moves from its pose `before` to `after` (a frame's worth of
+ * orbit, spin and any date jump). Translation only unless `coRotate`: then the eye keeps its
+ * offset in the body's drawn frame (the model matrix's 3×3, which is what the surface is
+ * drawn with), so it stays over the same ground point at the same altitude. `rotation`, if
+ * given, receives the turn to apply to the camera's orientation (identity without coRotate).
+ * All in double: the rotation is about the body's own axis, which is whatever the matrix
+ * says, so nothing here needs to know the spin law.
+ */
+glm::dvec3 CarryEye(const Body& before, const Body& after, const glm::dvec3& eye, bool coRotate,
+                    glm::dmat3* rotation = nullptr);
 
 struct ClipPlanes {
     float nearPlane;

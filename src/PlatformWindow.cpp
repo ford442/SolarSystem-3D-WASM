@@ -9,7 +9,9 @@
 #include "assets/TextureFormatSupport.h"
 #include "Solar_System/OrbitLayout.h"
 #include "core/Log.h"
-#include <SDL_image.h>
+#ifndef __EMSCRIPTEN__
+#include <SDL_image.h> // native window icon only; the web build links neither SDL nor SDL_image
+#endif
 #include <algorithm>
 #include <cmath>
 #include <cstdlib>
@@ -126,10 +128,12 @@ void Application::InitSystems() {
 #else
     _simState.qualityPreset = ReadInitialQualityPreset();
 #endif
-    // MSAA is fixed when the context is created, so it must come from the *initial*
-    // quality preset; ApplyQualityPreset cannot change it later (same restriction as
-    // web, where the WebGL context's `antialias` is decided in bootstrap.ts).
+    // Context samples are fixed when the context is created, so they must come from the
+    // *initial* quality preset; ApplyQualityPreset cannot change them later (same
+    // restriction as web, where the WebGL context's `antialias` is decided in
+    // web/src/webglContext.ts). A tier with HDR asks for none: see ContextMsaaSamples.
     const auto qualitySettings = GetQualitySettings(_simState.qualityPreset, _simState.isMobileWeb);
+    const int requestedSamples = ContextMsaaSamples(qualitySettings);
 
 #ifdef __EMSCRIPTEN__
     glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 3);
@@ -138,13 +142,13 @@ void Application::InitSystems() {
     glfwWindowHint(GLFW_RESIZABLE, GLFW_TRUE);
     // GLFW_SAMPLES (and every other GLFW context-attribute hint) is inert here: the
     // WebGL2 context is created up front by web/src/bootstrap.ts (with antialias already
-    // decided from the same quality tier) and handed in via Module.preinitializedWebGLContext,
+    // decided from the same quality tier) and handed in via Module['preinitializedWebGLContext'],
     // which GLFW/Emscripten reuse as-is instead of building a context from these hints.
 #else
     glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 4);
     glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 6);
     glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
-    glfwWindowHint(GLFW_SAMPLES, qualitySettings.requestedMsaaSamples);
+    glfwWindowHint(GLFW_SAMPLES, requestedSamples);
     // Debug builds (or SOLARSYSTEM_GL_DEBUG=1): KHR_debug context, messages routed into Log.
     glfwWindowHint(GLFW_OPENGL_DEBUG_CONTEXT, GlDebugRequested() ? GLFW_TRUE : GLFW_FALSE);
 #endif
@@ -212,8 +216,12 @@ void Application::InitSystems() {
 
     GLint actualSamples = 0;
     glGetIntegerv(GL_SAMPLES, &actualSamples);
-    LOG_INFO("Quality", "Requested %dx MSAA, context provides %d samples", qualitySettings.requestedMsaaSamples,
-             actualSamples);
+    _simState.contextSamples = actualSamples;
+    // The tier's HDR flag is only a request (HDR::InitFBO can refuse); the "[Quality] Active
+    // tier" line later prints the path that actually runs.
+    LOG_INFO("Quality", "Context samples: requested %d, GL_SAMPLES=%d; %s", requestedSamples, actualSamples,
+             qualitySettings.enableHdr ? "HDR tone-map pass is the antialiasing path"
+                                       : "HDR off, antialiasing is the context's");
 
     // The UI reports _isVertSyncEnabled from startup, but only the F-key toggle used to
     // call through to the driver — so the reported state could disagree with reality
@@ -258,9 +266,8 @@ void Application::InitSystems() {
     FT_Init_FreeType(&_ft);
 
 #ifdef __EMSCRIPTEN__
-    // No SDL_Init on web: GLFW owns the canvas and web/src/music.ts owns audio. Calling it
-    // would keep SDL's audio subsystem (a deprecated ScriptProcessorNode device) linked in.
-    // IMG_Init below does not need it.
+    // No SDL on web at all: GLFW owns the canvas and web/src/music.ts owns audio. SDL_image
+    // exists only for the native window icon (LoadWindowIcon), so the SDL ports are not linked.
 #else
     // SDL's default SIGINT/SIGTERM handlers turn the signal into an SDL_QUIT event, but the
     // frame loop is GLFW's and never polls SDL events — so Ctrl-C and `timeout` were
@@ -290,12 +297,14 @@ void Application::InitSystems() {
     _soundEngine->setSoundVolume(0.3);
 #endif
 
+#ifndef __EMSCRIPTEN__
     if (!IMG_Init(IMG_INIT_JPG | IMG_INIT_PNG)) {
         Dispose();
         std::string msg = "Failed to init SDL_Image: ";
         msg += IMG_GetError();
         throw runtime_error(msg);
     }
+#endif
 
     glEnable(GL_DEPTH_TEST);
 #ifndef __EMSCRIPTEN__
@@ -325,10 +334,9 @@ void Application::Dispose() {
     glfwTerminate();
 
 #ifndef __EMSCRIPTEN__
+    IMG_Quit();
     SDL_Quit();
 #endif
-
-    IMG_Quit();
 
 #ifdef SOLARSYSTEM_USE_SDL_MIXER
     Mix_CloseAudio();
@@ -379,6 +387,7 @@ void Application::DisplaySystemInformation() const {
     LOG_INFO("GPU", "Driver: %s", glString(GL_VERSION));
 }
 
+#ifndef __EMSCRIPTEN__
 void Application::LoadWindowIcon() const {
     constexpr auto execIconPath = "resource/icons/solarsystem-logo.png";
     SDL_Surface* windowIcon = IMG_Load(execIconPath);
@@ -398,6 +407,7 @@ void Application::LoadWindowIcon() const {
     glfwSetWindowIcon(_mainWindow, 1, &image);
     SDL_FreeSurface(windowIcon);
 }
+#endif
 
 void Application::HandleResize(int width, int height) {
     width = std::max(1, width);
@@ -418,6 +428,9 @@ void Application::FramebufferSizeCallback(GLFWwindow* window, int width, int hei
         glViewport(0, 0, width, height);
         return;
     }
+    if (app->_capture.resized) {
+        return; // a capture renders at its own size (WebWindowResizeCallback)
+    }
     app->HandleResize(width, height);
 }
 
@@ -429,15 +442,22 @@ void Application::FramebufferSizeCallback(GLFWwindow* window, int width, int hei
 // independent mechanism that actually listens for window resize (and orientation change).
 EM_BOOL Application::WebWindowResizeCallback(int /*eventType*/, const EmscriptenUiEvent*, void* userData) {
     auto* app = static_cast<Application*>(userData);
+    // A capture renders at its own size; EndCapture fits the canvas to the window again.
+    if (!app->_capture.resized) {
+        app->FitCanvasToCss();
+    }
+    return EM_FALSE; // Don't block the event from reaching other listeners.
+}
+
+void Application::FitCanvasToCss() {
     double cssWidth = 0.0, cssHeight = 0.0;
     emscripten_get_element_css_size("#canvas", &cssWidth, &cssHeight);
     if (cssWidth > 0.0 && cssHeight > 0.0) {
-        const int width = static_cast<int>(std::lround(cssWidth * app->_simState.backingStoreScale));
-        const int height = static_cast<int>(std::lround(cssHeight * app->_simState.backingStoreScale));
+        const int width = static_cast<int>(std::lround(cssWidth * _simState.backingStoreScale));
+        const int height = static_cast<int>(std::lround(cssHeight * _simState.backingStoreScale));
         emscripten_set_canvas_element_size("#canvas", width, height);
-        app->HandleResize(width, height);
+        HandleResize(width, height);
     }
-    return EM_FALSE; // Don't block the event from reaching other listeners.
 }
 #endif
 
