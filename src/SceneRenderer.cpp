@@ -114,7 +114,7 @@ void Renderer::Init(const SimState& sim, FT_Library ft, glm::ivec2 display) {
     // HDR turns itself off when the GPU cannot give it a complete float FBO; follow it,
     // otherwise the composite path would keep sampling an empty buffer.
     _hdrEnabled = _hdr->IsEnabled();
-    LogQualityTier(qualitySettings, _hdrEnabled, sim.shadowQuality);
+    LogQualityTier(qualitySettings, _hdrEnabled, sim.shadowQuality, sim.contextSamples);
 
     _mainTextShader = &_shaders.Get(textSpec);
     _textRenderer = make_unique<TextRenderer>(ft, "resource/fonts/Arial.ttf");

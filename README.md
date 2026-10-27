@@ -180,7 +180,7 @@ See [docs/plans/PORTING_GUIDE.md](docs/plans/PORTING_GUIDE.md) for detailed info
 
 ```bash
 ./build-web.sh          # Release WASM (default: -O3 -flto)
-./build-web.sh --debug  # Debug WASM with symbols (-O0 -g)
+./build-web.sh --debug  # Debug WASM with symbols (-O0 -g -gsource-map)
 cd web
 npm run dev             # http://localhost:5173/solar-system/
 npm run preview         # http://localhost:4173/solar-system/ (production bundle)

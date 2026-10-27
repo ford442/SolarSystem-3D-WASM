@@ -28,7 +28,7 @@ void Application::ApplyQualityPreset(int preset) {
     }
     _renderer.RebuildMissionPaths(_missionCatalog, _simState.qualityPreset);
     _renderer.RebuildMagneticFields(_simState.qualityPreset);
-    LogQualityTier(settings, _renderer.HdrEnabled(), _simState.shadowQuality);
+    LogQualityTier(settings, _renderer.HdrEnabled(), _simState.shadowQuality, _simState.contextSamples);
 }
 
 void Application::ApplyShadowQuality(int quality) {
@@ -41,7 +41,7 @@ void Application::ApplyShadowQuality(int quality) {
     const auto settings = GetQualitySettings(_simState.shadowQuality - 1, _simState.isMobileWeb);
     _renderer.ResizeShadowMap(settings.shadowResolution);
     _renderer.ApplyRenderResources(_simState, settings.shadowResolution, settings.enableHdr, DisplaySize());
-    LogQualityTier(settings, _renderer.HdrEnabled(), _simState.shadowQuality);
+    LogQualityTier(settings, _renderer.HdrEnabled(), _simState.shadowQuality, _simState.contextSamples);
 }
 
 void Application::ApplyOrbitScaleMode(int mode) {

@@ -16,6 +16,8 @@ struct SimState {
     bool isMobileWeb = false;
     /** Canvas backing-store pixels per CSS pixel (capped per quality tier); see webglContext.ts. */
     float backingStoreScale = 1.0f;
+    /** glGetIntegerv(GL_SAMPLES) of the default framebuffer, read once after context creation. */
+    int contextSamples = 0;
 };
 
 #endif // SOLARSYSTEM_SIM_STATE_H

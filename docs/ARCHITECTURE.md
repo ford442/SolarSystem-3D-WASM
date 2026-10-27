@@ -360,6 +360,27 @@ window.__solarSystemAssetBase = runtimeAssetBase;  // consumed by WebResourceFet
 {VITE_ASSET_BASE or page base URL} + resource/...
 ```
 
+### 6.1.1 Fetched assets are cached in the page
+
+`WebResourceFetcher` normally downloads with `emscripten_async_wget2`. When
+`window['__solarSystemFetchAsset']` exists (`web/src/assetCache.ts`, installed by `bootstrap.ts`
+before `Module()` runs), `StartTransfer` calls it instead and only writes the returned bytes into
+MEMFS. The hook resolves a cached body or fetches it and stores it in the **Cache API**:
+
+- Cache name `solarsystem-assets:<asset base URL>`: a deploy that moves to a new base starts
+  clean, and caches of other bases are deleted. A deploy that replaces files *in place* at the
+  same base must change the base (a versioned path, as in the S3 layout above) or the old bytes
+  are served.
+- Hit: no network request. Miss: fetch, and store only a complete `200` body — not an HTTP error,
+  a `206`, a body shorter than its `Content-Length`, or a `text/html` body (Vite's SPA fallback
+  answers a missing file with `index.html` and a 200).
+- Core preloads in `SolarSystem.data` never come through here; neither does anything prefetch.
+  What gets requested is still decided by the texture LOD tier, so a Low preset never pulls high tiers.
+- Off in `npm run dev` (edited textures would be pinned); `?assetcache=1` / `?assetcache=0`
+  overrides either way. Without the Cache API (insecure origin) it fetches uncached.
+
+It is not a service worker and not an offline shell. Quadtree terrain tiles will use the same storage.
+
 ### 6.1 Dev, preview, and production (single rule)
 
 | Mode | Command | Default asset origin | Notes |
@@ -381,7 +402,8 @@ The value is the directory **containing** `resource/`, with a trailing slash. It
 
 | Asset class | WASM `.data` preload | Runtime fetch |
 |-------------|---------------------|---------------|
-| Shaders, fonts, icons | Yes | — |
+| Shaders, fonts, missions, sky | Yes | — |
+| `resource/icons/` (14 MB, native window icon only) | **No** | — |
 | Atmosphere LUTs (`resource/atmosphere/`, ~560 KB RGBA16F KTX2) | Yes | — |
 | Low-res placeholders | Partial (via build copy to `web/public/`) | Core + staged + LOD |
 | High-res textures | No | LOD queue + skybox core load |
@@ -820,6 +842,34 @@ std::string GetTexturePath(const std::string& lowRes, const std::string& highRes
 
 **Catalog-only bodies first:** if the world needs nothing but a diffuse/normal (optional
 specular) texture set, an orbit, and catalog tilt, skip the list below — add a catalog entry
+### 9.6 Antialiasing and the context attributes
+
+Context attributes are fixed for the life of the page and chosen once from the initial quality
+tier: native with `GLFW_SAMPLES` (`PlatformWindow.cpp`), web in `web/src/webglContext.ts`
+(`Module.contextAttributes` and GLFW hints are ignored by the Emscripten port; the context is
+created in TypeScript and handed in as `preinitializedWebGLContext`). Everything else about them
+(`alpha: false`, `stencil: false`, `preserveDrawingBuffer: false` because capture reads the canvas
+in the same turn as `StepCaptureFrame`, `xrCompatible: true`, `powerPreference`) stays there too.
+
+With HDR on, the colour pass draws into `gfx/HDR`'s single-sampled texture and `hdr.fs` writes the
+default framebuffer. Default-framebuffer MSAA would resolve an image that was already resolved, so
+**a tier with HDR asks the context for no samples** (`ContextMsaaSamples()`), and the tone-map pass
+antialiases instead: `hdr.fs` runs FXAA on the *tone-mapped* value (so an HDR sun many times
+brighter than its neighbours does not decide every edge test), with the HDR texture clamped to
+edge. Only a tier without HDR (low) may keep a multisampled context. Startup logs
+`[Quality] Context samples: requested N, GL_SAMPLES=M` and the `Active tier` line prints
+`AA=<path>` from `ResolveAntialiasPath(hdrEnabled, GL_SAMPLES)`. If `HDR::InitFBO` refuses (no
+float render targets) the path becomes `none`: the context was created without samples.
+
+### 9.7 Web link flags
+
+Release: `-O3 -flto --closure 1 --emit-symbol-map` (minified stacks map back through
+`SolarSystem.js.symbols`); Debug: `-O0 -g -gsource-map`. Both: `-msimd128`, `-sENVIRONMENT=web`,
+`-sSTACK_SIZE=1MB`, `-fwasm-exceptions`. `GROWABLE_ARRAYBUFFERS=0` (Chrome's WebGL/DOM APIs reject
+views over a resizable `ArrayBuffer`) and no pthread / `SHARED_MEMORY` flags. `--preload-file`
+directories and `scripts/wasm-exports.json` are `LINK_DEPENDS` in `CMakeLists.txt`.
+`SDL2`/`SDL2_image` are native-only.
+
 with a `render` block, textures, and an `initTag` on `initTagAllowlist`. Codegen updates
 `BodyCatalog.generated.h`; `InitCatalogSystem` / `MakePlanetInitFunc` pick it up with **no new
 `.h/.cpp`**. If it is a new *focus* body, also add an `OrbitLayout::Body` value, a

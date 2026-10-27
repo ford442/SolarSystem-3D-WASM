@@ -140,7 +140,12 @@ fi
 echo ""
 echo "Artifact sizes ($BUILD_TYPE):"
 if [ -f "$PROJECT_ROOT/web/public/SolarSystem.wasm" ]; then
-    wc -c "$PROJECT_ROOT/web/public/SolarSystem.wasm" "$PROJECT_ROOT/web/src/SolarSystem.js" 2>/dev/null || true
+    wc -c "$PROJECT_ROOT/web/public/SolarSystem.wasm" "$PROJECT_ROOT/web/public/SolarSystem.data" \
+        "$PROJECT_ROOT/web/src/SolarSystem.js" 2>/dev/null || true
+fi
+# Release only: minified name -> original name, for reading Closure-renamed stacks.
+if [ -f "SolarSystem.js.symbols" ]; then
+    echo "Symbol map kept at $BUILD_DIR/SolarSystem.js.symbols (not deployed)"
 fi
 echo ""
 echo "Build & Deployment Complete!"

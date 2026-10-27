@@ -579,5 +579,11 @@ declare global {
       isMobileWeb: boolean;
       backingStoreScale: number;
     };
+    /**
+     * Download hook for WebResourceFetcher: resolves the body, or the HTTP status of a
+     * failure (0 = network). Installed by bootstrap.ts (assetCache.ts); when absent C++
+     * falls back to emscripten_async_wget2 with no cache.
+     */
+    __solarSystemFetchAsset?: (url: string) => Promise<Uint8Array<ArrayBuffer> | number>;
   }
 }

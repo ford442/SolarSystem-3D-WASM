@@ -114,3 +114,30 @@ TEST(QualitySettingsTest, AtmosphereAndCoronaEffectsPerTier) {
     ExpectEffects(GetQualitySettings(1, true), true, 8, false, 0);
     ExpectEffects(GetQualitySettings(2, true), true, 12, true, 16);
 }
+
+TEST(QualitySettingsTest, TiersWithHdrAskTheContextForNoSamples) {
+    // Full's table row still says 4: the request is for the HDR path's benefit and the
+    // context must not honour it, because the colour pass never draws into that buffer.
+    EXPECT_EQ(GetQualitySettings(2, false).requestedMsaaSamples, 4);
+    for (const bool mobile : {false, true}) {
+        for (int preset = 0; preset <= 2; ++preset) {
+            const auto settings = GetQualitySettings(preset, mobile);
+            if (settings.enableHdr) {
+                EXPECT_EQ(ContextMsaaSamples(settings), 0) << settings.name << (mobile ? " (mobile)" : "");
+            } else {
+                EXPECT_EQ(ContextMsaaSamples(settings), settings.requestedMsaaSamples) << settings.name;
+            }
+        }
+    }
+}
+
+TEST(QualitySettingsTest, AntialiasPathFollowsWhatTheFrameDrawsInto) {
+    // HDR on: the tone-map pass resolves, whatever the context has.
+    EXPECT_EQ(ResolveAntialiasPath(true, 0), AntialiasPath::HdrResolve);
+    EXPECT_EQ(ResolveAntialiasPath(true, 4), AntialiasPath::HdrResolve);
+    // HDR off (low tier, or HDR::InitFBO refused): only a multisampled context antialiases.
+    EXPECT_EQ(ResolveAntialiasPath(false, 4), AntialiasPath::ContextMsaa);
+    EXPECT_EQ(ResolveAntialiasPath(false, 1), AntialiasPath::None);
+    EXPECT_EQ(ResolveAntialiasPath(false, 0), AntialiasPath::None);
+    EXPECT_STREQ(AntialiasPathName(AntialiasPath::HdrResolve), "FXAA in HDR tone-map");
+}

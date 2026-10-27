@@ -190,6 +190,67 @@ TEST(Framebuffers, ShadowMapAndHdrTargetsAreComplete) {
     EXPECT_EQ(glGetError(), static_cast<GLenum>(GL_NO_ERROR));
 }
 
+TEST(Hdr, TheToneMapPassAntialiasesAHardEdgeAndLeavesFlatAreasAlone) {
+    REQUIRE_GL_CONTEXT();
+    constexpr int kSize = 32;
+    const Shader hdrShader("resource/shaders/passThrough.vs", "resource/shaders/hdr.fs");
+    HDR hdr(hdrShader, kSize, kSize);
+    if (!hdr.IsEnabled()) {
+        GTEST_SKIP() << "no renderable float color buffers";
+    }
+
+    // A staircase diagonal in the HDR target: bright (value 4) where x < y, black elsewhere.
+    // Scissored clears give hard, aliased steps with no rasteriser involved.
+    glBindFramebuffer(GL_FRAMEBUFFER, hdr.GetHdrFBO());
+    glViewport(0, 0, kSize, kSize);
+    glEnable(GL_SCISSOR_TEST);
+    glScissor(0, 0, kSize, kSize);
+    glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
+    glClear(GL_COLOR_BUFFER_BIT);
+    glClearColor(4.0f, 4.0f, 4.0f, 1.0f);
+    for (int y = 0; y < kSize; ++y) {
+        glScissor(0, y, y, 1);
+        glClear(GL_COLOR_BUFFER_BIT);
+    }
+    glDisable(GL_SCISSOR_TEST);
+
+    GlTexture color = GlTexture::Create();
+    glBindTexture(GL_TEXTURE_2D, color.get());
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA8, kSize, kSize, 0, GL_RGBA, GL_UNSIGNED_BYTE, nullptr);
+    GlFramebuffer target = GlFramebuffer::Create();
+    glBindFramebuffer(GL_FRAMEBUFFER, target.get());
+    glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, color.get(), 0);
+    ASSERT_EQ(glCheckFramebufferStatus(GL_FRAMEBUFFER), static_cast<GLenum>(GL_FRAMEBUFFER_COMPLETE));
+    glDisable(GL_DEPTH_TEST);
+    glDisable(GL_CULL_FACE);
+    hdr.Render(1.0f, 1.0f); // gamma 1: the displayed value is the tone-mapped one
+
+    std::vector<unsigned char> pixels(kSize * kSize * 4);
+    glReadPixels(0, 0, kSize, kSize, GL_RGBA, GL_UNSIGNED_BYTE, pixels.data());
+    glBindFramebuffer(GL_FRAMEBUFFER, 0);
+    const auto red = [&](int x, int y) { return static_cast<int>(pixels[(y * kSize + x) * 4]); };
+
+    const int flatDark = red(kSize - 4, 3);
+    const int flatBright = red(3, kSize - 4);
+    EXPECT_EQ(flatDark, 0);                  // 1 - exp(0)
+    EXPECT_NEAR(flatBright, 250, 2);         // 1 - exp(-4), untouched away from the edge
+    EXPECT_NEAR(red(0, kSize - 1), 250, 2);  // a corner tap must clamp, not wrap to the dark side
+
+    // Without the resolve every pixel is one of the two flat values; on the edge there are
+    // now in-between ones.
+    int blended = 0;
+    for (int y = 0; y < kSize; ++y) {
+        for (int x = 0; x < kSize; ++x) {
+            const int value = red(x, y);
+            if (value > 15 && value < 235) {
+                ++blended;
+            }
+        }
+    }
+    EXPECT_GE(blended, kSize / 2) << "the tone-map pass left the staircase aliased";
+    EXPECT_EQ(glGetError(), static_cast<GLenum>(GL_NO_ERROR));
+}
+
 TEST(Draw, ALineStripBatchQuadFillsTheTarget) {
     REQUIRE_GL_CONTEXT();
     constexpr int kSize = 16;

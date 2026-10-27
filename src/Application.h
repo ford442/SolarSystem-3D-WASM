@@ -326,7 +326,9 @@ private:
     void StartPlayBackgroundMusic();
     void UpdateBackgroundMusic(); // For Emscripten frame-based music
     void StopPlayBackgroundMusic();
+#ifndef __EMSCRIPTEN__
     void LoadWindowIcon() const;
+#endif
     void DisplaySystemInformation() const;
     void ProcessInput(GLFWwindow* window);
     float CalculateSpaceObjectDistance(const SpaceObject* spaceObject) const;

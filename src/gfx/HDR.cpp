@@ -53,6 +53,8 @@ void HDR::Render(float exposure, float gamma) const {
     _hdrShader->SetBool("hdr", true);
     _hdrShader->SetFloat("exposure", exposure);
     _hdrShader->SetFloat("gamma", gamma);
+    // The tone-map pass also antialiases (FXAA in hdr.fs); its taps are one texel apart.
+    _hdrShader->SetVec2("texelSize", 1.0f / static_cast<float>(_width), 1.0f / static_cast<float>(_height));
 
     glBindVertexArray(_quadVao.get());
     glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
@@ -118,6 +120,9 @@ void HDR::InitFBO(uint16_t width, uint16_t height) {
 #endif
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+    // The FXAA taps reach one texel past the border; wrapping would blend in the opposite edge.
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
 
     _rboDepth = GlRenderbuffer::Create();
     glBindRenderbuffer(GL_RENDERBUFFER, _rboDepth.get());

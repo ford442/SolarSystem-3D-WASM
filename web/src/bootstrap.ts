@@ -18,6 +18,7 @@ import {
     type SolarSystemRuntime,
 } from './wasmBridge';
 import { installWasmCallbacksOnConfig, setModuleInstance } from './wasmCallbacks';
+import { assetCacheEnabled, createAssetFetcher } from './assetCache';
 import { computeWebGlSizing } from './webglContext';
 
 const canvas = document.getElementById('canvas') as HTMLCanvasElement;
@@ -110,6 +111,19 @@ const progressCallbacks = createProgressCallbacks({
 });
 
 window.__solarSystemAssetBase = runtimeAssetBase;
+
+// Runtime downloads (textures, planet manifests) go through the Cache API so a repeat visit
+// skips the network. Installed before Module() because the first downloads happen inside
+// main(). Core preloads are in SolarSystem.data and never come through here.
+if (assetCacheEnabled(window.location.search, import.meta.env.DEV)) {
+    window.__solarSystemFetchAsset = createAssetFetcher({
+        assetBase: runtimeAssetBase,
+        baseHref: window.location.href,
+        caches: typeof caches === 'undefined' ? undefined : caches,
+        fetch: window.fetch.bind(window),
+        log: (message) => console.debug(message),
+    });
+}
 
 // Music is a browser media concern: tracks stream straight from the asset base, outside the
 // WASM core-resource count, and a missing mp3 just logs and skips.
