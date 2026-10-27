@@ -76,8 +76,12 @@ CatalogMaterial::Textures CatalogBody::CurrentTextures() const {
 }
 
 void CatalogBody::Draw(const Shader& shader) const {
-    CatalogMaterial::BindMaterial(shader, _material, CurrentTextures());
+    BindMaterial(shader);
     SpaceObject::Draw(shader);
+}
+
+void CatalogBody::BindMaterial(const Shader& shader) const {
+    CatalogMaterial::BindMaterial(shader, _material, CurrentTextures());
 }
 
 void CatalogBody::LoadHighResIfClose(const glm::vec3& cameraPos, const TextureLodPolicy& policy) {

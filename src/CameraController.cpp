@@ -59,6 +59,10 @@ Application::SurfacePoint Application::SurfaceAlong(int catalogIndex, const glm:
     // Any point along the direction will do: the floor's cast only takes its bearing.
     const glm::dvec3 eye = body.center + radial;
     const glm::dvec3 model = glm::normalize(CameraNavigation::ToModel(body, eye));
+    // Tiles drawn there: their ground, under the sphere's own normal (no slope in v1).
+    if (const std::optional<double> terrain = TerrainSurfaceRadius(*object, eye)) {
+        return {*terrain * CameraNavigation::WorldScaleAlong(body, model), CameraNavigation::NormalToWorld(body, model)};
+    }
     const CameraNavigation::FacetHit facet = SurfaceModelFacet(*object, body, eye);
     return {facet.radius * CameraNavigation::WorldScaleAlong(body, model),
             CameraNavigation::NormalToWorld(body, facet.normal)};
@@ -155,8 +159,12 @@ void Application::ConstrainCamera() {
     if (nearest) {
         const CameraNavigation::Body body = NavigationBody(*nearest);
         const double radius = nearest->GetBoundingSphere().radius;
-        const double surface =
-            nearestAltitude < CameraNavigation::kHoverRadii * radius ? SurfaceModelRadius(*nearest, body, eye) : body.meshRadius;
+        // A body drawing terrain tiles stands the camera on the tile under it (the deepest one
+        // resident there: its roots always are). The sphere is what is drawn otherwise.
+        const std::optional<double> terrain = TerrainSurfaceRadius(*nearest, eye);
+        const double surface = terrain ? *terrain
+                               : nearestAltitude < CameraNavigation::kHoverRadii * radius ? SurfaceModelRadius(*nearest, body, eye)
+                                                                                         : body.meshRadius;
         // Observe parks the camera on Earth's surface itself and draws only the sky.
         if (!_observe.active) {
             const double margin = trueScale ? SceneScale::KmToScene(kRealisticFloorMarginKm) : kCompressedFloorMargin;

@@ -26,7 +26,9 @@
     X(Ring, 6, TU_RING)                  /* a nearby ring's texture, for ring shadows/occlusion */ \
     X(TransmittanceLut, 7, TU_TRANSMITTANCE_LUT)                                               \
     X(MultiScatteringLut, 8, TU_MULTI_SCATTERING_LUT)                                          \
-    X(Moon, 9, TU_MOON)                  /* Observe's Moon disc */
+    X(Moon, 9, TU_MOON)                  /* Observe's Moon disc */                              \
+    X(TerrainHeight, 10, TU_TERRAIN_HEIGHT) /* a terrain tile's heights, read by terrain.vs */  \
+    X(TerrainParent, 11, TU_TERRAIN_PARENT) /* its parent's, which it morphs to */
 
 enum class TextureUnit : int {
 #define SOLARSYSTEM_TEXTURE_UNIT_ENUM(name, value, glsl) name = value,

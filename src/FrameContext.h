@@ -13,7 +13,11 @@
 #include <vector>
 
 class AsteroidField;
+class SpaceObject;
 class Star;
+namespace Terrain {
+struct ActiveBody;
+}
 
 /**
  * Everything a render pass is allowed to know, handed to Renderer explicitly instead of the
@@ -62,6 +66,24 @@ struct SceneSnapshot {
     const Observer::Sky* observeSky = nullptr;
     unsigned int observeMoonTexture = 0;
     const SkyEvents::SkyEvent* nextSkyEvent = nullptr;
+
+    // Bodies flagged render.terrain that the camera is near (src/render/terrain/). `tiles`
+    // is this frame's selection when the body draws as tiles instead of its sphere; null
+    // while it is only close enough for the renderer to get its terrain programs ready.
+    struct TerrainBody {
+        const SpaceObject* body = nullptr;
+        const Terrain::ActiveBody* tiles = nullptr;
+    };
+    std::vector<TerrainBody> terrain;
+
+    const TerrainBody* TerrainFor(const SpaceObject* body) const {
+        for (const TerrainBody& entry : terrain) {
+            if (entry.body == body) {
+                return &entry;
+            }
+        }
+        return nullptr;
+    }
 
     const RenderableSceneComponent* Nearest() const {
         if (!components || nearestComponent < 0 || static_cast<size_t>(nearestComponent) >= components->size()) {

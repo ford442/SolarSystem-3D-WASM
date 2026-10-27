@@ -68,6 +68,7 @@ The CMakeLists.txt has separate configurations for EMSCRIPTEN vs native builds, 
   - `RenderSettings.cpp` — quality/shadow presets, orbit scale mode, texture LOD manager
   - `StarSystemFactory.cpp` / `PlanetSystemLoader.cpp` — scene construction and staged web loading
   - `XrSession.cpp` — WebXR eye state and the stereo render pass (web only)
+  - `TerrainController.cpp` — terrain fetch hook, per-frame tile selection into the frame snapshot, the `[Terrain]` log line
   - `Cinematics.cpp` — what web timelines and capture call: body catalog / scene state JSON, surface queries, system preload, HUD mask, `BeginCapture`/`StepCaptureFrame`/`EndCapture` (ARCHITECTURE §11.2)
 - `Renderer.h` — The `Renderer` class: shadow/color/overlay/HDR draw passes and the GPU
   resources they own (shaders, shadow FBO, HDR, skybox, lens flare, text renderer, orbit/
@@ -87,6 +88,7 @@ The CMakeLists.txt has separate configurations for EMSCRIPTEN vs native builds, 
 - `gfx/` — every GL object: `GlHandle` (the only `glGen*`/`glDelete*`), `Shader`/`ShaderLibrary`/`ShaderSource`, `Mesh`/`MeshHolder`, `LineStripBatch`, `TextureImage2D`, `FloatLutTexture`, `ShadowMapFBO`, `HDR`, `FrameUniforms`, `TextureUnits.h`, `Frustum.h`, `GlCapabilities`
 - `render/` — features built on `gfx/`: `LensFlare`, `TextRenderer`, orbit/mission/XR-pointer/magnetic-field renderers, field-line bloom
 - `assets/` — `WebResourceFetcher` (callback-based `emscripten_async_wget2`; the blocking `emscripten_wget_data` path is gone — see "No blocking fetches" below), `TextureLoadingQueue`, `TextureLODController`, `PlanetManifestLoader`, `TextureFormatSupport`, `BlockCompression`
+- `render/terrain/` — cube-sphere height tiles for `render.terrain` bodies (Moon, Mars, Mercury, Earth): GL-free `CubeSphere`/`TerrainTile`/`TerrainQuadtree`/`TileCache`/`TerrainSystem` (unit-tested in `test_terrain_quadtree.cpp`) plus the GL `TerrainRenderer`; `TerrainController.cpp` runs it per frame, `terrain.vs`/`terrain.fs` share the catalog material through `common/planet_surface.glsl`. Tiles are baked offline (`scripts/bake-terrain-tiles.py`), never committed; Low never fetches one (ARCHITECTURE §11.3)
 - `astro/` — GL-free: `Ephemeris`, `SkyEvents`, `Observer`, `LunarTheory`, `StarCatalog`, `MissionCatalog`, `MagneticField*` models, `SeatedView.h`
 - Headers carry no `using namespace`, and `Renderer.h` forward-declares the GPU helpers it holds by `unique_ptr` — include their headers in the `.cpp` that uses them. `scripts/check-source-rules.sh` and `scripts/check-gl-handles.sh` (CI) enforce both rules plus "no `std::cout`/`std::cerr` in `src/`"
 

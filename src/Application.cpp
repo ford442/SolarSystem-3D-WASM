@@ -14,6 +14,7 @@
 #include "Solar_System/SceneScale.h"
 #include "core/Log.h"
 #include "render/XrPointerRenderer.h"
+#include "render/terrain/TerrainSystem.h"
 #include <algorithm>
 #include <chrono>
 #include <cmath>
@@ -349,6 +350,7 @@ void Application::RenderFrame(int viewCount) {
         _renderer.BeginFrame();
         UpdateScene(OrbitLayout::GetJulianDate());
         BuildFrameSnapshot(viewCount);
+        UpdateTerrain(viewCount);
         CullScene(viewCount);
         return _observe.active ? 0 : _drawOrder.size();
     };

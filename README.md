@@ -389,6 +389,30 @@ from the keyboard.
 Configure CORS on the bucket and response-header/CORP injection on the CDN before switching
 `VITE_ASSET_BASE` to the new version. Keep the previous version prefix available for rollback.
 
+### Terrain tiles
+
+The Moon, Mars, Mercury and Earth (catalog `render.terrain`) draw height tiles instead of
+their sphere when the camera is low, on Medium and Full (docs/ARCHITECTURE.md §11.3). The
+tiles are not in git or in `SolarSystem.data`: bake them by hand from the public elevation
+models named in each row's attribution, then publish `terrain/` with the other runtime assets.
+Without them a body simply stays its sphere.
+
+```bash
+pip install numpy gdal          # GDAL for the source rasters (a global .npy works without it)
+python3 scripts/bake-terrain-tiles.py moon --source LDEM_118M.tif --datum-km 1737.4 \
+    --levels 6 --region -89.9 0 60 9 --out build/terrain
+cp -r build/terrain/moon resource/terrain/   # then: node scripts/generate-planet-metadata.mjs --write-checksums
+```
+
+`--levels` bakes the whole body to that depth, and each `--region LAT LON RADIUS_KM MAX_LEVEL`
+goes deeper around one place (Shackleton above, Olympus Mons with `18.65 -133.8 400 9` on
+Mars). Repeat `--source` in priority order (Earth: SRTM, then ETOPO 2022 for the sea floor and
+the rest); `--datum-km` is the radius the source's heights are measured from. Each
+`terrain/<body>/tileset.json` is listed (optional) in `resource/asset-manifest.json` and
+records the SHA-256 of every tile. Tiles are fetched through the same asset cache as
+textures, so a body visited once still draws its tiles offline. For `npm run dev`, put a
+baked set under `web/public/resource/terrain/`.
+
 ### Separate deployment
 
 `web/deploy.py` has independent `app` and `assets` targets. It reads connection details from the
@@ -404,7 +428,7 @@ export SOLAR_DEPLOY_ASSET_REMOTE=public_html/solar-assets/2026.07.0/resource
 
 cd web
 python3 deploy.py app       # uploads dist/ only
-python3 deploy.py assets    # uploads resource/{textures,textures_low,textures_mid,sounds} + manifest
+python3 deploy.py assets    # uploads resource/{textures,textures_low,textures_mid,sounds,terrain} + manifest
 # Or publish both explicitly:
 python3 deploy.py all
 ```

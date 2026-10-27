@@ -153,6 +153,9 @@
       },
       "includeInCompanion": true,
       "render": {
+        "terrain": {
+          "attribution": "Heights: MESSENGER MLA/MDIS global DEM (NASA/JHUAPL/Carnegie Institution of Washington/USGS), public domain. Faces the DEM does not cover stay the sphere."
+        },
         "shaderFlags": {
           "hasNightTexture": false,
           "hasSpecularMap": true,
@@ -338,6 +341,9 @@
       },
       "includeInCompanion": true,
       "render": {
+        "terrain": {
+          "attribution": "Heights: SRTM v3 (NASA/USGS) on land and ETOPO 2022 bathymetry (NOAA NCEI) at sea, both public domain."
+        },
         "shaderFlags": {
           "hasNightTexture": true,
           "hasSpecularMap": true,
@@ -452,6 +458,9 @@
       },
       "includeInCompanion": true,
       "render": {
+        "terrain": {
+          "attribution": "Heights: MGS MOLA MEGDR (NASA/JPL/GSFC), public domain."
+        },
         "shaderFlags": {
           "hasNightTexture": false,
           "hasSpecularMap": false,
@@ -1553,6 +1562,9 @@
       },
       "includeInCompanion": false,
       "render": {
+        "terrain": {
+          "attribution": "Heights: LRO LOLA LDEM (NASA/GSFC/LOLA Science Team), public domain."
+        },
         "shaderFlags": {
           "hasNightTexture": false,
           "hasSpecularMap": false,

@@ -38,6 +38,7 @@ set(SOLARSYSTEM_SOURCES_CORE
     src/ResourceManifest.cpp
     src/PlanetSystemLoader.cpp
     src/CameraController.cpp
+    src/TerrainController.cpp
     src/Cinematics.cpp
     src/SceneRenderer.cpp
     src/SceneOverlayRenderer.cpp
@@ -80,6 +81,13 @@ set(SOLARSYSTEM_SOURCES_AUX
     src/render/XrPointerRenderer.cpp
     src/render/MagneticFieldLineRenderer.cpp
     src/render/MagneticFieldBloom.cpp
+    # render/terrain/: cube-sphere height tiles (GL-free except TerrainRenderer)
+    src/render/terrain/CubeSphere.cpp
+    src/render/terrain/TerrainTile.cpp
+    src/render/terrain/TerrainQuadtree.cpp
+    src/render/terrain/TileCache.cpp
+    src/render/terrain/TerrainSystem.cpp
+    src/render/terrain/TerrainRenderer.cpp
     # assets/: downloads, texture streaming and formats
     src/assets/WebResourceFetcher.cpp
     src/assets/TextureLoadingQueue.cpp

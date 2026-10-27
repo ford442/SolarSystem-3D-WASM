@@ -52,3 +52,11 @@ Eris, Haumea, Makemake and Halley have no IAU frame: omit both. W0 is then 0 and
 `360 / siderealRotationDays`. The generator rejects a rate more than 1.5 % off the sidereal day.
 Earth's W0/Wdot are the IAU values, but Earth's drawn spin is solved against the true sub-solar
 longitude (ARCHITECTURE §11), with the texture centre as the one constant.
+
+## Terrain
+
+`render.terrain` (`{ "attribution": "…" }`) makes a body draw cube-sphere height tiles instead
+of its sphere close up (ARCHITECTURE §11.3). The attribution credits the elevation data the
+tiles are baked from (`scripts/bake-terrain-tiles.py`, which refuses a body without the
+block); the generator emits it as `BodyCatalog::Entry::hasTerrain` / `terrainAttribution` and
+rejects the block on a body with its own `render.mesh`. Moon, Mars, Mercury and Earth carry it.

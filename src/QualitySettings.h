@@ -35,6 +35,12 @@ struct QualityTierSettings {
     // Web staged loading: how many planet systems nearest the start pose load right away
     // instead of waiting for the camera to approach them (see ActivateNearestPlanetSystems).
     int eagerPlanetSystems;
+    // Height tiles on bodies flagged render.terrain (src/render/terrain/). A budget of 0 keeps
+    // every body its sphere and never fetches a tile. The pixel error is the largest a tile's
+    // quad may span on screen before it splits; the in-flight cap bounds tile downloads.
+    int terrainBudgetMiB;
+    float terrainPixelError;
+    int terrainMaxInFlight;
     const char* name;
 };
 

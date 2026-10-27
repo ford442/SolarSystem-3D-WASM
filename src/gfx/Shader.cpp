@@ -112,6 +112,11 @@ Shader::Shader(Shader&& other) noexcept : Shader() {
 Shader& Shader::operator=(Shader&& other) noexcept = default;
 
 Shader::~Shader() {
+    // A setter on the next program compares its name with the tracked one; GL may hand this
+    // name out again, so a stale entry would let a value land in whatever program is bound.
+    if (_program && s_currentProgram == _program.get()) {
+        s_currentProgram = 0;
+    }
     std::vector<Shader*>& registry = Registry();
     registry.erase(std::remove(registry.begin(), registry.end(), this), registry.end());
 }

@@ -27,6 +27,7 @@
 #include "render/OrbitPathRenderer.h"
 #include "render/TextRenderer.h"
 #include "render/XrPointerRenderer.h"
+#include "render/terrain/TerrainRenderer.h"
 #include "Solar_System/SkyBox.h"
 #include <algorithm>
 #include <array>
@@ -59,6 +60,11 @@ ShaderSpec Program(const char* vertex, const char* fragment, vector<string> defi
 
 ShaderSpec PlanetSpec(unsigned variant) {
     return Program("planetLighting.vs", "planetLighting.fs", CatalogMaterial::Defines(variant));
+}
+
+// The same material permutations on the terrain tiles (terrain.fs shares planet_surface.glsl).
+ShaderSpec TerrainSpec(unsigned variant) {
+    return Program("terrain.vs", "terrain.fs", CatalogMaterial::Defines(variant));
 }
 
 const vector<string> kNearSurfaceDefine{"NEAR_SURFACE"};
@@ -171,6 +177,10 @@ void Renderer::Init(const SimState& sim, FT_Library ft, glm::ivec2 display) {
     _orbitPathRenderer = make_unique<OrbitPathRenderer>();
     _surfacePatch = make_unique<SurfacePatchMesh>();
     _surfacePatchKey = SurfacePatchKey{};
+    // Its programs compile on first use, once a terrain body is within reach (DrawLitBody).
+    _terrainRenderer = make_unique<TerrainRenderer>();
+    _terrainVariants.fill(nullptr);
+    _terrainShadowShader = nullptr;
     _xrPointerRenderer = make_unique<XrPointerRenderer>();
     _magneticFieldRenderer = make_unique<MagneticFieldLineRenderer>();
     {
@@ -201,6 +211,7 @@ void Renderer::Release() {
     _orbitPathRenderer.reset();
     _surfacePatch.reset();
     _surfacePatchKey = SurfacePatchKey{};
+    _terrainRenderer.reset();
     _observeSky.reset();
     _lensFlare.reset();
     _skyBox.reset();
@@ -211,10 +222,12 @@ void Renderer::Release() {
                             &_mainCoronaStarShader, &_mainPlanetShader, &_mainAtmosphereShader,
                             &_mainCloudsShader, &_mainRingShader, &_hdrShader, &_lensFlareShader,
                             &_starGlowShader, &_pbrAtmosphereShader, &_coronaVolumeShader,
-                            &_nearAtmosphereShader, &_nearPbrAtmosphereShader, &_nearCloudsShader}) {
+                            &_nearAtmosphereShader, &_nearPbrAtmosphereShader, &_nearCloudsShader,
+                            &_terrainShadowShader}) {
         *shader = nullptr;
     }
     _planetVariants.fill(nullptr);
+    _terrainVariants.fill(nullptr);
     _shaders.Clear();
 }
 
@@ -362,9 +375,23 @@ void Renderer::ShadowMapPass(const FrameContext& ctx, const RenderableSceneCompo
     _shadowMapShader->Use();
     _shadowMapShader->SetMat4("lightSpaceMatrix", component.lightSpaceMatrix);
 
-    component.planet->Draw(*_shadowMapShader);
+    // A body drawing terrain casts from its tiles: its sphere's facets sag below the ground
+    // the colour pass draws, and would shadow it from underneath.
+    const auto drawCaster = [&](const SpaceObject& object) {
+        const SceneSnapshot::TerrainBody* terrain = ctx.scene.TerrainFor(&object);
+        const Shader* program = terrain && terrain->tiles ? TerrainShadowProgram() : nullptr;
+        if (!program) {
+            object.Draw(*_shadowMapShader);
+            return;
+        }
+        program->Use();
+        program->SetMat4("lightSpaceMatrix", component.lightSpaceMatrix);
+        _terrainRenderer->Draw(*program, *terrain->tiles, object.GetModelMatrix(), TerrainRenderer::Pass::Shadow);
+        _shadowMapShader->Use();
+    };
+    drawCaster(*component.planet);
     for (const auto& satellite : component.satellites) {
-        satellite->Draw(*_shadowMapShader);
+        drawCaster(*satellite);
     }
 
     if (component.planetaryRing) {
@@ -1311,6 +1338,15 @@ void Renderer::DrawLitBody(const FrameContext& ctx, const SpaceObject& body, con
         return;
     }
     ++_stats.bodyDraws;
+    if (const SceneSnapshot::TerrainBody* terrain = ctx.scene.TerrainFor(&body)) {
+        if (!terrain->tiles) {
+            // Within reach but still the sphere: submit the programs its descent will need.
+            TerrainProgram(body.ShaderVariant() | CatalogMaterial::kNearSurface);
+            TerrainShadowProgram();
+        } else if (DrawTerrain(ctx, body, *terrain->tiles, component, umbra)) {
+            return;
+        }
+    }
     const bool near = NearSurface(body, ctx.view);
     const unsigned variant = body.ShaderVariant() | (near ? CatalogMaterial::kNearSurface : 0u);
     const Shader& program = PlanetProgram(variant);
@@ -1323,4 +1359,58 @@ void Renderer::DrawLitBody(const FrameContext& ctx, const SpaceObject& body, con
     if (near) {
         DrawSurfacePatch(program, body, ctx.view);
     }
+}
+
+const Shader* Renderer::TerrainProgram(unsigned variant) {
+    using CatalogMaterial::kNearSurface;
+    // As PlanetProgram: drop the maps, then NEAR_SURFACE. A tile placed without it is in the
+    // same place; only its depth is per vertex.
+    const unsigned candidates[] = {variant, variant & kNearSurface, variant & ~kNearSurface, 0u};
+    for (const unsigned candidate : candidates) {
+        Shader*& program = _terrainVariants[candidate];
+        if (!program) {
+            program = _shaders.GetIfReady(TerrainSpec(candidate));
+        }
+        if (program) {
+            return program;
+        }
+    }
+    return nullptr;
+}
+
+const Shader* Renderer::TerrainShadowProgram() {
+    if (!_terrainShadowShader) {
+        _terrainShadowShader = _shaders.GetIfReady(Program("terrain.vs", "shadowMap.fs", {"SHADOW_PASS"}));
+    }
+    return _terrainShadowShader;
+}
+
+bool Renderer::DrawTerrain(const FrameContext& ctx, const SpaceObject& body, const Terrain::ActiveBody& tiles,
+                           const RenderableSceneComponent& component, const EclipseUmbra& umbra) {
+    const unsigned material = body.ShaderVariant() & ~CatalogMaterial::kNearSurface;
+    const Shader* far = TerrainProgram(material);
+    if (!_terrainRenderer || !far) {
+        return false;
+    }
+    const Shader* near = TerrainProgram(material | CatalogMaterial::kNearSurface);
+    const glm::mat4 model = body.GetModelMatrix();
+    const glm::mat3 normalMatrix = glm::transpose(glm::inverse(glm::mat3(model)));
+    for (const auto& [program, pass] : {std::pair{far, TerrainRenderer::Pass::ColourFar},
+                                        std::pair{near, TerrainRenderer::Pass::ColourNear}}) {
+        ConfigurePlanetProgram(ctx, *program, component, umbra);
+        body.BindMaterial(*program);
+        program->SetMat3("normalMatrix", normalMatrix);
+        _terrainRenderer->Draw(*program, tiles, model, pass);
+    }
+    return true;
+}
+
+void Renderer::ForgetTerrainTiles(const std::vector<uint64_t>& uids) {
+    if (_terrainRenderer && !uids.empty()) {
+        _terrainRenderer->Forget(uids);
+    }
+}
+
+std::size_t Renderer::TerrainTextureCount() const {
+    return _terrainRenderer ? _terrainRenderer->TextureCount() : 0;
 }

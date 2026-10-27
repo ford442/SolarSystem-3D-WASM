@@ -64,6 +64,79 @@ void PutDataFormatDescriptor(std::vector<std::uint8_t>& out) {
     }
 }
 
+// Basic DFD for one 16-bit unsigned normalized red channel, linear.
+void PutR16UnormDescriptor(std::vector<std::uint8_t>& out) {
+    constexpr std::uint32_t kBlockSize = 24 + 16;
+    PutU32(out, 4 + kBlockSize);
+    PutU32(out, 0);
+    PutU32(out, 2u | (kBlockSize << 16));
+    PutU32(out, 1u | (1u << 8) | (1u << 16));
+    PutU32(out, 0);
+    PutU32(out, 2); // bytesPlane0
+    PutU32(out, 0);
+    PutU32(out, 0u | (15u << 16) | (0u << 24)); // bits 0..15, channel R, unsigned, linear
+    PutU32(out, 0);
+    PutU32(out, 0);      // sampleLower
+    PutU32(out, 0xFFFF); // sampleUpper
+}
+
+/** One 2D level of `payload` in a KTX2 container; `alignment` is the level's required alignment. */
+std::vector<std::uint8_t> WriteSingleLevel(std::uint32_t vkFormat, std::uint32_t typeSize, std::uint32_t width,
+                                           std::uint32_t height, void (*putDescriptor)(std::vector<std::uint8_t>&),
+                                           const std::vector<std::uint8_t>& payload, std::size_t alignment,
+                                           std::vector<std::pair<std::string, std::string>> keyValues) {
+    std::sort(keyValues.begin(), keyValues.end());
+
+    std::vector<std::uint8_t> out(kIdentifier, kIdentifier + sizeof(kIdentifier));
+    PutU32(out, vkFormat);
+    PutU32(out, typeSize);
+    PutU32(out, width);
+    PutU32(out, height);
+    PutU32(out, 0);      // pixelDepth
+    PutU32(out, 0);      // layerCount
+    PutU32(out, 1);      // faceCount
+    PutU32(out, 1);      // levelCount
+    PutU32(out, 0);      // supercompressionScheme
+    const std::size_t indexAt = out.size();
+    for (int i = 0; i < 4; ++i) {
+        PutU32(out, 0);  // dfd offset/length, kvd offset/length (patched below)
+    }
+    PutU64(out, 0);      // sgdByteOffset
+    PutU64(out, 0);      // sgdByteLength
+    const std::size_t levelIndexAt = out.size();
+    PutU64(out, 0);      // level 0 byteOffset (patched)
+    PutU64(out, 0);      // level 0 byteLength
+    PutU64(out, 0);      // level 0 uncompressedByteLength
+
+    const std::size_t dfdAt = out.size();
+    putDescriptor(out);
+    SetU32(out, indexAt + 0, static_cast<std::uint32_t>(dfdAt));
+    SetU32(out, indexAt + 4, static_cast<std::uint32_t>(out.size() - dfdAt));
+
+    const std::size_t kvdAt = out.size();
+    for (const auto& [key, value] : keyValues) {
+        const std::uint32_t length = static_cast<std::uint32_t>(key.size() + 1 + value.size() + 1);
+        PutU32(out, length);
+        out.insert(out.end(), key.begin(), key.end());
+        out.push_back(0);
+        out.insert(out.end(), value.begin(), value.end());
+        out.push_back(0);
+        PadTo(out, 4);
+    }
+    if (out.size() > kvdAt) {
+        SetU32(out, indexAt + 8, static_cast<std::uint32_t>(kvdAt));
+        SetU32(out, indexAt + 12, static_cast<std::uint32_t>(out.size() - kvdAt));
+    }
+
+    PadTo(out, alignment);
+    const std::size_t levelAt = out.size();
+    out.insert(out.end(), payload.begin(), payload.end());
+    SetU64(out, levelIndexAt + 0, levelAt);
+    SetU64(out, levelIndexAt + 8, payload.size());
+    SetU64(out, levelIndexAt + 16, payload.size());
+    return out;
+}
+
 } // namespace
 
 std::uint16_t FloatToHalf(float value) {
@@ -127,61 +200,32 @@ std::vector<std::uint8_t> WriteRgba16f(std::uint32_t width, std::uint32_t height
     if (width == 0 || height == 0 || rgba.size() != static_cast<std::size_t>(width) * height * 4) {
         throw std::invalid_argument("WriteRgba16f: rgba must hold 4 * width * height floats");
     }
-    std::sort(keyValues.begin(), keyValues.end());
-
-    std::vector<std::uint8_t> out(kIdentifier, kIdentifier + sizeof(kIdentifier));
-    PutU32(out, kVkFormatR16G16B16A16Sfloat);
-    PutU32(out, 2);      // typeSize
-    PutU32(out, width);
-    PutU32(out, height);
-    PutU32(out, 0);      // pixelDepth
-    PutU32(out, 0);      // layerCount
-    PutU32(out, 1);      // faceCount
-    PutU32(out, 1);      // levelCount
-    PutU32(out, 0);      // supercompressionScheme
-    const std::size_t indexAt = out.size();
-    for (int i = 0; i < 4; ++i) {
-        PutU32(out, 0);  // dfd offset/length, kvd offset/length (patched below)
-    }
-    PutU64(out, 0);      // sgdByteOffset
-    PutU64(out, 0);      // sgdByteLength
-    const std::size_t levelIndexAt = out.size();
-    PutU64(out, 0);      // level 0 byteOffset (patched)
-    PutU64(out, 0);      // level 0 byteLength
-    PutU64(out, 0);      // level 0 uncompressedByteLength
-
-    const std::size_t dfdAt = out.size();
-    PutDataFormatDescriptor(out);
-    SetU32(out, indexAt + 0, static_cast<std::uint32_t>(dfdAt));
-    SetU32(out, indexAt + 4, static_cast<std::uint32_t>(out.size() - dfdAt));
-
-    const std::size_t kvdAt = out.size();
-    for (const auto& [key, value] : keyValues) {
-        const std::uint32_t length = static_cast<std::uint32_t>(key.size() + 1 + value.size() + 1);
-        PutU32(out, length);
-        out.insert(out.end(), key.begin(), key.end());
-        out.push_back(0);
-        out.insert(out.end(), value.begin(), value.end());
-        out.push_back(0);
-        PadTo(out, 4);
-    }
-    if (out.size() > kvdAt) {
-        SetU32(out, indexAt + 8, static_cast<std::uint32_t>(kvdAt));
-        SetU32(out, indexAt + 12, static_cast<std::uint32_t>(out.size() - kvdAt));
-    }
-
-    PadTo(out, 8); // lcm(texel size 8, 4)
-    const std::size_t levelAt = out.size();
+    std::vector<std::uint8_t> payload;
+    payload.reserve(rgba.size() * 2);
     for (const float component : rgba) {
         const std::uint16_t half = FloatToHalf(component);
-        out.push_back(static_cast<std::uint8_t>(half & 0xFF));
-        out.push_back(static_cast<std::uint8_t>(half >> 8));
+        payload.push_back(static_cast<std::uint8_t>(half & 0xFF));
+        payload.push_back(static_cast<std::uint8_t>(half >> 8));
     }
-    const std::uint64_t levelLength = out.size() - levelAt;
-    SetU64(out, levelIndexAt + 0, levelAt);
-    SetU64(out, levelIndexAt + 8, levelLength);
-    SetU64(out, levelIndexAt + 16, levelLength);
-    return out;
+    // lcm(texel size 8, 4)
+    return WriteSingleLevel(kVkFormatR16G16B16A16Sfloat, 2, width, height, PutDataFormatDescriptor, payload, 8,
+                            std::move(keyValues));
+}
+
+std::vector<std::uint8_t> WriteR16Unorm(std::uint32_t width, std::uint32_t height,
+                                        const std::vector<std::uint16_t>& texels,
+                                        std::vector<std::pair<std::string, std::string>> keyValues) {
+    if (width == 0 || height == 0 || texels.size() != static_cast<std::size_t>(width) * height) {
+        throw std::invalid_argument("WriteR16Unorm: texels must hold width * height values");
+    }
+    std::vector<std::uint8_t> payload;
+    payload.reserve(texels.size() * 2);
+    for (const std::uint16_t texel : texels) {
+        payload.push_back(static_cast<std::uint8_t>(texel & 0xFF));
+        payload.push_back(static_cast<std::uint8_t>(texel >> 8));
+    }
+    return WriteSingleLevel(kVkFormatR16Unorm, 2, width, height, PutR16UnormDescriptor, payload, 4,
+                            std::move(keyValues));
 }
 
 } // namespace ktx2
