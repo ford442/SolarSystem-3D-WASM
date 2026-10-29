@@ -55,6 +55,27 @@ TEST(QualitySettingsTest, EveryTierLoadsTheNearestThreeSystemsEagerly) {
     }
 }
 
+// Low never draws (or fetches) a terrain tile; the higher tiers get more budget and a finer
+// split, and mobile less of both than desktop.
+TEST(QualitySettingsTest, TerrainIsOffOnLowAndGrowsWithTier) {
+    for (const bool mobile : {false, true}) {
+        EXPECT_EQ(GetQualitySettings(0, mobile).terrainBudgetMiB, 0);
+        EXPECT_EQ(GetQualitySettings(0, mobile).terrainMaxInFlight, 0);
+        for (int preset = 1; preset <= 2; ++preset) {
+            const QualityTierSettings s = GetQualitySettings(preset, mobile);
+            EXPECT_GT(s.terrainBudgetMiB, 0) << s.name;
+            EXPECT_GT(s.terrainMaxInFlight, 0) << s.name;
+            EXPECT_GT(s.terrainPixelError, 0.0f) << s.name;
+        }
+        EXPECT_LT(GetQualitySettings(1, mobile).terrainBudgetMiB, GetQualitySettings(2, mobile).terrainBudgetMiB);
+        EXPECT_GT(GetQualitySettings(1, mobile).terrainPixelError, GetQualitySettings(2, mobile).terrainPixelError);
+    }
+    for (int preset = 1; preset <= 2; ++preset) {
+        EXPECT_LT(GetQualitySettings(preset, true).terrainBudgetMiB, GetQualitySettings(preset, false).terrainBudgetMiB);
+        EXPECT_GT(GetQualitySettings(preset, true).terrainPixelError, GetQualitySettings(preset, false).terrainPixelError);
+    }
+}
+
 TEST(QualitySettingsTest, DesktopPresetMapping) {
     ExpectTier(GetQualitySettings(0, false), 1024, 0, 0, false, false, 0, 600, TextureLodTier::Low, "low");
     ExpectTier(GetQualitySettings(1, false), 2048, 2, 0, true, true, 1, 1800, TextureLodTier::Mid, "medium");

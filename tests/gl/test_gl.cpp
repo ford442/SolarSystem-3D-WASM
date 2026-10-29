@@ -16,10 +16,15 @@
 #include "gfx/ShadowMapFBO.h"
 #include "gfx/TextureImage2D.h"
 #include "gfx/TextureUnits.h"
+#include "render/terrain/TerrainRenderer.h"
+
+#include <glm/gtc/matrix_transform.hpp>
 
 #include <array>
+#include <cmath>
 #include <cstdlib>
 #include <filesystem>
+#include <memory>
 #include <string>
 #include <vector>
 
@@ -310,5 +315,101 @@ TEST(TextureImage2D, UploadsAPlaceholderDds) {
     EXPECT_TRUE(glIsTexture(texture.GetTexture()));
     EXPECT_EQ(texture.GetWidth(), 4u);
     EXPECT_EQ(texture.GetHeight(), 4u);
+    EXPECT_EQ(glGetError(), static_cast<GLenum>(GL_NO_ERROR));
+}
+
+TEST(Terrain, EveryProgramLinksWithItsSamplerUnits) {
+    REQUIRE_GL_CONTEXT();
+    // Kept for the run, as PlanetProgram keeps its: a program deleted while Shader still
+    // tracks it as current would have its name reused by the next one.
+    static std::vector<std::unique_ptr<Shader>> programs;
+    for (unsigned variant = 0; variant < CatalogMaterial::kVariantCount; ++variant) {
+        SCOPED_TRACE(variant);
+        programs.push_back(std::make_unique<Shader>("resource/shaders/terrain.vs", "resource/shaders/terrain.fs",
+                                                    CatalogMaterial::Defines(variant)));
+        const Shader& shader = *programs.back();
+        shader.Use();
+        const GLuint program = CurrentProgram();
+        ASSERT_NE(program, 0u);
+        EXPECT_TRUE(shader.UsesFrameUniforms());
+        GLint unit = -1;
+        glGetUniformiv(program, glGetUniformLocation(program, "heightTile"), &unit);
+        EXPECT_EQ(unit, static_cast<GLint>(Unit(TextureUnit::TerrainHeight)));
+        glGetUniformiv(program, glGetUniformLocation(program, "mainDiffuseTexture"), &unit);
+        EXPECT_EQ(unit, static_cast<GLint>(Unit(TextureUnit::Diffuse)));
+    }
+    programs.push_back(std::make_unique<Shader>("resource/shaders/terrain.vs", "resource/shaders/shadowMap.fs",
+                                                std::vector<std::string>{"SHADOW_PASS"}));
+    programs.back()->Use();
+    EXPECT_NE(CurrentProgram(), 0u);
+    EXPECT_EQ(glGetError(), static_cast<GLenum>(GL_NO_ERROR));
+}
+
+// terrain.vs places a tile where CubeSphere says, on the GPU: a level-0 face is the bulging
+// square of the cube face on the unit sphere, and a level-1 tile one quadrant of it.
+TEST(Terrain, ATileDrawsWhereTheCubeSpherePutsIt) {
+    REQUIRE_GL_CONTEXT();
+    static constexpr int kSize = 64;
+    GlTexture color = GlTexture::Create();
+    glBindTexture(GL_TEXTURE_2D, color.get());
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA8, kSize, kSize, 0, GL_RGBA, GL_UNSIGNED_BYTE, nullptr);
+    GlFramebuffer fbo = GlFramebuffer::Create();
+    glBindFramebuffer(GL_FRAMEBUFFER, fbo.get());
+    glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, color.get(), 0);
+    ASSERT_EQ(glCheckFramebufferStatus(GL_FRAMEBUFFER), static_cast<GLenum>(GL_FRAMEBUFFER_COMPLETE));
+    glViewport(0, 0, kSize, kSize);
+    glDisable(GL_DEPTH_TEST);
+    glDisable(GL_CULL_FACE);
+
+    // Looking down -Z at the unit sphere: x, y in [-1, 1] fill the target.
+    FrameUniformData frame;
+    frame.view = glm::lookAt(glm::vec3(0.0f, 0.0f, 3.0f), glm::vec3(0.0f), glm::vec3(0.0f, 1.0f, 0.0f));
+    frame.proj = glm::ortho(-1.0f, 1.0f, -1.0f, 1.0f, 0.1f, 10.0f);
+    frame.viewProj = frame.proj * frame.view;
+    frame.farPlane = 10.0f;
+    frame.zCoef = static_cast<float>(2.0 / std::log2(10.0 + 1.0));
+    FrameUniformBuffer frameBuffer;
+    frameBuffer.Upload(0, frame);
+    frameBuffer.Bind(0);
+
+    static const Shader shader("resource/shaders/terrain.vs", "resource/shaders/terrain.fs");
+    shader.Use();
+    TerrainRenderer renderer;
+    const auto coverage = [&](const Terrain::TileKey& key) {
+        const Terrain::HeightTile tile = Terrain::FlatTile(key);
+        Terrain::ActiveBody body;
+        body.frame.meshRadius = 1.0;
+        Terrain::DrawTile draw;
+        draw.tile = &tile;
+        draw.frame = Terrain::MakeTileFrame(key, 1.0);
+        draw.center = draw.frame.centerModel;
+        draw.skirtDepth = 0.01;
+        body.selection.tiles.push_back(draw);
+        glClearColor(0.0f, 0.0f, 0.0f, 0.0f);
+        glClear(GL_COLOR_BUFFER_BIT);
+        EXPECT_EQ(renderer.Draw(shader, body, glm::mat4(1.0f), TerrainRenderer::Pass::ColourFar), 1);
+        std::vector<unsigned char> pixels(kSize * kSize * 4);
+        glReadPixels(0, 0, kSize, kSize, GL_RGBA, GL_UNSIGNED_BYTE, pixels.data());
+        // Drawn = alpha 1 (terrain.fs writes it; the clear is 0), at NDC (x, y).
+        return [pixels](double x, double y) {
+            const int i = static_cast<int>((x + 1.0) * 0.5 * kSize);
+            const int j = static_cast<int>((y + 1.0) * 0.5 * kSize);
+            return pixels[static_cast<std::size_t>((j * kSize + i) * 4 + 3)] == 255;
+        };
+    };
+
+    const auto face = coverage(Terrain::TileKey{4, 0, 0, 0}); // +Z: u = +X, v = +Y
+    EXPECT_TRUE(face(0.0, 0.0));
+    EXPECT_TRUE(face(0.66, 0.0));  // the edge bulges out to 1/√2 at its middle
+    EXPECT_TRUE(face(0.0, -0.66));
+    EXPECT_FALSE(face(0.64, 0.64)); // past the corner at 1/√3
+    EXPECT_FALSE(face(0.75, 0.0));
+
+    const auto quadrant = coverage(Terrain::TileKey{4, 1, 1, 1}); // s, t in [0, 1]
+    EXPECT_TRUE(quadrant(0.3, 0.3));
+    EXPECT_FALSE(quadrant(-0.3, 0.3));
+    EXPECT_FALSE(quadrant(0.3, -0.3));
+    EXPECT_FALSE(quadrant(-0.3, -0.3));
+    glBindFramebuffer(GL_FRAMEBUFFER, 0);
     EXPECT_EQ(glGetError(), static_cast<GLenum>(GL_NO_ERROR));
 }

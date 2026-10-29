@@ -11,3 +11,5 @@
 #define TU_TRANSMITTANCE_LUT    7
 #define TU_MULTI_SCATTERING_LUT 8
 #define TU_MOON                 9
+#define TU_TERRAIN_HEIGHT       10
+#define TU_TERRAIN_PARENT       11

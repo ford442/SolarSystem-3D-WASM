@@ -279,6 +279,18 @@ function validateCatalog(catalog) {
         throw new Error(`Satellite ${body.id} cannot set render.oblateness`);
       }
     }
+    // render.terrain: height tiles close up (src/render/terrain/). They tile the sphere mesh,
+    // so a body drawn with its own mesh (Phobos) cannot have them.
+    const terrain = body.render?.terrain;
+    if (terrain !== undefined) {
+      if (typeof terrain !== 'object' || terrain === null || typeof terrain.attribution !== 'string' ||
+          terrain.attribution.trim() === '') {
+        throw new Error(`Body ${body.id} render.terrain needs an attribution string`);
+      }
+      if (body.render.mesh) {
+        throw new Error(`Body ${body.id} has its own mesh and cannot set render.terrain`);
+      }
+    }
   }
 
   // Focusable primary bodies (star/planet/dwarf_planet) must form a contiguous 0..N-1 range.
@@ -588,7 +600,8 @@ function buildBodyCatalogHeader(catalog) {
       `{${cppNullableString(cloud.diffuse)}, ${cppNullableString(cloud.normal)}, ` +
       `${cppFloat(cloud.scaleFactor)}, ${cppFloat(cloud.spinDegPerSimSecond)}, ` +
       `${cppFloat(cloud.ambientFactor)}}, ` +
-      `${!!body.system?.hasCloudLayer}, ${!!body.system?.hasRings}}, // ${body.id}`
+      `${!!body.system?.hasCloudLayer}, ${!!body.system?.hasRings}, ` +
+      `${!!r.terrain}, ${cppNullableString(r.terrain?.attribution)}}, // ${body.id}`
     );
   });
 
@@ -693,6 +706,8 @@ function buildBodyCatalogHeader(catalog) {
     '    CloudLayer cloudLayer;',
     '    bool hasCloudLayer;',
     '    bool hasRings;',
+    '    bool hasTerrain;                // render.terrain: height tiles close up (render/terrain/)',
+    '    const char* terrainAttribution; // their elevation data\'s credit; nullptr without',
     '};',
     '',
     'inline constexpr Entry kEntries[] = {',

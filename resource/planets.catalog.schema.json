@@ -99,6 +99,15 @@
               "ambientFactor": { "type": "number" },
               "useSphereIntersect": { "type": "boolean" },
               "artTiltXDegrees": { "type": "number", "description": "Optional extra Rotate(X) overlay (Saturn rings)." },
+              "terrain": {
+                "type": "object",
+                "description": "Cube-sphere height tiles replace the sphere close up (src/render/terrain/, docs/ARCHITECTURE.md §11.3). Tiles are baked offline by scripts/bake-terrain-tiles.py into resource/terrain/<id>/ and published with the runtime assets; without them the body stays its sphere.",
+                "required": ["attribution"],
+                "additionalProperties": false,
+                "properties": {
+                  "attribution": { "type": "string", "minLength": 1, "description": "Credit for the elevation data the tiles are baked from." }
+                }
+              },
               "oblateness": { "type": "number", "minimum": 0, "exclusiveMaximum": 0.5, "description": "Flattening 1 - polar/equatorial. Squashes the surface, cloud and atmosphere meshes along the pole (BodyShape.h); the mesh radius stays equatorial, and physical.groundRadiusKm is the equatorial radius. Primaries only." },
               "mesh": { "type": ["string", "null"], "description": "Optional non-sphere mesh path (Phobos/Deimos)." },
               "lod": {

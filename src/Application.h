@@ -26,6 +26,10 @@
 #include <string>
 #include <unordered_set>
 
+namespace Terrain {
+class TerrainSystem;
+}
+
 #ifdef __EMSCRIPTEN__
 #include <emscripten.h>
 #include <emscripten/html5.h>
@@ -284,6 +288,23 @@ private:
     HudState _frameHud;
     // Each mission's probe position at this frame's date (UpdateScene); nullopt off its trajectory.
     std::vector<std::optional<glm::vec3>> _missionProbes;
+
+    // --- Terrain (TerrainController.cpp; src/render/terrain/, docs/ARCHITECTURE.md §11.3) --
+    std::unique_ptr<Terrain::TerrainSystem> _terrain;
+    std::string _terrainLogged; // the last [Terrain] stats line, and when it went out
+    double _terrainLoggedAt = 0.0;
+    /** Budget, pixel error and in-flight cap from a quality tier (Low turns terrain off). */
+    void ConfigureTerrain(const QualityTierSettings& settings);
+    /**
+     * After UpdateScene and BuildFrameSnapshot, before CullScene: which render.terrain
+     * bodies draw tiles this frame, their selections into _frameScene.terrain, and the
+     * GPU copies of evicted tiles dropped.
+     */
+    void UpdateTerrain(int viewCount);
+    /** The terrain slot of a body flagged render.terrain that UpdateTerrain has seen, else -1. */
+    int TerrainSlotOf(const SpaceObject& object) const;
+    /** The tile surface's radius under `eye` (model units) while `object` draws tiles, else nullopt. */
+    std::optional<double> TerrainSurfaceRadius(const SpaceObject& object, const glm::dvec3& eye) const;
 
     void InitSystems();
     void InitScene();

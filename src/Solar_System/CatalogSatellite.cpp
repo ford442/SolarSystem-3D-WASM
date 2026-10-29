@@ -66,6 +66,10 @@ CatalogMaterial::Textures CatalogSatellite::CurrentTextures() const {
 }
 
 void CatalogSatellite::Draw(const Shader& shader) const {
-    CatalogMaterial::BindMaterial(shader, _material, CurrentTextures());
+    BindMaterial(shader);
     SpaceObject::Draw(shader);
+}
+
+void CatalogSatellite::BindMaterial(const Shader& shader) const {
+    CatalogMaterial::BindMaterial(shader, _material, CurrentTextures());
 }

@@ -38,6 +38,11 @@ set(SOLARSYSTEM_TEST_SOURCES
     ${CMAKE_SOURCE_DIR}/src/Solar_System/CatalogMaterialVariants.cpp
     ${CMAKE_SOURCE_DIR}/src/Solar_System/AtmosphereModel.cpp
     ${CMAKE_SOURCE_DIR}/src/3rdparty/ktx2_writer.cpp
+    ${CMAKE_SOURCE_DIR}/src/render/terrain/CubeSphere.cpp
+    ${CMAKE_SOURCE_DIR}/src/render/terrain/TerrainTile.cpp
+    ${CMAKE_SOURCE_DIR}/src/render/terrain/TerrainQuadtree.cpp
+    ${CMAKE_SOURCE_DIR}/src/render/terrain/TileCache.cpp
+    ${CMAKE_SOURCE_DIR}/src/render/terrain/TerrainSystem.cpp
 )
 
 add_executable(SolarSystemTests
@@ -46,6 +51,7 @@ add_executable(SolarSystemTests
     test_camera_navigation.cpp
     test_mesh_anchor.cpp
     test_surface_patch.cpp
+    test_terrain_quadtree.cpp
     test_ephemeris.cpp
     test_quality_settings.cpp
     test_planet_manifest_loader.cpp
@@ -114,6 +120,9 @@ add_executable(SolarSystemGlTests
     ${CMAKE_SOURCE_DIR}/src/3rdparty/nv_dds.cpp
     ${CMAKE_SOURCE_DIR}/src/3rdparty/ktx2_reader.cpp
     ${CMAKE_SOURCE_DIR}/src/Solar_System/CatalogMaterialVariants.cpp
+    ${CMAKE_SOURCE_DIR}/src/render/terrain/CubeSphere.cpp
+    ${CMAKE_SOURCE_DIR}/src/render/terrain/TerrainTile.cpp
+    ${CMAKE_SOURCE_DIR}/src/render/terrain/TerrainRenderer.cpp
 )
 target_compile_definitions(SolarSystemGlTests PRIVATE SOLARSYSTEM_SOURCE_DIR="${CMAKE_SOURCE_DIR}")
 target_include_directories(SolarSystemGlTests PRIVATE ${CMAKE_SOURCE_DIR}/src)

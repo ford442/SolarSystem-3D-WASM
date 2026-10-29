@@ -408,6 +408,7 @@ The value is the directory **containing** `resource/`, with a trailing slash. It
 | Low-res placeholders | Partial (via build copy to `web/public/`) | Core + staged + LOD |
 | High-res textures | No | LOD queue + skybox core load |
 | Sounds | No (may be absent in checkout) | Optional parallel download |
+| Terrain height tiles (`terrain/<body>/`, baked offline, not in git) | No | `TileCache` through `WebResourceFetcher`, only on Medium/Full and only near a flagged body (§11.3) |
 
 See [README.md § Runtime asset hosting](../README.md#runtime-asset-hosting) for CDN layout, manifest checksums, and `web/deploy.py` targets. For COEP/CORS/CORP header matrix and subdomain CDN setup, see [docs/CROSS_ORIGIN_HEADERS.md](CROSS_ORIGIN_HEADERS.md).
 
@@ -450,6 +451,9 @@ logging out of `src/`.
 | | `MissionPathRenderer` | Sampled probe ribbons (Voyager); quality downsample; AU→scene via `HelioAuToScene` |
 | | `XrPointerRenderer` | WebXR controller rays (skipped on Low) |
 | | `MagneticFieldLineMesh` / `MagneticFieldLineRenderer` / `MagneticFieldBloom` | Optional dipole+toroidal ribbons (static VBO, GPU flow, half-res bloom on Medium+, separate from the star HDR FBO) |
+| `render/terrain/` | `CubeSphere`, `TerrainTile`, `TerrainQuadtree` | GL-free: equal-angle cube-sphere tile keys and float-exact placement, R16 KTX2 tile parse and Catmull-Rom upsample, screen-space-error selection with horizon/frustum/light-box culling and the geomorph (§11.3) |
+| | `TileCache`, `TerrainSystem` | GL-free: one LRU of tiles under the tier's byte budget with an in-flight cap; when each flagged body swaps its sphere for tiles, and the floor's surface radius (§11.3) |
+| | `TerrainRenderer` | The shared 65×65 grid with skirts and a height texture per drawn tile; draws a selection with the bound program |
 | `assets/` | `WebResourceFetcher` | `DownloadFile` (async, callback-based) + `RequireResident` (residency probe) — WASM only |
 | | `TextureLoadingQueue`, `TextureLODController` | Serialized high-res LOD downloads; per-texture tier state machine (§4.3) |
 | | `PlanetManifestLoader` | Parses `planet_manifest.json` for staged loading (§4.2) |
@@ -466,7 +470,8 @@ destructors, which never run on an empty handle). `SolarSystemGlTests` (`tests/g
 hidden GLFW window with a real GL 4.6 core context and checks handles, that every
 planetLighting permutation links and reads `FrameUBO` at its binding, sampler units, the
 uniform cache, the shadow/HDR framebuffers, one `LineStripBatch` draw read back with
-`glReadPixels`, and a DDS upload that must not fall back. CI runs it under Xvfb/llvmpipe; with no display it skips
+`glReadPixels`, a DDS upload that must not fall back, that every terrain permutation links
+with its sampler units, and that a terrain tile lands where `CubeSphere` puts it. CI runs it under Xvfb/llvmpipe; with no display it skips
 (`MESA_GL_VERSION_OVERRIDE=4.6 MESA_GLSL_VERSION_OVERRIDE=460 xvfb-run -a <build>/tests/SolarSystemGlTests`).
 
 ### 7.3 Scene objects
@@ -1242,6 +1247,71 @@ track (anchors, rates, interpolation, eases), steps, `keyframeFromPose` round tr
 errors, and every shipped timeline parses and evaluates. Native: spins are date functions
 and survive a fresh start (`test_orbit_layout.cpp`), roll keeps the view direction, and `FacetAlong`
 gives the hit facet's outward normal (`test_camera_navigation.cpp`).
+
+### 11.3 Terrain (cube-sphere height tiles)
+
+Bodies whose catalog row has `render.terrain` (Moon, Mars, Mercury, Earth) draw height tiles
+instead of their sphere while the camera is close. From altitude nothing changes: the sphere
+mesh, catalog material, atmosphere and eclipse decal are what they were. The code is
+`src/render/terrain/` (GL-free except `TerrainRenderer`), wired in by
+`TerrainController.cpp` and two small branches in `SceneRenderer.cpp`.
+
+**When.** `TerrainSystem` loads a body's `terrain/<id>/tileset.json` below 2 radii of altitude
+(`kPrefetchRadii`), swaps the sphere for tiles below 0.5 (back above 0.55), and grows the
+heights from zero between 0.45 and 0.2 radii (`HeightFade`), so the swap happens on the bare
+analytic sphere under the same material. A body without a tile set (or a deployment without
+`terrain/`) logs `[Terrain] <id>: no tile set … it stays the sphere` once. Low
+(`terrainBudgetMiB = 0`) never fetches anything; Observe and bodies out of reach draw spheres.
+
+**Tiles.** Equal-angle cube sphere (`w = tan(π/4·s)`), faces +X −X +Y −Y +Z −Z with the bases in
+`CubeSphere.cpp`. A tile is 65×65 samples (64 quads) plus a one-sample apron: 67×67
+`R16_UNORM` KTX2 at `terrain/<body>/<face>/<z>/<x>/<y>.ktx2`, quantised between the tile's own
+min and max, with the mask of children that exist (`SSterrain` key/value). Heights are metres
+above the catalog radius. The baker (`scripts/bake-terrain-tiles.py`, GDAL, run by hand,
+never in CI) samples every tile of a level from one block-averaged grid, so shared edges
+agree exactly; deep levels can be limited to regions (Shackleton, Olympus Mons). A child the
+data set does not have, or one whose fetch failed, is upsampled from its parent
+(Catmull-Rom), so there is no hole and no procedural detail.
+
+**Selection** (`TerrainQuadtree::Select`). Split on screen-space error: a level's tiles split
+inside `ratio × diagonal`, the ratio chosen so a quad spans the tier's pixel error
+(`terrainPixelError`: Full 6 px, Medium 8, mobile 10–12) and never below 1.5. A tile splits
+only when all four children are resident; otherwise it draws itself and asks for them
+(priority: error bucket, then angle from the view centre). Tiles behind the horizon, out of
+every view frustum and out of the component's light box are dropped.
+
+**Placement.** A vertex is an offset from the tile's centre computed small-to-small in float
+(`tan(a+b) − tan(a)`, series sin/cos; `GridOffset` is the C++ mirror the tests hold to a
+millimetre), added to the tile centre in the render frame, which is the body's
+`GetWorldPosition() − renderOrigin` taken in double each frame (§11.1). Nothing render-frame
+is kept across frames. Tiles nearer than their own diagonal use the `NEAR_SURFACE`
+permutation (fragment log depth); the rest use vertex log depth.
+
+**No pop, no cracks.** `terrain.vs` geomorphs heights (not grid positions) from the tile's own
+samples to the parent's surface across `[split + diagonal, split(parent)]`, so a split or a
+merge changes nothing on screen at the moment it happens; skirts as deep as a level step
+covers hide the T-junctions between levels.
+
+**Shading.** `terrain.fs` is the catalog material: it and `planetLighting.fs` include
+`common/planet_surface.glsl` (maps, night side, specular, clouds, shadow map, ring and eclipse
+tests) with the same `CatalogMaterial` permutations. Texture coordinates and the
+east/north/up frame are derived per fragment from the model direction in the sphere mesh's
+convention, and the relief normal (from the height samples, in the vertex shader; no normal
+tiles in v1) is folded into the normal map (`SURFACE_RELIEF`). The shadow pass draws the
+tiles too (`terrain.vs` `SHADOW_PASS` + `shadowMap.fs`): the sphere's facets would shadow the
+ground from below.
+
+**Memory and network.** One LRU across bodies under the tier's budget (`kTileGpuBytes` per
+tile; Full 128 MiB, Medium 64, mobile 32–48), an in-flight cap (Full 8, Medium 6, mobile 4),
+roots pinned. Every request goes through `WebResourceFetcher`, so the page's asset cache
+(§6.1.1) answers a revisit with the network off; the MEMFS copy is unlinked once read. The
+tier line logs the budget next to the shadow map, and while tiles are drawn
+`[Terrain] budget … resident … drawn … in flight …` goes out at most every 5 s.
+
+**Camera floor.** `ConstrainCamera` and `SurfaceAlong` stand on `TerrainSystem::SurfaceRadius`:
+the drawn tile under the eye with its morph, else the deepest resident tile (the roots always
+are). The floor only lifts: a camera placed before finer tiles arrive stays above the coarse
+surface it was lifted to. Co-rotation (§11) keeps a hover over one tile while time runs.
 
 ## 12. Common pitfalls
 

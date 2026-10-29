@@ -28,6 +28,7 @@ void Application::ApplyQualityPreset(int preset) {
     }
     _renderer.RebuildMissionPaths(_missionCatalog, _simState.qualityPreset);
     _renderer.RebuildMagneticFields(_simState.qualityPreset);
+    ConfigureTerrain(settings);
     LogQualityTier(settings, _renderer.HdrEnabled(), _simState.shadowQuality, _simState.contextSamples);
 }
 
