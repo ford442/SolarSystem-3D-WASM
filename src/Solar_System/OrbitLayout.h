@@ -59,10 +59,10 @@ ScaleMode GetScaleMode();
 void SetJulianDate(double julianDate);
 double GetJulianDate();
 
-/** Advance ephemeris epoch and axial spin by scaled wall-clock seconds. */
+/** Advance the ephemeris epoch by scaled wall-clock seconds (spins follow from the date). */
 void Advance(float scaledDtSeconds);
 
-/** Reset to J2000.0, zero axial spin, compressed scale, render origin at the Sun (tests). */
+/** Reset to J2000.0, compressed scale, render origin at the Sun (tests). */
 void ResetForTests();
 
 /**
@@ -147,7 +147,16 @@ float GetSceneDistance(Body body);
 /** Compressed-scene offset baked into the original art direction (phase-0 reference). */
 glm::vec3 GetCompressedOffset(Body body);
 
-/** Accumulated axial spin in degrees (linear in sim time; negative = retrograde). */
+/**
+ * Axial spin in degrees at `julianDate`, wrapped to [0, 360): the turn about the body's pole
+ * that CatalogBody applies after the tilt. A pure function of the date (no state), in double
+ * so a caller can difference it frame to frame without float's ~3e-5° grain, which is 3 m at
+ * Earth's surface. Earth: solved so the drawn map has the true sub-solar longitude. Others:
+ * IAU W0 + Wdot * days since J2000 from the catalog (negative rate = retrograde).
+ */
+double AxialSpinDegreesAt(Body body, double julianDate);
+
+/** AxialSpinDegreesAt at the current Julian date, as the float the model matrix takes. */
 float GetAxialSpinDegrees(Body body);
 
 /** Orbital period in Earth days (NASA averages). Sun returns 0. */

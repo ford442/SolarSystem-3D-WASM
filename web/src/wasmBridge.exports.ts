@@ -62,6 +62,21 @@ export interface CachedCwrapExports {
     getCameraHeliocentricZ: () => number;
     getCameraYaw: () => number;
     getCameraPitch: () => number;
+    setCameraRoll: (...args: number[]) => void;
+    getCameraRoll: () => number;
+    setCameraFov: (...args: number[]) => void;
+    getCameraFov: () => number;
+    advanceSimulationTo: (...args: number[]) => void;
+    getSceneStateJson: () => string;
+    getBodyCatalogJson: () => string;
+    getSurfaceJson: (...args: number[]) => string;
+    preloadBodySystem: (...args: number[]) => void;
+    getPendingAssetCount: () => number;
+    setHudOverlays: (...args: number[]) => void;
+    getHudOverlays: () => number;
+    beginCapture: (...args: number[]) => number;
+    stepCaptureFrame: (...args: number[]) => void;
+    endCapture: () => void;
     getShaderSourceFiles: () => string;
     reloadShaders: () => number;
 }
@@ -128,9 +143,24 @@ export function createCachedCwrapExports(cwrap: SolarSystemCwrap): CachedCwrapEx
     getCameraHeliocentricZ: cwrap('GetCameraHeliocentricZ', 'number', []) as () => number,
     getCameraYaw: cwrap('GetCameraYaw', 'number', []) as () => number,
     getCameraPitch: cwrap('GetCameraPitch', 'number', []) as () => number,
+    setCameraRoll: cwrap('SetCameraRoll', null, ['number']) as (...args: number[]) => void,
+    getCameraRoll: cwrap('GetCameraRoll', 'number', []) as () => number,
+    setCameraFov: cwrap('SetCameraFov', null, ['number']) as (...args: number[]) => void,
+    getCameraFov: cwrap('GetCameraFov', 'number', []) as () => number,
+    advanceSimulationTo: cwrap('AdvanceSimulationTo', null, ['number']) as (...args: number[]) => void,
+    getSceneStateJson: cwrap('GetSceneStateJson', 'string', []) as () => string,
+    getBodyCatalogJson: cwrap('GetBodyCatalogJson', 'string', []) as () => string,
+    getSurfaceJson: cwrap('GetSurfaceJson', 'string', ['number', 'number', 'number', 'number']) as (...args: number[]) => string,
+    preloadBodySystem: cwrap('PreloadBodySystem', null, ['number']) as (...args: number[]) => void,
+    getPendingAssetCount: cwrap('GetPendingAssetCount', 'number', []) as () => number,
+    setHudOverlays: cwrap('SetHudOverlays', null, ['number']) as (...args: number[]) => void,
+    getHudOverlays: cwrap('GetHudOverlays', 'number', []) as () => number,
+    beginCapture: cwrap('BeginCapture', 'number', ['number', 'number']) as (...args: number[]) => number,
+    stepCaptureFrame: cwrap('StepCaptureFrame', null, ['number']) as (...args: number[]) => void,
+    endCapture: cwrap('EndCapture', null, []) as () => void,
     getShaderSourceFiles: cwrap('GetShaderSourceFiles', 'string', []) as () => string,
     reloadShaders: cwrap('ReloadShaders', 'number', []) as () => number,
     };
 }
 
-export const EXPORT_COUNT = 62;
+export const EXPORT_COUNT = 77;

@@ -28,6 +28,7 @@ class OrbitPathRenderer;
 class ShadowMapFBO;
 class SkyBox;
 class SurfacePatchMesh;
+class TerrainRenderer;
 class TextRenderer;
 class XrPointerRenderer;
 
@@ -59,6 +60,8 @@ public:
         bool hints = true;
         bool planetStarDistances = true;
         bool satelliteDistances = true;
+        /** Web staged loading: "Jupiter (approach to load)" at systems not loaded yet. */
+        bool stagingLabels = true;
     };
 
     /**
@@ -119,10 +122,15 @@ public:
 
     StarTuning& GetStarTuning() { return _starTuning; }
     OverlayToggles& GetOverlayToggles() { return _overlayToggles; }
+    const OverlayToggles& GetOverlayToggles() const { return _overlayToggles; }
     /** Null before Init() and after Release(). */
     XrPointerRenderer* GetXrPointers() { return _xrPointerRenderer.get(); }
     /** Brightest catalog stars Observe draws right now (0 without its shaders). */
     int ObserveStarsDrawn() const;
+    /** Delete the GPU copies of terrain tiles the cache evicted (Terrain::TileCache::TakeEvicted). */
+    void ForgetTerrainTiles(const std::vector<uint64_t>& uids);
+    /** Terrain tiles with a GPU copy, for the [Terrain] log line. */
+    std::size_t TerrainTextureCount() const;
 
 private:
     void ConfigureMainShaders(const FrameContext& ctx);
@@ -193,6 +201,20 @@ private:
     /** Draw one body (planet or moon) with its own material variant. */
     void DrawLitBody(const FrameContext& ctx, const SpaceObject& body, const RenderableSceneComponent& component,
                      const EclipseUmbra& umbra);
+    /**
+     * terrain.vs + terrain.fs for a material variant (CatalogMaterial bits, NEAR_SURFACE
+     * included), falling back as PlanetProgram does; null until even the plain one is built.
+     */
+    const Shader* TerrainProgram(unsigned variant);
+    /** terrain.vs SHADOW_PASS + shadowMap.fs, or null until it is built. */
+    const Shader* TerrainShadowProgram();
+    /**
+     * `body`'s terrain tiles in place of its sphere, with the material, shadow and eclipse
+     * uniforms the sphere would have had. False when the programs are not built yet: the
+     * caller draws the sphere instead.
+     */
+    bool DrawTerrain(const FrameContext& ctx, const SpaceObject& body, const Terrain::ActiveBody& tiles,
+                     const RenderableSceneComponent& component, const EclipseUmbra& umbra);
 
     // First, so it is destroyed last: everything below may hold a Shader& from it.
     ShaderLibrary _shaders;
@@ -223,6 +245,10 @@ private:
         glm::dvec3 eyeModel{0.0};
         float nearPlane = 0.0f;
     } _surfacePatchKey;
+    // Terrain tiles (src/render/terrain/): the shared grid and each tile's height texture.
+    std::unique_ptr<TerrainRenderer> _terrainRenderer;
+    std::array<Shader*, CatalogMaterial::kVariantCount> _terrainVariants{}; // into _shaders; null = not ready
+    Shader* _terrainShadowShader = nullptr;
     // Null if its shaders failed to compile; Observe then draws an empty sky.
     std::unique_ptr<ObserveSky> _observeSky;
     std::unique_ptr<OrbitPathRenderer> _orbitPathRenderer;

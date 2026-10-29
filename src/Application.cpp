@@ -14,6 +14,7 @@
 #include "Solar_System/SceneScale.h"
 #include "core/Log.h"
 #include "render/XrPointerRenderer.h"
+#include "render/terrain/TerrainSystem.h"
 #include <algorithm>
 #include <chrono>
 #include <cmath>
@@ -87,8 +88,10 @@ void Application::RunOneFrame() {
     }
 
     const double currentFrame = glfwGetTime();
-    _deltaTime = currentFrame - _lastFrame;
+    // A capture frame is a fixed step after the last, however long encoding it took.
+    _deltaTime = _capture.active ? _capture.stepSeconds : currentFrame - _lastFrame;
     _lastFrame = currentFrame;
+    _simState.animationSeconds += _deltaTime;
 #ifndef __EMSCRIPTEN__
     PollShaderHotReload(currentFrame);
 #endif
@@ -138,7 +141,9 @@ void Application::RunOneFrame() {
     _renderer.RenderHud(FrameContextFor(0));
 
     TextureLoadingQueue::GetInstance().ProcessQueue();
-    _renderer.RenderTextureLoadingProgress(FrameContextFor(0));
+    if (!_capture.active) {
+        _renderer.RenderTextureLoadingProgress(FrameContextFor(0));
+    }
 
 #ifdef SOLARSYSTEM_USE_SDL_MIXER
     UpdateBackgroundMusic();
@@ -173,21 +178,27 @@ void Application::UpdateScene(double julianDate) {
         // the only receivers that read it — instead of the camera's 0.001–20000, which
         // wasted precision and clipped everything past 20000 units from the Sun (Uranus and
         // beyond on realistic scale).
-        const float extent = component.planet->GetRadius() * 3.0f;
+        const float radius = component.planet->GetRadius();
+        const float fullExtent = radius * 3.0f;
         std::vector<BoundingSphere> bodies;
         component.ForEachObject([&](const SpaceObject& object) { bodies.push_back(object.GetBoundingSphere()); });
         const glm::vec3 toPlanet = component.planet->GetPosition() - _sun->GetPosition();
         const DepthRange depth = FitDepthRange(_sun->GetPosition(), glm::normalize(toPlanet), bodies,
-                                               0.01f * extent + 0.05f, _camera.GetNear());
+                                               0.01f * fullExtent + 0.05f, _camera.GetNear());
         component.shadowDepthRange = glm::vec2(depth.nearPlane, depth.farPlane - depth.nearPlane);
-        const glm::mat4 lightProjection =
-            glm::ortho(-extent, extent, -extent, extent, depth.nearPlane, depth.farPlane);
+
         // Built in double: the eye is the Sun, tens of thousands of units from the render
         // origin on realistic scale, and a float lookAt folds that into the light-space x/y
         // the shadow lookup reads. In double those reduce to the planet's own small offset.
-        const glm::mat4 lightView(glm::lookAt(glm::dvec3(_sun->GetPosition()),
-                                              glm::dvec3(component.planet->GetPosition()),
-                                              glm::dvec3(0.0, 1.0, 0.0)));
+        const glm::dvec3 lightEye(_sun->GetPosition());
+        const glm::dvec3 lightTarget(component.planet->GetPosition());
+        const glm::mat4 lightView(glm::lookAt(lightEye, lightTarget, glm::dvec3(0.0, 1.0, 0.0)));
+
+        const ShadowFit::Box box = FitShadowBox(component, ShadowFit::LightLookAt(lightEye, lightTarget), fullExtent);
+        const float extent = static_cast<float>(box.halfExtent);
+        const glm::mat4 lightProjection = glm::ortho(static_cast<float>(box.centerX) - extent, static_cast<float>(box.centerX) + extent,
+                                                     static_cast<float>(box.centerY) - extent, static_cast<float>(box.centerY) + extent,
+                                                     depth.nearPlane, depth.farPlane);
         component.lightSpaceMatrix = lightProjection * lightView;
     }
 
@@ -209,6 +220,66 @@ void Application::UpdateScene(double julianDate) {
     if (_observe.active) {
         CurrentObserveSky();
     }
+}
+
+ShadowFit::Box Application::FitShadowBox(RenderableSceneComponent& component, const ShadowFit::LightBasis& light,
+                                         float fullExtent) {
+    const ShadowFit::Box full{0.0, 0.0, static_cast<double>(fullExtent)};
+    // The cap is the camera's own frustum: an XR eye pair has two, so it keeps the full box.
+    const double radius = component.planet->GetRadius();
+    const glm::dvec3 center(component.planet->GetPosition());
+    const glm::dvec3 eye(CameraRenderPosition());
+    bool xrActive = false;
+#ifdef __EMSCRIPTEN__
+    xrActive = _xr.active;
+#endif
+    const bool shadows = _simState.shadowQuality > 0 && !xrActive && radius > 0.0;
+    component.shadowVisibleCap =
+        shadows && ShadowFit::UseVisibleCap(component.shadowVisibleCap, glm::distance(eye, center) / radius);
+
+    ShadowFit::Box box = full;
+    if (component.shadowVisibleCap) {
+        ShadowFit::View view;
+        view.eye = eye;
+        view.front = glm::dvec3(_camera.GetFrontVector());
+        view.right = glm::dvec3(_camera.GetRightVector());
+        view.up = glm::dvec3(_camera.GetUpVector());
+        view.tanHalfFovY = std::tan(glm::radians(static_cast<double>(_camera.GetZoom())) * 0.5);
+        view.aspect = _camera.GetAspect();
+
+        // Receivers the old box covered that stand clear of the sphere: the ring and any moon
+        // in the frustum. (Shells hug the planet; the sphere stands for them.)
+        const Frustum frustum(_camera.GetProjectionMatrix() * _camera.GetViewMatrix(glm::vec3(eye)));
+        std::vector<BoundingSphere> extras;
+        const auto addIfSeen = [&](const SpaceObject& object) {
+            const BoundingSphere sphere = object.GetBoundingSphere();
+            const glm::dvec2 offset = light.ToLight(glm::dvec3(sphere.center));
+            if (frustum.Intersects(sphere) && glm::length(offset) - sphere.radius < fullExtent) {
+                extras.push_back(sphere);
+            }
+        };
+        for (const auto& satellite : component.satellites) {
+            addIfSeen(*satellite);
+        }
+        if (component.planetaryRing) {
+            addIfSeen(*component.planetaryRing);
+        }
+
+        const ShadowFit::Box cap = ShadowFit::FitVisibleCap(light, view, center, radius, extras);
+        if (cap.halfExtent >= 0.0) {
+            const ShadowFit::Box fitted = ShadowFit::Quantize(cap, ShadowFit::kMinCapRadii * radius);
+            if (fitted.halfExtent < full.halfExtent) {
+                box = fitted;
+            }
+        }
+    }
+
+    if (static_cast<float>(box.halfExtent) != component.shadowHalfExtent) {
+        LOG_DEBUG("ShadowFit", "light box half-extent %.6g scene units (%s, full %.6g)", box.halfExtent,
+                  component.shadowVisibleCap ? "visible cap" : "full", static_cast<double>(fullExtent));
+        component.shadowHalfExtent = static_cast<float>(box.halfExtent);
+    }
+    return box;
 }
 
 void Application::PlaceBodies() {
@@ -279,6 +350,7 @@ void Application::RenderFrame(int viewCount) {
         _renderer.BeginFrame();
         UpdateScene(OrbitLayout::GetJulianDate());
         BuildFrameSnapshot(viewCount);
+        UpdateTerrain(viewCount);
         CullScene(viewCount);
         return _observe.active ? 0 : _drawOrder.size();
     };

@@ -428,6 +428,9 @@ void Application::FramebufferSizeCallback(GLFWwindow* window, int width, int hei
         glViewport(0, 0, width, height);
         return;
     }
+    if (app->_capture.resized) {
+        return; // a capture renders at its own size (WebWindowResizeCallback)
+    }
     app->HandleResize(width, height);
 }
 
@@ -439,15 +442,22 @@ void Application::FramebufferSizeCallback(GLFWwindow* window, int width, int hei
 // independent mechanism that actually listens for window resize (and orientation change).
 EM_BOOL Application::WebWindowResizeCallback(int /*eventType*/, const EmscriptenUiEvent*, void* userData) {
     auto* app = static_cast<Application*>(userData);
+    // A capture renders at its own size; EndCapture fits the canvas to the window again.
+    if (!app->_capture.resized) {
+        app->FitCanvasToCss();
+    }
+    return EM_FALSE; // Don't block the event from reaching other listeners.
+}
+
+void Application::FitCanvasToCss() {
     double cssWidth = 0.0, cssHeight = 0.0;
     emscripten_get_element_css_size("#canvas", &cssWidth, &cssHeight);
     if (cssWidth > 0.0 && cssHeight > 0.0) {
-        const int width = static_cast<int>(std::lround(cssWidth * app->_simState.backingStoreScale));
-        const int height = static_cast<int>(std::lround(cssHeight * app->_simState.backingStoreScale));
+        const int width = static_cast<int>(std::lround(cssWidth * _simState.backingStoreScale));
+        const int height = static_cast<int>(std::lround(cssHeight * _simState.backingStoreScale));
         emscripten_set_canvas_element_size("#canvas", width, height);
-        app->HandleResize(width, height);
+        HandleResize(width, height);
     }
-    return EM_FALSE; // Don't block the event from reaching other listeners.
 }
 #endif
 

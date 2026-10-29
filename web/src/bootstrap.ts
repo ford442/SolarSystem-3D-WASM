@@ -10,6 +10,7 @@ import { PlanetExplorer } from './planetExplorer';
 import { createProgressCallbacks } from './progressOverlay';
 import { createMusicPlayer } from './music';
 import { initSettingsPanel } from './settingsPanel';
+import { initTimelineEditor } from './timelineEditor';
 import { initTouchControls, isMobileLikeDevice } from './touchControls';
 import { initWebXr } from './webxr';
 import {
@@ -381,7 +382,7 @@ void startModule().then((instance) => {
         },
     });
 
-    initEducationalLayer({
+    const tourPlayer = initEducationalLayer({
         runtime,
         deepLink,
         missionList: explorerMissionList,
@@ -393,7 +394,9 @@ void startModule().then((instance) => {
         settingsStatus,
     });
 
-    if (deepLink.planet !== undefined && !deepLink.mission && !deepLink.tour) {
+    initTimelineEditor({ runtime, canvas, deepLink, tourPlayer, caption: tourCaption });
+
+    if (deepLink.planet !== undefined && !deepLink.mission && !deepLink.tour && !deepLink.timeline) {
         explorer.applyDeepLinkPlanet(deepLink.planet, { focusCamera: false });
     }
 }, (error: unknown) => {

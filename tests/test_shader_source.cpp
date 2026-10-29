@@ -447,11 +447,15 @@ TEST(ShaderSourceTree, EveryDeclaredPermutationIsUsedAndPreprocesses) {
             continue;
         }
         ++declaring;
+        // Tested in the stage or in what it includes (planet_surface.glsl holds the material
+        // switches planetLighting.fs and terrain.fs share): the expanded source counts.
+        const Stage stage = file.extension() == ".vs" ? Stage::Vertex : Stage::Fragment;
+        const auto expanded = Preprocess(file.string(), stage, Dialect::GlslEs300, ShaderSource::ReadFileFromDisk);
+        ASSERT_TRUE(expanded.ok) << file << ": " << expanded.error;
         for (const std::string& define : permutations) {
             EXPECT_TRUE(ShaderSource::IsValidDefine(define)) << file << ": " << define;
-            EXPECT_GE(CountOf(*text, define), 2u) << file << " declares " << define << " but never tests it";
+            EXPECT_GE(CountOf(expanded.code, define), 2u) << file << " declares " << define << " but never tests it";
         }
-        const Stage stage = file.extension() == ".vs" ? Stage::Vertex : Stage::Fragment;
         for (unsigned mask = 0; mask < (1u << permutations.size()); ++mask) {
             std::vector<std::string> defines;
             for (size_t bit = 0; bit < permutations.size(); ++bit) {

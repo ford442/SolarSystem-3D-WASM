@@ -385,6 +385,81 @@ export interface SolarSystemCwrap {
     argTypes: [],
   ): (...args: number[]) => number;
   (
+    ident: 'SetCameraRoll',
+    returnType: null,
+    argTypes: ['number'],
+  ): (...args: number[]) => void;
+  (
+    ident: 'GetCameraRoll',
+    returnType: 'number',
+    argTypes: [],
+  ): (...args: number[]) => number;
+  (
+    ident: 'SetCameraFov',
+    returnType: null,
+    argTypes: ['number'],
+  ): (...args: number[]) => void;
+  (
+    ident: 'GetCameraFov',
+    returnType: 'number',
+    argTypes: [],
+  ): (...args: number[]) => number;
+  (
+    ident: 'AdvanceSimulationTo',
+    returnType: null,
+    argTypes: ['number'],
+  ): (...args: number[]) => void;
+  (
+    ident: 'GetSceneStateJson',
+    returnType: 'string',
+    argTypes: [],
+  ): (...args: number[]) => string;
+  (
+    ident: 'GetBodyCatalogJson',
+    returnType: 'string',
+    argTypes: [],
+  ): (...args: number[]) => string;
+  (
+    ident: 'GetSurfaceJson',
+    returnType: 'string',
+    argTypes: ['number', 'number', 'number', 'number'],
+  ): (...args: number[]) => string;
+  (
+    ident: 'PreloadBodySystem',
+    returnType: null,
+    argTypes: ['number'],
+  ): (...args: number[]) => void;
+  (
+    ident: 'GetPendingAssetCount',
+    returnType: 'number',
+    argTypes: [],
+  ): (...args: number[]) => number;
+  (
+    ident: 'SetHudOverlays',
+    returnType: null,
+    argTypes: ['number'],
+  ): (...args: number[]) => void;
+  (
+    ident: 'GetHudOverlays',
+    returnType: 'number',
+    argTypes: [],
+  ): (...args: number[]) => number;
+  (
+    ident: 'BeginCapture',
+    returnType: 'number',
+    argTypes: ['number', 'number'],
+  ): (...args: number[]) => number;
+  (
+    ident: 'StepCaptureFrame',
+    returnType: null,
+    argTypes: ['number'],
+  ): (...args: number[]) => void;
+  (
+    ident: 'EndCapture',
+    returnType: null,
+    argTypes: [],
+  ): (...args: number[]) => void;
+  (
     ident: 'GetShaderSourceFiles',
     returnType: 'string',
     argTypes: [],
@@ -527,6 +602,21 @@ export interface SolarSystemModule {
   _GetCameraHeliocentricZ: () => number;
   _GetCameraYaw: () => number;
   _GetCameraPitch: () => number;
+  _SetCameraRoll: (...args: number[]) => void;
+  _GetCameraRoll: () => number;
+  _SetCameraFov: (...args: number[]) => void;
+  _GetCameraFov: () => number;
+  _AdvanceSimulationTo: (...args: number[]) => void;
+  _GetSceneStateJson: () => number;
+  _GetBodyCatalogJson: () => number;
+  _GetSurfaceJson: (...args: number[]) => number;
+  _PreloadBodySystem: (...args: number[]) => void;
+  _GetPendingAssetCount: () => number;
+  _SetHudOverlays: (...args: number[]) => void;
+  _GetHudOverlays: () => number;
+  _BeginCapture: (...args: number[]) => number;
+  _StepCaptureFrame: (...args: number[]) => void;
+  _EndCapture: () => void;
   _GetShaderSourceFiles: () => number;
   _ReloadShaders: () => number;
   // END GENERATED MODULE EXPORTS
@@ -561,6 +651,12 @@ declare global {
       z: number;
     };
     startTour?: (id?: string) => void;
+    /** Cinematic timelines (timelineEditor.ts): the player, and load(id or URL) into the dock. */
+    solarSystemTimeline?: {
+      player: import('./timelinePlayer').TimelinePlayer;
+      load: (source: string) => Promise<import('./timeline').TimelineParseResult>;
+      snapshot: (t: number, width?: number, height?: number) => string | null;
+    };
     /** Observe mode console helpers (see observe.ts / ObserveState). */
     setObserveMode?: (enabled: boolean) => void;
     setObserverSite?: (latDeg: number, lonDeg: number, altM?: number) => void;
@@ -571,6 +667,12 @@ declare global {
     };
     /** Runtime asset base URL for WebResourceFetcher. */
     __solarSystemAssetBase?: string;
+    /**
+     * Download hook for WebResourceFetcher: resolves the body, or the HTTP status of a
+     * failure (0 = network). Installed by bootstrap.ts (assetCache.ts); when absent C++
+     * falls back to emscripten_async_wget2 with no cache.
+     */
+    __solarSystemFetchAsset?: (url: string) => Promise<Uint8Array<ArrayBuffer> | number>;
     /** KTX2 texture packs published by this deployment — read by PlatformWindow.cpp. */
     __solarSystemTexturePacks?: string[];
     /** Init config published before Module() — read by QualitySettings.cpp. */

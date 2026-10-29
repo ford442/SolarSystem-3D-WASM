@@ -99,6 +99,10 @@ jobs:
         working-directory: web
         run: npx tsc && npx vite build
 
+      - name: Run frontend unit tests
+        working-directory: web
+        run: npm run test:unit
+
       - name: Install Playwright Chromium
         working-directory: web
         run: npx playwright install --with-deps chromium
