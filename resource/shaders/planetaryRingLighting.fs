@@ -27,6 +27,7 @@ float sphereIntersectDistance;
 out vec4 fragColor;
 
 #include "common/frame.glsl"
+#include "common/log_depth.glsl"
 #include "common/shadow_pcf.glsl"
 
 float vecSum(vec3 v) {
@@ -86,7 +87,7 @@ float CalculateShadow(vec4 fragPosLightSpace) {
 }
 
 void main() {
-    gl_FragDepth = log2(fLogZ) * frame.zCoef * 0.5;
+    gl_FragDepth = LogFragDepth(fLogZ);
 
     vec4 ringColor = texture(ringTexture, texCoords);
 

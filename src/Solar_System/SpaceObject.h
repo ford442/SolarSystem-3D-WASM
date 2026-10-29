@@ -5,6 +5,10 @@
 #include "Transformable.h"
 #include "../gfx/Frustum.h"
 
+namespace BodyCatalog {
+struct Entry;
+}
+
 class SpaceObject : public Transformable {
 public:
     explicit SpaceObject(MeshHolder model, std::wstring engName = L"", std::wstring otherLangName = L"");
@@ -15,8 +19,21 @@ public:
      * shadow and colour passes draw the same object with different programs.
      */
     virtual void Draw(const Shader& shader) const;
+    /**
+     * Only the material half of Draw: the maps and uniforms, no `model` and no mesh. Terrain
+     * tiles drawn in place of the sphere bind the body's material with it (none by default).
+     */
+    virtual void BindMaterial(const Shader& shader) const { (void)shader; }
+    /** The catalog row this object was built from, or nullptr (the Sun, rings, shells). */
+    virtual const BodyCatalog::Entry* CatalogEntry() const { return nullptr; }
     /** The planetLighting permutation this object draws with now (CatalogMaterial::Variant); 0 = none. */
     virtual unsigned ShaderVariant() const { return 0; }
+    /**
+     * Drawn size over art size: 1 on compressed scale, true radius over art radius on
+     * realistic (SceneScale::BodySizeFactor). Lengths tied to a body — its shells, rings,
+     * focus and LOD distances — are the art numbers times this.
+     */
+    virtual float SizeFactor() const { return 1.0f; }
     const MeshHolder& GetModel() const;
     /** The mesh's bounds under the current model matrix (render frame). */
     BoundingSphere GetBoundingSphere() const;

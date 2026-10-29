@@ -2,9 +2,11 @@
 #define SOLARSYSTEM_KTX2_WRITER_H
 
 // Minimal KTX2 writer for the offline tools: one 2D level of VK_FORMAT_R16G16B16A16_SFLOAT
-// (vkFormat 97), no supercompression, a basic Data Format Descriptor and optional
-// key/value entries. Counterpart of ktx2_reader.h; GL-free so tests can round-trip it.
-// Used by tools/atmosphere_lut_baker for the atmosphere LUTs in resource/atmosphere/.
+// (vkFormat 97) or VK_FORMAT_R16_UNORM (70), no supercompression, a basic Data Format
+// Descriptor and optional key/value entries. Counterpart of ktx2_reader.h; GL-free so tests
+// can round-trip it. Used by tools/atmosphere_lut_baker for the atmosphere LUTs in
+// resource/atmosphere/, and by the terrain tests for height tiles in the format
+// scripts/bake-terrain-tiles.py writes.
 
 #include <cstdint>
 #include <string>
@@ -22,6 +24,13 @@ constexpr std::uint32_t kVkFormatR16G16B16A16Sfloat = 97;
  */
 std::vector<std::uint8_t> WriteRgba16f(std::uint32_t width, std::uint32_t height, const std::vector<float>& rgba,
                                        std::vector<std::pair<std::string, std::string>> keyValues);
+
+constexpr std::uint32_t kVkFormatR16Unorm = 70;
+
+/** width x height VK_FORMAT_R16_UNORM texels, row-major in file order (terrain height tiles). */
+std::vector<std::uint8_t> WriteR16Unorm(std::uint32_t width, std::uint32_t height,
+                                        const std::vector<std::uint16_t>& texels,
+                                        std::vector<std::pair<std::string, std::string>> keyValues);
 
 /** IEEE 754 binary16 <-> binary32, round-to-nearest-even; exposed for the baker's --check. */
 std::uint16_t FloatToHalf(float value);

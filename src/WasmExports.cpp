@@ -331,17 +331,17 @@ extern "C" {
             activeApplication->SetXrControllerRay(hand, ox, oy, oz, dx, dy, dz, visible);
         }
     }
-    // Render-frame camera position (relative to the render origin). webxr.ts composes the
-    // eye views from it, so it must be the frame the scene is drawn in; deep links and tours
-    // read GetCameraHeliocentric* instead.
+    // Render-frame camera position (relative to the render origin, which follows the camera,
+    // so about zero between frames). webxr.ts composes the eye views from it, so it must be
+    // the frame the scene is drawn in; deep links and tours read GetCameraHeliocentric*.
     EMSCRIPTEN_KEEPALIVE float GetCameraPositionX() {
-        return activeApplication ? activeApplication->GetCamera().GetPosition().x : 0.0f;
+        return activeApplication ? activeApplication->CameraRenderPosition().x : 0.0f;
     }
     EMSCRIPTEN_KEEPALIVE float GetCameraPositionY() {
-        return activeApplication ? activeApplication->GetCamera().GetPosition().y : 0.0f;
+        return activeApplication ? activeApplication->CameraRenderPosition().y : 0.0f;
     }
     EMSCRIPTEN_KEEPALIVE float GetCameraPositionZ() {
-        return activeApplication ? activeApplication->GetCamera().GetPosition().z : 0.0f;
+        return activeApplication ? activeApplication->CameraRenderPosition().z : 0.0f;
     }
     EMSCRIPTEN_KEEPALIVE double GetCameraHeliocentricX() {
         return activeApplication ? activeApplication->GetCameraHeliocentricPosition().x : 0.0;
@@ -357,6 +357,91 @@ extern "C" {
     }
     EMSCRIPTEN_KEEPALIVE float GetCameraPitch() {
         return activeApplication ? activeApplication->GetCamera().GetPitch() : 0.0f;
+    }
+    EMSCRIPTEN_KEEPALIVE void SetCameraRoll(float roll) {
+        if (activeApplication) {
+            activeApplication->GetCamera().SetRoll(roll);
+        }
+    }
+    EMSCRIPTEN_KEEPALIVE float GetCameraRoll() {
+        return activeApplication ? activeApplication->GetCamera().GetRoll() : 0.0f;
+    }
+    // Vertical field of view in degrees, within the fly camera's 1–45 zoom range.
+    EMSCRIPTEN_KEEPALIVE void SetCameraFov(float fovDeg) {
+        if (activeApplication) {
+            activeApplication->GetCamera().SetZoom(fovDeg);
+        }
+    }
+    EMSCRIPTEN_KEEPALIVE float GetCameraFov() {
+        return activeApplication ? activeApplication->GetCamera().GetZoom() : 45.0f;
+    }
+
+    // --- Timelines and capture (web/src/timeline.ts, web/src/capture.ts) ---
+    // A timeline drives the date with this rather than SetSimulationEpoch. Spins are
+    // functions of the date, so both land on the same pose; this one sends no settings
+    // notification: it runs every frame, and the timeline panel shows the date itself.
+    EMSCRIPTEN_KEEPALIVE void AdvanceSimulationTo(double julianDate) {
+        OrbitLayout::SetJulianDate(julianDate);
+    }
+    // Bodies and probes at the current date and scale, one JSON string for the same reason
+    // as GetNextSkyEventJson: {"jd","scale","bodies":[[x,y,z,radius]|null…],"missions":[…]}.
+    EMSCRIPTEN_KEEPALIVE const char* GetSceneStateJson() {
+        static std::string json;
+        json = activeApplication ? activeApplication->GetSceneStateJson() : R"({"jd":0,"scale":0,"bodies":[],"missions":[]})";
+        return json.c_str();
+    }
+    EMSCRIPTEN_KEEPALIVE const char* GetBodyCatalogJson() {
+        static std::string json;
+        json = activeApplication ? activeApplication->GetBodyCatalogJson() : "[]";
+        return json.c_str();
+    }
+    EMSCRIPTEN_KEEPALIVE const char* GetSurfaceJson(int bodyIndex, double dx, double dy, double dz) {
+        static char json[160];
+        const glm::dvec3 direction(dx, dy, dz);
+        const Application::SurfacePoint surface = activeApplication
+            ? activeApplication->SurfaceAlong(bodyIndex, direction)
+            : Application::SurfacePoint{0.0, direction};
+        std::snprintf(json, sizeof(json), R"({"radius":%.17g,"normal":[%.17g,%.17g,%.17g]})", surface.radius,
+                      surface.normal.x, surface.normal.y, surface.normal.z);
+        return json;
+    }
+    EMSCRIPTEN_KEEPALIVE void PreloadBodySystem(int bodyIndex) {
+        if (activeApplication) {
+            activeApplication->PreloadBodySystem(bodyIndex);
+        }
+    }
+    EMSCRIPTEN_KEEPALIVE int GetPendingAssetCount() {
+        return activeApplication ? activeApplication->PendingAssetCount() : 0;
+    }
+    EMSCRIPTEN_KEEPALIVE void SetHudOverlays(int mask) {
+        if (activeApplication) {
+            activeApplication->SetHudOverlays(mask);
+        }
+    }
+    EMSCRIPTEN_KEEPALIVE int GetHudOverlays() {
+        return activeApplication ? activeApplication->GetHudOverlays() : 15;
+    }
+    // Offline capture: the browser's main loop stops (as for WebXR) and JS draws each frame
+    // with StepCaptureFrame, a fixed step of the animation clock, at width × height (0 keeps
+    // the canvas size).
+    EMSCRIPTEN_KEEPALIVE int BeginCapture(int width, int height) {
+        if (!activeApplication || activeApplication->IsXrActive()) {
+            return 0;
+        }
+        activeApplication->BeginCapture(width, height);
+        emscripten_pause_main_loop();
+        return 1;
+    }
+    EMSCRIPTEN_KEEPALIVE void StepCaptureFrame(double deltaSeconds) {
+        if (activeApplication) {
+            activeApplication->StepCaptureFrame(deltaSeconds);
+        }
+    }
+    EMSCRIPTEN_KEEPALIVE void EndCapture() {
+        if (activeApplication && activeApplication->IsCaptureActive()) {
+            activeApplication->EndCapture();
+            emscripten_resume_main_loop();
+        }
     }
     // Dev-only shader hot reload (web/src/shaderReload.ts): the page lists the files every
     // live program was built from, rewrites them in MEMFS, then asks for a rebuild of the

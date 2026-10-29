@@ -32,5 +32,5 @@ void main() {
     vFade = 1.0 - aUV.y;
 
     gl_Position = frame.proj * frame.view * vec4(world, 1.0);
-    gl_Position = ApplyLogDepth(gl_Position, frame.zCoef);
+    gl_Position = ApplyLogDepth(gl_Position);
 }

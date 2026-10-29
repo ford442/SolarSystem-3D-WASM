@@ -2,20 +2,13 @@
 #define SOLARSYSTEM_MESH_H
 #include "Shader.h"
 #include "GlHandle.h"
+#include "Vertex.h"
 #include <glm/glm.hpp>
 #include <glm/gtc/matrix_transform.hpp>
 #include <assimp/types.h>
 #include <string>
 #include <utility>
 #include <vector>
-
-struct Vertex {
-    glm::vec3 position;
-    glm::vec3 normal;
-    glm::vec2 textureCoords;
-    glm::vec3 tangent;
-    glm::vec3 bitangent;
-};
 
 struct Texture {
     size_t id;
@@ -35,6 +28,9 @@ public:
     Mesh& operator=(Mesh&& other) noexcept = default;
     
     void Draw(const Shader& shader) const; // Отрисовка (рендеринг) меша
+
+    /** Point attributes 0–4 of the bound VAO at Vertex fields in the bound GL_ARRAY_BUFFER. */
+    static void SetVertexLayout();
 
 private:
     std::vector<Vertex> _vertices; // Вершины

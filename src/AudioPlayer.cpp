@@ -194,7 +194,8 @@ float Application::MusicDuckAmount() const {
     if (!planet) {
         return 1.0f;
     }
-    const float dist = CalculateSpaceObjectDistance(planet);
+    // In compressed-scale units: realistic divides out the planet's size factor.
+    const float dist = CalculateSpaceObjectDistance(planet) / planet->SizeFactor();
     constexpr float kDuckStart = 90.0f;
     constexpr float kDuckEnd = 18.0f;
     if (dist >= kDuckStart) {

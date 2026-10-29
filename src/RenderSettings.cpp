@@ -28,7 +28,8 @@ void Application::ApplyQualityPreset(int preset) {
     }
     _renderer.RebuildMissionPaths(_missionCatalog, _simState.qualityPreset);
     _renderer.RebuildMagneticFields(_simState.qualityPreset);
-    LogQualityTier(settings, _renderer.HdrEnabled(), _simState.shadowQuality);
+    ConfigureTerrain(settings);
+    LogQualityTier(settings, _renderer.HdrEnabled(), _simState.shadowQuality, _simState.contextSamples);
 }
 
 void Application::ApplyShadowQuality(int quality) {
@@ -41,13 +42,17 @@ void Application::ApplyShadowQuality(int quality) {
     const auto settings = GetQualitySettings(_simState.shadowQuality - 1, _simState.isMobileWeb);
     _renderer.ResizeShadowMap(settings.shadowResolution);
     _renderer.ApplyRenderResources(_simState, settings.shadowResolution, settings.enableHdr, DisplaySize());
-    LogQualityTier(settings, _renderer.HdrEnabled(), _simState.shadowQuality);
+    LogQualityTier(settings, _renderer.HdrEnabled(), _simState.shadowQuality, _simState.contextSamples);
 }
 
 void Application::ApplyOrbitScaleMode(int mode) {
     const auto scaleMode = mode == 1 ? OrbitLayout::ScaleMode::Realistic : OrbitLayout::ScaleMode::Compressed;
+    // The camera keeps its place relative to the body it is nearest, in that body's radii, so
+    // the view survives the bodies resizing and moving under it (docs/ARCHITECTURE.md §11.1).
+    const CameraBodyFrame frame = CaptureCameraBodyFrame();
     OrbitLayout::SetScaleMode(scaleMode);
-    // Compressed pins the render origin back to the Sun; realistic may need to rebase.
+    PlaceBodies();
+    RestoreCameraBodyFrame(frame);
     UpdateRenderOrigin();
     RefreshPlanetProxyPositions();
     // Belt instance matrices follow the new AU→scene mapping at the next UpdateScene.
@@ -60,7 +65,7 @@ void Application::UpdateLOD() {
 #ifdef __EMSCRIPTEN__
     if (_renderableSceneComponents.empty()) return;
 
-    const glm::vec3 camPos = _camera.GetPosition();
+    const glm::vec3 camPos = CameraRenderPosition();
     const TextureLodPolicy policy = GetTextureLodPolicy(_simState.qualityPreset, _simState.isMobileWeb);
 
     if (_simState.qualityPreset == 0) {

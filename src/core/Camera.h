@@ -14,9 +14,15 @@ enum class CameraVector {
     WORLD_DOWN
 };
 
+/**
+ * The viewer. Its position is a heliocentric scene position in double (the world frame of
+ * docs/ARCHITECTURE.md §11.1), never a render-frame float: on realistic scale a metre is
+ * 1.3e-8 scene units, below a float's resolution anywhere past the Moon. The render frame
+ * is centred on this position every frame, so the view matrix carries no translation.
+ */
 class Camera {
 public:
-    Camera(float near, float far, float movementSpeed, float mouseSensitivity, glm::vec3 position = glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3 up = glm::vec3(0.0f, 1.0f, 0.0f),
+    Camera(float near, float far, float movementSpeed, float mouseSensitivity, glm::dvec3 position = glm::dvec3(0.0), glm::vec3 up = glm::vec3(0.0f, 1.0f, 0.0f),
            float yaw = -90.0f, float pitch = 0.0f, float zoom = 45.0f);
     void SetMovementSpeed(float speed);
     void SetAspect(float aspect);
@@ -27,9 +33,11 @@ public:
     float GetFar() const;
     float GetZoom() const;
     float GetMovementSpeed() const;
-    glm::mat4 GetViewMatrix() const;
+    /** View matrix for an eye at `eyeRenderPosition` (the camera in the render frame: zero once the origin is on it). */
+    glm::mat4 GetViewMatrix(const glm::vec3& eyeRenderPosition = glm::vec3(0.0f)) const;
     glm::mat4 GetProjectionMatrix() const;
-    glm::vec3 GetPosition() const;
+    /** Heliocentric scene position. */
+    const glm::dvec3& GetWorldPosition() const { return _worldPosition; }
     float GetYaw() const { return _yaw; }
     float GetPitch() const { return _pitch; }
     glm::vec3 GetRightVector() const;
@@ -60,16 +68,31 @@ public:
 
     void CancelTransition() { _transitionActive = false; }
 
-    void SetPosition(const glm::vec3& position) { _position = position; }
-    // Positions here are in the render frame (OrbitLayout::ToRenderFrame). When the render
-    // origin moves by `shift`, this keeps the camera (and any transition in flight) where it
-    // was in the heliocentric frame. The double pose lives with the origin, not here.
-    void ShiftOrigin(const glm::vec3& shift) {
-        _position -= shift;
-        _transitionStartPos -= shift;
-        _transitionTargetPos -= shift;
+    void SetWorldPosition(const glm::dvec3& position) { _worldPosition = position; }
+    // Moves the camera, and any transition in flight, with a body it is hovering near, so the
+    // view holds while the orrery clock carries the body along its orbit.
+    void Carry(const glm::dvec3& delta) {
+        _worldPosition += delta;
+        _transitionStartPos += delta;
+        _transitionTargetPos += delta;
     }
+    // Turns the view by `rotation` (a world-frame rotation, columns orthonormal), keeping its
+    // roll: how a camera hovering over a spinning body turns with it. Yaw, pitch and roll are
+    // re-derived from the turned front and up vectors.
+    void Reorient(const glm::dmat3& rotation);
+    // Scene units per second per unit of movement speed. 1 keeps the historical constant
+    // speed; Application's navigation scales it with altitude on realistic scale.
+    void SetSpeedScale(double scale) { _speedScale = scale; }
+    double GetSpeedScale() const { return _speedScale; }
     void SetYawPitch(float yaw, float pitch) { _yaw = yaw; _pitch = pitch; UpdateCameraVectors(); }
+    /**
+     * Roll about the view direction in degrees, right-handed about the front vector; 0 keeps
+     * up in the plane of front and world up. Mouse look and flying keep it. Only timelines
+     * set it (web/src/timeline.ts: a keyframe's quaternion, or a horizon held level next to
+     * the ground), and they put it back to 0 when they stop.
+     */
+    void SetRoll(float roll) { _roll = roll; UpdateCameraVectors(); }
+    float GetRoll() const { return _roll; }
 
     // Processes input received from any keyboard-like input system. Accepts input parameter in the form of camera defined ENUM (to abstract it from windowing systems)
     void ProcessKeyboard(CameraVector direction, float deltaTime);
@@ -81,21 +104,23 @@ public:
     void ProcessMouseScroll(float yoffset);
 
     // Starts a smooth transition to target position and orientation over given seconds
-    void StartTransitionTo(const glm::vec3& targetPos, float targetYaw, float targetPitch, float durationSeconds = 2.0f);
+    void StartTransitionTo(const glm::dvec3& targetPos, float targetYaw, float targetPitch, float durationSeconds = 2.0f);
 
     // Updates any active smooth transition (call every frame with deltaTime)
     void UpdateTransition(float deltaTime);
 
     bool IsTransitionActive() const { return _transitionActive; }
 private:
-    glm::vec3 _position;
+    glm::dvec3 _worldPosition;
     glm::vec3 _frontVector;
     glm::vec3 _upVector;
     glm::vec3 _rightVector;
     glm::vec3 _worldUpVector;
     float _yaw;
     float _pitch;
+    float _roll = 0.0f;
     float _movementSpeed;
+    double _speedScale = 1.0;
     float _mouseSensitivity;
     float _zoom;
     float _zoomMin = 1.0f, _zoomMax = 45.0f;
@@ -105,9 +130,9 @@ private:
 
     // Smooth transition state
     bool _transitionActive = false;
-    glm::vec3 _transitionStartPos{0};
+    glm::dvec3 _transitionStartPos{0.0};
     float _transitionStartYaw = 0, _transitionStartPitch = 0;
-    glm::vec3 _transitionTargetPos{0};
+    glm::dvec3 _transitionTargetPos{0.0};
     float _transitionTargetYaw = 0, _transitionTargetPitch = 0;
     float _transitionDuration = 2.0f;
     float _transitionElapsed = 0.0f;

@@ -49,6 +49,9 @@ std::vector<std::string> Defines(unsigned variant) {
     if (variant & kSphereIntersect) {
         defines.emplace_back("USE_SPHERE_INTERSECT");
     }
+    if (variant & kNearSurface) {
+        defines.emplace_back("NEAR_SURFACE");
+    }
     return defines;
 }
 

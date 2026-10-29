@@ -97,6 +97,71 @@ function parseFocusedMissionJson(json: string): FocusedMission {
     }
 }
 
+/** A row of the body catalog (GetBodyCatalogJson): the Sun is index 0, then every catalog body. */
+export interface BodyCatalogEntry {
+    index: number;
+    id: string;
+    name: string;
+    parent: string | null;
+    kind: 'star' | 'planet' | 'dwarf-planet' | 'satellite' | 'comet';
+    radiusKm: number;
+}
+
+/**
+ * Where everything is at the current date and scale (GetSceneStateJson): heliocentric scene
+ * positions in double, drawn radii, indexed by catalog index and mission index. A moon whose
+ * system has not loaded yet is null.
+ */
+export interface SceneStateSnapshot {
+    jd: number;
+    scale: OrbitScaleMode;
+    bodies: ([number, number, number, number] | null)[];
+    missions: ([number, number, number] | null)[];
+}
+
+const EMPTY_SCENE_STATE: SceneStateSnapshot = { jd: 0, scale: 0, bodies: [], missions: [] };
+
+/** A body's drawn surface along a direction from its centre (GetSurfaceJson). */
+export interface SurfacePoint {
+    /** Centre to surface, scene units. */
+    radius: number;
+    /** Outward unit normal of the facet there (the direction itself before the body loads). */
+    normal: [number, number, number];
+}
+
+function parseBodyCatalogJson(json: string): BodyCatalogEntry[] {
+    try {
+        const raw = JSON.parse(json) as unknown;
+        return Array.isArray(raw)
+            ? raw.filter((entry): entry is BodyCatalogEntry =>
+                typeof entry === 'object' && entry !== null
+                && typeof (entry as BodyCatalogEntry).id === 'string'
+                && Number.isInteger((entry as BodyCatalogEntry).index))
+            : [];
+    } catch {
+        return [];
+    }
+}
+
+function parseSceneStateJson(json: string): SceneStateSnapshot {
+    // Read every frame of a timeline: C++ writes it, so trust the shape and skip a deep check.
+    try {
+        const raw = JSON.parse(json) as SceneStateSnapshot;
+        return Array.isArray(raw.bodies) && Array.isArray(raw.missions) ? raw : EMPTY_SCENE_STATE;
+    } catch {
+        return EMPTY_SCENE_STATE;
+    }
+}
+
+function parseSurfaceJson(json: string): SurfacePoint {
+    try {
+        const raw = JSON.parse(json) as SurfacePoint;
+        return typeof raw.radius === 'number' && Array.isArray(raw.normal) ? raw : { radius: 0, normal: [0, 1, 0] };
+    } catch {
+        return { radius: 0, normal: [0, 1, 0] };
+    }
+}
+
 /** Map quality preset + shadows toggle to C++ shadow quality (0=off, 1–3 = low…full). */
 export function shadowQualityForPreset(preset: QualityPreset, shadowsEnabled: boolean): ShadowQuality {
     return shadowsEnabled ? (preset + 1) as ShadowQuality : 0;
@@ -177,6 +242,28 @@ export interface SolarSystemRuntime {
     getCameraYaw(): number;
     getCameraPitch(): number;
     setXrControllerRay(hand: number, ox: number, oy: number, oz: number, dx: number, dy: number, dz: number, visible: boolean): void;
+    /** Roll about the view direction, degrees (timelines only; 0 restores the level camera). */
+    setCameraRoll(rollDeg: number): void;
+    getCameraRoll(): number;
+    /** Vertical field of view, degrees, clamped to the fly camera's 1–45. */
+    setCameraFov(fovDeg: number): void;
+    getCameraFov(): number;
+    /** Move the date as the clock would (spins turn with it), without a settings notification. */
+    advanceSimulationTo(julianDate: number): void;
+    getBodyCatalog(): BodyCatalogEntry[];
+    getSceneState(): SceneStateSnapshot;
+    /** A body's drawn surface along a world direction: the facet once loaded, its sphere before. */
+    getSurface(bodyIndex: number, dx: number, dy: number, dz: number): SurfacePoint;
+    /** Start downloading the system a body belongs to, without moving the camera. */
+    preloadBodySystem(bodyIndex: number): void;
+    getPendingAssetCount(): number;
+    /** Text overlays: bit 0 hints, bit 1 planet/star distances, bit 2 moon distances, bit 3 staging labels. */
+    setHudOverlays(mask: number): void;
+    getHudOverlays(): number;
+    /** Stop the browser main loop and draw only on stepCaptureFrame, at width × height (0 = canvas). */
+    beginCapture(width: number, height: number): boolean;
+    stepCaptureFrame(deltaSeconds: number): void;
+    endCapture(): void;
     /** Files the live shader programs were built from (MEMFS paths); dev reload only. */
     getShaderSourceFiles(): string[];
     /** Rebuild the programs whose files changed in MEMFS; returns how many. Dev reload only. */
@@ -298,6 +385,21 @@ export function createSolarSystemRuntime(instance: SolarSystemModule): SolarSyst
         setXrControllerRay: (hand, ox, oy, oz, dx, dy, dz, visible) => {
             exports.setXrControllerRay(hand, ox, oy, oz, dx, dy, dz, visible ? 1 : 0);
         },
+        setCameraRoll: exports.setCameraRoll,
+        getCameraRoll: exports.getCameraRoll,
+        setCameraFov: exports.setCameraFov,
+        getCameraFov: exports.getCameraFov,
+        advanceSimulationTo: exports.advanceSimulationTo,
+        getBodyCatalog: () => parseBodyCatalogJson(exports.getBodyCatalogJson()),
+        getSceneState: () => parseSceneStateJson(exports.getSceneStateJson()),
+        getSurface: (bodyIndex, dx, dy, dz) => parseSurfaceJson(exports.getSurfaceJson(bodyIndex, dx, dy, dz)),
+        preloadBodySystem: exports.preloadBodySystem,
+        getPendingAssetCount: exports.getPendingAssetCount,
+        setHudOverlays: exports.setHudOverlays,
+        getHudOverlays: exports.getHudOverlays,
+        beginCapture: (width, height) => exports.beginCapture(width, height) !== 0,
+        stepCaptureFrame: exports.stepCaptureFrame,
+        endCapture: exports.endCapture,
         getShaderSourceFiles: () => exports.getShaderSourceFiles().split('\n').filter((path) => path.length > 0),
         reloadChangedShaders: exports.reloadShaders,
     };

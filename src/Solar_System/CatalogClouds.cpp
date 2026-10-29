@@ -19,9 +19,8 @@ void CatalogClouds::AdjustToParent() {
     const float spinDegrees = SatelliteOrbit::SpinDegreesAt(_parentEntry.cloudLayer.spinDegPerSimSecond,
                                                             OrbitLayout::GetJulianDate());
 
-    LoadIdentityModelMatrix();
-    Translate(_parent->GetPosition());
-    Scale(glm::vec3(_scaleFactor));
+    Place(_parent->GetWorldPosition());
+    Scale(glm::vec3(_scaleFactor * _parent->SizeFactor()));
     Rotate(_parentEntry.axialTiltDegrees, glm::vec3(0.0f, 0.0f, 1.0f));
     if (_parentEntry.artTiltXDegrees != 0.0f) {
         Rotate(_parentEntry.artTiltXDegrees, glm::vec3(1.0f, 0.0f, 0.0f));

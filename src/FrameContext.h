@@ -13,7 +13,11 @@
 #include <vector>
 
 class AsteroidField;
+class SpaceObject;
 class Star;
+namespace Terrain {
+struct ActiveBody;
+}
 
 /**
  * Everything a render pass is allowed to know, handed to Renderer explicitly instead of the
@@ -26,7 +30,8 @@ struct CameraView {
     glm::mat4 projection{1.0f};
     glm::mat4 view{1.0f};
     glm::vec3 eyePosition{0.0f};  // this eye, render frame (inverse(view)[3])
-    glm::vec3 headPosition{0.0f}; // Camera::GetPosition() — the head, between the eyes
+    glm::vec3 headPosition{0.0f}; // the head (between the eyes), render frame: zero, the origin sits on it
+    glm::dvec3 renderOrigin{0.0}; // world position of the render frame's origin (OrbitLayout::GetRenderOrigin)
     glm::vec3 front{0.0f, 0.0f, -1.0f}, right{1.0f, 0.0f, 0.0f}, up{0.0f, 1.0f, 0.0f}; // head axes
     float nearPlane = 0.001f;
     float farPlane = 20000.0f;
@@ -34,7 +39,8 @@ struct CameraView {
     float zoomDeg = 45.0f; // Camera::GetZoom(), the mono vertical FOV
     float yawDeg = 0.0f;
     float pitchDeg = 0.0f;
-    float zCoef = 1.0f; // 2 / log2(far + 1): the log-depth scale every lit vertex shader uses
+    float logDepthC = 1.0f; // C in log2(1 + C·w) (common/log_depth.glsl): 1 compressed, 1/near realistic
+    float zCoef = 1.0f;     // 2 / log2(C·far + 1): the log-depth scale every lit shader uses
     glm::ivec4 viewport{0}; // x, y, width, height
     int eye = -1;           // -1 mono, 0/1 XR eye
 };
@@ -60,6 +66,24 @@ struct SceneSnapshot {
     const Observer::Sky* observeSky = nullptr;
     unsigned int observeMoonTexture = 0;
     const SkyEvents::SkyEvent* nextSkyEvent = nullptr;
+
+    // Bodies flagged render.terrain that the camera is near (src/render/terrain/). `tiles`
+    // is this frame's selection when the body draws as tiles instead of its sphere; null
+    // while it is only close enough for the renderer to get its terrain programs ready.
+    struct TerrainBody {
+        const SpaceObject* body = nullptr;
+        const Terrain::ActiveBody* tiles = nullptr;
+    };
+    std::vector<TerrainBody> terrain;
+
+    const TerrainBody* TerrainFor(const SpaceObject* body) const {
+        for (const TerrainBody& entry : terrain) {
+            if (entry.body == body) {
+                return &entry;
+            }
+        }
+        return nullptr;
+    }
 
     const RenderableSceneComponent* Nearest() const {
         if (!components || nearestComponent < 0 || static_cast<size_t>(nearestComponent) >= components->size()) {

@@ -13,9 +13,13 @@
 #include "Solar_System/OrbitLayout.h"
 #include "astro/Ephemeris.h"
 #include "assets/TextureLoadingQueue.h"
+#include "core/CameraNavigation.h"
 #include "core/Log.h"
 #include "gfx/HDR.h"
+#include "gfx/MeshAnchor.h"
 #include "gfx/ShadowMapFBO.h"
+#include "gfx/SurfacePatch.h"
+#include "gfx/SurfacePatchMesh.h"
 #include "render/LensFlare.h"
 #include "render/MagneticFieldBloom.h"
 #include "render/MagneticFieldLineRenderer.h"
@@ -23,6 +27,7 @@
 #include "render/OrbitPathRenderer.h"
 #include "render/TextRenderer.h"
 #include "render/XrPointerRenderer.h"
+#include "render/terrain/TerrainRenderer.h"
 #include "Solar_System/SkyBox.h"
 #include <algorithm>
 #include <array>
@@ -56,6 +61,13 @@ ShaderSpec Program(const char* vertex, const char* fragment, vector<string> defi
 ShaderSpec PlanetSpec(unsigned variant) {
     return Program("planetLighting.vs", "planetLighting.fs", CatalogMaterial::Defines(variant));
 }
+
+// The same material permutations on the terrain tiles (terrain.fs shares planet_surface.glsl).
+ShaderSpec TerrainSpec(unsigned variant) {
+    return Program("terrain.vs", "terrain.fs", CatalogMaterial::Defines(variant));
+}
+
+const vector<string> kNearSurfaceDefine{"NEAR_SURFACE"};
 
 // Every planetLighting variant some catalog row can draw with (CatalogMaterial::PossibleVariants).
 vector<unsigned> CatalogPlanetVariants() {
@@ -108,7 +120,7 @@ void Renderer::Init(const SimState& sim, FT_Library ft, glm::ivec2 display) {
     // HDR turns itself off when the GPU cannot give it a complete float FBO; follow it,
     // otherwise the composite path would keep sampling an empty buffer.
     _hdrEnabled = _hdr->IsEnabled();
-    LogQualityTier(qualitySettings, _hdrEnabled, sim.shadowQuality);
+    LogQualityTier(qualitySettings, _hdrEnabled, sim.shadowQuality, sim.contextSamples);
 
     _mainTextShader = &_shaders.Get(textSpec);
     _textRenderer = make_unique<TextRenderer>(ft, "resource/fonts/Arial.ttf");
@@ -163,6 +175,12 @@ void Renderer::Init(const SimState& sim, FT_Library ft, glm::ivec2 display) {
         _observeSky.reset();
     }
     _orbitPathRenderer = make_unique<OrbitPathRenderer>();
+    _surfacePatch = make_unique<SurfacePatchMesh>();
+    _surfacePatchKey = SurfacePatchKey{};
+    // Its programs compile on first use, once a terrain body is within reach (DrawLitBody).
+    _terrainRenderer = make_unique<TerrainRenderer>();
+    _terrainVariants.fill(nullptr);
+    _terrainShadowShader = nullptr;
     _xrPointerRenderer = make_unique<XrPointerRenderer>();
     _magneticFieldRenderer = make_unique<MagneticFieldLineRenderer>();
     {
@@ -191,6 +209,9 @@ void Renderer::Release() {
     _magneticFieldsBuilt = false;
     _xrPointerRenderer.reset();
     _orbitPathRenderer.reset();
+    _surfacePatch.reset();
+    _surfacePatchKey = SurfacePatchKey{};
+    _terrainRenderer.reset();
     _observeSky.reset();
     _lensFlare.reset();
     _skyBox.reset();
@@ -200,10 +221,13 @@ void Renderer::Release() {
     for (Shader** shader : {&_shadowMapShader, &_mainSkyBoxShader, &_mainTextShader, &_mainStarShader,
                             &_mainCoronaStarShader, &_mainPlanetShader, &_mainAtmosphereShader,
                             &_mainCloudsShader, &_mainRingShader, &_hdrShader, &_lensFlareShader,
-                            &_starGlowShader, &_pbrAtmosphereShader, &_coronaVolumeShader}) {
+                            &_starGlowShader, &_pbrAtmosphereShader, &_coronaVolumeShader,
+                            &_nearAtmosphereShader, &_nearPbrAtmosphereShader, &_nearCloudsShader,
+                            &_terrainShadowShader}) {
         *shader = nullptr;
     }
     _planetVariants.fill(nullptr);
+    _terrainVariants.fill(nullptr);
     _shaders.Clear();
 }
 
@@ -260,7 +284,9 @@ void Renderer::BeginView(const FrameContext& ctx) {
         data.sunPos = glm::vec4(ctx.scene.sun ? ctx.scene.sun->GetPosition() : glm::vec3(0.0f), 1.0f);
         data.farPlane = ctx.view.farPlane;
         data.zCoef = ctx.view.zCoef;
-        data.time = static_cast<float>(glfwGetTime());
+        data.logDepthC = ctx.view.logDepthC;
+        data.nearPlane = ctx.view.nearPlane;
+        data.time = static_cast<float>(ctx.sim.animationSeconds);
         data.exposure = _starTuning.exposure;
         _frameUniforms.Upload(viewIndex, data);
         _uploadedViews |= 1u << viewIndex;
@@ -349,9 +375,23 @@ void Renderer::ShadowMapPass(const FrameContext& ctx, const RenderableSceneCompo
     _shadowMapShader->Use();
     _shadowMapShader->SetMat4("lightSpaceMatrix", component.lightSpaceMatrix);
 
-    component.planet->Draw(*_shadowMapShader);
+    // A body drawing terrain casts from its tiles: its sphere's facets sag below the ground
+    // the colour pass draws, and would shadow it from underneath.
+    const auto drawCaster = [&](const SpaceObject& object) {
+        const SceneSnapshot::TerrainBody* terrain = ctx.scene.TerrainFor(&object);
+        const Shader* program = terrain && terrain->tiles ? TerrainShadowProgram() : nullptr;
+        if (!program) {
+            object.Draw(*_shadowMapShader);
+            return;
+        }
+        program->Use();
+        program->SetMat4("lightSpaceMatrix", component.lightSpaceMatrix);
+        _terrainRenderer->Draw(*program, *terrain->tiles, object.GetModelMatrix(), TerrainRenderer::Pass::Shadow);
+        _shadowMapShader->Use();
+    };
+    drawCaster(*component.planet);
     for (const auto& satellite : component.satellites) {
-        satellite->Draw(*_shadowMapShader);
+        drawCaster(*satellite);
     }
 
     if (component.planetaryRing) {
@@ -385,16 +425,16 @@ void Renderer::RenderPass(const FrameContext& ctx, const RenderableSceneComponen
         std::any_of(component.atmospheres.begin(), component.atmospheres.end(),
                     [](const RenderableAtmosphere& a) { return a.atmosphere->IsPhysicalPathActive(); });
     if (physicalAtmosphere) {
-        RenderClouds(component);
+        RenderClouds(ctx, component);
         RenderAtmospheres(ctx, component);
     } else {
         RenderAtmospheres(ctx, component);
-        RenderClouds(component);
+        RenderClouds(ctx, component);
     }
     RenderPlanetaryRing(*_mainRingShader, component);
 }
 
-void Renderer::RenderAtmospheres(const FrameContext& ctx, const RenderableSceneComponent& component) const {
+void Renderer::RenderAtmospheres(const FrameContext& ctx, const RenderableSceneComponent& component) {
     if (component.atmospheres.empty()) {
         return;
     }
@@ -423,46 +463,50 @@ void Renderer::RenderAtmospheres(const FrameContext& ctx, const RenderableSceneC
 }
 
 void Renderer::RenderOneilAtmosphere(const FrameContext& ctx, const RenderableAtmosphere& renderableAtmosphere,
-                                     const RenderableSceneComponent& component) const {
+                                     const RenderableSceneComponent& component) {
     Atmosphere& atmosphere = *renderableAtmosphere.atmosphere;
     const PlanetaryRing* ring = component.planetaryRing.get();
     glBlendFunc(GL_ONE, GL_ONE);
 
-    _mainAtmosphereShader->Use();
-    _mainAtmosphereShader->SetMat4("lightSpaceMatrix", component.lightSpaceMatrix);
-    _mainAtmosphereShader->SetVec2("shadowDepthRange", component.shadowDepthRange);
-    _mainAtmosphereShader->SetFloat("bias", ShadowBias(component, kShellShadowBias));
+    static const ShaderSpec nearSpec = Program("atmosphere.vs", "atmosphere.fs", kNearSurfaceDefine);
+    Shader& program = ShellProgram(*_mainAtmosphereShader, _nearAtmosphereShader, nearSpec,
+                                   NearSurface(atmosphere, ctx.view));
+    program.Use();
+    program.SetFloat("uSurfaceDim", _magneticFieldsEnabled ? 0.40f : 1.0f);
+    program.SetMat4("lightSpaceMatrix", component.lightSpaceMatrix);
+    program.SetVec2("shadowDepthRange", component.shadowDepthRange);
+    program.SetFloat("bias", ShadowBias(component, kShellShadowBias));
     // Per-shell constants are set here, after Use(): Saturn and Titan share a component,
     // so setting them at placement time let the last shell's values win for both.
-    _mainAtmosphereShader->SetVec3("C_R", atmosphere.GetAtmosphereColor());
-    _mainAtmosphereShader->SetFloat("innerRadius", atmosphere.GetInnerRadius());
-    _mainAtmosphereShader->SetFloat("outerRadius", atmosphere.GetOuterRadius());
-    _mainAtmosphereShader->SetVec3("camPosition", ctx.view.eyePosition - atmosphere.GetPosition());
-    _mainAtmosphereShader->SetVec3("lightPos", ctx.scene.sun->GetPosition() - atmosphere.GetPosition());
-    _mainAtmosphereShader->SetVec3("mieTint", atmosphere.GetMieTint());
-    _mainAtmosphereShader->SetFloat("SCALE_H_FACTOR", atmosphere.GetRow().oneil.hScaleFactor);
-    _mainAtmosphereShader->SetFloat("SCALE_L_FACTOR", 1.0f);
-    _mainAtmosphereShader->SetFloat("earthSizeCoefficient", renderableAtmosphere.parentEarthSizeCoefficient);
-    _mainAtmosphereShader->SetBool("isUseToneMapping", atmosphere.GetRow().oneil.toneMapping);
-    _mainAtmosphereShader->SetMat3("bodyToSphere", atmosphere.GetBodyToSphere());
-    _mainAtmosphereShader->SetBool("isNearbyPlanetaryRing", ring != nullptr);
+    program.SetVec3("C_R", atmosphere.GetAtmosphereColor());
+    program.SetFloat("innerRadius", atmosphere.GetInnerRadius());
+    program.SetFloat("outerRadius", atmosphere.GetOuterRadius());
+    program.SetVec3("camPosition", ctx.view.eyePosition - atmosphere.GetPosition());
+    program.SetVec3("lightPos", ctx.scene.sun->GetPosition() - atmosphere.GetPosition());
+    program.SetVec3("mieTint", atmosphere.GetMieTint());
+    program.SetFloat("SCALE_H_FACTOR", atmosphere.GetRow().oneil.hScaleFactor);
+    program.SetFloat("SCALE_L_FACTOR", 1.0f);
+    program.SetFloat("earthSizeCoefficient", renderableAtmosphere.parentEarthSizeCoefficient);
+    program.SetBool("isUseToneMapping", atmosphere.GetRow().oneil.toneMapping);
+    program.SetMat3("bodyToSphere", atmosphere.GetBodyToSphere());
+    program.SetBool("isNearbyPlanetaryRing", ring != nullptr);
 
     if (ring) {
-        _mainAtmosphereShader->SetVec3("ringParentPlanetCenter", ring->GetParent()->GetPosition());
-        _mainAtmosphereShader->SetFloat("ringParentPlanetRadiusSquared", ring->GetParent()->GetRadius() * ring->GetParent()->GetRadius());
-        _mainAtmosphereShader->SetBool("isUseSphereIntersect", ring->GetParent() != atmosphere.GetParent());
+        program.SetVec3("ringParentPlanetCenter", ring->GetParent()->GetPosition());
+        program.SetFloat("ringParentPlanetRadiusSquared", ring->GetParent()->GetRadius() * ring->GetParent()->GetRadius());
+        program.SetBool("isUseSphereIntersect", ring->GetParent() != atmosphere.GetParent());
 
-        _mainAtmosphereShader->SetVec3("ringCenter", ring->GetPosition());
-        _mainAtmosphereShader->SetVec3("ringNormal", ring->GetRingNormal());
-        _mainAtmosphereShader->SetVec2("ringInnerOuterRadiuses", glm::vec2(ring->GetInnerRadius(), ring->GetOuterRadius()));
+        program.SetVec3("ringCenter", ring->GetPosition());
+        program.SetVec3("ringNormal", ring->GetRingNormal());
+        program.SetVec2("ringInnerOuterRadiuses", glm::vec2(ring->GetInnerRadius(), ring->GetOuterRadius()));
         glBindTextureUnit(Unit(TextureUnit::Ring), ring->GetRingTexture());
     }
 
-    atmosphere.Draw(*_mainAtmosphereShader);
+    atmosphere.Draw(program);
 }
 
 void Renderer::RenderPbrAtmosphere(const FrameContext& ctx, const RenderableAtmosphere& renderableAtmosphere,
-                                   const RenderableSceneComponent& component) const {
+                                   const RenderableSceneComponent& component) {
     Atmosphere& atmosphere = *renderableAtmosphere.atmosphere;
     const PlanetaryRing* ring = component.planetaryRing.get();
     const BodyCatalog::AtmosphereRow& row = atmosphere.GetRow();
@@ -473,8 +517,11 @@ void Renderer::RenderPbrAtmosphere(const FrameContext& ctx, const RenderableAtmo
     // Premultiplied: rgb is in-scattered light, alpha what survives of the scene behind.
     glBlendFunc(GL_ONE, GL_SRC_ALPHA);
 
-    Shader& shader = *_pbrAtmosphereShader;
+    static const ShaderSpec nearSpec = Program("atmosphere.vs", "atmospherePbr.fs", kNearSurfaceDefine);
+    Shader& shader = ShellProgram(*_pbrAtmosphereShader, _nearPbrAtmosphereShader, nearSpec,
+                                  NearSurface(atmosphere, ctx.view));
     shader.Use();
+    shader.SetFloat("uSurfaceDim", _magneticFieldsEnabled ? 0.40f : 1.0f);
     shader.SetMat4("lightSpaceMatrix", component.lightSpaceMatrix);
     shader.SetVec3("camPosition", camera - center);
     shader.SetVec3("lightPos", ctx.scene.sun->GetPosition() - center);
@@ -529,7 +576,7 @@ void Renderer::RenderPbrAtmosphere(const FrameContext& ctx, const RenderableAtmo
     atmosphere.Draw(shader);
 }
 
-void Renderer::RenderClouds(const RenderableSceneComponent& component) const {
+void Renderer::RenderClouds(const FrameContext& ctx, const RenderableSceneComponent& component) {
     const Clouds* renderableClouds = component.clouds.get();
     if (renderableClouds && renderableClouds->IsVisible()) {
         glDepthMask(GL_FALSE);
@@ -537,10 +584,17 @@ void Renderer::RenderClouds(const RenderableSceneComponent& component) const {
         glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_COLOR);
         glDisable(GL_CULL_FACE);
 
-        _mainCloudsShader->Use();
-        _mainCloudsShader->SetMat4("lightSpaceMatrix", component.lightSpaceMatrix);
-        _mainCloudsShader->SetFloat("bias", ShadowBias(component, kShellShadowBias));
-        renderableClouds->Draw(*_mainCloudsShader);
+        static const ShaderSpec nearSpec = Program("planetLighting.vs", "cloudsLighting.fs", kNearSurfaceDefine);
+        const bool near = NearSurface(*renderableClouds, ctx.view);
+        Shader& program = ShellProgram(*_mainCloudsShader, _nearCloudsShader, nearSpec, near);
+        program.Use();
+        program.SetFloat("uSurfaceDim", _magneticFieldsEnabled ? 0.28f : 1.0f);
+        program.SetMat4("lightSpaceMatrix", component.lightSpaceMatrix);
+        program.SetFloat("bias", ShadowBias(component, kShellShadowBias));
+        if (&program != _mainCloudsShader) {
+            SetMeshAnchor(program, *renderableClouds, ctx.view);
+        }
+        renderableClouds->Draw(program);
 
         glEnable(GL_CULL_FACE);
         glDisable(GL_BLEND);
@@ -760,7 +814,7 @@ void Renderer::RenderStarEffects(const FrameContext& ctx) const {
 
 void Renderer::RenderPlanetProxyMarkers(const FrameContext& ctx) const {
     // Web staged loading: a label at the orbital position of every system not READY yet.
-    if (!ctx.scene.stagedSystems || ctx.scene.stagedSystems->empty()) return;
+    if (!_overlayToggles.stagingLabels || !ctx.scene.stagedSystems || ctx.scene.stagedSystems->empty()) return;
 
     glDisable(GL_DEPTH_TEST);
     glEnable(GL_BLEND);
@@ -1177,18 +1231,75 @@ Renderer::EclipseUmbra Renderer::ComputeEclipseUmbra(const FrameContext& ctx, co
 }
 
 const Shader& Renderer::PlanetProgram(unsigned variant) {
-    Shader*& program = _planetVariants[variant];
-    if (!program) {
-        program = _shaders.GetIfReady(PlanetSpec(variant));
-    }
-    if (program) {
-        return *program;
-    }
-    // Not built yet (or failed): drop the maps, keep the sphere test if that one is there.
-    if (Shader* withoutMaps = _planetVariants[variant & CatalogMaterial::kSphereIntersect]) {
-        return *withoutMaps;
+    using CatalogMaterial::kNearSurface;
+    using CatalogMaterial::kSphereIntersect;
+    // Not built yet (or failed): drop the maps, keeping the sphere test and, close to a
+    // surface, fragment depth (without it the facets around the eye clip wrongly); then drop
+    // NEAR_SURFACE too. Each candidate is submitted the first time it is asked for.
+    const unsigned candidates[] = {variant, variant & (kSphereIntersect | kNearSurface), variant & ~kNearSurface,
+                                   variant & kSphereIntersect};
+    for (const unsigned candidate : candidates) {
+        Shader*& program = _planetVariants[candidate];
+        if (!program) {
+            program = _shaders.GetIfReady(PlanetSpec(candidate));
+        }
+        if (program) {
+            return *program;
+        }
     }
     return *_mainPlanetShader;
+}
+
+bool Renderer::NearSurface(const SpaceObject& object, const CameraView& view) {
+    const BoundingSphere bounds = object.GetBoundingSphere();
+    const auto reach = static_cast<float>(1.0 + CameraNavigation::kNearSurfaceRadii);
+    return glm::distance(view.eyePosition, bounds.center) < bounds.radius * reach;
+}
+
+void Renderer::SetMeshAnchor(const Shader& program, const SpaceObject& object, const CameraView& view) {
+    // The body's render-frame position in double, rather than the model matrix's float
+    // translation: that rounding is exactly what the anchor exists to keep out.
+    const glm::dvec3 bodyRender = object.GetWorldPosition() - view.renderOrigin;
+    const glm::dvec3 eyeRender(view.eyePosition);
+    const MeshAnchor anchor = ComputeMeshAnchor(glm::mat3(object.GetModelMatrix()), eyeRender - bodyRender, eyeRender);
+    program.SetVec3("meshAnchor", anchor.anchor);
+    program.SetVec3("meshAnchorOffset", anchor.anchorOffset);
+}
+
+void Renderer::DrawSurfacePatch(const Shader& program, const SpaceObject& body, const CameraView& view) {
+    const vector<string>& defines = program.Spec().defines;
+    if (!_surfacePatch || std::find(defines.begin(), defines.end(), kNearSurfaceDefine[0]) == defines.end()) {
+        return; // a fallback program would place the eye-relative positions as model ones
+    }
+    const MeshHolder& mesh = body.GetModel();
+    const MeshHolder::Triangles& triangles = mesh.GetTriangles();
+    const glm::dmat3 shape{glm::mat3(body.GetModelMatrix())};
+    // Built around the head, not this eye, so both XR eyes share one patch.
+    const glm::dvec3 eyeModel = glm::inverse(shape) * (view.renderOrigin - body.GetWorldPosition());
+    if (!SurfacePatch::InReach(shape, eyeModel, mesh.BoundingRadius(), triangles.maxEdge, view.nearPlane)) {
+        return;
+    }
+    const SurfacePatchKey key{&body, eyeModel, view.nearPlane};
+    if (key.body != _surfacePatchKey.body || key.eyeModel != _surfacePatchKey.eyeModel ||
+        key.nearPlane != _surfacePatchKey.nearPlane) {
+        _surfacePatch->Stream(SurfacePatch::Build(triangles.vertices, triangles.indices, shape, eyeModel, view.nearPlane));
+        _surfacePatchKey = key;
+    }
+    // The positions are offsets from eyeModel, which is the render origin: no anchor, and
+    // an offset that is zero up to rounding.
+    program.SetVec3("meshAnchor", glm::vec3(0.0f));
+    program.SetVec3("meshAnchorOffset", glm::vec3(body.GetWorldPosition() + shape * eyeModel - view.renderOrigin));
+    _surfacePatch->Draw();
+}
+
+Shader& Renderer::ShellProgram(Shader& normal, Shader*& nearCache, const ShaderSpec& nearSpec, bool near) {
+    if (!near) {
+        return normal;
+    }
+    if (!nearCache) {
+        nearCache = _shaders.GetIfReady(nearSpec);
+    }
+    return nearCache ? *nearCache : normal;
 }
 
 void Renderer::ConfigurePlanetProgram(const FrameContext& ctx, const Shader& program,
@@ -1227,7 +1338,79 @@ void Renderer::DrawLitBody(const FrameContext& ctx, const SpaceObject& body, con
         return;
     }
     ++_stats.bodyDraws;
-    const Shader& program = PlanetProgram(body.ShaderVariant());
+    if (const SceneSnapshot::TerrainBody* terrain = ctx.scene.TerrainFor(&body)) {
+        if (!terrain->tiles) {
+            // Within reach but still the sphere: submit the programs its descent will need.
+            TerrainProgram(body.ShaderVariant() | CatalogMaterial::kNearSurface);
+            TerrainShadowProgram();
+        } else if (DrawTerrain(ctx, body, *terrain->tiles, component, umbra)) {
+            return;
+        }
+    }
+    const bool near = NearSurface(body, ctx.view);
+    const unsigned variant = body.ShaderVariant() | (near ? CatalogMaterial::kNearSurface : 0u);
+    const Shader& program = PlanetProgram(variant);
     ConfigurePlanetProgram(ctx, program, component, umbra);
+    if (near) {
+        // Harmless on a fallback program without NEAR_SURFACE: it has no such uniforms.
+        SetMeshAnchor(program, body, ctx.view);
+    }
     body.Draw(program);
+    if (near) {
+        DrawSurfacePatch(program, body, ctx.view);
+    }
+}
+
+const Shader* Renderer::TerrainProgram(unsigned variant) {
+    using CatalogMaterial::kNearSurface;
+    // As PlanetProgram: drop the maps, then NEAR_SURFACE. A tile placed without it is in the
+    // same place; only its depth is per vertex.
+    const unsigned candidates[] = {variant, variant & kNearSurface, variant & ~kNearSurface, 0u};
+    for (const unsigned candidate : candidates) {
+        Shader*& program = _terrainVariants[candidate];
+        if (!program) {
+            program = _shaders.GetIfReady(TerrainSpec(candidate));
+        }
+        if (program) {
+            return program;
+        }
+    }
+    return nullptr;
+}
+
+const Shader* Renderer::TerrainShadowProgram() {
+    if (!_terrainShadowShader) {
+        _terrainShadowShader = _shaders.GetIfReady(Program("terrain.vs", "shadowMap.fs", {"SHADOW_PASS"}));
+    }
+    return _terrainShadowShader;
+}
+
+bool Renderer::DrawTerrain(const FrameContext& ctx, const SpaceObject& body, const Terrain::ActiveBody& tiles,
+                           const RenderableSceneComponent& component, const EclipseUmbra& umbra) {
+    const unsigned material = body.ShaderVariant() & ~CatalogMaterial::kNearSurface;
+    const Shader* far = TerrainProgram(material);
+    if (!_terrainRenderer || !far) {
+        return false;
+    }
+    const Shader* near = TerrainProgram(material | CatalogMaterial::kNearSurface);
+    const glm::mat4 model = body.GetModelMatrix();
+    const glm::mat3 normalMatrix = glm::transpose(glm::inverse(glm::mat3(model)));
+    for (const auto& [program, pass] : {std::pair{far, TerrainRenderer::Pass::ColourFar},
+                                        std::pair{near, TerrainRenderer::Pass::ColourNear}}) {
+        ConfigurePlanetProgram(ctx, *program, component, umbra);
+        body.BindMaterial(*program);
+        program->SetMat3("normalMatrix", normalMatrix);
+        _terrainRenderer->Draw(*program, tiles, model, pass);
+    }
+    return true;
+}
+
+void Renderer::ForgetTerrainTiles(const std::vector<uint64_t>& uids) {
+    if (_terrainRenderer && !uids.empty()) {
+        _terrainRenderer->Forget(uids);
+    }
+}
+
+std::size_t Renderer::TerrainTextureCount() const {
+    return _terrainRenderer ? _terrainRenderer->TextureCount() : 0;
 }

@@ -16,8 +16,9 @@ void UranusRing::AdjustToParent() {
     const float tiltZ = entry ? entry->axialTiltDegrees : -97.8f;
     const float tiltX = entry ? entry->artTiltXDegrees : 0.0f;
 
-    LoadIdentityModelMatrix();
-    Translate(_parentPlanet->GetPosition());
+    Place(_parentPlanet->GetWorldPosition());
+    // The ring mesh is built in compressed-scale units; it grows with its planet.
+    Scale(glm::vec3(_parentPlanet->SizeFactor()));
     Rotate(tiltZ, glm::vec3(0, 0, 1));
     if (tiltX != 0.0f) {
         Rotate(tiltX, glm::vec3(1, 0, 0));

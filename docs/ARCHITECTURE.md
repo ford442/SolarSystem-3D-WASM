@@ -360,6 +360,27 @@ window.__solarSystemAssetBase = runtimeAssetBase;  // consumed by WebResourceFet
 {VITE_ASSET_BASE or page base URL} + resource/...
 ```
 
+### 6.1.1 Fetched assets are cached in the page
+
+`WebResourceFetcher` normally downloads with `emscripten_async_wget2`. When
+`window['__solarSystemFetchAsset']` exists (`web/src/assetCache.ts`, installed by `bootstrap.ts`
+before `Module()` runs), `StartTransfer` calls it instead and only writes the returned bytes into
+MEMFS. The hook resolves a cached body or fetches it and stores it in the **Cache API**:
+
+- Cache name `solarsystem-assets:<asset base URL>`: a deploy that moves to a new base starts
+  clean, and caches of other bases are deleted. A deploy that replaces files *in place* at the
+  same base must change the base (a versioned path, as in the S3 layout above) or the old bytes
+  are served.
+- Hit: no network request. Miss: fetch, and store only a complete `200` body — not an HTTP error,
+  a `206`, a body shorter than its `Content-Length`, or a `text/html` body (Vite's SPA fallback
+  answers a missing file with `index.html` and a 200).
+- Core preloads in `SolarSystem.data` never come through here; neither does anything prefetch.
+  What gets requested is still decided by the texture LOD tier, so a Low preset never pulls high tiers.
+- Off in `npm run dev` (edited textures would be pinned); `?assetcache=1` / `?assetcache=0`
+  overrides either way. Without the Cache API (insecure origin) it fetches uncached.
+
+It is not a service worker and not an offline shell. Quadtree terrain tiles will use the same storage.
+
 ### 6.1 Dev, preview, and production (single rule)
 
 | Mode | Command | Default asset origin | Notes |
@@ -381,11 +402,13 @@ The value is the directory **containing** `resource/`, with a trailing slash. It
 
 | Asset class | WASM `.data` preload | Runtime fetch |
 |-------------|---------------------|---------------|
-| Shaders, fonts, icons | Yes | — |
+| Shaders, fonts, missions, sky | Yes | — |
+| `resource/icons/` (14 MB, native window icon only) | **No** | — |
 | Atmosphere LUTs (`resource/atmosphere/`, ~560 KB RGBA16F KTX2) | Yes | — |
 | Low-res placeholders | Partial (via build copy to `web/public/`) | Core + staged + LOD |
 | High-res textures | No | LOD queue + skybox core load |
 | Sounds | No (may be absent in checkout) | Optional parallel download |
+| Terrain height tiles (`terrain/<body>/`, baked offline, not in git) | No | `TileCache` through `WebResourceFetcher`, only on Medium/Full and only near a flagged body (§11.3) |
 
 See [README.md § Runtime asset hosting](../README.md#runtime-asset-hosting) for CDN layout, manifest checksums, and `web/deploy.py` targets. For COEP/CORS/CORP header matrix and subdomain CDN setup, see [docs/CROSS_ORIGIN_HEADERS.md](CROSS_ORIGIN_HEADERS.md).
 
@@ -412,12 +435,14 @@ logging out of `src/`.
 | Folder | Module | Role |
 |--------|--------|------|
 | `core/` | `Log` | `LOG_*` macros, level from `SOLARSYSTEM_LOG` / `?log=` (§7.6) |
-| | `Camera`, `FrameTimer` | First-person navigation; native frame pacing and the FPS count |
+| | `Camera`, `FrameTimer` | First-person camera (double world position); native frame pacing and the FPS count |
+| | `CameraNavigation` | GL-free altitude, floor, facet ray cast, clip planes, altitude-scaled speed and anchor hysteresis (§11.1) |
 | `gfx/` | `GlHandle`, `GlPlatform.h` | Move-only RAII GL objects (the only `glGen*`/`glDelete*`); the GL header and web polyfills |
 | | `Shader` / `ShaderLibrary` | Deferred compile/link (`KHR_parallel_shader_compile`), link-time uniform table with a value cache, hot reload; programs keyed by `ShaderSpec` (files + permutation defines) (§9.1) |
 | | `ShaderSource` | GL-free source assembly: `#version` rewrite, `common/preamble.glsl`, permutation `#define`s, `#include`, sampler bindings, `#line` bookkeeping (§9.1) |
 | | `FrameUniforms`, `TextureUnits.h` | The per-view `FrameUBO` and the shared texture-unit list (§9.1) |
-| | `Mesh`, `MeshHolder`, `LineStripBatch` | Model meshes (with bounding radius) and the one ribbon VAO layout |
+| | `Mesh`, `MeshHolder`, `Vertex.h`, `LineStripBatch` | Model meshes (with bounding radius and a CPU copy of their triangles) and the one ribbon VAO layout |
+| | `MeshAnchor.h`, `SurfacePatch`, `SurfacePatchMesh` | Relative-to-eye vertex placement and the re-tessellated facets under a camera metres up (§11.1) |
 | | `TextureImage2D`, `FloatLutTexture` | DDS/KTX2 load, reload, mip level management; baked RGBA16F LUTs (quiet `nullopt` instead of a checkerboard) |
 | | `ShadowMapFBO`, `HDR`, `Frustum.h` | Shadow map target; star HDR target; frustum test and fitted depth range (§7.5) |
 | | `GlCapabilities` | One probe of extensions and limits (compressed formats, float FBOs, parallel compile) |
@@ -426,6 +451,9 @@ logging out of `src/`.
 | | `MissionPathRenderer` | Sampled probe ribbons (Voyager); quality downsample; AU→scene via `HelioAuToScene` |
 | | `XrPointerRenderer` | WebXR controller rays (skipped on Low) |
 | | `MagneticFieldLineMesh` / `MagneticFieldLineRenderer` / `MagneticFieldBloom` | Optional dipole+toroidal ribbons (static VBO, GPU flow, half-res bloom on Medium+, separate from the star HDR FBO) |
+| `render/terrain/` | `CubeSphere`, `TerrainTile`, `TerrainQuadtree` | GL-free: equal-angle cube-sphere tile keys and float-exact placement, R16 KTX2 tile parse and Catmull-Rom upsample, screen-space-error selection with horizon/frustum/light-box culling and the geomorph (§11.3) |
+| | `TileCache`, `TerrainSystem` | GL-free: one LRU of tiles under the tier's byte budget with an in-flight cap; when each flagged body swaps its sphere for tiles, and the floor's surface radius (§11.3) |
+| | `TerrainRenderer` | The shared 65×65 grid with skirts and a height texture per drawn tile; draws a selection with the bound program |
 | `assets/` | `WebResourceFetcher` | `DownloadFile` (async, callback-based) + `RequireResident` (residency probe) — WASM only |
 | | `TextureLoadingQueue`, `TextureLODController` | Serialized high-res LOD downloads; per-texture tier state machine (§4.3) |
 | | `PlanetManifestLoader` | Parses `planet_manifest.json` for staged loading (§4.2) |
@@ -442,7 +470,8 @@ destructors, which never run on an empty handle). `SolarSystemGlTests` (`tests/g
 hidden GLFW window with a real GL 4.6 core context and checks handles, that every
 planetLighting permutation links and reads `FrameUBO` at its binding, sampler units, the
 uniform cache, the shadow/HDR framebuffers, one `LineStripBatch` draw read back with
-`glReadPixels`, and a DDS upload that must not fall back. CI runs it under Xvfb/llvmpipe; with no display it skips
+`glReadPixels`, a DDS upload that must not fall back, that every terrain permutation links
+with its sampler units, and that a terrain tile lands where `CubeSphere` puts it. CI runs it under Xvfb/llvmpipe; with no display it skips
 (`MESA_GL_VERSION_OVERRIDE=4.6 MESA_GLSL_VERSION_OVERRIDE=460 xvfb-run -a <build>/tests/SolarSystemGlTests`).
 
 ### 7.3 Scene objects
@@ -498,10 +527,29 @@ One frame (`Application::RenderFrame` → `FramePasses::Run`):
 4. **Draw**: background per view; then per component, its shadow pass followed by each
    view's colour pass (one shadow FBO); then the foreground per view.
 
-**Shadow frustum.** Each component's light frustum is an ortho box of ±3 planet radii
-looking from the Sun at the planet, with its depth range fitted to the component's own
-bodies (`FitDepthRange`): the only casters drawn into that map and the only receivers that
-read it. `shadowDepthRange` (near, far − near) goes to the shaders that turn a stored depth
+**Shadow frustum.** Each component's light frustum is an ortho box looking from the Sun at
+the planet, with its depth range fitted to the component's own bodies (`FitDepthRange`): the
+only casters drawn into that map and the only receivers that read it. The sideways extent is
+±3 planet radii from orbit, which holds a full-disk view's terminator and the rings and moons
+that receive the planet's shadow. One map has one texel size, so on realistic scale near the
+ground that box is a texel of kilometres. Inside 3 radii of the planet's centre (released
+past 4, so the resolution does not pump on the boundary) with shadows on and no XR session,
+`Application::FitShadowBox` fits the box to the **visible cap** instead (`gfx/ShadowFit.h`,
+GL-free, double): the part of the planet's sphere the camera's frustum sees. Camera rays
+along the frustum's rim and across a grid give the visible surface; each line of rays that
+turns from hitting to missing is bisected to the grazing ray, which is the horizon; the
+horizon circle is included where it lies inside the view; the point under the camera is
+always in; a ring or moon whose bounding sphere is in the frustum (and inside the old box)
+is added. The square around that, plus 10 %, is rounded up to a quarter octave with its
+centre snapped to a 1/1024 grid of the box, so it does not swim as the camera turns, and is
+never tighter than 1e-4 radii (0.64 km half-extent on Earth, a 0.3 m texel at 4096). It is
+only used when it is smaller than the ±3-radii box. The light still looks from the Sun at the
+planet; the box is off-centre in that view (`glm::ortho` with asymmetric bounds), and the
+depth fit, `shadowDepthRange` and the bias-over-range path are unchanged. The cap is the
+analytic sphere, not terrain, and a camera floored on the facets just under it (they sag
+kilometres on realistic Earth) is given a ground a hair under its own radius. There is one
+map and one pass: no cascades. `[ShadowFit]` at debug level logs the half-extent in scene
+units whenever it changes. `shadowDepthRange` (near, far − near) goes to the shaders that turn a stored depth
 back into a distance (the ring tests), and each pass's `bias` is a fixed scene-unit bias
 divided by that range, which keeps the comparisons the shaders always made. (The frustum
 used to borrow the camera's 0.001–20000, which also clipped every body more than 20000
@@ -538,6 +586,10 @@ test's error filter. Use `LOG_*` rather than `std::cout`/`std::cerr`. The parser
 | `index.html` | Canvas, loading overlay, settings panel, streaming progress bar, tour caption, XR HUD |
 | `src/main.ts` | Module init, `updateLoadingProgress`, `updateStreamingProgress`, `setCameraPose`, settings persistence |
 | `src/tourPlayer.ts` | Guided-tour playlist over `SolarSystemRuntime` |
+| `src/timeline.ts` | Cinematic timeline schema, parser and evaluator (pure; §11.2) |
+| `src/timelinePlayer.ts` | Plays a timeline through the engine; shipped timeline list, `?timeline=` URL rule |
+| `src/timelineEditor.ts` | Timeline dock: play/scrub, keys at the current pose, import/export, record |
+| `src/capture.ts` | Deterministic video capture (WebCodecs + mp4-muxer; MediaRecorder fallback) |
 | `src/educationalLayer.ts` | Mission list + tour controls |
 | `src/observe.ts` | Explore/Observe switch, site + UTC time + rate controls, 2017 eclipse preset, telescope eyepieces + overlay, `ObserveState` parsing |
 | `vite.config.ts` | Base path `/solar-system/` |
@@ -650,8 +702,9 @@ never `SetInt`s a sampler. The units are fixed across programs (diffuse 0, norma
 specular 2, night 3, clouds 4, shadow map 5, ring 6, the two atmosphere LUTs 7/8, Observe's
 Moon 9), so the shadow map is bound once per view, not per program.
 
-**Per-frame uniforms.** View/projection matrices, the eye and Sun positions, far plane,
-log-depth `zCoef`, time and exposure are one std140 block, `FrameUBO`
+**Per-frame uniforms.** View/projection matrices, the eye and Sun positions, near and far
+planes, the log-depth `zCoef` and `logDepthC` (§11.1), time and exposure are one std140
+block, `FrameUBO`
 (`common/frame.glsl`, read as `frame.view` etc.; C++ layout `gfx/FrameUniforms.h`).
 `Renderer::BeginView` uploads it once per view (per eye in XR) to binding 0; `Shader` binds
 the block of every program that declares it at link. Every lit program reads it (planets,
@@ -741,7 +794,8 @@ under the LUT ground sphere, so the view ray stops at the surface above them; dr
 
 **Comparing captures.** Native `SOLARSYSTEM_CAMERA_POSE=x,y,z,yaw,pitch[,jd]` applies the same
 pose as the web's `window.setCameraPose(x, y, z, yaw, pitch)`; the optional Julian date pins
-and pauses the clock so planet positions match. `exposure` is a display uniform, not part of
+and pauses the clock so planet positions match. `SOLARSYSTEM_SCALE=realistic` switches scale
+first (§11.1). `exposure` is a display uniform, not part of
 the bake, so a native and a web capture at one pose differ only by the display.
 
 `thicknessScale` stretches a shell while keeping vertical optical depth, for bodies whose
@@ -811,6 +865,34 @@ std::string GetTexturePath(const std::string& lowRes, const std::string& highRes
 | GL driver messages | KHR_debug in Debug builds (`SOLARSYSTEM_GL_DEBUG=1/0`) → `[GL]` log lines | Browser console (WebGL warnings) |
 | Frame counters | `[FrameStats]` at debug level (§7.5) | same |
 | Uncompressed DDS upload | Sized internal format (`GL_R8`/`GL_RGB8`/`GL_RGBA8`); core profile rejects the legacy component count | `GL_R8`/`GL_RGBA8` (RGB expanded to RGBA for mipmapping) |
+
+### 9.6 Antialiasing and the context attributes
+
+Context attributes are fixed for the life of the page and chosen once from the initial quality
+tier: native with `GLFW_SAMPLES` (`PlatformWindow.cpp`), web in `web/src/webglContext.ts`
+(`Module.contextAttributes` and GLFW hints are ignored by the Emscripten port; the context is
+created in TypeScript and handed in as `preinitializedWebGLContext`). Everything else about them
+(`alpha: false`, `stencil: false`, `preserveDrawingBuffer: false` because capture reads the canvas
+in the same turn as `StepCaptureFrame`, `xrCompatible: true`, `powerPreference`) stays there too.
+
+With HDR on, the colour pass draws into `gfx/HDR`'s single-sampled texture and `hdr.fs` writes the
+default framebuffer. Default-framebuffer MSAA would resolve an image that was already resolved, so
+**a tier with HDR asks the context for no samples** (`ContextMsaaSamples()`), and the tone-map pass
+antialiases instead: `hdr.fs` runs FXAA on the *tone-mapped* value (so an HDR sun many times
+brighter than its neighbours does not decide every edge test), with the HDR texture clamped to
+edge. Only a tier without HDR (low) may keep a multisampled context. Startup logs
+`[Quality] Context samples: requested N, GL_SAMPLES=M` and the `Active tier` line prints
+`AA=<path>` from `ResolveAntialiasPath(hdrEnabled, GL_SAMPLES)`. If `HDR::InitFBO` refuses (no
+float render targets) the path becomes `none`: the context was created without samples.
+
+### 9.7 Web link flags
+
+Release: `-O3 -flto --closure 1 --emit-symbol-map` (minified stacks map back through
+`SolarSystem.js.symbols`); Debug: `-O0 -g -gsource-map`. Both: `-msimd128`, `-sENVIRONMENT=web`,
+`-sSTACK_SIZE=1MB`, `-fwasm-exceptions`. `GROWABLE_ARRAYBUFFERS=0` (Chrome's WebGL/DOM APIs reject
+views over a resizable `ArrayBuffer`) and no pthread / `SHARED_MEMORY` flags. `--preload-file`
+directories and `scripts/wasm-exports.json` are `LINK_DEPENDS` in `CMakeLists.txt`.
+`SDL2`/`SDL2_image` are native-only.
 
 ## 10. Adding a new planet
 
@@ -889,10 +971,36 @@ terms** (the Moon has them: see above). Frames: Triton's is genuinely ecliptic; 
 fits of Horizons ecliptic osculating elements, so their inclinations carry the parent's
 obliquity (2.2° for Jupiter, 27.7° for Saturn) rather than being Laplace-plane values.
 
-**Earth's rotation** is GMST at the epoch, not an accumulator, so a given UTC always gives the
-same terminator and scrubbing backwards is exact. The texture's prime meridian is aligned by an
-art constant that has not been calibrated against a reference image — the rate and the epoch
-behaviour are the honest parts.
+**Spins are functions of the date** (`OrbitLayout::AxialSpinDegreesAt(body, jd)`, double, wrapped to
+[0, 360)); there is no per-frame accumulator, so a reload, a shared `?date=` link, a timeline that
+starts at a keyframe, or a scrub away and back reproduces every body's spin exactly.
+
+- **Every primary but Earth** turns from the IAU WGCCRE 2015 prime-meridian angle,
+  W = W0 + Wdot · (days since J2000) (Archinal et al. 2018), generated from the catalog's
+  `orbit.primeMeridianDegJ2000` and `orbit.primeMeridianRateDegPerDay` into
+  `OrbitLayoutBodies.generated.inc`. Venus and Uranus have a negative Wdot and need no special
+  case. Eris, Haumea, Makemake and Halley have no IAU frame: W0 = 0 and the rate follows
+  `siderealRotationDays`. The generator checks each rate against the sidereal day (1.5 %, which
+  is what Neptune's fact-sheet day and the 2015 rate differ by). Poles and textures are art, not
+  IAU frames, so W0 fixes a reproducible epoch; it does not put a named feature at a real
+  longitude. Moons use `SatelliteOrbit::SpinDegreesAt`.
+- **Earth** is solved so the drawn map has the real sub-solar *longitude*. It cannot be GMST plus
+  a constant: scene axes are (ecliptic x, z, y), a reflection, and the drawn pole is art
+  (`Rz(axialTiltDegrees)`), so about the drawn pole the Sun circles the year the wrong way
+  round, and a texture turned at the GMST rate with any fixed offset is right at one instant and
+  then off by ~2° a day (a full turn over a year). So each date the Sun's true Earth-fixed
+  longitude (`Observer`: GMST, precession, J2000 ecliptic) is turned toward the scene's Sun through
+  `CatalogBody`'s tilt chain and the Blender `sphere.obj` UVs (map longitude = −atan2(z, x) in
+  model space, u = 0.5 on +X; checked against the upstream mesh). The named constant is
+  `kEarthTextureCentreLonDeg` = 0, the Greenwich-centred Blue Marble / Solar System Scope map
+  convention; the catalog's Earth W0/Wdot are the IAU values and only validate the sidereal day.
+  `test_orbit_layout.cpp` checks the drawn sub-solar longitude against `Observer` on 16 dates
+  across 2024 in both scale modes (residual < 0.01°) and against USNO equation-of-time anchors at
+  the 2024 equinox and solstice (measured 0.005° and 0.10°, locked at 0.25°). Changing the constant without recentring the texture
+  fails there. The **latitude is not calibrated**: the art pole leans along scene X, not toward
+  the mirrored true pole, so the drawn seasons are off by up to ~33° of latitude; fixing that
+  means moving Earth's pole (and its clouds/atmosphere frame), not the spin. The solved spin
+  turns at the sidereal rate less the Sun's own ~1°/day twice over (~359.0°/day).
 
 **Time scale.** Julian dates are treated as UTC (≈ UT1) throughout, which is exactly right for
 Earth rotation (GMST) and good enough for the planets: UTC↔TT (~69 s) and UT1↔UTC (< 0.9 s) are
@@ -916,39 +1024,294 @@ than a fan of `GetEclipseX/Y/Z` scalars, because an event's body pair only means
 alongside its kind tag. `web/src/skyEvents.ts` parses it and owns the chip; `web/src/
 conjunction.ts` remains for the explorer's conjunction-only chip.
 
-### 11.1 Render origin (how positions reach the GPU)
+### 11.1 Precision and scale (how positions reach the GPU)
 
-Realistic scale puts Neptune ~57 000 scene units from the Sun, where adjacent floats are ~0.004
-apart — a tenth of Earth's realistic radius (~0.08). Logarithmic depth (`common/log_depth.glsl`)
-fixes the depth buffer, not vertex positions, so the simulation stays heliocentric in double and
-only the *rendered* frame is camera-relative:
+**World frame.** Simulation state is heliocentric scene units in double:
+`Transformable::Place` / `GetWorldPosition`, `Camera::GetWorldPosition`,
+`OrbitLayout::GetHeliocentricScenePosition`. Realistic scale is true scale — 1 AU = 1900
+units, `SceneScale::kKmPerSceneUnit` ≈ 78 737 km — so Earth's radius is 0.081 units and a
+metre is 1.27e-8 units, below a float's spacing anywhere more than ~0.1 units from the
+origin. `OrbitLayout::GetOffset` (the float cast) is for coarse callers only.
 
-- `OrbitLayout` keeps the ephemeris cache (lon, lat, r) in double and exposes
-  `GetHeliocentricScenePosition(body)`. `GetOffset` is that cast to float, for coarse callers
-  only (nearest-planet search, activation radii).
-- A **render origin** (`OrbitLayout::GetRenderOrigin`, double) is subtracted in double before
-  anything becomes a `glm::vec3`: `ToRenderFrame(helio)`, `GetRenderPosition(body)`. Every float
-  scene position in the engine — `Transformable::GetPosition`, `Camera` position, the Sun's own
-  position (`-origin`), uniforms, model matrices, overlay VBOs — is in that frame.
-- `Application::UpdateRenderOrigin` runs once per frame after input. `ChooseRenderOrigin` moves the
-  origin onto the camera only when it is more than `kRenderOriginRebaseDistance` (512) units away,
-  so ordinary flight does not rebase every frame. `MoveRenderOrigin` then carries what holds a
-  render-frame position across frames: the camera and its transition endpoints, this frame's XR eye
-  views (webxr.ts built them before the shift), XR pointer rays, staged-loading proxies, mission
-  path VBOs, and the bodies themselves (re-placed at once so the LOD manager sees them next to the
-  shifted camera).
-- On compressed scale the origin is pinned at the Sun, so the render frame is the heliocentric
-  frame and positions are what they always were.
-- The shadow light view is built with a double `lookAt` (its eye is the Sun, far from the origin);
-  lighting gets the Sun's render-frame position, which shaders only use as a direction.
-- The camera pose JS reads and writes is heliocentric: `SetCameraPose` takes doubles and, on
-  realistic scale, rebases onto the pose so the camera stores an exact zero; deep links carry
-  1e-6-unit coordinates on realistic scale. `GetCameraPositionX/Y/Z` stay render-frame because
-  webxr.ts composes eye views from them.
+**Compressed is a view of the same bodies.** The scale mode picks, per body, where it sits
+and how big it is drawn (`Solar_System/SceneScale.h`). Compressed puts planets on the art
+orbit radii, moons on their catalog `sceneOrbitRadius`, and draws every body at its art
+radius; realistic draws the true radius (`radiusKm`) at the true distances.
+`SpaceObject::SizeFactor()` is drawn size over art size (1 on compressed), and every art
+length tied to a body — atmosphere and cloud shells, rings, focus distances, LOD distances,
+magnetic-field radius, music ducking, Observe height — is multiplied by it, so those numbers
+stay compressed-scale numbers. `Application::PlaceBodies` places every body from the date
+each frame, so `ApplyOrbitScaleMode` switches without reloading; the camera keeps its offset
+in radii from its nearest body (`CaptureCameraBodyFrame` / `RestoreCameraBodyFrame`).
 
-`tests/test_render_origin.cpp` pins this down: a camera one Earth radius from Eris (≥ 50 AU)
-sees it at the double offset, a rebase mid-flight moves it on screen by under a pixel, and
-compressed positions match the old float computation.
+**Floating origin.** The render origin (`OrbitLayout::GetRenderOrigin`, double) is put on
+the camera once per frame in both modes, after everything that moves the camera
+(`UpdateRenderOrigin` → `MoveRenderOrigin`). Every float position — model matrices
+(`Transformable::Rebase`), uniforms, overlay VBOs — is world minus origin taken in double
+(`ToRenderFrame`, `GetRenderPosition`); the camera sits at an exact zero and the view matrix
+has no translation (`Camera::GetViewMatrix(eyeRender)`). `MoveRenderOrigin` carries what
+holds a render-frame position across the shift: this frame's XR eye views (webxr.ts built
+them before it), XR pointer rays, the bodies, staged-loading proxies and the mission-path
+origin. Mission paths are uploaded relative to `_missionPathOrigin` and drawn with a
+`pathOffset` uniform, re-uploading only once the camera is 512 units from it. On compressed
+scale the moving origin changes positions by float rounding only: the golden poses differ
+from the Sun-origin build by under 0.04 px, all of it the ulp of the camera position that
+the old `lookAt(camPos, camPos + front)` lost from its forward axis.
+
+**Depth.** One logarithmic curve for every pass (`common/log_depth.glsl`):
+depth = log2(1 + C·w) / log2(1 + C·far), `frame.zCoef` = 2 / log2(1 + C·far),
+`frame.logDepthC` = C. Compressed keeps near 0.001, far 20000 and C = 1, bit-identical to
+the curve it always used. Realistic uses far 1e6, a near plane of half the altitude above
+the nearest surface (0.25 m up to 0.001 units) and C = 1/near
+(`CameraNavigation::ChooseClipPlanes`): a 24-bit buffer then separates 1 cm at 1 m and
+1000 km at 1 AU (`test_mesh_anchor.cpp`). Reversed-Z was the alternative, but its precision
+needs `glClipControl` (GL 4.5 / `EXT_clip_control`), which WebGL 2 does not dependably
+have, so the web needed log depth regardless; one scheme serves both targets.
+
+The vertex form (`ApplyLogDepth`) interpolates z linearly on screen, which is only right
+while a triangle is small next to its distance; the facet under the camera is neither. With
+the eye within 1.5× a body's bounding radius (`Renderer::NearSurface`), its surface, cloud
+and atmosphere programs use the **`NEAR_SURFACE`** permutation:
+- depth is written per fragment from an interpolated 1 + C·w (`PrepareLogFragDepth` /
+  `LogFragDepth`; exact, as it is linear in w);
+- clip z is parked at −`frame.nearPlane`, so clipping happens at the navigation's near
+  plane whatever near the projection was built with (WebXR keeps a fixed depthNear). Not
+  z = 0: that is the eye plane, and vertices clipped there divide by zero;
+- vertices are placed relative to the eye (below).
+
+The near programs compile on first use; until then a body draws with its normal program.
+
+**Relative-to-eye vertices** (`gfx/MeshAnchor.h`). `model * aPos` adds a body-sized
+translation and a body-sized vertex offset in float: 0.6 m of error on realistic Earth.
+`NEAR_SURFACE` planetLighting.vs computes `mat3(model) * (aPos - meshAnchor) +
+meshAnchorOffset`, where `meshAnchor` is the eye in model space rounded to float and
+`meshAnchorOffset` the render-frame position of that rounded point, both from double: a
+vertex under the eye lands within a millimetre.
+
+**Surface patch** (`gfx/SurfacePatch.h`, `Renderer::DrawSurfacePatch`). sphere.obj's facets
+are ~600 km across on realistic Earth. When one passes a metre under the eye, the GPU clips
+it by interpolating corners hundreds of kilometres away in float, and the clipped edges land
+about a centimetre off — 1–2 % of the screen at that range, seen as holes along the screen
+borders (measured: 13 700 hole pixels at 0.5 m, 800 at 5 m, none at 50 m). The patch
+re-tessellates every facet that comes within size/1000 of the eye until each piece is at
+most 1000× its distance (or the near plane), with barycentric attributes and positions
+stored as offsets from the eye (a float at the mesh radius is spaced 0.75 m), and draws it
+over the mesh with the same program; the facet underneath fills any T-junction crack. It
+exists only below ~600 m over Earth and is rebuilt when the eye moves, once per frame for
+both XR eyes. Terrain tiles (#151 phase 2) will replace it where a body has a DEM. Shells
+get no patch: an eye within a few hundred metres of a cloud or atmosphere shell (crossing
+it) can see the same holes in that shell for the moment it takes.
+
+**Navigation** (GL-free math in `core/CameraNavigation.h`, fed by `CameraController.cpp`).
+- *Co-moving anchor:* the camera carries the motion of the body it is near (engage within
+  64 radii, release past 80, hand over to a body twice as close), so a planet does not run
+  off at 30 km/s and a date jump keeps it in view. A focus flight pins its target; mission
+  follow and Observe pose the camera themselves and suspend the anchor, and so does a
+  timeline (`setCameraPose` clears it every frame).
+- *Co-rotation, only while hovering:* inside `kHoverRadii` (0.05 radii of altitude, the same
+  distance the floor starts ray-casting facets; released past 0.06) the anchor also carries
+  the body's spin, so the camera stays over the same ground point at the same altitude with
+  time running. Outside it the anchor is translation-only and a fly-around sees the body
+  turn. The camera keeps its offset in the body's *drawn* frame: `CameraNavigation::CarryEye`
+  puts the eye at `after.center + after.shape · (before.shape⁻¹ · (eye − before.center))`
+  from the model matrix's 3×3, in double, so it needs no spin law (planets, moons and the
+  Sun alike), follows the axis the mesh is really drawn about, never drifts from the
+  surface that is drawn whatever the float matrix's rounding does, and `Camera::Reorient`
+  turns the view by the same rotation. The render origin rebases afterwards as always; no
+  rotation is stored in a render-frame offset. A focus flight (`IsTransitionActive`), Observe,
+  mission follow and a timeline's `setCameraPose` are authored motion and suspend co-rotation
+  with the anchor: the engine never adds a second rotation to a timeline's.
+- *Speed:* on realistic scale movement is scaled by the altitude above the nearest surface,
+  altitude per second at the default speed, from 1 mm/s to 1 AU/s. Compressed keeps its
+  constant speed.
+- *Floor:* the camera stays a margin above the drawn surface (0.5 m realistic, 0.002 units
+  compressed). Within 0.05 radii the facets are ray-cast (`FacetRadius`, double
+  Möller–Trumbore cast inward from outside the mesh, so an eye that ended up beneath a facet
+  still finds it), since they sit up to kilometres inside the analytic sphere.
+
+**Interfaces.** The camera pose JS reads and writes is heliocentric: `SetCameraPose` takes
+doubles, and deep links keep 1e-9-unit coordinates on realistic scale (8 cm).
+`GetCameraPositionX/Y/Z` stay render-frame, because webxr.ts composes eye views from them.
+Native `SOLARSYSTEM_SCALE=compressed|realistic` runs the toggle at start-up, before
+`SOLARSYSTEM_CAMERA_POSE`, so a pose can be given in realistic coordinates.
+
+**Known limits.** The shadow fit (§7.5) is against the analytic sphere until a DEM exists, one
+map with no cascades: a view that takes in the horizon from a kilometre up still spans ~100
+km. Co-rotation holds the camera to the drawn float model matrix, whose own spin rounds to
+~3e-5° (a few metres at Earth's radius) per step.
+
+**Tests.** `test_render_origin.cpp`: a flyby 90 AU out stays on its exact track to 0.01 px
+with the origin on the camera, while the float-only control is over 10 px off; compressed
+positions match the float computation they replaced. `test_camera_navigation.cpp`: altitude,
+the floor from above and beneath a facet, clip planes, speed, anchor hysteresis, the camera
+moving in double. `test_mesh_anchor.cpp`: millimetre placement and both depth curves.
+`test_surface_patch.cpp`: the pieces tile their facet in place to the millimetre and meet
+the size rule. Co-rotation (`test_camera_navigation.cpp`): at 1 km a sidereal day, a quarter
+day or ten years leave the camera's offset in the drawn Earth frame unchanged to 1e-10, at 2
+radii the carry is translation only, the engage/release hysteresis, `RotationBetween` under
+a scale change, `Camera::Reorient`. Shadow fit (`test_shadow_fit.cpp`): the cap is metres to
+tens of kilometres where ±3 radii is thousands, reaches the horizon, holds every visible
+surface point across pitches and altitudes, stays put under a metre of drift, and still fits a
+camera floored below the analytic sphere.
+
+### 11.2 Cinematic timelines and capture
+
+A timeline (`web/public/timelines/*.json`, issue #151 phase 3) is a keyframed camera and
+date track that the web front end evaluates and the engine only draws. `web/src/timeline.ts`
+is pure (parsing, splines, the date track; unit-tested in `timeline.test.ts`),
+`timelinePlayer.ts` drives the engine with it, `timelineEditor.ts` is the dock (play, scrub,
+add a key at the current pose, import/export JSON, copy a link, record), and `capture.ts`
+writes the video. `?timeline=<id or http(s) URL>` deep-links one (`&tt=` starts it part
+way). Shipped: Voyager 2's Grand Tour (compressed scale, along the mission path), the
+2024-04-08 eclipse seen from the Moon, and a seamless descent to 1 m above Earth (both
+realistic). The "descent to Olympus Mons" in the issue waits for terrain (phase 2).
+
+**Schema.** `{id, title, description?, durationSec, view?, keyframes[]}`. `view` is a
+tour step's view (`tourPlayer.ts`: scale, overlays, quality…) applied once when the
+timeline takes the camera, without its camera, planet or mission. A keyframe is
+`{t, jd?, dateEase?, focus?, camera, path?, tension?, continuity?, bias?, fov?, timeScale?,
+overlays?, caption?}`:
+- *Where:* `focus` is a catalog body id or `mission:<id>` (a probe on its path), and
+  `camera.position` an offset from it in `units`: `scene`, `radii` (drawn radius, so a shot
+  holds on both scales) or `km` (true km scaled body-relatively). `camera.altitudeKm`
+  instead puts the camera that far above the drawn surface along `position`'s direction.
+  `camera.frame: <body>` turns the offset into a frame with +Z toward that body from the
+  focus and +Y toward ecliptic north (right-handed), so "sunward of Jupiter" stays sunward
+  as the date moves. Each key is resolved at the date being drawn, so a key on a moving body
+  moves with it.
+- *Path:* Kochanek–Bartels (Catmull-Rom at tension = continuity = bias = 0) through the
+  resolved points, with tangents scaled for uneven key spacing so the speed is continuous.
+  `path: "polar"` between two keys on the same focus splines the direction instead, and
+  log(height above the surface) with a monotone cubic: a descent from 1.5 million km to a
+  metre is exponential and never dips below its lowest key.
+- *Look:* a fixed quaternion `rotation` ([x, y, z, w]; −Z forward, +Y up; consecutive
+  quaternion keys use squad), or `lookAt` (body id or offset point) with `up`
+  `ecliptic` | `radial`, or `horizon {azimuthDeg, elevationDeg}` (azimuth 0 = the Sun's
+  bearing, clockwise from above), else the focus centre. Look-at and horizon keys are
+  re-aimed from wherever the camera is on the spline and slerped with smoothstep. Radial up
+  turns from the radial direction to the normal of the drawn facet below between 0.02 and
+  0.002 radii (`GetSurfaceJson` returns both radius and normal, `CameraNavigation::FacetAlong`):
+  near the ground the horizon is that flat facet, a few degrees off radial.
+- *Date:* `jd` anchors a key; a key without one follows from the previous key at
+  `timeScale` (orrery rate, 365.25/120 days per second at 1×) or, without a rate in force,
+  is interpolated between its dated neighbours. A monotone cubic runs through the dates;
+  `dateEase` (`smooth`, `linear`, `ease-in`, `ease-out`, `ease-in-out`, `step`) shapes the
+  segment that starts at the key. FOV is a monotone cubic (default 45°, clamped 1–45° by the
+  engine); `overlays {orbitLines, magneticFields, hud}` and `caption` are steps carried
+  forward.
+
+**Playback.** While a timeline holds the camera the orrery clock is paused, Observe and
+mission follow are off, and each frame does `AdvanceSimulationTo(jd)` (no UI notification),
+`GetSceneStateJson` (every body's position and drawn radius, and each probe's position, in
+%.17g after `PlaceBodies`), evaluates, then `setCameraPose` / `SetCameraRoll` /
+`SetCameraFov`. Overlay setters run only on a change. A focus whose system is not loaded
+yet (staged loading) returns null and the player holds the last pose; taking the camera
+preloads every referenced system. Releasing it restores clock, FOV, HUD and overlays and
+reports the date the timeline left. Every spin is a function of the date (§ above:
+planets' `AxialSpinDegreesAt`, moons' and cloud layers' `SpinDegreesAt`), so which longitude
+of Jupiter faces the camera at a keyframe's date does not depend on how the session got
+there, and `AdvanceSimulationTo` is the same as `SetSimulationEpoch` without the settings
+notification. Earth's map longitude is calibrated to the true sub-solar point, so the
+eclipse's umbra lands on the right continents.
+
+**Camera roll and HUD.** `Camera::SetRoll` turns right/up about the view direction (the
+engine camera is otherwise yaw/pitch); the player converts each quaternion to
+yaw/pitch/roll, with heading from the up vector within 0.1° of straight up or down.
+`SetHudOverlays` is a mask: bit 0 hints, 1 planet/star distances, 2 moon distances, 3 the
+staged-loading "(approach to load)" labels; `hud: false` clears all four.
+
+**Capture.** Offline and deterministic:
+- `BeginCapture(w, h)` pauses the Emscripten main loop (as WebXR does) and sets the canvas
+  backing store and every render target to the output size. Window and GLFW resize callbacks
+  are ignored until `EndCapture` fits the canvas to the page again.
+- Frame i puts the timeline at t = i / fps. `StepCaptureFrame(1/fps)` then runs one frame
+  with exactly that delta, re-asserting the size first, and `new VideoFrame(canvas)` is taken
+  in the same task, while the drawing buffer holds the frame.
+- Animated shaders read `SimState::animationSeconds`, the sum of frame deltas, not
+  `glfwGetTime()`, so the corona and the field ribbons advance by exactly 1/fps per frame.
+- Before a frame is encoded, pending textures and manifests (`GetPendingAssetCount`) get up
+  to 5 s to arrive, redrawing at the same instant. After one timeout, later frames wait only
+  for focus bodies that are not loaded at all, so a missing file does not cost every frame.
+- Encoding: WebCodecs `VideoEncoder` (H.264 High → Baseline, then AV1, then VP9, picked by
+  `isConfigSupported`, ~0.12 bits per pixel, keyframe every 2 s) and mp4-muxer into an
+  in-memory fast-start MP4.
+- Without WebCodecs, `MediaRecorder` records `canvas.captureStream()` while the timeline
+  plays in real time, at the canvas size and with no determinism. It waits for the
+  recorder's `start` event and fails on an empty recording.
+
+**Tests.** `timeline.test.ts` (Vitest, `npm run test:unit`, run in CI): splines through
+their keys, linear motion under uneven spacing, C1 continuity, tension, a moving focus, frame
+axes, polar descent (lands at 1 m, monotone, exponential, facet surface, facet-normal
+horizon), squad and slerp, yaw/pitch/roll round trips including straight down, the date
+track (anchors, rates, interpolation, eases), steps, `keyframeFromPose` round trip, parse
+errors, and every shipped timeline parses and evaluates. Native: spins are date functions
+and survive a fresh start (`test_orbit_layout.cpp`), roll keeps the view direction, and `FacetAlong`
+gives the hit facet's outward normal (`test_camera_navigation.cpp`).
+
+### 11.3 Terrain (cube-sphere height tiles)
+
+Bodies whose catalog row has `render.terrain` (Moon, Mars, Mercury, Earth) draw height tiles
+instead of their sphere while the camera is close. From altitude nothing changes: the sphere
+mesh, catalog material, atmosphere and eclipse decal are what they were. The code is
+`src/render/terrain/` (GL-free except `TerrainRenderer`), wired in by
+`TerrainController.cpp` and two small branches in `SceneRenderer.cpp`.
+
+**When.** `TerrainSystem` loads a body's `terrain/<id>/tileset.json` below 2 radii of altitude
+(`kPrefetchRadii`), swaps the sphere for tiles below 0.5 (back above 0.55), and grows the
+heights from zero between 0.45 and 0.2 radii (`HeightFade`), so the swap happens on the bare
+analytic sphere under the same material. A body without a tile set (or a deployment without
+`terrain/`) logs `[Terrain] <id>: no tile set … it stays the sphere` once. Low
+(`terrainBudgetMiB = 0`) never fetches anything; Observe and bodies out of reach draw spheres.
+
+**Tiles.** Equal-angle cube sphere (`w = tan(π/4·s)`), faces +X −X +Y −Y +Z −Z with the bases in
+`CubeSphere.cpp`. A tile is 65×65 samples (64 quads) plus a one-sample apron: 67×67
+`R16_UNORM` KTX2 at `terrain/<body>/<face>/<z>/<x>/<y>.ktx2`, quantised between the tile's own
+min and max, with the mask of children that exist (`SSterrain` key/value). Heights are metres
+above the catalog radius. The baker (`scripts/bake-terrain-tiles.py`, GDAL, run by hand,
+never in CI) samples every tile of a level from one block-averaged grid, so shared edges
+agree exactly; deep levels can be limited to regions (Shackleton, Olympus Mons). A child the
+data set does not have, or one whose fetch failed, is upsampled from its parent
+(Catmull-Rom), so there is no hole and no procedural detail.
+
+**Selection** (`TerrainQuadtree::Select`). Split on screen-space error: a level's tiles split
+inside `ratio × diagonal`, the ratio chosen so a quad spans the tier's pixel error
+(`terrainPixelError`: Full 6 px, Medium 8, mobile 10–12) and never below 1.5. A tile splits
+only when all four children are resident; otherwise it draws itself and asks for them
+(priority: error bucket, then angle from the view centre). Tiles behind the horizon, out of
+every view frustum and out of the component's light box are dropped.
+
+**Placement.** A vertex is an offset from the tile's centre computed small-to-small in float
+(`tan(a+b) − tan(a)`, series sin/cos; `GridOffset` is the C++ mirror the tests hold to a
+millimetre), added to the tile centre in the render frame, which is the body's
+`GetWorldPosition() − renderOrigin` taken in double each frame (§11.1). Nothing render-frame
+is kept across frames. Tiles nearer than their own diagonal use the `NEAR_SURFACE`
+permutation (fragment log depth); the rest use vertex log depth.
+
+**No pop, no cracks.** `terrain.vs` geomorphs heights (not grid positions) from the tile's own
+samples to the parent's surface across `[split + diagonal, split(parent)]`, so a split or a
+merge changes nothing on screen at the moment it happens; skirts as deep as a level step
+covers hide the T-junctions between levels.
+
+**Shading.** `terrain.fs` is the catalog material: it and `planetLighting.fs` include
+`common/planet_surface.glsl` (maps, night side, specular, clouds, shadow map, ring and eclipse
+tests) with the same `CatalogMaterial` permutations. Texture coordinates and the
+east/north/up frame are derived per fragment from the model direction in the sphere mesh's
+convention, and the relief normal (from the height samples, in the vertex shader; no normal
+tiles in v1) is folded into the normal map (`SURFACE_RELIEF`). The shadow pass draws the
+tiles too (`terrain.vs` `SHADOW_PASS` + `shadowMap.fs`): the sphere's facets would shadow the
+ground from below.
+
+**Memory and network.** One LRU across bodies under the tier's budget (`kTileGpuBytes` per
+tile; Full 128 MiB, Medium 64, mobile 32–48), an in-flight cap (Full 8, Medium 6, mobile 4),
+roots pinned. Every request goes through `WebResourceFetcher`, so the page's asset cache
+(§6.1.1) answers a revisit with the network off; the MEMFS copy is unlinked once read. The
+tier line logs the budget next to the shadow map, and while tiles are drawn
+`[Terrain] budget … resident … drawn … in flight …` goes out at most every 5 s.
+
+**Camera floor.** `ConstrainCamera` and `SurfaceAlong` stand on `TerrainSystem::SurfaceRadius`:
+the drawn tile under the eye with its morph, else the deepest resident tile (the roots always
+are). The floor only lifts: a camera placed before finer tiles arrive stays above the coarse
+surface it was lifted to. Co-rotation (§11) keeps a hover over one tile while time runs.
 
 ## 12. Common pitfalls
 
@@ -961,7 +1324,9 @@ compressed positions match the old float computation.
 7. After `TextureImage2D::ReloadTexture`, render passes must rebind texture IDs each frame.
 8. Black textures on web usually mean incorrect `GL_TEXTURE_MAX_LEVEL` — verify mip chain upload.
 9. Do not add a heliocentric float to a render-frame float (`sun->GetPosition() + GetOffset(...)`)
-   or cache a render-frame position across frames without shifting it in `MoveRenderOrigin` (§11.1).
+   or cache a render-frame position across frames without shifting it in `MoveRenderOrigin`;
+   keep world positions (`GetWorldPosition`) in double instead, and multiply an art length
+   tied to a body by its `SizeFactor()` (§11.1).
 
 ---
 

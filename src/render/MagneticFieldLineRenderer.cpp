@@ -26,7 +26,7 @@ void MagneticFieldLineRenderer::AddBody(OrbitLayout::Body body, MagneticFieldLin
 
 void MagneticFieldLineRenderer::Draw(const glm::mat4& projection, const glm::mat4& view, const glm::mat4& model,
                                      const MagneticFieldParams& params, OrbitLayout::Body body,
-                                     const glm::vec3& cameraPosition, float zCoef, float timeSeconds,
+                                     const glm::vec3& cameraPosition, float timeSeconds,
                                      float ribbonWidthScale, float opacityScale) const {
     if (!_shader || !params.enabled) {
         return;
@@ -37,7 +37,6 @@ void MagneticFieldLineRenderer::Draw(const glm::mat4& projection, const glm::mat
     _shader->SetMat4("view", view);
     _shader->SetMat4("model", model);
     _shader->SetVec3("cameraPos", cameraPosition);
-    _shader->SetFloat("zCoef", zCoef);
     _shader->SetFloat("uTime", timeSeconds);
     _shader->SetFloat("ribbonWidth", params.ribbonWidth * ribbonWidthScale);
     _shader->SetFloat("uFlowSpeed", params.flowSpeed);

@@ -1,4 +1,9 @@
 #version 300 es
+// NEAR_SURFACE (atmosphere.vs) writes depth per fragment.
+// permutations: NEAR_SURFACE
+#ifdef NEAR_SURFACE
+in float vLogDepth;
+#endif
 
 //
 // Physically based atmosphere from baked lookup tables (Medium/Full presets).
@@ -22,6 +27,7 @@ in vec4 fragPosLightSpace;
 
 out vec4 fragColor;
 
+#include "common/log_depth.glsl"
 #include "common/raytrace.glsl"
 #include "common/ring.glsl"
 #include "common/eclipse.glsl"
@@ -82,6 +88,9 @@ float RingVisibilityAt(vec3 worldPoint, vec3 sunWorld) {
 }
 
 void main() {
+#ifdef NEAR_SURFACE
+    gl_FragDepth = LogFragDepth(vLogDepth); // first: every path that is not discarded writes it
+#endif
     float bottom = uAtmosphere.bottomRadius;
     float top = uAtmosphere.topRadius;
 

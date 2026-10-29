@@ -68,8 +68,7 @@ void Renderer::RenderMagneticFields(const FrameContext& ctx) {
         return;
     }
 
-    const float zCoef = ctx.view.zCoef;
-    const float now = static_cast<float>(glfwGetTime());
+    const float now = static_cast<float>(ctx.sim.animationSeconds);
     const glm::vec3 camPos = ctx.view.headPosition;
 
     auto drawBodies = [&](float ribbonWidthScale, float opacityScale) {
@@ -83,7 +82,7 @@ void Renderer::RenderMagneticFields(const FrameContext& ctx) {
             model *= rotation;
             model = glm::rotate(model, glm::radians(params.dipoleTiltDeg), glm::vec3(1.0f, 0.0f, 0.0f));
             model = glm::scale(model, glm::vec3(radius));
-            _magneticFieldRenderer->Draw(ctx.view.projection, ctx.view.view, model, params, body, camPos, zCoef, now,
+            _magneticFieldRenderer->Draw(ctx.view.projection, ctx.view.view, model, params, body, camPos, now,
                                          ribbonWidthScale, opacityScale);
         };
 
@@ -91,7 +90,7 @@ void Renderer::RenderMagneticFields(const FrameContext& ctx) {
             const MagneticFieldParams sunParams =
                 MagneticFieldCatalog::ParamsForBody(OrbitLayout::Body::Sun, ctx.sim.qualityPreset);
             // Mesh is scaled 0.5 × sphere radius (~2) ≈ 1 unit; inflate so the torus is readable.
-            const float sunRadius = 28.0f;
+            const float sunRadius = 28.0f * ctx.scene.sun->SizeFactor();
             drawBody(OrbitLayout::Body::Sun, sunParams, ctx.scene.sun->GetPosition(), glm::mat4(1.0f), sunRadius);
         }
 
@@ -109,7 +108,7 @@ void Renderer::RenderMagneticFields(const FrameContext& ctx) {
             if (!params.enabled) {
                 continue;
             }
-            const float radius = std::max(component.planet->GetRadius(), 0.5f);
+            const float radius = std::max(component.planet->GetRadius(), 0.5f * component.planet->SizeFactor());
             drawBody(body, params, component.planet->GetPosition(), component.planet->GetRotationMatrix(), radius);
         }
     };
@@ -179,9 +178,20 @@ void Renderer::RenderOrbitPaths(const FrameContext& ctx) const {
     glDisable(GL_BLEND);
 }
 
+namespace {
+
+// How far the render origin may move from the mission paths' upload origin before they are
+// re-uploaded. Floats below 512 are spaced at most 6e-5 units apart, under a thousandth of
+// Earth's realistic radius, so a path near the camera stays under a pixel off its probe.
+constexpr double kMissionPathRebaseDistance = 512.0;
+
+} // namespace
+
 void Renderer::RebuildMissionPaths(const MissionCatalog::Catalog& catalog, int qualityPreset) {
-    // Vertices are uploaded in the render frame, so this also runs whenever the render
-    // origin moves. Reuse the renderers (each owns a compiled shader) and only re-upload.
+    // Vertices are relative to the render origin at upload time; RenderMissionPaths offsets
+    // them by where that point is now. Reuse the renderers (each owns a compiled shader) and
+    // only re-upload.
+    _missionPathOrigin = OrbitLayout::GetRenderOrigin();
     const auto& missions = catalog.missions;
     if (_missionPathMeshes.size() != missions.size()) {
         _missionPathMeshes.clear();
@@ -195,9 +205,15 @@ void Renderer::RebuildMissionPaths(const MissionCatalog::Catalog& catalog, int q
         std::vector<glm::vec3> scene;
         scene.reserve(auSamples.size());
         for (const auto& au : auSamples) {
-            scene.push_back(OrbitLayout::ToRenderFrame(OrbitLayout::HelioAuToSceneDouble(glm::dvec3(au))));
+            scene.push_back(glm::vec3(OrbitLayout::HelioAuToSceneDouble(glm::dvec3(au)) - _missionPathOrigin));
         }
         _missionPathMeshes[i]->Upload(scene);
+    }
+}
+
+void Renderer::FollowMissionPathOrigin(const MissionCatalog::Catalog& catalog, int qualityPreset) {
+    if (glm::distance(OrbitLayout::GetRenderOrigin(), _missionPathOrigin) > kMissionPathRebaseDistance) {
+        RebuildMissionPaths(catalog, qualityPreset);
     }
 }
 
@@ -211,8 +227,8 @@ void Renderer::RenderMissionPaths(const FrameContext& ctx) const {
     glDepthMask(GL_FALSE);
     glDisable(GL_CULL_FACE);
 
-    const float zCoef = ctx.view.zCoef;
     const glm::vec3 camPos = ctx.view.headPosition;
+    const glm::vec3 pathOffset(_missionPathOrigin - ctx.view.renderOrigin);
     for (size_t i = 0; i < _missionPathMeshes.size(); ++i) {
         if (!_missionPathMeshes[i] || _missionPathMeshes[i]->Empty()) {
             continue;
@@ -222,14 +238,13 @@ void Renderer::RenderMissionPaths(const FrameContext& ctx) const {
         }
         const auto& mission = ctx.scene.missions->missions[i];
         const bool focused = static_cast<int>(i) == ctx.scene.focusedMission;
-        _missionPathMeshes[i]->Draw(ctx.view.projection, ctx.view.view, camPos, zCoef, mission.color,
+        _missionPathMeshes[i]->Draw(ctx.view.projection, ctx.view.view, camPos, pathOffset, mission.color,
                                     focused ? 0.85f : 0.45f, focused);
         const std::optional<glm::vec3>* probe =
             ctx.scene.missionProbes && i < ctx.scene.missionProbes->size() ? &(*ctx.scene.missionProbes)[i] : nullptr;
         if (probe && probe->has_value()) {
             _missionPathMeshes[i]->DrawProbe(ctx.view.projection, ctx.view.view, camPos,
-                                             ctx.view.right, ctx.view.up, zCoef,
-                                             **probe, mission.color);
+                                             ctx.view.right, ctx.view.up, **probe, mission.color);
         }
     }
 
@@ -248,8 +263,7 @@ void Renderer::RenderXrPointers(const FrameContext& ctx) const {
     glBlendFunc(GL_SRC_ALPHA, GL_ONE);
     glDepthMask(GL_FALSE);
     glDisable(GL_CULL_FACE);
-    const float zCoef = ctx.view.zCoef;
-    _xrPointerRenderer->Draw(ctx.view.projection, ctx.view.view, ctx.view.headPosition, zCoef);
+    _xrPointerRenderer->Draw(ctx.view.projection, ctx.view.view, ctx.view.headPosition);
     glEnable(GL_CULL_FACE);
     glDepthMask(GL_TRUE);
     glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
@@ -265,7 +279,7 @@ void Renderer::RenderAsteroidField(const FrameContext& ctx) const {
     }
 
     // Advanced once per frame by Application::UpdateScene; this pass only draws, with the
-    // view's FrameUBO (BeginView) supplying matrices, eye, Sun and zCoef.
+    // view's FrameUBO (BeginView) supplying matrices, eye, Sun and log-depth constants.
     ctx.scene.asteroidField->Render(ctx.view.right);
     if (ctx.scene.kuiperField) {
         ctx.scene.kuiperField->Render(ctx.view.right);

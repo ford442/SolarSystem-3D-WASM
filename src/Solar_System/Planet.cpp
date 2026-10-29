@@ -8,7 +8,7 @@ Planet::Planet(const PlanetInfo& planetInfo, std::shared_ptr<Star> parentStar) :
 }
 
 float Planet::GetRadius() const {
-    return _radius;
+    return _radius * SizeFactor();
 }
 
 float Planet::GetEarthSizeCoefficient() const {
@@ -16,5 +16,5 @@ float Planet::GetEarthSizeCoefficient() const {
 }
 
 float Planet::GetEffectiveLODThreshold(const TextureLodPolicy& policy) const {
-    return _lodThreshold * policy.planetThresholdScale;
+    return _lodThreshold * SizeFactor() * policy.planetThresholdScale;
 }

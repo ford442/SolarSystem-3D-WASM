@@ -20,7 +20,10 @@ public:
 
     void AdjustToParent() override;
     void Draw(const Shader& shader) const override;
+    void BindMaterial(const Shader& shader) const override;
+    const BodyCatalog::Entry* CatalogEntry() const override { return &_entry; }
     unsigned ShaderVariant() const override { return CatalogMaterial::Variant(_material, CurrentTextures()); }
+    float SizeFactor() const override;
 
     bool IsEphemerisPlaced() const override { return _ephemerisPlaced; }
     float OrbitSceneUnitsPerKm() const override;

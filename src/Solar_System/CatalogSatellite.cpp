@@ -1,5 +1,6 @@
 #include "CatalogSatellite.h"
 #include "SatelliteOrbit.h"
+#include "SceneScale.h"
 
 CatalogSatellite::CatalogSatellite(SatelliteInfo&& satelliteInfo,
                                    std::shared_ptr<SpaceObject> parent,
@@ -19,18 +20,19 @@ void CatalogSatellite::AdjustToParent() {
     // reverse scrubbing are exact. Keplerian placement where the backend has a solution
     // (Moon, Galileans, Titan, Triton); otherwise the circular mean-anomaly offset.
     const double julianDate = OrbitLayout::GetJulianDate();
-    glm::vec3 offset;
+    glm::dvec3 offset;
     _ephemerisPlaced = SatelliteOrbit::EphemerisOffset(_entry, julianDate, offset);
     if (!_ephemerisPlaced) {
         const float anomaly = SatelliteOrbit::MeanAnomalyAt(_entry, julianDate);
-        offset = _entry.orbitPlane == BodyCatalog::OrbitPlane::XY
-                     ? SatelliteOrbit::OffsetXY(_entry.sceneOrbitRadius, anomaly)
-                     : SatelliteOrbit::Offset(_entry.sceneOrbitRadius, anomaly);
+        const double radius = SceneScale::SatelliteCircularRadius(_entry);
+        offset = _entry.orbitPlane == BodyCatalog::OrbitPlane::XY ? SatelliteOrbit::OffsetXY(radius, anomaly)
+                                                                  : SatelliteOrbit::Offset(radius, anomaly);
     }
 
-    LoadIdentityModelMatrix();
-    Translate(_parent->GetPosition() + offset);
-    Scale(glm::vec3(_earthSizeCoefficient));
+    // Parent world position plus offset in double: on realistic scale both are large
+    // numbers and the moon is a few hundred metres across on that grid.
+    Place(_parent->GetWorldPosition() + offset);
+    Scale(glm::vec3(_earthSizeCoefficient * SizeFactor()));
     if (_entry.artRollDegrees != 0.0f) {
         Rotate(_entry.artRollDegrees, glm::vec3(0.0f, 0.0f, 1.0f));
     }
@@ -40,13 +42,15 @@ void CatalogSatellite::AdjustToParent() {
     Rotate(SatelliteOrbit::SpinDegreesAt(_entry.spinDegPerSimSecond, julianDate), glm::vec3(0.0f, 1.0f, 0.0f));
 }
 
+float CatalogSatellite::SizeFactor() const {
+    return SceneScale::BodySizeFactor(_entry);
+}
+
 float CatalogSatellite::OrbitSceneUnitsPerKm() const {
-    if (_entry.keplerian.aKm <= 0.0f || _entry.sceneOrbitRadius <= 0.0f) {
-        return 0.0f;
-    }
-    // EphemerisOffset maps the semi-major axis onto sceneOrbitRadius, so this is exactly the
-    // factor that relates a real length near this orbit to its length on screen.
-    return _entry.sceneOrbitRadius / _entry.keplerian.aKm;
+    // EphemerisOffset scales the parent-relative offset by exactly this (sceneOrbitRadius
+    // over the semi-major axis on compressed scale, the true scale on realistic), so it
+    // relates a real length near this orbit to its length on screen.
+    return static_cast<float>(SceneScale::SatelliteSceneUnitsPerAu(_entry) / SceneScale::kKmPerAu);
 }
 
 CatalogMaterial::Textures CatalogSatellite::CurrentTextures() const {
@@ -62,6 +66,10 @@ CatalogMaterial::Textures CatalogSatellite::CurrentTextures() const {
 }
 
 void CatalogSatellite::Draw(const Shader& shader) const {
-    CatalogMaterial::BindMaterial(shader, _material, CurrentTextures());
+    BindMaterial(shader);
     SpaceObject::Draw(shader);
+}
+
+void CatalogSatellite::BindMaterial(const Shader& shader) const {
+    CatalogMaterial::BindMaterial(shader, _material, CurrentTextures());
 }

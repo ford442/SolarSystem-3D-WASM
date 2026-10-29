@@ -72,6 +72,12 @@ void Mesh::SetupMesh() {
     // builds (every other index would read as 0) while it happens to be 4 on wasm32.
     glBufferData(GL_ELEMENT_ARRAY_BUFFER, _indices.size() * sizeof(GLuint), _indices.data(), GL_STATIC_DRAW);
 
+    SetVertexLayout();
+
+    glBindVertexArray(0);
+}
+
+void Mesh::SetVertexLayout() {
     // Установка указателей вершинных атрибутов (указание параметров доступа вершинных атрибутов к VBO)
     // Позиции вершин
     glEnableVertexAttribArray(0);
@@ -88,6 +94,4 @@ void Mesh::SetupMesh() {
     // Битангент к вершинам
     glEnableVertexAttribArray(4);
     glVertexAttribPointer(4, 3, GL_FLOAT, GL_FALSE, sizeof(Vertex), (void*)offsetof(Vertex, bitangent));
-
-    glBindVertexArray(0);
 }
