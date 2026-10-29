@@ -39,6 +39,7 @@ export interface CachedCwrapExports {
     setObserveView: (...args: number[]) => void;
     setObserveFov: (...args: number[]) => void;
     setObserveTimeRate: (...args: number[]) => void;
+    setObserveConstellations: (...args: number[]) => void;
     getObserveStateJson: () => string;
     setOrbitLines: (...args: number[]) => void;
     getOrbitLines: () => number;
@@ -103,6 +104,7 @@ export function createCachedCwrapExports(cwrap: SolarSystemCwrap): CachedCwrapEx
     setObserveView: cwrap('SetObserveView', null, ['number', 'number']) as (...args: number[]) => void,
     setObserveFov: cwrap('SetObserveFov', null, ['number']) as (...args: number[]) => void,
     setObserveTimeRate: cwrap('SetObserveTimeRate', null, ['number']) as (...args: number[]) => void,
+    setObserveConstellations: cwrap('SetObserveConstellations', null, ['number']) as (...args: number[]) => void,
     getObserveStateJson: cwrap('GetObserveStateJson', 'string', []) as () => string,
     setOrbitLines: cwrap('SetOrbitLines', null, ['number']) as (...args: number[]) => void,
     getOrbitLines: cwrap('GetOrbitLines', 'number', []) as () => number,
@@ -129,4 +131,4 @@ export function createCachedCwrapExports(cwrap: SolarSystemCwrap): CachedCwrapEx
     };
 }
 
-export const EXPORT_COUNT = 64;
+export const EXPORT_COUNT = 61;

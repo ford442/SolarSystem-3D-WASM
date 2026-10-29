@@ -36,6 +36,14 @@ void ExpectEffects(const QualityTierSettings& settings, bool pbrAtmosphere, int 
 
 } // namespace
 
+TEST(QualitySettingsTest, OnlyLowDrawsTheCoreConstellationSubset) {
+    for (const bool mobile : {false, true}) {
+        EXPECT_TRUE(GetQualitySettings(0, mobile).observeCoreConstellationsOnly);
+        EXPECT_FALSE(GetQualitySettings(1, mobile).observeCoreConstellationsOnly);
+        EXPECT_FALSE(GetQualitySettings(2, mobile).observeCoreConstellationsOnly);
+    }
+}
+
 TEST(QualitySettingsTest, ObserveStarCountGrowsWithTier) {
     EXPECT_EQ(GetQualitySettings(0, false).observeStarCount, 500);
     EXPECT_EQ(GetQualitySettings(1, false).observeStarCount, 2000);

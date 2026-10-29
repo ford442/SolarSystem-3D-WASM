@@ -26,6 +26,24 @@ struct Catalog {
     std::unordered_map<int, std::string> names;       // index into `stars` → common name
 };
 
+/** One stick figure of resource/sky/constellation_lines.json. */
+struct Constellation {
+    std::string id;           // IAU three-letter abbreviation
+    bool core = false;        // one of the 20 the Low preset draws
+    std::vector<int> lines;   // flat pairs of indices into Catalog::stars
+};
+
+/**
+ * Parse scripts/generate-constellation-lines.mjs's JSON. The lines index the star catalog, so
+ * the file's "starCount" must equal `starCount` (the parsed catalog's size): a mismatch means
+ * one of the two files was regenerated without the other and every line would be misjoined.
+ */
+bool ParseConstellations(const std::string& json, int starCount, std::vector<Constellation>& out,
+                         std::string& errorOut);
+
+bool LoadConstellationsFromFile(const std::string& path, int starCount, std::vector<Constellation>& out,
+                                std::string& errorOut);
+
 /** Parse the generator's JSON. False (and an empty catalog) for anything malformed. */
 bool Parse(const std::string& json, Catalog& out, std::string& errorOut);
 
