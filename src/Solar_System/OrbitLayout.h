@@ -38,6 +38,8 @@ enum class ScaleMode : int {
 
 /** Wall seconds for one Earth orbit at timeScale == 1. */
 constexpr float kEarthOrbitSecondsAt1x = 120.0f;
+/** Days per Earth orbit, the other half of the orrery-seconds ↔ days conversion. */
+constexpr float kEarthYearDays = 365.25f;
 
 /** 1 AU in scene units (matches Earth's compressed orbit radius). */
 constexpr float kAuToSceneUnits = 1900.0f;
@@ -80,25 +82,17 @@ glm::dvec3 GetHeliocentricScenePosition(Body body);
 
 // --- Render origin -----------------------------------------------------------------------
 //
-// The simulation origin is the Sun, but the frame the GPU sees is centred on a render
-// origin near the camera so that the float positions near the viewer stay fine-grained.
-// Every glm::vec3 scene position in the engine (Transformable::GetPosition, the camera,
-// the Sun's own position, uniforms, model matrices) is in this render frame:
+// The simulation origin is the Sun, but the frame the GPU sees is centred on the camera
+// (a floating origin, docs/ARCHITECTURE.md §11.1) so that float positions near the viewer
+// are as fine-grained as a float gets. Every glm::vec3 scene position in the engine
+// (Transformable::GetPosition, the Sun's own position, uniforms, model matrices) is in this
+// render frame:
 //
 //     render = float(heliocentricScene - renderOrigin)
 //
-// computed in double. The origin only moves when the camera strays more than
-// kRenderOriginRebaseDistance from it (ChooseRenderOrigin), and on compressed scale it
-// stays pinned at the Sun, so the render frame is the heliocentric frame there.
-
-/**
- * How far (scene units) the camera may stray from the render origin before it rebases.
- * Floats below 512 are spaced at most 6e-5 units apart, under a thousandth of Earth's
- * realistic radius (~0.08), so a body one Earth radius away is placed to well under a pixel.
- * At the top fly speed (150 units/s) that is a rebase every few seconds, not every frame;
- * only a focus transition across the system rebases on most frames for its two seconds.
- */
-constexpr float kRenderOriginRebaseDistance = 512.0f;
+// computed in double. Application::MoveRenderOrigin puts the origin on the camera's world
+// position once per frame, in both scale modes, after everything that moves the camera;
+// the view matrix then has no translation.
 
 glm::dvec3 GetRenderOrigin();
 void SetRenderOrigin(const glm::dvec3& origin);
@@ -111,13 +105,6 @@ glm::dvec3 ToHeliocentricScene(const glm::vec3& renderFrame);
 
 /** GetHeliocentricScenePosition(body) in the render frame. The Sun's is -origin. */
 glm::vec3 GetRenderPosition(Body body);
-
-/**
- * The origin the render frame should use given where the camera is in it. Compressed:
- * always the Sun. Realistic: the current origin until the camera is more than
- * kRenderOriginRebaseDistance from it, then the camera's own heliocentric position.
- */
-glm::dvec3 ChooseRenderOrigin(const glm::vec3& cameraRenderFrame);
 
 /** Semi-major axis in astronomical units (NASA fact-sheet averages). */
 float GetAuDistance(Body body);
@@ -161,10 +148,15 @@ float GetSceneDistance(Body body);
 glm::vec3 GetCompressedOffset(Body body);
 
 /**
- * Axial spin in degrees at the current Julian date, applied as Ry after the catalog tilt.
- * Earth: solved so the map shows the real sub-solar longitude. Others: catalog W0 at J2000
- * plus 360 deg per sidereal day (negative period = retrograde), wrapped to [0, 360).
+ * Axial spin in degrees at `julianDate`, wrapped to [0, 360): the turn about the body's pole
+ * that CatalogBody applies after the tilt. A pure function of the date (no state), in double
+ * so a caller can difference it frame to frame without float's ~3e-5° grain, which is 3 m at
+ * Earth's surface. Earth: solved so the drawn map has the true sub-solar longitude. Others:
+ * IAU W0 + Wdot * days since J2000 from the catalog (negative rate = retrograde).
  */
+double AxialSpinDegreesAt(Body body, double julianDate);
+
+/** AxialSpinDegreesAt at the current Julian date, as the float the model matrix takes. */
 float GetAxialSpinDegrees(Body body);
 
 /** Orbital period in Earth days (NASA averages). Sun returns 0. */

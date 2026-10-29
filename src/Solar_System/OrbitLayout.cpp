@@ -1,8 +1,8 @@
 #include "OrbitLayout.h"
 
-#include "../Auxiliary_Modules/Ephemeris.h"
-#include "../Auxiliary_Modules/Observer.h"
-#include "../Auxiliary_Modules/SkyEvents.h"
+#include "../astro/Ephemeris.h"
+#include "../astro/Observer.h"
+#include "../astro/SkyEvents.h"
 #include "BodyCatalog.generated.h"
 
 #include <algorithm>
@@ -20,17 +20,19 @@ struct BodyData {
     float orbitalPeriodDays;
     float inclinationDeg;
     float siderealRotationDays; // negative => retrograde
-    float primeMeridianDegJ2000; // IAU W0, the spin epoch (Earth solves its own, see below)
+    // IAU prime-meridian angle at J2000 and its rate: W = W0 + Wdot * days. Double, since
+    // Wdot times a century of days is millions of degrees. Negative rate => retrograde.
+    double primeMeridianDegJ2000;
+    double primeMeridianRateDegPerDay;
 };
 
-constexpr float kEarthYearDays = 365.25f;
-
 /**
- * Geographic longitude at the centre (u = 0.5) of the Earth diffuse map. The reference is
- * the map convention itself: NASA Blue Marble / Solar System Scope Earth maps are centred
- * on Greenwich, and the Blender sphere.obj puts u = 0.5 on model +X (texture longitude =
- * -atan2(z, x) in model space). tests/test_orbit_layout.cpp locks the result against
- * almanac sub-solar longitudes, so changing this without a recentred texture fails there.
+ * Geographic longitude at the centre (u = 0.5) of the Earth diffuse map: the Greenwich-
+ * centred equirectangular convention of NASA Blue Marble and Solar System Scope maps. The
+ * drawn sphere (the Blender sphere.obj; scripts/generate_sphere.py is only a stand-in) puts
+ * u = 0.5 on model +X and u rising as atan2(z, x) falls, so a model direction's map
+ * longitude is -atan2(z, x). tests/test_orbit_layout.cpp locks this constant against the
+ * real sub-solar longitude all year, so changing it without recentring the texture fails.
  */
 constexpr double kEarthTextureCentreLonDeg = 0.0;
 
@@ -68,44 +70,32 @@ void refreshEphemerisCache() {
     }
 }
 
-/** GetOrbitRadius in double. */
-double orbitRadius(Body body) {
-    if (body == Body::Sun) {
-        return 0.0;
-    }
-    if (UsesTrueRadius(body)) {
-        return AuToSceneDistanceDouble(g_rAu[bodyIndex(body)]);
-    }
-    if (g_scaleMode == ScaleMode::Compressed) {
-        return static_cast<double>(glm::length(GetCompressedOffset(body)));
-    }
-    return AuToSceneDistanceDouble(static_cast<double>(GetAuDistance(body)));
-}
-
 double wrapDegrees(double deg) {
-    const double w = std::fmod(deg, 360.0);
-    return w < 0.0 ? w + 360.0 : w;
+    const double wrapped = std::fmod(deg, 360.0);
+    return wrapped < 0.0 ? wrapped + 360.0 : wrapped;
 }
 
 /**
  * Earth's spin about model +Y (CatalogBody::AdjustToParent's last Rotate) that puts the
- * real sub-solar point under the scene's Sun on the texture at g_julianDate.
+ * real sub-solar longitude of `julianDate` under the scene's Sun on the drawn map.
  *
- * GMST plus a constant cannot do this: scene axes are (ecliptic x, z, y), a reflection of
- * the ecliptic, and the drawn pole is art (Rz(axialTilt)), so the Sun's azimuth about the
- * drawn pole runs backwards over the year — with the old GMST spin the texture's sub-solar
- * longitude was off by up to ~180 deg depending on the season. Instead take the Sun's true
- * Earth-fixed longitude (Observer: GMST, precession, J2000 ecliptic) and solve for the spin
- * that turns that longitude of the map toward the scene's Sun.
+ * It is not GMST plus a constant, and cannot be. Scene axes are (ecliptic x, z, y), a
+ * reflection, and the drawn pole is art (Rz(axialTilt)), so about the drawn pole the Sun
+ * circles the year the wrong way round: a texture turned at the GMST rate with any fixed
+ * offset is right at one instant and off by 2° a day from there (a full turn over a year).
+ * The Sun's true Earth-fixed longitude comes from Observer (GMST, precession, J2000
+ * ecliptic); the spin turns that longitude of the map toward the scene's Sun. The rate is
+ * still the sidereal one, to within the Sun's own ~1°/day, and the epoch behaviour is
+ * unchanged: a pure function of the date.
  *
- * Only longitude is calibrated: the sub-solar latitude is whatever the art pole gives.
+ * Only longitude is calibrated. The sub-solar latitude is whatever the art pole gives.
  */
-double earthSpinDegrees() {
+double earthSpinDegrees(double julianDate) {
     // Horizon frame at lat 0 / lon 0: X = east (body lon 90E), Y = up (lon 0), Z = -north.
     double sunEcl[3] = {0.0, 0.0, 0.0};
-    SkyEvents::GeocentricEclipticKm(0, g_julianDate, sunEcl);
+    SkyEvents::GeocentricEclipticKm(0, julianDate, sunEcl);
     double sunHorizon[3];
-    Observer::HorizonFromEclipticJ2000(g_julianDate, Observer::Site{}).Apply(sunEcl, sunHorizon);
+    Observer::HorizonFromEclipticJ2000(julianDate, Observer::Site{}).Apply(sunEcl, sunHorizon);
     const double trueLonDeg = glm::degrees(std::atan2(sunHorizon[0], sunHorizon[1]));
 
     // The scene Sun in the model frame before the spin: undo Rz(tilt) then Rx(artTiltX).
@@ -118,13 +108,31 @@ double earthSpinDegrees() {
         const glm::dmat3 rx(1.0, 0.0, 0.0, 0.0, std::cos(x), std::sin(x), 0.0, -std::sin(x), std::cos(x));
         tilt = rz * rx;
     }
-    const glm::dvec3 s = glm::transpose(tilt) * -GetHeliocentricScenePosition(Body::Earth);
+    const Ephemeris::HelioLB earthPos = Ephemeris::Position(static_cast<int>(Body::Earth), julianDate);
+    const double cosLat = std::cos(earthPos.latRad);
+    const glm::dvec3 sunDirection = -glm::dvec3(std::cos(earthPos.lonRad) * cosLat, std::sin(earthPos.latRad),
+                                                std::sin(earthPos.lonRad) * cosLat);
+    const glm::dvec3 s = glm::transpose(tilt) * sunDirection;
 
-    // The map longitude of a model direction is centre - atan2(z, x), and undoing Ry(spin)
-    // raises the Sun's atan2(z, x) by `spin`, so the longitude facing the Sun is
+    // Map longitude of a model direction is centre - atan2(z, x); undoing Ry(spin) raises
+    // the Sun's atan2(z, x) by `spin`, so the longitude facing the Sun is
     // centre - (azimuth + spin). Set that to the true one.
     const double azimuthDeg = glm::degrees(std::atan2(s.z, s.x));
     return wrapDegrees(kEarthTextureCentreLonDeg - trueLonDeg - azimuthDeg);
+}
+
+/** GetOrbitRadius in double. */
+double orbitRadius(Body body) {
+    if (body == Body::Sun) {
+        return 0.0;
+    }
+    if (UsesTrueRadius(body)) {
+        return AuToSceneDistanceDouble(g_rAu[bodyIndex(body)]);
+    }
+    if (g_scaleMode == ScaleMode::Compressed) {
+        return static_cast<double>(glm::length(GetCompressedOffset(body)));
+    }
+    return AuToSceneDistanceDouble(static_cast<double>(GetAuDistance(body)));
 }
 
 } // namespace
@@ -260,25 +268,26 @@ float GetSceneDistance(Body body) {
     return GetOrbitRadius(body);
 }
 
-float GetAxialSpinDegrees(Body body) {
-    // Every spin is a function of the date, never an accumulator, so scrubbing the date and
-    // coming back reproduces it exactly (CLAUDE.md, "Poses are functions of the date").
+double AxialSpinDegreesAt(Body body, double julianDate) {
+    // Every spin is a function of the date, never an accumulator (CLAUDE.md, "Poses are
+    // functions of the date"): a reload, a shared ?date= link, a timeline that starts at a
+    // keyframe, or scrubbing away and back all land on the same longitude.
     //
-    // Earth is calibrated: the map longitude under the Sun is the real sub-solar longitude
-    // (earthSpinDegrees). Every other body turns from its IAU WGCCRE 2015 prime-meridian
-    // angle at J2000 (catalog orbit.primeMeridianDegJ2000; 0 where the IAU gives none) at
-    // the catalog sidereal rate. Their poles and textures are art, not IAU frames, so W0
-    // only fixes a reproducible epoch; it does not put a named feature at a real longitude.
+    // Earth is solved so the drawn map shows the real sub-solar longitude (earthSpinDegrees).
+    // Every other body turns from its IAU WGCCRE W0 at J2000 at its catalog Wdot, which is
+    // negative for the retrograde rotators (Venus, Uranus) and needs no special case. Their
+    // poles and textures are art, not IAU frames, so W0 fixes a reproducible epoch; it does
+    // not by itself put a named feature at a real longitude.
     if (body == Body::Earth) {
-        return static_cast<float>(earthSpinDegrees());
+        return earthSpinDegrees(julianDate);
     }
     const BodyData& row = kBodies[bodyIndex(body)];
-    if (row.siderealRotationDays == 0.0f) {
-        return row.primeMeridianDegJ2000;
-    }
-    const double days = g_julianDate - Ephemeris::kJ2000;
-    return static_cast<float>(wrapDegrees(static_cast<double>(row.primeMeridianDegJ2000) +
-                                          360.0 * days / static_cast<double>(row.siderealRotationDays)));
+    return wrapDegrees(row.primeMeridianDegJ2000 +
+                       row.primeMeridianRateDegPerDay * (julianDate - Ephemeris::kJ2000));
+}
+
+float GetAxialSpinDegrees(Body body) {
+    return static_cast<float>(AxialSpinDegreesAt(body, g_julianDate));
 }
 
 float GetInclinationDegrees(Body body) {
@@ -328,16 +337,6 @@ glm::dvec3 ToHeliocentricScene(const glm::vec3& renderFrame) {
 
 glm::vec3 GetRenderPosition(Body body) {
     return ToRenderFrame(GetHeliocentricScenePosition(body));
-}
-
-glm::dvec3 ChooseRenderOrigin(const glm::vec3& cameraRenderFrame) {
-    if (g_scaleMode != ScaleMode::Realistic) {
-        return glm::dvec3(0.0);
-    }
-    if (glm::length(cameraRenderFrame) <= kRenderOriginRebaseDistance) {
-        return g_renderOrigin;
-    }
-    return ToHeliocentricScene(cameraRenderFrame);
 }
 
 Body BodyFromName(const std::string& name) {

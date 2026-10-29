@@ -15,11 +15,15 @@
  */
 class CatalogSatellite : public Satellite {
 public:
-    CatalogSatellite(const SatelliteInfo& satelliteInfo, std::shared_ptr<SpaceObject> parent,
+    CatalogSatellite(SatelliteInfo&& satelliteInfo, std::shared_ptr<SpaceObject> parent,
                      const BodyCatalog::Entry& entry);
 
-    void AdjustToParent(float timeScale) override;
-    void Render() const override;
+    void AdjustToParent() override;
+    void Draw(const Shader& shader) const override;
+    void BindMaterial(const Shader& shader) const override;
+    const BodyCatalog::Entry* CatalogEntry() const override { return &_entry; }
+    unsigned ShaderVariant() const override { return CatalogMaterial::Variant(_material, CurrentTextures()); }
+    float SizeFactor() const override;
 
     bool IsEphemerisPlaced() const override { return _ephemerisPlaced; }
     float OrbitSceneUnitsPerKm() const override;
@@ -30,6 +34,9 @@ public:
     unsigned int GetDiffuseTexture() const { return _diffuses.empty() ? 0u : _diffuses.front().GetTexture(); }
 
 private:
+    /** The GL names of this draw's maps (0 where the material has none). */
+    CatalogMaterial::Textures CurrentTextures() const;
+
     const BodyCatalog::Entry& _entry;
     CatalogMaterial::Material _material;
     bool _ephemerisPlaced = false;

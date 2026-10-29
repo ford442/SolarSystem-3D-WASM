@@ -5,7 +5,7 @@
 #include <algorithm>
 #include <cmath>
 #include <cstddef>
-#include <iostream>
+#include "../core/Log.h"
 #include <glm/gtc/matrix_transform.hpp>
 
 #ifndef M_PI
@@ -51,6 +51,14 @@ AsteroidField::AsteroidField(uint32_t seed, int instanceCount, Population popula
     }
     _activeCount = std::clamp(instanceCount, 0, static_cast<int>(_asteroids.size()));
     _instanceData.resize(static_cast<size_t>(kMaxInstances));
+    // The generated phases are an arbitrary starting sky; pin them to today's date.
+    _epochJd = OrbitLayout::GetJulianDate();
+    for (const auto& el : _asteroids) {
+        _asteroidEpoch.push_back({el.meanAnomalyRad, el.spinPhaseRad});
+    }
+    for (const auto& el : _comets) {
+        _cometEpoch.push_back({el.meanAnomalyRad, el.spinPhaseRad});
+    }
 
     InitRockMesh();
     InitInstanceBuffer();
@@ -59,31 +67,8 @@ AsteroidField::AsteroidField(uint32_t seed, int instanceCount, Population popula
     RebuildInstanceBuffer();
     UploadInstances();
 
-    std::cout << (population == Population::Kuiper ? "[KuiperField]" : "[AsteroidField]")
-              << " seed=0x" << std::hex << seed << std::dec
-              << " asteroids=" << _activeCount << "/" << _asteroids.size()
-              << " comets=" << _comets.size() << std::endl;
-}
-
-AsteroidField::~AsteroidField() {
-    if (_instanceVbo) {
-        glDeleteBuffers(1, &_instanceVbo);
-    }
-    if (_rockEbo) {
-        glDeleteBuffers(1, &_rockEbo);
-    }
-    if (_rockVbo) {
-        glDeleteBuffers(1, &_rockVbo);
-    }
-    if (_rockVao) {
-        glDeleteVertexArrays(1, &_rockVao);
-    }
-    if (_tailVbo) {
-        glDeleteBuffers(1, &_tailVbo);
-    }
-    if (_tailVao) {
-        glDeleteVertexArrays(1, &_tailVao);
-    }
+    LOG_INFO(population == Population::Kuiper ? "KuiperField" : "AsteroidField", "seed=0x%x asteroids=%d/%zu comets=%zu",
+             static_cast<unsigned>(seed), _activeCount, _asteroids.size(), _comets.size());
 }
 
 void AsteroidField::SetInstanceCount(int count) {
@@ -146,16 +131,16 @@ void AsteroidField::InitRockMesh() {
                      verts[i].n.x, verts[i].n.y, verts[i].n.z};
     }
 
-    glGenVertexArrays(1, &_rockVao);
-    glGenBuffers(1, &_rockVbo);
-    glGenBuffers(1, &_rockEbo);
-    glBindVertexArray(_rockVao);
+    _rockVao = GlVertexArray::Create();
+    _rockVbo = GlBuffer::Create();
+    _rockEbo = GlBuffer::Create();
+    glBindVertexArray(_rockVao.get());
 
-    glBindBuffer(GL_ARRAY_BUFFER, _rockVbo);
+    glBindBuffer(GL_ARRAY_BUFFER, _rockVbo.get());
     glBufferData(GL_ARRAY_BUFFER, static_cast<GLsizeiptr>(packed.size() * sizeof(Packed)),
                  packed.data(), GL_STATIC_DRAW);
 
-    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, _rockEbo);
+    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, _rockEbo.get());
     glBufferData(GL_ELEMENT_ARRAY_BUFFER, static_cast<GLsizeiptr>(indices.size() * sizeof(unsigned int)),
                  indices.data(), GL_STATIC_DRAW);
 
@@ -169,9 +154,9 @@ void AsteroidField::InitRockMesh() {
 }
 
 void AsteroidField::InitInstanceBuffer() {
-    glGenBuffers(1, &_instanceVbo);
-    glBindVertexArray(_rockVao);
-    glBindBuffer(GL_ARRAY_BUFFER, _instanceVbo);
+    _instanceVbo = GlBuffer::Create();
+    glBindVertexArray(_rockVao.get());
+    glBindBuffer(GL_ARRAY_BUFFER, _instanceVbo.get());
     glBufferData(GL_ARRAY_BUFFER, static_cast<GLsizeiptr>(kMaxInstances * sizeof(InstanceGPU)),
                  nullptr, GL_DYNAMIC_DRAW);
 
@@ -200,10 +185,10 @@ void AsteroidField::InitCometTailMesh() {
         -0.5f, 1.0f, 0.0f, 1.0f,
     };
 
-    glGenVertexArrays(1, &_tailVao);
-    glGenBuffers(1, &_tailVbo);
-    glBindVertexArray(_tailVao);
-    glBindBuffer(GL_ARRAY_BUFFER, _tailVbo);
+    _tailVao = GlVertexArray::Create();
+    _tailVbo = GlBuffer::Create();
+    glBindVertexArray(_tailVao.get());
+    glBindBuffer(GL_ARRAY_BUFFER, _tailVbo.get());
     glBufferData(GL_ARRAY_BUFFER, sizeof(quad), quad, GL_STATIC_DRAW);
     glEnableVertexAttribArray(0);
     glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, 4 * sizeof(float), reinterpret_cast<void*>(0));
@@ -236,37 +221,46 @@ void AsteroidField::RebuildInstanceBuffer() {
 }
 
 void AsteroidField::UploadInstances() const {
-    if (_instanceVbo == 0 || _activeCount <= 0) {
+    if (!_instanceVbo || _activeCount <= 0) {
         return;
     }
-    glBindBuffer(GL_ARRAY_BUFFER, _instanceVbo);
+    glBindBuffer(GL_ARRAY_BUFFER, _instanceVbo.get());
     glBufferSubData(GL_ARRAY_BUFFER, 0,
                     static_cast<GLsizeiptr>(static_cast<size_t>(_activeCount) * sizeof(InstanceGPU)),
                     _instanceData.data());
     glBindBuffer(GL_ARRAY_BUFFER, 0);
 }
 
-void AsteroidField::Update(float simDeltaSeconds) {
-    if (simDeltaSeconds != 0.0f) {
-        for (auto& el : _asteroids) {
-            el.meanAnomalyRad = std::fmod(el.meanAnomalyRad + el.meanMotionRadPerSec * simDeltaSeconds, kTwoPi);
-            el.spinPhaseRad = std::fmod(el.spinPhaseRad + el.spinRateRadPerSec * simDeltaSeconds, kTwoPi);
+void AsteroidField::Update(double julianDate) {
+    // Rates are per orrery second (OrbitLayout's 1x clock: one Earth orbit in
+    // kEarthOrbitSecondsAt1x), so convert the date offset into those seconds. In double:
+    // decades of scrubbing are tens of thousands of seconds times a rate.
+    const double simSeconds = (julianDate - _epochJd) *
+                              (static_cast<double>(OrbitLayout::kEarthOrbitSecondsAt1x) /
+                               static_cast<double>(OrbitLayout::kEarthYearDays));
+    const auto advance = [simSeconds](float base, float ratePerSec) {
+        double phase = std::fmod(static_cast<double>(base) + static_cast<double>(ratePerSec) * simSeconds,
+                                 static_cast<double>(kTwoPi));
+        if (phase < 0.0) {
+            phase += kTwoPi;
         }
-        for (auto& el : _comets) {
-            el.meanAnomalyRad = std::fmod(el.meanAnomalyRad + el.meanMotionRadPerSec * simDeltaSeconds, kTwoPi);
-            el.spinPhaseRad = std::fmod(el.spinPhaseRad + el.spinRateRadPerSec * simDeltaSeconds, kTwoPi);
-        }
+        return static_cast<float>(phase);
+    };
+    for (size_t i = 0; i < _asteroids.size(); ++i) {
+        _asteroids[i].meanAnomalyRad = advance(_asteroidEpoch[i].meanAnomalyRad, _asteroids[i].meanMotionRadPerSec);
+        _asteroids[i].spinPhaseRad = advance(_asteroidEpoch[i].spinPhaseRad, _asteroids[i].spinRateRadPerSec);
+    }
+    for (size_t i = 0; i < _comets.size(); ++i) {
+        _comets[i].meanAnomalyRad = advance(_cometEpoch[i].meanAnomalyRad, _comets[i].meanMotionRadPerSec);
+        _comets[i].spinPhaseRad = advance(_cometEpoch[i].spinPhaseRad, _comets[i].spinRateRadPerSec);
     }
 
     RebuildInstanceBuffer();
     UploadInstances();
 }
 
-void AsteroidField::Render(const glm::mat4& projection, const glm::mat4& view,
-                           const glm::vec3& sunPos, const glm::vec3& viewPos,
-                           const glm::vec3& cameraRight, const glm::vec3& /*cameraUp*/,
-                           float zCoef) const {
-    if (!_asteroidShader || _rockVao == 0) {
+void AsteroidField::Render(const glm::vec3& cameraRight) const {
+    if (!_asteroidShader || !_rockVao) {
         return;
     }
     if (_population == Population::Kuiper && OrbitLayout::GetScaleMode() != OrbitLayout::ScaleMode::Realistic) {
@@ -280,15 +274,10 @@ void AsteroidField::Render(const glm::mat4& projection, const glm::mat4& view,
     glCullFace(GL_BACK);
 
     _asteroidShader->Use();
-    _asteroidShader->SetMat4("projection", projection);
-    _asteroidShader->SetMat4("view", view);
-    _asteroidShader->SetVec3("lightPos", sunPos);
-    _asteroidShader->SetVec3("viewPos", viewPos);
-    _asteroidShader->SetFloat("zCoef", zCoef);
     _asteroidShader->SetFloat("ambientFactor", 0.12f);
 
     if (_activeCount > 0) {
-        glBindVertexArray(_rockVao);
+        glBindVertexArray(_rockVao.get());
         glDrawElementsInstanced(GL_TRIANGLES, _rockIndexCount, GL_UNSIGNED_INT, nullptr, _activeCount);
         glBindVertexArray(0);
     }
@@ -304,11 +293,11 @@ void AsteroidField::Render(const glm::mat4& projection, const glm::mat4& view,
         model = glm::scale(model, glm::vec3(comet.visualRadius));
 
         InstanceGPU one{model, glm::vec4(comet.color, 1.0f)};
-        glBindBuffer(GL_ARRAY_BUFFER, _instanceVbo);
+        glBindBuffer(GL_ARRAY_BUFFER, _instanceVbo.get());
         glBufferSubData(GL_ARRAY_BUFFER, 0, sizeof(InstanceGPU), &one);
         glBindBuffer(GL_ARRAY_BUFFER, 0);
 
-        glBindVertexArray(_rockVao);
+        glBindVertexArray(_rockVao.get());
         glDrawElementsInstanced(GL_TRIANGLES, _rockIndexCount, GL_UNSIGNED_INT, nullptr, 1);
         glBindVertexArray(0);
     }
@@ -317,20 +306,16 @@ void AsteroidField::Render(const glm::mat4& projection, const glm::mat4& view,
         UploadInstances();
     }
 
-    if (_cometTailShader && _tailVao != 0 && !_comets.empty()) {
+    if (_cometTailShader && _tailVao && !_comets.empty()) {
         glDepthMask(GL_FALSE);
         glEnable(GL_BLEND);
         glBlendFunc(GL_ONE, GL_ONE);
         glDisable(GL_CULL_FACE);
 
         _cometTailShader->Use();
-        _cometTailShader->SetMat4("projection", projection);
-        _cometTailShader->SetMat4("view", view);
-        _cometTailShader->SetVec3("lightPos", sunPos);
         _cometTailShader->SetVec3("cameraRight", cameraRight);
-        _cometTailShader->SetFloat("zCoef", zCoef);
 
-        glBindVertexArray(_tailVao);
+        glBindVertexArray(_tailVao.get());
         for (const auto& comet : _comets) {
             const glm::vec3 pos = OrbitLayout::ToRenderFrame(AsteroidOrbit::HeliocentricScenePosition(comet));
             const float e = std::clamp(comet.eccentricity, 0.0f, 0.999f);

@@ -1,162 +1,300 @@
 #ifndef SOLARSYSTEM_RENDERER_H
 #define SOLARSYSTEM_RENDERER_H
 #include "ApplicationTypes.h"
+#include "FrameContext.h"
+#include "FramePasses.h"
 #include "SystemModules.h"
+#include "gfx/FrameUniforms.h"
+#include "astro/MissionCatalog.h"
+#include "gfx/ShaderLibrary.h"
+#include "Solar_System/CatalogMaterial.h"
 #include "Solar_System/ObserveSky.h"
+#include <array>
 #include <deque>
-#include <functional>
+#include <memory>
 #include <string>
+#include <vector>
 
-class Application;
 class SpaceObject;
 struct QualityTierSettings;
-struct MagneticFieldParams;
+// GPU helpers held by unique_ptr: complete in the Renderer TUs only, which keeps their
+// headers out of everything that includes Application.h.
+class HDR;
+class LensFlare;
+class MagneticFieldBloom;
+class MagneticFieldLineRenderer;
+class MissionPathRenderer;
+class OrbitPathRenderer;
+class ShadowMapFBO;
+class SkyBox;
+class SurfacePatchMesh;
+class TerrainRenderer;
+class TextRenderer;
+class XrPointerRenderer;
 
 /**
  * Shadow/color/overlay/HDR draw passes, the GPU resources they own (shaders, shadow FBO,
  * HDR, skybox, lens flare, text renderer, orbit/mission/magnetic-field overlay meshes) and
  * the render-only toggles (orbit lines, magnetic fields, hint overlay, star tuning).
  *
- * Extracted off Application:: (see SceneRenderer.cpp / SceneOverlayRenderer.cpp); scene
- * data that outlives a single frame — the camera, the planet list, the sun, mission and
- * asteroid state — is still Application-owned; Renderer reaches it through the `_app` back
- * reference rather than duplicating storage. That reference is why Renderer is declared a
- * friend of Application instead of exposing a getter for every field it reads.
+ * Every pass takes the frame's FrameContext: the camera view, a snapshot of the scene and
+ * the sim/quality state. That is all a pass may read — the renderer has no reference back
+ * to Application, and nothing in the scene moves during a pass (Application::UpdateScene
+ * placed it before the first one). See FrameContext.h.
  */
 class Renderer {
 public:
-    explicit Renderer(Application& app) : _app(app) {}
+    Renderer();
+    ~Renderer(); // out of line: the unique_ptr members above are incomplete here
+    Renderer(const Renderer&) = delete;
+    Renderer& operator=(const Renderer&) = delete;
 
-    /** Build shaders + GPU resources sized to the current display/quality settings. */
-    void Init();
+    /** Hand-tuned star look (keys 3–8): HDR exposure/gamma and the glow's temperature. */
+    struct StarTuning {
+        float exposure = 8.0f;
+        float gamma = 0.4545454f;
+        float temperatureKelvin = 5778.0f;
+    };
+    /** Text overlays toggled from the keyboard (TAB, Z, X). */
+    struct OverlayToggles {
+        bool hints = true;
+        bool planetStarDistances = true;
+        bool satelliteDistances = true;
+        /** Web staged loading: "Jupiter (approach to load)" at systems not loaded yet. */
+        bool stagingLabels = true;
+    };
+
+    /**
+     * Build shaders + GPU resources sized to `display` and the current quality settings.
+     * Takes ownership of `ft` (the text renderer loads its face, then FreeType is released).
+     */
+    void Init(const SimState& sim, FT_Library ft, glm::ivec2 display);
+    /** Follow a framebuffer resize: HUD projection and the screen-sized render targets. */
+    void Resize(uint16_t width, uint16_t height);
+    /** Delete every GPU resource Init() built. Needs the GL context still current. */
+    void Release();
     /** Atmosphere/corona effect levels from a quality tier (preset changes call this too). */
     void ApplyEffectQuality(const QualityTierSettings& settings);
+    /**
+     * Quality/shadow changes: resize the shadow map (unless shadows are off) and switch HDR
+     * and the field-line bloom on or off. HDR can refuse (no float FBO); HdrEnabled() follows.
+     */
+    void ApplyRenderResources(const SimState& sim, uint16_t shadowResolution, bool enableHdr, glm::ivec2 display);
+    void ResizeShadowMap(uint16_t resolution);
+    bool HdrEnabled() const { return _hdrEnabled; }
 
-    void ConfigureMainShaders();
-    /** Re-derive every body's render-frame placement from the ephemeris (no drawing). */
-    void PlaceSceneComponents();
-    void ProcessSceneComponentsRendering();
-    void ProcessStarRendering();
-    /** Flat corona billboard (Low, or coronaSlices == 0); drawn before the planets. */
-    void RenderStarCorona() const;
-    /** Instanced-slice corona (coronaSlices > 0); drawn after the planets so they occlude it. */
-    void RenderStarCoronaVolume() const;
-    void RenderStarEffects() const;
-    void RenderPlanetSatelliteStarDistances() const;
-    void RenderHints() const;
-    void RenderTextureLoadingProgress() const;
-    void RenderOrbitPaths() const;
-    void RenderMagneticFields();
-    void RenderAsteroidField();
-    void RenderMissionPaths() const;
-    void RenderXrPointers() const;
-    /** Observe mode: the ground-level sky pass (replaces every scene pass). */
-    void RenderObserveSky();
-    /** Observe mode: compass, body labels and the readout line, drawn over the sky. */
-    void RenderObserveHud();
-    void EnsureMagneticFieldsBuilt();
-    void RebuildMissionPaths();
+    // One frame, as FramePasses::Run orders it. The passes only read scene state: everything
+    // that moves (placement, light matrices, belts, LOD) happened in Application::UpdateScene.
+    void BeginFrame();
+    /** Bind `ctx.view`: its viewport, and its matrices the first time it is bound this frame. */
+    void BeginView(const FrameContext& ctx);
+    void RenderBackground(const FrameContext& ctx);
+    void ShadowMapPass(const FrameContext& ctx, const RenderableSceneComponent& component);
+    void RenderPass(const FrameContext& ctx, const RenderableSceneComponent& component);
+    void RenderForeground(const FrameContext& ctx);
+    /** Mono only: staged-loading proxy labels, then the star glow, HDR composite and lens flare. */
+    void RenderMonoEffects(const FrameContext& ctx);
+    /** Screen-space text after the scene: Observe's HUD, or distances and the hint list. */
+    void RenderHud(const FrameContext& ctx);
+    /** Texture-upgrade progress line; also reports streaming progress to the page on web. */
+    void RenderTextureLoadingProgress(const FrameContext& ctx) const;
+    /** Whether atmospheres with LUTs should take the physical path this frame. */
+    bool PhysicalAtmosphereAvailable() const { return _pbrAtmosphereSteps > 0 && _pbrAtmosphereShader != nullptr; }
+    /** This frame's pass counts (reset by BeginFrame). */
+    const FramePasses::Stats& Stats() const { return _stats; }
+    void CountSceneUpdate() { ++_stats.sceneUpdates; }
+    void CountCulledComponents(int count) { _stats.culledComponents = count; }
 
-    void SetOrbitLinesEnabled(bool enabled) { orbitLinesEnabled = enabled; }
-    bool GetOrbitLinesEnabled() const { return orbitLinesEnabled; }
-    void SetMagneticFieldsEnabled(bool enabled);
-    bool GetMagneticFieldsEnabled() const { return magneticFieldsEnabled; }
-    void ForEachEnabledMagneticField(
-        const std::function<void(const SpaceObject& object, const MagneticFieldParams& params)>& fn) const;
+    /**
+     * Re-upload every mission path relative to the current render origin (scale or quality
+     * change). Draws offset them by where that origin is now, so the per-frame origin move
+     * only re-uploads once it has gone kMissionPathRebaseDistance (FollowMissionPathOrigin).
+     */
+    void RebuildMissionPaths(const MissionCatalog::Catalog& catalog, int qualityPreset);
+    /** After the render origin moved: rebuild the paths if it is now far from their upload origin. */
+    void FollowMissionPathOrigin(const MissionCatalog::Catalog& catalog, int qualityPreset);
+    void SetOrbitLinesEnabled(bool enabled) { _orbitLinesEnabled = enabled; }
+    bool GetOrbitLinesEnabled() const { return _orbitLinesEnabled; }
+    void SetMagneticFieldsEnabled(bool enabled, int qualityPreset);
+    bool GetMagneticFieldsEnabled() const { return _magneticFieldsEnabled; }
+    /** After a preset change: re-trace the field lines at the new density if they are shown. */
+    void RebuildMagneticFields(int qualityPreset);
 
-    // GPU resources. Public: every module that constructs the scene (StarSystemFactory.cpp),
-    // resizes on quality/window changes (RenderSettings.cpp, PlatformWindow.cpp) or draws
-    // proxy markers during staged loading (PlanetSystemLoader.cpp) already reached these
-    // directly as Application:: members before this split — keeping them public here avoids
-    // a getter per field for what is still, in effect, internal engine wiring. Tightening
-    // this is a follow-up, not a blocker for getting them off Application.h.
-    std::unique_ptr<TextRenderer> textRenderer;
-    std::unique_ptr<ShadowMapFBO> shadowMapFBO;
-    std::unique_ptr<HDR> hdr;
-    bool hdrEnabled = true;
-    std::unique_ptr<SkyBox> skyBox;
-    std::unique_ptr<Shader> shadowMapShader;
-    std::unique_ptr<Shader> mainSkyBoxShader, mainTextShader, mainStarShader, mainCoronaStarShader,
-        mainPlanetShader, mainAtmosphereShader, mainCloudsShader, mainRingShader;
-    std::unique_ptr<Shader> hdrShader, lensFlareShader, starGlowShader;
-    // LUT atmosphere (atmosphere.vs + atmospherePbr.fs). Null if it failed to compile, in
-    // which case every shell stays on mainAtmosphereShader.
-    std::unique_ptr<Shader> pbrAtmosphereShader;
-    std::unique_ptr<Shader> coronaVolumeShader;
-    std::unique_ptr<LensFlare> lensFlare;
-    // Null if its shaders failed to compile; Observe then draws an empty sky.
-    std::unique_ptr<ObserveSky> observeSky;
-    std::unique_ptr<OrbitPathRenderer> orbitPathRenderer;
-    std::unique_ptr<XrPointerRenderer> xrPointerRenderer;
-    std::unique_ptr<MagneticFieldLineRenderer> magneticFieldRenderer;
-    std::unique_ptr<MagneticFieldBloom> magneticFieldBloom;
-    std::vector<std::unique_ptr<MissionPathRenderer>> missionPathMeshes;
-
-    bool orbitLinesEnabled = true;
-    bool magneticFieldsEnabled = false;
-    bool magneticFieldsBuilt = false;
-    int magneticFieldsQuality = -1;
-
-    bool isRenderHints = true;
-    bool isRenderPlanetStarDistances = true;
-    bool isRenderSatelliteDistances = true;
-
-    // From the quality tier (ApplyEffectQuality); 0 = effect off.
-    int pbrAtmosphereSteps = 0;
-    int coronaSlices = 0;
-    int observeStarCount = 0; // brightest catalog stars Observe draws; see QualityTierSettings
-    // Corona slices follow the view direction (not the camera->Sun axis) while the camera
-    // is inside the corona; kept across frames for hysteresis.
-    mutable bool coronaSlicesViewAligned = false;
-
-    float starExposure = 8.0f;
-    float starGamma = 0.4545454f;
-    float starTemperatureInKelvin = 5778.0f;
-
-    // Current frame's camera matrices, set by ConfigureMainShaders(); read externally only
-    // by PlanetSystemLoader.cpp's proxy-marker text pass, which draws after these are set.
-    glm::mat4 cameraProjection = glm::mat4();
-    glm::mat4 cameraView = glm::mat4();
+    StarTuning& GetStarTuning() { return _starTuning; }
+    OverlayToggles& GetOverlayToggles() { return _overlayToggles; }
+    const OverlayToggles& GetOverlayToggles() const { return _overlayToggles; }
+    /** Null before Init() and after Release(). */
+    XrPointerRenderer* GetXrPointers() { return _xrPointerRenderer.get(); }
+    /** Brightest catalog stars Observe draws right now (0 without its shaders). */
+    int ObserveStarsDrawn() const;
+    int ObserveConstellationSegments() const;
+    /** Delete the GPU copies of terrain tiles the cache evicted (Terrain::TileCache::TakeEvicted). */
+    void ForgetTerrainTiles(const std::vector<uint64_t>& uids);
+    /** Terrain tiles with a GPU copy, for the [Terrain] log line. */
+    std::size_t TerrainTextureCount() const;
 
 private:
-    void ShadowMapPass(const RenderableSceneComponent& component);
-    void RenderPass(const RenderableSceneComponent& component);
-    void RenderAtmospheres(const RenderableSceneComponent& component) const;
+    void ConfigureMainShaders(const FrameContext& ctx);
+    void ProcessStarRendering(const FrameContext& ctx);
+    /** Flat corona billboard (Low, or coronaSlices == 0); drawn before the planets. */
+    void RenderStarCorona(const FrameContext& ctx) const;
+    /** Instanced-slice corona (coronaSlices > 0); drawn after the planets so they occlude it. */
+    void RenderStarCoronaVolume(const FrameContext& ctx) const;
+    void RenderStarEffects(const FrameContext& ctx) const;
+    void RenderPlanetProxyMarkers(const FrameContext& ctx) const;
+    void RenderPlanetSatelliteStarDistances(const FrameContext& ctx) const;
+    void RenderHints(const FrameContext& ctx) const;
+    void RenderOrbitPaths(const FrameContext& ctx) const;
+    void RenderMagneticFields(const FrameContext& ctx);
+    void RenderAsteroidField(const FrameContext& ctx) const;
+    void RenderMissionPaths(const FrameContext& ctx) const;
+    void RenderXrPointers(const FrameContext& ctx) const;
+    /** Observe mode: the ground-level sky pass (replaces every scene pass). */
+    void RenderObserveSky(const FrameContext& ctx);
+    /** Observe mode: compass, body labels and the readout line, drawn over the sky. */
+    void RenderObserveHud(const FrameContext& ctx);
     /** Compass points and body/star names projected onto `_observeFrame`; `textScale` grows them for a headset. */
-    void RenderObserveLabels(float width, float height, float textScale);
-    void RenderOneilAtmosphere(const RenderableAtmosphere& renderableAtmosphere,
-                               const RenderableSceneComponent& component) const;
-    void RenderPbrAtmosphere(const RenderableAtmosphere& renderableAtmosphere,
-                             const RenderableSceneComponent& component) const;
-    /** Camera position for the current eye (XR-correct), from the view matrix. */
-    glm::vec3 CameraWorldPosition() const;
-    void RenderClouds(Clouds* renderableClouds, const glm::mat4& lightSpaceMatrix) const;
-    void RenderPlanetaryRing(const Shader& shader, PlanetaryRing* planetaryRing, const glm::mat4& lightSpaceMatrix) const;
-    void RenderStar() const;
-    void RenderSpaceObjectDistance(const SpaceObject* spaceObject) const;
-    void UpdateOcclusionQuery();
-    void ConfigureMainPlanetShader(const RenderableSceneComponent& renderableComponent);
-    /** Upload (or clear) the one moon currently casting an umbra on this component's planet. */
-    void ConfigureEclipseUmbra(const RenderableSceneComponent& renderableComponent);
+    void RenderObserveLabels(const FrameContext& ctx, float width, float height, float textScale);
+    void EnsureMagneticFieldsBuilt(int qualityPreset);
+
+    void RenderAtmospheres(const FrameContext& ctx, const RenderableSceneComponent& component);
+    void RenderOneilAtmosphere(const FrameContext& ctx, const RenderableAtmosphere& renderableAtmosphere,
+                               const RenderableSceneComponent& component);
+    void RenderPbrAtmosphere(const FrameContext& ctx, const RenderableAtmosphere& renderableAtmosphere,
+                             const RenderableSceneComponent& component);
+    void RenderClouds(const FrameContext& ctx, const RenderableSceneComponent& component);
+    void RenderPlanetaryRing(const Shader& shader, const RenderableSceneComponent& component) const;
+    void RenderStar(const FrameContext& ctx) const;
+    void RenderSpaceObjectDistance(const FrameContext& ctx, const SpaceObject* spaceObject) const;
+    void UpdateOcclusionQuery(Star& sun);
     struct EclipseUmbra {
         bool active = false;
         glm::vec3 casterCenter{0.0f};
         float casterRadius = 0.0f;
         float starRadius = 0.0f;
     };
-    EclipseUmbra ComputeEclipseUmbra(const RenderableSceneComponent& renderableComponent) const;
+    EclipseUmbra ComputeEclipseUmbra(const FrameContext& ctx, const RenderableSceneComponent& renderableComponent) const;
+    /**
+     * The planetLighting program for a CatalogMaterial variant. A variant that is still
+     * compiling (or failed) draws with the one without its maps rather than stalling the frame.
+     */
+    const Shader& PlanetProgram(unsigned variant);
+    /** Bind `program` and give it this component's shadow, ring and eclipse uniforms. */
+    void ConfigurePlanetProgram(const FrameContext& ctx, const Shader& program,
+                                const RenderableSceneComponent& component, const EclipseUmbra& umbra) const;
+    /**
+     * Whether `object` is close enough to this view's eye for the NEAR_SURFACE permutations:
+     * within CameraNavigation::kNearSurfaceRadii of its bounding radius above it.
+     */
+    static bool NearSurface(const SpaceObject& object, const CameraView& view);
+    /** NEAR_SURFACE planetLighting.vs: the relative-to-eye anchor for `object` (gfx/MeshAnchor.h). */
+    static void SetMeshAnchor(const Shader& program, const SpaceObject& object, const CameraView& view);
+    /**
+     * After `body` drew with a NEAR_SURFACE `program`: its facets that pass within metres of
+     * the eye, re-tessellated (gfx/SurfacePatch.h) and drawn over them with the same state.
+     */
+    void DrawSurfacePatch(const Shader& program, const SpaceObject& body, const CameraView& view);
+    /**
+     * `normal` with NEAR_SURFACE when `near`: the near build of a shell program once it has
+     * compiled (it is submitted on first use), `normal` until then.
+     */
+    Shader& ShellProgram(Shader& normal, Shader*& nearCache, const ShaderSpec& nearSpec, bool near);
+    /** Draw one body (planet or moon) with its own material variant. */
+    void DrawLitBody(const FrameContext& ctx, const SpaceObject& body, const RenderableSceneComponent& component,
+                     const EclipseUmbra& umbra);
+    /**
+     * terrain.vs + terrain.fs for a material variant (CatalogMaterial bits, NEAR_SURFACE
+     * included), falling back as PlanetProgram does; null until even the plain one is built.
+     */
+    const Shader* TerrainProgram(unsigned variant);
+    /** terrain.vs SHADOW_PASS + shadowMap.fs, or null until it is built. */
+    const Shader* TerrainShadowProgram();
+    /**
+     * `body`'s terrain tiles in place of its sphere, with the material, shadow and eclipse
+     * uniforms the sphere would have had. False when the programs are not built yet: the
+     * caller draws the sphere instead.
+     */
+    bool DrawTerrain(const FrameContext& ctx, const SpaceObject& body, const Terrain::ActiveBody& tiles,
+                     const RenderableSceneComponent& component, const EclipseUmbra& umbra);
+
+    // First, so it is destroyed last: everything below may hold a Shader& from it.
+    ShaderLibrary _shaders;
+    std::array<Shader*, CatalogMaterial::kVariantCount> _planetVariants{}; // into _shaders; null = not ready
+
+    std::unique_ptr<TextRenderer> _textRenderer;
+    std::unique_ptr<ShadowMapFBO> _shadowMapFBO;
+    std::unique_ptr<HDR> _hdr;
+    bool _hdrEnabled = true;
+    std::unique_ptr<SkyBox> _skyBox;
+    // Owned by _shaders.
+    Shader* _shadowMapShader = nullptr;
+    Shader *_mainSkyBoxShader = nullptr, *_mainTextShader = nullptr, *_mainStarShader = nullptr,
+           *_mainCoronaStarShader = nullptr, *_mainPlanetShader = nullptr, *_mainAtmosphereShader = nullptr,
+           *_mainCloudsShader = nullptr, *_mainRingShader = nullptr;
+    Shader *_hdrShader = nullptr, *_lensFlareShader = nullptr, *_starGlowShader = nullptr;
+    // LUT atmosphere (atmosphere.vs + atmospherePbr.fs). Null if it failed to compile, in
+    // which case every shell stays on mainAtmosphereShader.
+    Shader* _pbrAtmosphereShader = nullptr;
+    // NEAR_SURFACE builds of the shell programs, compiled on first use (ShellProgram).
+    Shader *_nearAtmosphereShader = nullptr, *_nearPbrAtmosphereShader = nullptr, *_nearCloudsShader = nullptr;
+    Shader* _coronaVolumeShader = nullptr;
+    std::unique_ptr<LensFlare> _lensFlare;
+    std::unique_ptr<SurfacePatchMesh> _surfacePatch;
+    // What _surfacePatch was last built for, so the second XR eye reuses the first's patch.
+    struct SurfacePatchKey {
+        const SpaceObject* body = nullptr;
+        glm::dvec3 eyeModel{0.0};
+        float nearPlane = 0.0f;
+    } _surfacePatchKey;
+    // Terrain tiles (src/render/terrain/): the shared grid and each tile's height texture.
+    std::unique_ptr<TerrainRenderer> _terrainRenderer;
+    std::array<Shader*, CatalogMaterial::kVariantCount> _terrainVariants{}; // into _shaders; null = not ready
+    Shader* _terrainShadowShader = nullptr;
+    // Null if its shaders failed to compile; Observe then draws an empty sky.
+    std::unique_ptr<ObserveSky> _observeSky;
+    std::unique_ptr<OrbitPathRenderer> _orbitPathRenderer;
+    std::unique_ptr<XrPointerRenderer> _xrPointerRenderer;
+    std::unique_ptr<MagneticFieldLineRenderer> _magneticFieldRenderer;
+    std::unique_ptr<MagneticFieldBloom> _magneticFieldBloom;
+    std::vector<std::unique_ptr<MissionPathRenderer>> _missionPathMeshes;
+    glm::dvec3 _missionPathOrigin{0.0}; // world point the path vertices are relative to
+
+    bool _orbitLinesEnabled = true;
+    bool _magneticFieldsEnabled = false;
+    bool _magneticFieldsBuilt = false;
+    int _magneticFieldsQuality = -1;
+
+    OverlayToggles _overlayToggles;
+    StarTuning _starTuning;
+
+    // From the quality tier (ApplyEffectQuality); 0 = effect off.
+    int _pbrAtmosphereSteps = 0;
+    int _coronaSlices = 0;
+    int _observeStarCount = 0; // brightest catalog stars Observe draws; see QualityTierSettings
+    // Corona slices follow the view direction (not the camera->Sun axis) while the camera
+    // is inside the corona; kept across frames for hysteresis.
+    mutable bool _coronaSlicesViewAligned = false;
+
+    // Screen-space text (hints, texture-upgrade progress); follows the framebuffer via Resize().
+    glm::mat4 _hudProjection = glm::mat4(1.0f);
 
     // View state of the last RenderObserveSky(), reused to project HUD labels onto the same frame.
     ObserveSky::Frame _observeFrame;
 
     // Pre-allocated containers for RenderHints to eliminate per-frame allocations
-    mutable std::deque<wchar_t> distanceInfoCache;
-    mutable std::deque<std::wstring> fpsHintCache;
-    mutable std::deque<std::wstring> gpuHintCache;
-    mutable std::deque<std::wstring> soundVolumeHintCache;
-    mutable std::deque<std::wstring> tmpStringCache;
+    mutable std::deque<wchar_t> _distanceInfoCache;
+    mutable std::deque<std::wstring> _fpsHintCache;
+    mutable std::deque<std::wstring> _gpuHintCache;
+    mutable std::deque<std::wstring> _soundVolumeHintCache;
+    mutable std::deque<std::wstring> _tmpStringCache;
+    // RenderTextureLoadingProgress: the hint and the counters it was built from.
+    mutable std::deque<std::wstring> _loadingHintCache;
+    mutable std::array<int, 4> _loadingHintCounters{};
 
-    Application& _app;
+    FrameUniformBuffer _frameUniforms;
+    unsigned int _uploadedViews = 0; // bit per view whose FrameUBO this frame already uploaded
+    const CameraView* _configuredView = nullptr; // view whose matrices ConfigureMainShaders last uploaded
+    FramePasses::Stats _stats;
 };
 
 #endif //SOLARSYSTEM_RENDERER_H

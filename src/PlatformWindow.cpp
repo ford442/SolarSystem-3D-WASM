@@ -4,16 +4,19 @@
 #include "Application.h"
 #include "QualitySettings.h"
 #include "SimState.h"
-#include "Auxiliary_Modules/Ephemeris.h"
-#include "Auxiliary_Modules/GlCapabilities.h"
-#include "Auxiliary_Modules/TextureFormatSupport.h"
+#include "astro/Ephemeris.h"
+#include "gfx/GlCapabilities.h"
+#include "assets/TextureFormatSupport.h"
 #include "Solar_System/OrbitLayout.h"
-#include <SDL_image.h>
+#include "core/Log.h"
+#ifndef __EMSCRIPTEN__
+#include <SDL_image.h> // native window icon only; the web build links neither SDL nor SDL_image
+#endif
 #include <algorithm>
 #include <cmath>
 #include <cstdlib>
 #include <cstring>
-#include <iostream>
+#include <unordered_map>
 
 #ifdef __EMSCRIPTEN__
 #include <emscripten.h>
@@ -50,25 +53,66 @@ void SelectTexturePack() {
 
     if (published) {
         TextureFormats::SetTexturePack(preferred);
-        std::cout << "[Texture] Using the '" << preferred << "' KTX2 pack" << std::endl;
+        LOG_INFO("Texture", "Using the '%s' KTX2 pack", preferred);
         return;
     }
-    std::cout << "[Texture] No '" << preferred << "' KTX2 pack published; using .dds"
-              << (GetGlCapabilities().s3tcCompressedTextures ? "" : " with software BC decode")
-              << std::endl;
+    LOG_INFO("Texture", "No '%s' KTX2 pack published; using .dds%s", preferred,
+             GetGlCapabilities().s3tcCompressedTextures ? "" : " with software BC decode");
 #endif
 }
 } // namespace
 
 // Error Callback
 void glfwErrorCallback(int error, const char* description) {
-    std::cerr << "GLFW Error (" << error << "): " << description << std::endl;
+    LOG_ERROR("GLFW", "error %d: %s", error, description);
 }
 
-void Application::InitSystems() {
-    ios_base::sync_with_stdio(false);
-    cin.tie(nullptr);
+#ifndef __EMSCRIPTEN__
+namespace {
+// A KHR_debug context in Debug builds; SOLARSYSTEM_GL_DEBUG=1/0 forces it on/off in any build.
+bool GlDebugRequested() {
+    if (const char* value = std::getenv("SOLARSYSTEM_GL_DEBUG"); value && *value) {
+        return std::string(value) != "0";
+    }
+#ifdef NDEBUG
+    return false;
+#else
+    return true;
+#endif
+}
 
+Log::Level GlDebugLevel(GLenum type, GLenum severity) {
+    if (type == GL_DEBUG_TYPE_ERROR || severity == GL_DEBUG_SEVERITY_HIGH) {
+        return Log::Level::Error;
+    }
+    switch (severity) {
+        case GL_DEBUG_SEVERITY_MEDIUM: return Log::Level::Warn;
+        case GL_DEBUG_SEVERITY_LOW: return Log::Level::Info;
+        default: return Log::Level::Debug; // GL_DEBUG_SEVERITY_NOTIFICATION
+    }
+}
+
+void GLAPIENTRY GlDebugCallback(GLenum /*source*/, GLenum type, GLuint id, GLenum severity, GLsizei /*length*/,
+                                const GLchar* message, const void* /*userParam*/) {
+    const Log::Level level = GlDebugLevel(type, severity);
+    if (!Log::Enabled(level)) {
+        return;
+    }
+    // A driver repeats the same message every draw (e.g. an incomplete placeholder texture);
+    // print each id a few times, then say once that it is being dropped.
+    constexpr int kRepeatsPerId = 5;
+    static std::unordered_map<GLuint, int> seen;
+    const int count = ++seen[id];
+    if (count > kRepeatsPerId) {
+        return;
+    }
+    Log::Write(level, "GL", "0x%x: %s%s", id, message,
+               count == kRepeatsPerId ? " (further messages with this id suppressed)" : "");
+}
+} // namespace
+#endif
+
+void Application::InitSystems() {
     OrbitLayout::SetJulianDate(Ephemeris::JulianDateNowUtc());
 
     glfwSetErrorCallback(glfwErrorCallback);
@@ -78,16 +122,18 @@ void Application::InitSystems() {
     }
 
 #ifdef __EMSCRIPTEN__
-    gSimState->isMobileWeb = ReadIsMobileWeb();
-    gSimState->qualityPreset = ReadInitialQualityPreset();
-    gSimState->backingStoreScale = ReadBackingStoreScale();
+    _simState.isMobileWeb = ReadIsMobileWeb();
+    _simState.qualityPreset = ReadInitialQualityPreset();
+    _simState.backingStoreScale = ReadBackingStoreScale();
 #else
-    gSimState->qualityPreset = ReadInitialQualityPreset();
+    _simState.qualityPreset = ReadInitialQualityPreset();
 #endif
-    // MSAA is fixed when the context is created, so it must come from the *initial*
-    // quality preset; ApplyQualityPreset cannot change it later (same restriction as
-    // web, where the WebGL context's `antialias` is decided in bootstrap.ts).
-    const auto qualitySettings = GetQualitySettings(gSimState->qualityPreset, gSimState->isMobileWeb);
+    // Context samples are fixed when the context is created, so they must come from the
+    // *initial* quality preset; ApplyQualityPreset cannot change them later (same
+    // restriction as web, where the WebGL context's `antialias` is decided in
+    // web/src/webglContext.ts). A tier with HDR asks for none: see ContextMsaaSamples.
+    const auto qualitySettings = GetQualitySettings(_simState.qualityPreset, _simState.isMobileWeb);
+    const int requestedSamples = ContextMsaaSamples(qualitySettings);
 
 #ifdef __EMSCRIPTEN__
     glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 3);
@@ -96,13 +142,15 @@ void Application::InitSystems() {
     glfwWindowHint(GLFW_RESIZABLE, GLFW_TRUE);
     // GLFW_SAMPLES (and every other GLFW context-attribute hint) is inert here: the
     // WebGL2 context is created up front by web/src/bootstrap.ts (with antialias already
-    // decided from the same quality tier) and handed in via Module.preinitializedWebGLContext,
+    // decided from the same quality tier) and handed in via Module['preinitializedWebGLContext'],
     // which GLFW/Emscripten reuse as-is instead of building a context from these hints.
 #else
     glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 4);
     glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 6);
     glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
-    glfwWindowHint(GLFW_SAMPLES, qualitySettings.requestedMsaaSamples);
+    glfwWindowHint(GLFW_SAMPLES, requestedSamples);
+    // Debug builds (or SOLARSYSTEM_GL_DEBUG=1): KHR_debug context, messages routed into Log.
+    glfwWindowHint(GLFW_OPENGL_DEBUG_CONTEXT, GlDebugRequested() ? GLFW_TRUE : GLFW_FALSE);
 #endif
 
     glfwWindowHint(GLFW_VISIBLE, GLFW_FALSE);
@@ -115,8 +163,8 @@ void Application::InitSystems() {
     double cssWidth = 0.0, cssHeight = 0.0;
     emscripten_get_element_css_size("#canvas", &cssWidth, &cssHeight);
     if (cssWidth > 0.0 && cssHeight > 0.0) {
-        _displayWidth = static_cast<uint16_t>(std::lround(cssWidth * gSimState->backingStoreScale));
-        _displayHeight = static_cast<uint16_t>(std::lround(cssHeight * gSimState->backingStoreScale));
+        _displayWidth = static_cast<uint16_t>(std::lround(cssWidth * _simState.backingStoreScale));
+        _displayHeight = static_cast<uint16_t>(std::lround(cssHeight * _simState.backingStoreScale));
     } else {
         _displayWidth = 1280;
         _displayHeight = 720;
@@ -168,13 +216,20 @@ void Application::InitSystems() {
 
     GLint actualSamples = 0;
     glGetIntegerv(GL_SAMPLES, &actualSamples);
-    std::cout << "[Quality] Requested " << qualitySettings.requestedMsaaSamples
-              << "x MSAA, context provides " << actualSamples << " samples" << std::endl;
+    _simState.contextSamples = actualSamples;
+    // The tier's HDR flag is only a request (HDR::InitFBO can refuse); the "[Quality] Active
+    // tier" line later prints the path that actually runs.
+    LOG_INFO("Quality", "Context samples: requested %d, GL_SAMPLES=%d; %s", requestedSamples, actualSamples,
+             qualitySettings.enableHdr ? "HDR tone-map pass is the antialiasing path"
+                                       : "HDR off, antialiasing is the context's");
 
     // The UI reports _isVertSyncEnabled from startup, but only the F-key toggle used to
     // call through to the driver — so the reported state could disagree with reality
-    // until the user pressed it. Apply the initial state here instead.
+    // until the user pressed it. Apply the initial state here instead. Web applies it in
+    // Exec(): there the swap interval is main-loop timing, which needs the loop to exist.
+#ifndef __EMSCRIPTEN__
     VertSync(_isVertSyncEnabled);
+#endif
 
     GetGlCapabilities(); // Probed once here (context is current); logs its findings.
     SelectTexturePack();  // Decide which texture pack every later asset path resolves to.
@@ -194,6 +249,13 @@ void Application::InitSystems() {
     glewExperimental = true;
     glewInit();
 
+    if (GlDebugRequested() && glDebugMessageCallback) {
+        glEnable(GL_DEBUG_OUTPUT);
+        glEnable(GL_DEBUG_OUTPUT_SYNCHRONOUS);
+        glDebugMessageCallback(GlDebugCallback, nullptr);
+        LOG_INFO("GL", "KHR_debug output enabled");
+    }
+
     if (const char* selfTest = std::getenv("SOLARSYSTEM_SHADER_SELFTEST"); selfTest && *selfTest && std::string(selfTest) != "0") {
         const int failures = Shader::SelfTestDirectory("resource/shaders");
         glfwTerminate();
@@ -204,10 +266,13 @@ void Application::InitSystems() {
     FT_Init_FreeType(&_ft);
 
 #ifdef __EMSCRIPTEN__
-    // No SDL_Init on web: GLFW owns the canvas and web/src/music.ts owns audio. Calling it
-    // would keep SDL's audio subsystem (a deprecated ScriptProcessorNode device) linked in.
-    // IMG_Init below does not need it.
+    // No SDL on web at all: GLFW owns the canvas and web/src/music.ts owns audio. SDL_image
+    // exists only for the native window icon (LoadWindowIcon), so the SDL ports are not linked.
 #else
+    // SDL's default SIGINT/SIGTERM handlers turn the signal into an SDL_QUIT event, but the
+    // frame loop is GLFW's and never polls SDL events — so Ctrl-C and `timeout` were
+    // swallowed and the process had to be SIGKILLed. Keep the default (terminating) handlers.
+    SDL_SetHint(SDL_HINT_NO_SIGNAL_HANDLERS, "1");
     if (SDL_Init(SDL_INIT_EVERYTHING)) {
         Dispose();
         throw runtime_error("Failed to init SDL");
@@ -216,27 +281,30 @@ void Application::InitSystems() {
 
 #ifdef SOLARSYSTEM_USE_SDL_MIXER
     if (Mix_OpenAudio(44100, MIX_DEFAULT_FORMAT, 2, 2048) < 0) {
-        std::cerr << "[Audio] Failed to init SDL_mixer: " << Mix_GetError() << std::endl;
+        LOG_WARN("Audio", "Failed to init SDL_mixer: %s", Mix_GetError());
         _mixerInitialized = false;
     } else {
         Mix_AllocateChannels(16);
         _mixerInitialized = true;
-        std::cout << "[Audio] SDL_mixer initialized" << std::endl;
+        LOG_INFO("Audio", "SDL_mixer initialized");
     }
 #elif !defined(__EMSCRIPTEN__)
-    _soundEngine = createIrrKlangDevice(ESOD_AUTO_DETECT, ESEO_MULTI_THREADED | ESEO_LOAD_PLUGINS);
+    _soundEngine = irrklang::createIrrKlangDevice(irrklang::ESOD_AUTO_DETECT,
+                                                  irrklang::ESEO_MULTI_THREADED | irrklang::ESEO_LOAD_PLUGINS);
     if (!_soundEngine) {
         throw runtime_error("Failed to init sound engine");
     }
     _soundEngine->setSoundVolume(0.3);
 #endif
 
+#ifndef __EMSCRIPTEN__
     if (!IMG_Init(IMG_INIT_JPG | IMG_INIT_PNG)) {
         Dispose();
         std::string msg = "Failed to init SDL_Image: ";
         msg += IMG_GetError();
         throw runtime_error(msg);
     }
+#endif
 
     glEnable(GL_DEPTH_TEST);
 #ifndef __EMSCRIPTEN__
@@ -257,15 +325,18 @@ void Application::InitSystems() {
 }
 
 void Application::Dispose() {
+    // Order matters: every destructor below issues glDelete*, so the scene and renderer go
+    // while the context is still current; then the worker threads; only then the window
+    // system and the context with it.
+    ReleaseGpuResources();
+    StopPlayBackgroundMusic();
+
     glfwTerminate();
 
 #ifndef __EMSCRIPTEN__
+    IMG_Quit();
     SDL_Quit();
 #endif
-
-    IMG_Quit();
-    StopSearchNearestPlanet();
-    StopPlayBackgroundMusic();
 
 #ifdef SOLARSYSTEM_USE_SDL_MIXER
     Mix_CloseAudio();
@@ -274,14 +345,28 @@ void Application::Dispose() {
 #endif
 }
 
+void Application::ReleaseGpuResources() {
+    _renderableSceneComponents.clear();
+    _planetSystemManifests.clear();
+    _sun.reset();
+    _asteroidField.reset();
+    _kuiperField.reset();
+    _sphereModel.reset();
+    _renderer.Release();
+}
+
 void Application::DisplaySystemInformation() const {
-    cout << "GPU Supplier: " << glGetString(GL_VENDOR) << endl;
-    cout << "GPU: " << glGetString(GL_RENDERER) << endl;
+    const auto glString = [](GLenum name) {
+        const GLubyte* value = glGetString(name);
+        return value ? reinterpret_cast<const char*>(value) : "?";
+    };
+    LOG_INFO("GPU", "Supplier: %s", glString(GL_VENDOR));
+    LOG_INFO("GPU", "Renderer: %s", glString(GL_RENDERER));
 
     GLint majorVersion, minorVersion;
     glGetIntegerv(GL_MAJOR_VERSION, &majorVersion);
     glGetIntegerv(GL_MINOR_VERSION, &minorVersion);
-    cout << "OpenGL version: " << majorVersion << '.' << minorVersion << endl;
+    LOG_INFO("GPU", "OpenGL version: %d.%d", majorVersion, minorVersion);
 
 #ifndef __EMSCRIPTEN__
     // GL_GPU_MEMORY_INFO_*_NVX comes from NV_NVX_gpu_memory_info; querying it on AMD or
@@ -292,27 +377,26 @@ void Application::DisplaySystemInformation() const {
 
         GLint currentMemoryKb = 0;
         glGetIntegerv(GL_GPU_MEMORY_INFO_CURRENT_AVAILABLE_VIDMEM_NVX, &currentMemoryKb);
-        cout << "Total GPU Memory: " << totalMemoryKb << " kb\nFree GPU Memory: " << currentMemoryKb << " kb" << endl;
+        LOG_INFO("GPU", "Total memory: %d kb, free: %d kb", totalMemoryKb, currentMemoryKb);
     }
 #endif
 
     GLint maxTextureSize;
     glGetIntegerv(GL_MAX_TEXTURE_SIZE, &maxTextureSize);
-    cout << "Max texture size in the system: "<< maxTextureSize << "x" << maxTextureSize << endl;
-    cout << "Driver: " << glGetString(GL_VERSION) << endl;
+    LOG_INFO("GPU", "Max texture size: %dx%d", maxTextureSize, maxTextureSize);
+    LOG_INFO("GPU", "Driver: %s", glString(GL_VERSION));
 }
 
+#ifndef __EMSCRIPTEN__
 void Application::LoadWindowIcon() const {
     constexpr auto execIconPath = "resource/icons/solarsystem-logo.png";
     SDL_Surface* windowIcon = IMG_Load(execIconPath);
     if (windowIcon == nullptr) {
-        std::cerr << "WARNING: Cannot load window icon " << execIconPath
-                  << " (" << IMG_GetError() << ")" << std::endl;
+        LOG_WARN("Window", "Cannot load window icon %s (%s)", execIconPath, IMG_GetError());
         return;
     }
     if (windowIcon->w > 256 || windowIcon->h > 256) {
-        std::cerr << "WARNING: Skipping oversized window icon ("
-                  << windowIcon->w << "x" << windowIcon->h << ")" << std::endl;
+        LOG_WARN("Window", "Skipping oversized window icon (%dx%d)", windowIcon->w, windowIcon->h);
         SDL_FreeSurface(windowIcon);
         return;
     }
@@ -323,6 +407,7 @@ void Application::LoadWindowIcon() const {
     glfwSetWindowIcon(_mainWindow, 1, &image);
     SDL_FreeSurface(windowIcon);
 }
+#endif
 
 void Application::HandleResize(int width, int height) {
     width = std::max(1, width);
@@ -333,12 +418,7 @@ void Application::HandleResize(int width, int height) {
     _displayWidth = static_cast<uint16_t>(width);
     _displayHeight = static_cast<uint16_t>(height);
     _camera.SetAspect(static_cast<float>(width) / static_cast<float>(height));
-    if (_renderer.hdr) {
-        _renderer.hdr->Resize(_displayWidth, _displayHeight);
-    }
-    if (_renderer.magneticFieldBloom) {
-        _renderer.magneticFieldBloom->Resize(_displayWidth, _displayHeight);
-    }
+    _renderer.Resize(_displayWidth, _displayHeight);
     glViewport(0, 0, width, height);
 }
 
@@ -347,6 +427,9 @@ void Application::FramebufferSizeCallback(GLFWwindow* window, int width, int hei
     if (!app) {
         glViewport(0, 0, width, height);
         return;
+    }
+    if (app->_capture.resized) {
+        return; // a capture renders at its own size (WebWindowResizeCallback)
     }
     app->HandleResize(width, height);
 }
@@ -359,15 +442,22 @@ void Application::FramebufferSizeCallback(GLFWwindow* window, int width, int hei
 // independent mechanism that actually listens for window resize (and orientation change).
 EM_BOOL Application::WebWindowResizeCallback(int /*eventType*/, const EmscriptenUiEvent*, void* userData) {
     auto* app = static_cast<Application*>(userData);
+    // A capture renders at its own size; EndCapture fits the canvas to the window again.
+    if (!app->_capture.resized) {
+        app->FitCanvasToCss();
+    }
+    return EM_FALSE; // Don't block the event from reaching other listeners.
+}
+
+void Application::FitCanvasToCss() {
     double cssWidth = 0.0, cssHeight = 0.0;
     emscripten_get_element_css_size("#canvas", &cssWidth, &cssHeight);
     if (cssWidth > 0.0 && cssHeight > 0.0) {
-        const int width = static_cast<int>(std::lround(cssWidth * gSimState->backingStoreScale));
-        const int height = static_cast<int>(std::lround(cssHeight * gSimState->backingStoreScale));
+        const int width = static_cast<int>(std::lround(cssWidth * _simState.backingStoreScale));
+        const int height = static_cast<int>(std::lround(cssHeight * _simState.backingStoreScale));
         emscripten_set_canvas_element_size("#canvas", width, height);
-        app->HandleResize(width, height);
+        HandleResize(width, height);
     }
-    return EM_FALSE; // Don't block the event from reaching other listeners.
 }
 #endif
 

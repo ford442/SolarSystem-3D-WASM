@@ -3,7 +3,7 @@ precision highp float;
 precision highp int;
 
 in vec3 TexCoords;
-uniform samplerCube skybox;
+layout(binding = TU_DIFFUSE) uniform samplerCube skybox;
 
 out vec4 fragColor;
 

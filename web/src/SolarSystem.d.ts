@@ -389,6 +389,91 @@ export interface SolarSystemCwrap {
     returnType: 'number',
     argTypes: [],
   ): (...args: number[]) => number;
+  (
+    ident: 'SetCameraRoll',
+    returnType: null,
+    argTypes: ['number'],
+  ): (...args: number[]) => void;
+  (
+    ident: 'GetCameraRoll',
+    returnType: 'number',
+    argTypes: [],
+  ): (...args: number[]) => number;
+  (
+    ident: 'SetCameraFov',
+    returnType: null,
+    argTypes: ['number'],
+  ): (...args: number[]) => void;
+  (
+    ident: 'GetCameraFov',
+    returnType: 'number',
+    argTypes: [],
+  ): (...args: number[]) => number;
+  (
+    ident: 'AdvanceSimulationTo',
+    returnType: null,
+    argTypes: ['number'],
+  ): (...args: number[]) => void;
+  (
+    ident: 'GetSceneStateJson',
+    returnType: 'string',
+    argTypes: [],
+  ): (...args: number[]) => string;
+  (
+    ident: 'GetBodyCatalogJson',
+    returnType: 'string',
+    argTypes: [],
+  ): (...args: number[]) => string;
+  (
+    ident: 'GetSurfaceJson',
+    returnType: 'string',
+    argTypes: ['number', 'number', 'number', 'number'],
+  ): (...args: number[]) => string;
+  (
+    ident: 'PreloadBodySystem',
+    returnType: null,
+    argTypes: ['number'],
+  ): (...args: number[]) => void;
+  (
+    ident: 'GetPendingAssetCount',
+    returnType: 'number',
+    argTypes: [],
+  ): (...args: number[]) => number;
+  (
+    ident: 'SetHudOverlays',
+    returnType: null,
+    argTypes: ['number'],
+  ): (...args: number[]) => void;
+  (
+    ident: 'GetHudOverlays',
+    returnType: 'number',
+    argTypes: [],
+  ): (...args: number[]) => number;
+  (
+    ident: 'BeginCapture',
+    returnType: 'number',
+    argTypes: ['number', 'number'],
+  ): (...args: number[]) => number;
+  (
+    ident: 'StepCaptureFrame',
+    returnType: null,
+    argTypes: ['number'],
+  ): (...args: number[]) => void;
+  (
+    ident: 'EndCapture',
+    returnType: null,
+    argTypes: [],
+  ): (...args: number[]) => void;
+  (
+    ident: 'GetShaderSourceFiles',
+    returnType: 'string',
+    argTypes: [],
+  ): (...args: number[]) => string;
+  (
+    ident: 'ReloadShaders',
+    returnType: 'number',
+    argTypes: [],
+  ): (...args: number[]) => number;
   // END GENERATED CWARP OVERLOADS
 }
 
@@ -404,7 +489,8 @@ export type SettingsChangeField =
   | 'observeMode'
   | 'observeSite'
   | 'observeTimeRate'
-  | 'observeConstellations';
+  | 'observeConstellations'
+  | 'orbitScaleMode';
 
 export interface SolarSystemModuleConfig {
   canvas: HTMLCanvasElement;
@@ -413,12 +499,15 @@ export interface SolarSystemModuleConfig {
   printErr?: (text: string) => void;
   onRuntimeInitialized?: () => void;
   /** C++ → JS callbacks registered on Module before runtime init. */
-  updateLoadingProgress?: (loaded: number, total: number) => void;
+  /** `failed` (core resources that failed, already counted in `loaded`) is omitted by streaming progress. */
+  updateLoadingProgress?: (loaded: number, total: number, failed?: number) => void;
   updateStreamingProgress?: (completed: number, total: number, active?: number, tierCode?: number) => void;
   onPlanetFocused?: (index: number) => void;
   /** 0–1 music gain for scene proximity; web/src/music.ts applies it. */
   onMusicDuck?: (duck: number) => void;
   onSettingsChanged?: (field: SettingsChangeField | string) => void;
+  onNearestPlanetChanged?: (index: number) => void;
+  onMissionFocused?: (index: number) => void;
   /**
    * A WebGL2 context created by the caller (see web/src/webglContext.ts), reused as-is by
    * Emscripten's GLFW port. This is the ONLY way to control powerPreference / xrCompatible /
@@ -441,12 +530,22 @@ export interface EmscriptenGL {
   getNewId: (table: unknown[]) => number;
 }
 
+/** The slice of Emscripten's FS the dev shader reload uses (EXPORTED_RUNTIME_METHODS 'FS'). */
+export interface EmscriptenFS {
+  readFile(path: string, opts: { encoding: 'utf8' }): string;
+  writeFile(path: string, data: string | Uint8Array): void;
+}
+
 export interface SolarSystemModule {
   canvas: HTMLCanvasElement;
+  FS?: EmscriptenFS;
   cwrap: SolarSystemCwrap;
   HEAPF32: Float32Array;
   HEAP8: Int8Array;
   GL?: EmscriptenGL;
+  /** Emscripten main-loop controls (library_browser.js); used on WebGL context loss. */
+  pauseMainLoop?: () => void;
+  resumeMainLoop?: () => void;
   _main: (argc: number, argv: number) => number;
   // BEGIN GENERATED MODULE EXPORTS
   _SetCameraPose: (...args: number[]) => void;
@@ -510,6 +609,23 @@ export interface SolarSystemModule {
   _GetCameraHeliocentricZ: () => number;
   _GetCameraYaw: () => number;
   _GetCameraPitch: () => number;
+  _SetCameraRoll: (...args: number[]) => void;
+  _GetCameraRoll: () => number;
+  _SetCameraFov: (...args: number[]) => void;
+  _GetCameraFov: () => number;
+  _AdvanceSimulationTo: (...args: number[]) => void;
+  _GetSceneStateJson: () => number;
+  _GetBodyCatalogJson: () => number;
+  _GetSurfaceJson: (...args: number[]) => number;
+  _PreloadBodySystem: (...args: number[]) => void;
+  _GetPendingAssetCount: () => number;
+  _SetHudOverlays: (...args: number[]) => void;
+  _GetHudOverlays: () => number;
+  _BeginCapture: (...args: number[]) => number;
+  _StepCaptureFrame: (...args: number[]) => void;
+  _EndCapture: () => void;
+  _GetShaderSourceFiles: () => number;
+  _ReloadShaders: () => number;
   // END GENERATED MODULE EXPORTS
 }
 
@@ -542,12 +658,28 @@ declare global {
       z: number;
     };
     startTour?: (id?: string) => void;
+    /** Cinematic timelines (timelineEditor.ts): the player, and load(id or URL) into the dock. */
+    solarSystemTimeline?: {
+      player: import('./timelinePlayer').TimelinePlayer;
+      load: (source: string) => Promise<import('./timeline').TimelineParseResult>;
+      snapshot: (t: number, width?: number, height?: number) => string | null;
+    };
     /** Observe mode console helpers (see observe.ts / ObserveState). */
     setObserveMode?: (enabled: boolean) => void;
     setObserverSite?: (latDeg: number, lonDeg: number, altM?: number) => void;
     getObserveState?: () => import('./observe').ObserveState;
+    /** Dev server only (shaderReload.ts): rebuild the programs whose shader files changed. */
+    __solarSystem?: {
+      reloadShaders?: () => Promise<number>;
+    };
     /** Runtime asset base URL for WebResourceFetcher. */
     __solarSystemAssetBase?: string;
+    /**
+     * Download hook for WebResourceFetcher: resolves the body, or the HTTP status of a
+     * failure (0 = network). Installed by bootstrap.ts (assetCache.ts); when absent C++
+     * falls back to emscripten_async_wget2 with no cache.
+     */
+    __solarSystemFetchAsset?: (url: string) => Promise<Uint8Array<ArrayBuffer> | number>;
     /** KTX2 texture packs published by this deployment — read by PlatformWindow.cpp. */
     __solarSystemTexturePacks?: string[];
     /** Init config published before Module() — read by QualitySettings.cpp. */
@@ -557,7 +689,4 @@ declare global {
       backingStoreScale: number;
     };
   }
-
-  /** Incoming Module config (callbacks live on SolarSystemModuleConfig). */
-  const Module: SolarSystemModuleConfig;
 }

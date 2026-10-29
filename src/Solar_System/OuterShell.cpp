@@ -1,7 +1,7 @@
 #include "OuterShell.h"
 
-OuterShell::OuterShell(MeshHolder model, const Shader& shader, std::shared_ptr<SpaceObject> parent, float earthScaleFactor) :
-    SpaceObject(std::move(model), shader), _parent(std::move(parent)), _scaleFactor(earthScaleFactor)
+OuterShell::OuterShell(MeshHolder model, std::shared_ptr<SpaceObject> parent, float earthScaleFactor) :
+    SpaceObject(std::move(model)), _parent(std::move(parent)), _scaleFactor(earthScaleFactor)
 {
 }
 

@@ -4,7 +4,7 @@ precision highp int;
 
 in vec2 TexCoords;
 
-uniform sampler2D text;
+layout(binding = TU_DIFFUSE) uniform sampler2D text;
 uniform vec3 textColor;
 
 out vec4 fragColor;

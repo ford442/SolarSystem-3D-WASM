@@ -4,8 +4,7 @@ import type { SolarSystemInitConfig } from './initialSettings';
 /**
  * Single owner of GPU-cost tiering shared by WebGL context creation and backing-store
  * (device-pixel-ratio) sizing. Mirrors GetQualitySettings()'s mobile-forces-cheapest-tier
- * rule in QualitySettings.cpp (requestedMsaaSamples is 0 for every mobile preset, 4 only
- * for desktop "full") so TS and C++ agree without duplicating the whole quality table.
+ * rule in QualitySettings.cpp so TS and C++ agree without duplicating the whole quality table.
  */
 export type WebGlCostTier = 'lowMobile' | 'medium' | 'full';
 
@@ -32,10 +31,17 @@ export function computeWebGlCostTier(qualityPreset: QualityPreset, isMobileWeb: 
 export function computeWebGlContextOptions(tier: WebGlCostTier): WebGlContextOptions {
     return {
         alpha: false,
-        antialias: tier === 'full',
+        // Never multisampled while HDR is on, and every tier that asks for MSAA also has HDR
+        // (see ContextMsaaSamples in QualitySettings.cpp): the colour pass draws into
+        // gfx/HDR's single-sampled texture, so a multisampled default framebuffer would only
+        // resolve an already-resolved image. Medium and full antialias in the tone-map pass
+        // (FXAA, hdr.fs); low has HDR off and no samples requested. If a tier ever gets
+        // HDR off plus samples, this is the one place the web side has to learn it.
+        antialias: false,
         depth: true,
         stencil: false,
-        premultipliedAlpha: true,
+        // Inert while alpha is false; stated so the object matches what the browser uses.
+        premultipliedAlpha: false,
         preserveDrawingBuffer: false,
         powerPreference: tier === 'lowMobile' ? 'low-power' : 'high-performance',
         // Enables WebXR's XRWebGLLayer to use this context directly; without this, WebXR

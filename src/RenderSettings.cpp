@@ -3,23 +3,22 @@
 // high-res textures in and out as the camera moves.
 #include "Application.h"
 #include "QualitySettings.h"
-#include "SimState.h"
-#include "Auxiliary_Modules/TextureLoadingQueue.h"
+#include "assets/TextureLoadingQueue.h"
 #include "Solar_System/OrbitLayout.h"
+#include "core/Log.h"
 #include <algorithm>
-#include <iostream>
 
 void Application::ApplyQualityPreset(int preset) {
-    gSimState->qualityPreset = std::clamp(preset, 0, 2);
-    const auto settings = GetQualitySettings(gSimState->qualityPreset, gSimState->isMobileWeb);
+    _simState.qualityPreset = std::clamp(preset, 0, 2);
+    const auto settings = GetQualitySettings(_simState.qualityPreset, _simState.isMobileWeb);
 
     TextureLoadingQueue::GetInstance().SetMaxConcurrentLoads(settings.maxConcurrentTextureLoads);
 
-    if (gSimState->shadowQuality > 0) {
-        gSimState->shadowQuality = gSimState->qualityPreset + 1;
+    if (_simState.shadowQuality > 0) {
+        _simState.shadowQuality = _simState.qualityPreset + 1;
     }
 
-    ApplyRenderResources(settings.shadowResolution, settings.enableHdr);
+    _renderer.ApplyRenderResources(_simState, settings.shadowResolution, settings.enableHdr, DisplaySize());
     _renderer.ApplyEffectQuality(settings);
     if (_asteroidField) {
         _asteroidField->SetInstanceCount(settings.asteroidInstanceCount);
@@ -27,78 +26,56 @@ void Application::ApplyQualityPreset(int preset) {
     if (_kuiperField) {
         _kuiperField->SetInstanceCount(settings.kuiperInstanceCount);
     }
-    _renderer.RebuildMissionPaths();
-    if (_renderer.magneticFieldsEnabled) {
-        _renderer.magneticFieldsBuilt = false;
-        _renderer.EnsureMagneticFieldsBuilt();
-    }
-    LogQualityTier(settings, _renderer.hdrEnabled, gSimState->shadowQuality);
-}
-
-void Application::ApplyRenderResources(uint16_t shadowResolution, bool enableHdr) {
-    _renderer.hdrEnabled = enableHdr;
-
-    if (_renderer.shadowMapFBO && gSimState->shadowQuality > 0) {
-        _renderer.shadowMapFBO->Resize(shadowResolution, shadowResolution);
-    }
-
-    if (_renderer.hdr) {
-        _renderer.hdr->SetEnabled(enableHdr, _displayWidth, _displayHeight);
-        // SetEnabled can refuse (no renderable float buffers / incomplete FBO).
-        _renderer.hdrEnabled = _renderer.hdr->IsEnabled();
-    }
-    if (_renderer.magneticFieldBloom) {
-        const auto bloomSettings = GetQualitySettings(gSimState->qualityPreset, gSimState->isMobileWeb);
-        _renderer.magneticFieldBloom->SetEnabled(bloomSettings.enableMagneticBloom, _displayWidth, _displayHeight);
-    }
+    _renderer.RebuildMissionPaths(_missionCatalog, _simState.qualityPreset);
+    _renderer.RebuildMagneticFields(_simState.qualityPreset);
+    ConfigureTerrain(settings);
+    LogQualityTier(settings, _renderer.HdrEnabled(), _simState.shadowQuality, _simState.contextSamples);
 }
 
 void Application::ApplyShadowQuality(int quality) {
-    gSimState->shadowQuality = std::clamp(quality, 0, 3);
-    if (gSimState->shadowQuality == 0) {
-        std::cout << "[Shadows] disabled" << std::endl;
+    _simState.shadowQuality = std::clamp(quality, 0, 3);
+    if (_simState.shadowQuality == 0) {
+        LOG_INFO("Shadows", "disabled");
         return;
     }
 
-    const auto settings = GetQualitySettings(gSimState->shadowQuality - 1, gSimState->isMobileWeb);
-    if (_renderer.shadowMapFBO) {
-        _renderer.shadowMapFBO->Resize(settings.shadowResolution, settings.shadowResolution);
-    }
-    ApplyRenderResources(settings.shadowResolution, settings.enableHdr);
-    LogQualityTier(settings, _renderer.hdrEnabled, gSimState->shadowQuality);
+    const auto settings = GetQualitySettings(_simState.shadowQuality - 1, _simState.isMobileWeb);
+    _renderer.ResizeShadowMap(settings.shadowResolution);
+    _renderer.ApplyRenderResources(_simState, settings.shadowResolution, settings.enableHdr, DisplaySize());
+    LogQualityTier(settings, _renderer.HdrEnabled(), _simState.shadowQuality, _simState.contextSamples);
 }
 
 void Application::ApplyOrbitScaleMode(int mode) {
     const auto scaleMode = mode == 1 ? OrbitLayout::ScaleMode::Realistic : OrbitLayout::ScaleMode::Compressed;
+    // The camera keeps its place relative to the body it is nearest, in that body's radii, so
+    // the view survives the bodies resizing and moving under it (docs/ARCHITECTURE.md §11.1).
+    const CameraBodyFrame frame = CaptureCameraBodyFrame();
     OrbitLayout::SetScaleMode(scaleMode);
-    // Compressed pins the render origin back to the Sun; realistic may need to rebase.
+    PlaceBodies();
+    RestoreCameraBodyFrame(frame);
     UpdateRenderOrigin();
     RefreshPlanetProxyPositions();
-    if (_asteroidField) {
-        _asteroidField->Update(0.0f); // rebuild instance matrices for new AU→scene mapping
-    }
-    if (_kuiperField) {
-        _kuiperField->Update(0.0f);
-    }
-    _renderer.RebuildMissionPaths();
-    std::cout << "[OrbitScale] " << (scaleMode == OrbitLayout::ScaleMode::Realistic ? "realistic" : "compressed")
-              << " distances active" << std::endl;
+    // Belt instance matrices follow the new AU→scene mapping at the next UpdateScene.
+    _renderer.RebuildMissionPaths(_missionCatalog, _simState.qualityPreset);
+    LOG_INFO("OrbitScale", "%s distances active",
+             scaleMode == OrbitLayout::ScaleMode::Realistic ? "realistic" : "compressed");
 }
 
 void Application::UpdateLOD() {
 #ifdef __EMSCRIPTEN__
     if (_renderableSceneComponents.empty()) return;
 
-    const glm::vec3 camPos = _camera.GetPosition();
+    const glm::vec3 camPos = CameraRenderPosition();
+    const TextureLodPolicy policy = GetTextureLodPolicy(_simState.qualityPreset, _simState.isMobileWeb);
 
-    if (gSimState->qualityPreset == 0) {
+    if (_simState.qualityPreset == 0) {
         // Low preset: force downgrade/cancel every high-res scene texture and skip upgrades.
         const glm::vec3 fakeFar = camPos + glm::vec3(100000.0f, 0.0f, 0.0f);
         for (auto& rc : _renderableSceneComponents) {
-            if (rc.planet) rc.planet->LoadHighResIfClose(fakeFar);
-            for (auto& satellite : rc.satellites) satellite->LoadHighResIfClose(fakeFar);
-            if (rc.planetaryRing) rc.planetaryRing->LoadHighResIfClose(fakeFar);
-            if (rc.clouds) rc.clouds->LoadHighResIfClose(fakeFar);
+            if (rc.planet) rc.planet->LoadHighResIfClose(fakeFar, policy);
+            for (auto& satellite : rc.satellites) satellite->LoadHighResIfClose(fakeFar, policy);
+            if (rc.planetaryRing) rc.planetaryRing->LoadHighResIfClose(fakeFar, policy);
+            if (rc.clouds) rc.clouds->LoadHighResIfClose(fakeFar, policy);
         }
         return;
     }
@@ -107,16 +84,16 @@ void Application::UpdateLOD() {
     // near ones will upgrade if appropriate.
     for (auto& rc : _renderableSceneComponents) {
         if (rc.planet) {
-            rc.planet->LoadHighResIfClose(camPos);
+            rc.planet->LoadHighResIfClose(camPos, policy);
         }
         for (auto& satellite : rc.satellites) {
-            satellite->LoadHighResIfClose(camPos);
+            satellite->LoadHighResIfClose(camPos, policy);
         }
         if (rc.planetaryRing) {
-            rc.planetaryRing->LoadHighResIfClose(camPos);
+            rc.planetaryRing->LoadHighResIfClose(camPos, policy);
         }
         if (rc.clouds) {
-            rc.clouds->LoadHighResIfClose(camPos);
+            rc.clouds->LoadHighResIfClose(camPos, policy);
         }
     }
 #endif

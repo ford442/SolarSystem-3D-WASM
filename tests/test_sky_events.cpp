@@ -6,8 +6,8 @@
 #include <string>
 #include <vector>
 
-#include "Auxiliary_Modules/Ephemeris.h"
-#include "Auxiliary_Modules/SkyEvents.h"
+#include "astro/Ephemeris.h"
+#include "astro/SkyEvents.h"
 
 namespace {
 

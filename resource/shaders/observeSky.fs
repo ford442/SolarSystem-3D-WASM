@@ -29,8 +29,8 @@ uniform float eclipse; // fraction of the Sun's disc covered by the Moon, 0..1
 uniform int uSteps;    // 0: gradient sky
 uniform float uExposure;
 uniform AtmosphereParams uAtmosphere;  // km
-uniform sampler2D transmittanceLut;
-uniform sampler2D multiScatteringLut;
+layout(binding = TU_TRANSMITTANCE_LUT) uniform sampler2D transmittanceLut;
+layout(binding = TU_MULTI_SCATTERING_LUT) uniform sampler2D multiScatteringLut;
 uniform float observerAltitudeKm;
 uniform vec3 moonOffsetKm;     // topocentric Moon centre, horizon frame
 uniform float moonRadiusKm;

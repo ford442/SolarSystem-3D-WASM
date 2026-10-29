@@ -3,9 +3,9 @@
 #include <cmath>
 #include <string>
 
-#include "Auxiliary_Modules/Ephemeris.h"
-#include "Auxiliary_Modules/Observer.h"
-#include "Auxiliary_Modules/StarCatalog.h"
+#include "astro/Ephemeris.h"
+#include "astro/Observer.h"
+#include "astro/StarCatalog.h"
 
 namespace {
 

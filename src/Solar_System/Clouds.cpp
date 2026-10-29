@@ -1,7 +1,7 @@
 #include "Clouds.h"
 
-Clouds::Clouds(const CloudsInfo& cloudsInfo, std::shared_ptr<SpaceObject> parent) : OuterShell(cloudsInfo.cloudsModel, *cloudsInfo.cloudsShader, std::move(parent),
-    cloudsInfo.scaleFactor), _diffuse(cloudsInfo.diffuseMap), _normal(cloudsInfo.normalMap)
+Clouds::Clouds(CloudsInfo&& cloudsInfo, std::shared_ptr<SpaceObject> parent) : OuterShell(cloudsInfo.cloudsModel, std::move(parent),
+    cloudsInfo.scaleFactor), _diffuse(std::move(cloudsInfo.diffuseMap)), _normal(std::move(cloudsInfo.normalMap))
 {
 }
 
@@ -10,6 +10,6 @@ void Clouds::ConfigureDiffuseLOD(const std::string& lowPath, const std::string& 
     _diffuseLOD.Configure(_diffuse, lowPath, midPath, highPath, label, TextureLoadCategory::Clouds);
 }
 
-void Clouds::LoadHighResIfClose(const glm::vec3& cameraPosition) {
-    _diffuseLOD.Update(cameraPosition, _parent->GetPosition());
+void Clouds::LoadHighResIfClose(const glm::vec3& cameraPosition, const TextureLodPolicy& policy) {
+    _diffuseLOD.Update(cameraPosition, _parent->GetPosition(), 50.0f * _parent->SizeFactor(), policy.maxTier);
 }

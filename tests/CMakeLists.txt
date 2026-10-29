@@ -13,37 +13,51 @@ FetchContent_MakeAvailable(googletest)
 set(SOLARSYSTEM_TEST_SOURCES
     ${CMAKE_SOURCE_DIR}/src/Solar_System/OrbitLayout.cpp
     ${CMAKE_SOURCE_DIR}/src/Solar_System/AsteroidOrbit.cpp
-    ${CMAKE_SOURCE_DIR}/src/Auxiliary_Modules/Ephemeris.cpp
-    ${CMAKE_SOURCE_DIR}/src/Auxiliary_Modules/SkyEvents.cpp
-    ${CMAKE_SOURCE_DIR}/src/Auxiliary_Modules/Observer.cpp
-    ${CMAKE_SOURCE_DIR}/src/Auxiliary_Modules/LunarTheory.cpp
-    ${CMAKE_SOURCE_DIR}/src/Auxiliary_Modules/StarCatalog.cpp
-    ${CMAKE_SOURCE_DIR}/src/Auxiliary_Modules/MagneticFieldParams.cpp
-    ${CMAKE_SOURCE_DIR}/src/Auxiliary_Modules/MagneticFieldModel.cpp
-    ${CMAKE_SOURCE_DIR}/src/Auxiliary_Modules/MagneticFieldTracer.cpp
+    ${CMAKE_SOURCE_DIR}/src/astro/Ephemeris.cpp
+    ${CMAKE_SOURCE_DIR}/src/astro/SkyEvents.cpp
+    ${CMAKE_SOURCE_DIR}/src/astro/Observer.cpp
+    ${CMAKE_SOURCE_DIR}/src/astro/LunarTheory.cpp
+    ${CMAKE_SOURCE_DIR}/src/astro/StarCatalog.cpp
+    ${CMAKE_SOURCE_DIR}/src/astro/MagneticFieldParams.cpp
+    ${CMAKE_SOURCE_DIR}/src/astro/MagneticFieldModel.cpp
+    ${CMAKE_SOURCE_DIR}/src/astro/MagneticFieldTracer.cpp
     ${CMAKE_SOURCE_DIR}/src/QualitySettings.cpp
-    ${CMAKE_SOURCE_DIR}/src/SimState.cpp
-    ${CMAKE_SOURCE_DIR}/src/Auxiliary_Modules/PlanetManifestLoader.cpp
-    ${CMAKE_SOURCE_DIR}/src/Auxiliary_Modules/MissionCatalog.cpp
-    ${CMAKE_SOURCE_DIR}/src/Auxiliary_Modules/TextureLoadingQueue.cpp
-    ${CMAKE_SOURCE_DIR}/src/Auxiliary_Modules/TextureLODController.cpp
-    ${CMAKE_SOURCE_DIR}/src/Auxiliary_Modules/WebResourceFetcher.cpp
-    ${CMAKE_SOURCE_DIR}/src/Auxiliary_Modules/TextureFormatSupport.cpp
-    ${CMAKE_SOURCE_DIR}/src/Auxiliary_Modules/BlockCompression.cpp
+    ${CMAKE_SOURCE_DIR}/src/assets/PlanetManifestLoader.cpp
+    ${CMAKE_SOURCE_DIR}/src/astro/MissionCatalog.cpp
+    ${CMAKE_SOURCE_DIR}/src/assets/TextureLoadingQueue.cpp
+    ${CMAKE_SOURCE_DIR}/src/assets/TextureLODController.cpp
+    ${CMAKE_SOURCE_DIR}/src/assets/WebResourceFetcher.cpp
+    ${CMAKE_SOURCE_DIR}/src/assets/TextureFormatSupport.cpp
+    ${CMAKE_SOURCE_DIR}/src/assets/BlockCompression.cpp
     ${CMAKE_SOURCE_DIR}/src/3rdparty/ktx2_reader.cpp
-    ${CMAKE_SOURCE_DIR}/src/Auxiliary_Modules/ShaderSource.cpp
+    ${CMAKE_SOURCE_DIR}/src/gfx/ShaderSource.cpp
+    ${CMAKE_SOURCE_DIR}/src/core/Log.cpp
+    ${CMAKE_SOURCE_DIR}/src/core/Camera.cpp
+    ${CMAKE_SOURCE_DIR}/src/core/CameraNavigation.cpp
+    ${CMAKE_SOURCE_DIR}/src/gfx/SurfacePatch.cpp
+    ${CMAKE_SOURCE_DIR}/src/Solar_System/CatalogMaterialVariants.cpp
     ${CMAKE_SOURCE_DIR}/src/Solar_System/AtmosphereModel.cpp
     ${CMAKE_SOURCE_DIR}/src/3rdparty/ktx2_writer.cpp
+    ${CMAKE_SOURCE_DIR}/src/render/terrain/CubeSphere.cpp
+    ${CMAKE_SOURCE_DIR}/src/render/terrain/TerrainTile.cpp
+    ${CMAKE_SOURCE_DIR}/src/render/terrain/TerrainQuadtree.cpp
+    ${CMAKE_SOURCE_DIR}/src/render/terrain/TileCache.cpp
+    ${CMAKE_SOURCE_DIR}/src/render/terrain/TerrainSystem.cpp
 )
 
 add_executable(SolarSystemTests
     test_orbit_layout.cpp
     test_render_origin.cpp
+    test_camera_navigation.cpp
+    test_mesh_anchor.cpp
+    test_surface_patch.cpp
+    test_terrain_quadtree.cpp
     test_ephemeris.cpp
     test_quality_settings.cpp
     test_planet_manifest_loader.cpp
     test_texture_loading_queue.cpp
     test_texture_lod_controller.cpp
+    test_web_resource_fetcher.cpp
     test_asteroid_field.cpp
     test_magnetic_field.cpp
     test_sky_events.cpp
@@ -59,6 +73,10 @@ add_executable(SolarSystemTests
     test_shader_source.cpp
     test_atmosphere_model.cpp
     test_giant_atmospheres.cpp
+    test_frame_passes.cpp
+    test_frustum.cpp
+    test_shadow_fit.cpp
+    test_log.cpp
     stub_texture_image2d.cpp
     ${SOLARSYSTEM_TEST_SOURCES}
 )
@@ -71,7 +89,45 @@ target_include_directories(SolarSystemTests PRIVATE
 if(EXISTS "${CMAKE_SOURCE_DIR}/external/glm")
     target_include_directories(SolarSystemTests PRIVATE ${CMAKE_SOURCE_DIR}/external/glm)
 endif()
-target_link_libraries(SolarSystemTests PRIVATE GTest::gtest_main)
+# GL-owning types (TextureImage2D, LineStripBatch) hold gfx/GlHandle members whose inline
+# destructors reference glDelete*, so the test binary links GL even though these tests never
+# create a context: a default-constructed handle is empty and deletes nothing.
+find_package(OpenGL REQUIRED)
+find_package(GLEW REQUIRED)
+target_link_libraries(SolarSystemTests PRIVATE GTest::gtest_main OpenGL::GL GLEW::GLEW)
 
 include(GoogleTest)
 gtest_discover_tests(SolarSystemTests)
+
+# GL-touching tests: a hidden GLFW window with a real GL 4.6 core context, so handles,
+# program linking, sampler units, the uniform cache, framebuffers and one draw run against a
+# driver. CI runs them under Xvfb/llvmpipe; with no display every test reports SKIPPED.
+find_package(glfw3 REQUIRED)
+add_executable(SolarSystemGlTests
+    gl/test_gl.cpp
+    ${CMAKE_SOURCE_DIR}/src/core/Log.cpp
+    ${CMAKE_SOURCE_DIR}/src/gfx/Shader.cpp
+    ${CMAKE_SOURCE_DIR}/src/gfx/ShaderSource.cpp
+    ${CMAKE_SOURCE_DIR}/src/gfx/GlCapabilities.cpp
+    ${CMAKE_SOURCE_DIR}/src/gfx/FrameUniforms.cpp
+    ${CMAKE_SOURCE_DIR}/src/gfx/LineStripBatch.cpp
+    ${CMAKE_SOURCE_DIR}/src/gfx/ShadowMapFBO.cpp
+    ${CMAKE_SOURCE_DIR}/src/gfx/HDR.cpp
+    ${CMAKE_SOURCE_DIR}/src/gfx/TextureImage2D.cpp
+    ${CMAKE_SOURCE_DIR}/src/assets/WebResourceFetcher.cpp
+    ${CMAKE_SOURCE_DIR}/src/assets/TextureFormatSupport.cpp
+    ${CMAKE_SOURCE_DIR}/src/assets/BlockCompression.cpp
+    ${CMAKE_SOURCE_DIR}/src/3rdparty/nv_dds.cpp
+    ${CMAKE_SOURCE_DIR}/src/3rdparty/ktx2_reader.cpp
+    ${CMAKE_SOURCE_DIR}/src/Solar_System/CatalogMaterialVariants.cpp
+    ${CMAKE_SOURCE_DIR}/src/render/terrain/CubeSphere.cpp
+    ${CMAKE_SOURCE_DIR}/src/render/terrain/TerrainTile.cpp
+    ${CMAKE_SOURCE_DIR}/src/render/terrain/TerrainRenderer.cpp
+)
+target_compile_definitions(SolarSystemGlTests PRIVATE SOLARSYSTEM_SOURCE_DIR="${CMAKE_SOURCE_DIR}")
+target_include_directories(SolarSystemGlTests PRIVATE ${CMAKE_SOURCE_DIR}/src)
+if(EXISTS "${CMAKE_SOURCE_DIR}/external/glm")
+    target_include_directories(SolarSystemGlTests PRIVATE ${CMAKE_SOURCE_DIR}/external/glm)
+endif()
+target_link_libraries(SolarSystemGlTests PRIVATE GTest::gtest_main OpenGL::GL GLEW::GLEW glfw)
+gtest_discover_tests(SolarSystemGlTests TEST_PREFIX "gl." DISCOVERY_MODE PRE_TEST)

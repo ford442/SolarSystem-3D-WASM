@@ -1,14 +1,14 @@
 #version 300 es
 
+#include "common/frame.glsl"
 #include "common/noise_simplex3d.glsl"
 
 in vec3 fPosition;
 in vec3 fWorldPosition;
 in vec3 fNormal;
-uniform vec3 viewPos;      // this eye's position (world)
 uniform vec3 shiftStarColor;
 uniform vec3 colorMult;
-uniform sampler2D colorMap;
+layout(binding = TU_DIFFUSE) uniform sampler2D colorMap;
 uniform float uColorMap;
 uniform float starRadiusInKilometers;
 uniform bool isVisible;
@@ -39,7 +39,7 @@ void main() {
     vec3 surface = colorByTemperature * (shiftStarColor * colorMult + totalNoise - 0.1);
 
     // mu = cosine between the surface normal and the line of sight.
-    float mu = clamp(dot(normalize(fNormal), normalize(viewPos - fWorldPosition)), 0.0, 1.0);
+    float mu = clamp(dot(normalize(fNormal), normalize(frame.cameraPos.xyz - fWorldPosition)), 0.0, 1.0);
     vec3 limb = pow(vec3(max(mu, 1e-4)), LIMB_DARKENING_ALPHA);
 
     fragColor = vec4(surface * limb, float(isVisible));

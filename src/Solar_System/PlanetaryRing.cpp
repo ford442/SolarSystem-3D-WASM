@@ -1,7 +1,7 @@
 #include "PlanetaryRing.h"
 
-PlanetaryRing::PlanetaryRing(const PlanetaryRingInfo& planetaryRingInfo, std::shared_ptr<Planet> parentPlanet) :
-    SpaceObject(planetaryRingInfo.ringModel, *planetaryRingInfo.ringShader), _ringTexture(planetaryRingInfo.ringDiffuse),
+PlanetaryRing::PlanetaryRing(PlanetaryRingInfo&& planetaryRingInfo, std::shared_ptr<Planet> parentPlanet) :
+    SpaceObject(planetaryRingInfo.ringModel), _ringTexture(std::move(planetaryRingInfo.ringDiffuse)),
     _parentPlanet(std::move(parentPlanet)), _ringInnerRadius(planetaryRingInfo.ringInnerRadius), _ringOuterRadius(planetaryRingInfo.ringOuterRadius), _ringNormal(_upVector)
 {
 }
@@ -19,11 +19,11 @@ glm::vec3 PlanetaryRing::GetRingNormal() const {
 }
 
 float PlanetaryRing::GetInnerRadius() const {
-    return _ringInnerRadius;
+    return _ringInnerRadius * _parentPlanet->SizeFactor();
 }
 
 float PlanetaryRing::GetOuterRadius() const {
-    return _ringOuterRadius;
+    return _ringOuterRadius * _parentPlanet->SizeFactor();
 }
 
 void PlanetaryRing::UpdateRingNormal() {
@@ -35,6 +35,6 @@ void PlanetaryRing::ConfigureDiffuseLOD(const std::string& lowPath, const std::s
     _diffuseLOD.Configure(_ringTexture, lowPath, midPath, highPath, label, TextureLoadCategory::Ring);
 }
 
-void PlanetaryRing::LoadHighResIfClose(const glm::vec3& cameraPosition) {
-    _diffuseLOD.Update(cameraPosition, _parentPlanet->GetPosition());
+void PlanetaryRing::LoadHighResIfClose(const glm::vec3& cameraPosition, const TextureLodPolicy& policy) {
+    _diffuseLOD.Update(cameraPosition, _parentPlanet->GetPosition(), 50.0f * _parentPlanet->SizeFactor(), policy.maxTier);
 }

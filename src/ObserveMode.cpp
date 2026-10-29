@@ -3,15 +3,16 @@
 // ObserveSky.cpp / Renderer::RenderObserveSky. See docs/ARCHITECTURE.md.
 #include "Application.h"
 #include "JsBridge.h"
-#include "Auxiliary_Modules/Ephemeris.h"
+#include "astro/Ephemeris.h"
 #include "Solar_System/Atmosphere.h"
 #include "Solar_System/CatalogSatellite.h"
 #include "Solar_System/OrbitLayout.h"
+#include "Solar_System/SceneScale.h"
 #include <algorithm>
 #include <cmath>
 #include <cstdio>
 #include <cstdlib>
-#include <iostream>
+#include "core/Log.h"
 #include <sstream>
 
 namespace {
@@ -29,7 +30,7 @@ void Application::SetObserveMode(bool active) {
     }
 
     if (active) {
-        _observe.savedPosition = OrbitLayout::ToHeliocentricScene(_camera.GetPosition());
+        _observe.savedPosition = _camera.GetWorldPosition();
         _observe.savedYaw = _camera.GetYaw();
         _observe.savedPitch = _camera.GetPitch();
         _observe.savedZoom = _camera.GetZoom();
@@ -176,24 +177,10 @@ void Application::UpdateObserveFrame() {
     // The sky pass draws from the horizon frame, not from this position. Parking the camera
     // just above Earth keeps everything keyed on camera distance (staged planet loading, the
     // LOD manager, the nearest-planet search) behaving as if the viewer were there.
-    const glm::vec3 earth = OrbitLayout::GetRenderPosition(OrbitLayout::Body::Earth);
-    _camera.SetPosition(earth + glm::vec3(0.0f, ObserveState::kEarthSurfaceSceneUnits, 0.0f));
-
-    // Scene components are not drawn (so not re-placed) in Observe; keep Earth and its moons at
-    // today's ephemeris position so the LOD manager and the Moon's texture follow the viewer.
-    for (auto& component : _renderableSceneComponents) {
-        if (!component.planet) {
-            continue;
-        }
-        const std::wstring& wideName = component.planet->GetEngName();
-        if (OrbitLayout::BodyFromName(std::string(wideName.begin(), wideName.end())) != OrbitLayout::Body::Earth) {
-            continue;
-        }
-        component.planet->AdjustToParent(0.0f);
-        for (const auto& satellite : component.satellites) {
-            satellite->AdjustToParent(0.0f);
-        }
-    }
+    const glm::dvec3 earth = OrbitLayout::GetHeliocentricScenePosition(OrbitLayout::Body::Earth);
+    const BodyCatalog::Entry* entry = BodyCatalog::FindByIndex(static_cast<int>(OrbitLayout::Body::Earth));
+    const double height = ObserveState::kEarthSurfaceSceneUnits * (entry ? SceneScale::BodySizeFactor(*entry) : 1.0f);
+    _camera.SetWorldPosition(earth + glm::dvec3(0.0, height, 0.0));
 }
 
 std::string Application::GetObserveStateJson() const {
@@ -213,12 +200,12 @@ std::string Application::GetObserveStateJson() const {
                   _observe.active ? "true" : "false", _observe.site.latDeg, _observe.site.lonDeg,
                   _observe.site.altM, jd, utc.c_str(),
                   wrapDegrees(_camera.GetYaw() + 90.0f), _camera.GetPitch(), _camera.GetZoom(),
-                  _observe.timeRate, gSimState->timePaused ? "true" : "false", sky.lstDeg,
+                  _observe.timeRate, _simState.timePaused ? "true" : "false", sky.lstDeg,
                   sun.apparentAltDeg, sun.azDeg, moon.apparentAltDeg, moon.azDeg, moon.illuminatedFraction,
                   sky.sunCoverage, sky.moonSubEarthLonDeg, sky.moonSubEarthLatDeg, ObserveEventVisibility(),
-                  _renderer.observeSky ? _renderer.observeSky->DrawnStarCount() : 0,
+                  _renderer.ObserveStarsDrawn(),
                   _observe.constellations ? "true" : "false",
-                  _renderer.observeSky ? _renderer.observeSky->ConstellationSegmentCount() : 0);
+                  _renderer.ObserveConstellationSegments());
     return buffer;
 }
 
@@ -236,13 +223,13 @@ void Application::ApplyObserveEnvOverride() {
         values[parsed++] = std::atof(token.c_str());
     }
     if (parsed < 2) {
-        std::cerr << "[Observe] SOLARSYSTEM_OBSERVE needs lat,lon[,jd[,az,el,fov]]" << std::endl;
+        LOG_WARN("Observe", "SOLARSYSTEM_OBSERVE needs lat,lon[,jd[,az,el,fov]]");
         return;
     }
     SetObserverSite(values[0], values[1], 0.0);
     if (parsed >= 3 && values[2] > 0.0) {
         OrbitLayout::SetJulianDate(values[2]);
-        gSimState->timePaused = true;
+        _simState.timePaused = true;
     }
     SetObserveMode(true);
     if (parsed >= 5) {
@@ -251,6 +238,6 @@ void Application::ApplyObserveEnvOverride() {
     if (parsed >= 6 && values[5] > 0.0) {
         SetObserveFov(static_cast<float>(values[5]));
     }
-    std::cout << "[Observe] lat " << values[0] << " lon " << values[1] << " at "
-              << Observer::FormatUtc(OrbitLayout::GetJulianDate()) << " UTC" << std::endl;
+    LOG_INFO("Observe", "lat %g lon %g at %s UTC", values[0], values[1],
+             Observer::FormatUtc(OrbitLayout::GetJulianDate()).c_str());
 }

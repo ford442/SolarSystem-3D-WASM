@@ -1,4 +1,9 @@
 #version 300 es
+// NEAR_SURFACE (planetLighting.vs) writes depth per fragment.
+// permutations: NEAR_SURFACE
+#ifdef NEAR_SURFACE
+in float vLogDepth;
+#endif
 in vec3 vFragPos;
 in vec2 vTexCoords;
 in vec3 vTangentLightPos;
@@ -6,14 +11,11 @@ in vec3 vTangentViewPos;
 in vec3 vTangentFragPos;
 in vec4 vFragPosLightSpace;
 
-uniform sampler2D mainDiffuseTexture;
-uniform sampler2D cloudsNormalMap;
-uniform sampler2D shadowMap;
+layout(binding = TU_DIFFUSE) uniform sampler2D mainDiffuseTexture;
+layout(binding = TU_NORMAL) uniform sampler2D cloudsNormalMap;
+layout(binding = TU_SHADOW_MAP) uniform sampler2D shadowMap;
 
-uniform vec3 lightPos;
-uniform vec3 viewPos;
 
-uniform float farPlane;
 uniform float ambientFactor;
 uniform float bias; // For shadows
 uniform float uSurfaceDim;
@@ -22,6 +24,8 @@ uniform float uSurfaceDim;
 out vec4 fragColor;
 
 #define PCF_NUM_SAMPLES 2.0 // lower to increase fps, higher to increase softening
+#include "common/frame.glsl"
+#include "common/log_depth.glsl"
 #include "common/shadow_pcf.glsl"
 
 float CalculateShadow(vec4 fragPosLightSpace) {
@@ -41,6 +45,9 @@ float CalculateShadow(vec4 fragPosLightSpace) {
 }
 
 void main() {
+#ifdef NEAR_SURFACE
+    gl_FragDepth = LogFragDepth(vLogDepth); // first: every path that is not discarded writes it
+#endif
     vec3 diffuseColor = texture(mainDiffuseTexture, vTexCoords).rgb;
 
     vec3 normal = texture(cloudsNormalMap, vTexCoords).rgb;

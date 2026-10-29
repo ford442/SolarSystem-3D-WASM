@@ -1,0 +1,44 @@
+{
+  "id": "eclipse-2024-from-the-moon",
+  "title": "2024-04-08 eclipse from the Moon",
+  "description": "The total solar eclipse of 8 April 2024, watched from just above the Moon's surface on true scale: the Moon's shadow crosses a full Earth, 15:40 to 20:55 UTC.",
+  "view": { "orbitScale": 1, "orbitLines": false },
+  "durationSec": 32,
+  "keyframes": [
+    {
+      "t": 0, "jd": 2460409.15278, "dateEase": "linear", "focus": "moon", "path": "polar", "fov": 7,
+      "camera": { "position": [0.04, 0.999, 0.035], "altitudeKm": 2, "frame": "earth", "lookAt": "earth", "up": "radial" },
+      "overlays": { "orbitLines": false, "magneticFields": false },
+      "caption": "8 April 2024, 15:40 UTC, from the Moon. Earth is full; the Moon's near side is in night."
+    },
+    {
+      "t": 0.2, "dateEase": "linear", "focus": "moon", "path": "polar",
+      "camera": { "position": [0.04, 0.999, 0.035], "altitudeKm": 2.02, "frame": "earth", "lookAt": "earth", "up": "radial" },
+      "caption": "15:42 UTC: the Moon's penumbra reaches Earth. A partial eclipse begins."
+    },
+    {
+      "t": 5.5, "dateEase": "linear", "focus": "moon", "path": "polar",
+      "camera": { "position": [0.025, 0.999, 0.035], "altitudeKm": 3, "frame": "earth", "lookAt": "earth", "up": "radial" },
+      "caption": "16:38 UTC: the umbra touches down. Totality begins."
+    },
+    {
+      "t": 15, "dateEase": "linear", "focus": "moon", "path": "polar", "fov": 4.5,
+      "camera": { "position": [0, 0.999, 0.035], "altitudeKm": 5, "frame": "earth", "lookAt": "earth", "up": "radial" },
+      "caption": "18:17 UTC: greatest eclipse, with 4 min 28 s of totality under the umbra."
+    },
+    {
+      "t": 24.3, "dateEase": "linear", "focus": "moon", "path": "polar",
+      "camera": { "position": [-0.025, 0.999, 0.035], "altitudeKm": 8, "frame": "earth", "lookAt": "earth", "up": "radial" },
+      "caption": "19:55 UTC: the umbra lifts off Earth."
+    },
+    {
+      "t": 29.7, "dateEase": "linear", "focus": "moon", "path": "polar",
+      "camera": { "position": [-0.04, 0.999, 0.035], "altitudeKm": 11, "frame": "earth", "lookAt": "earth", "up": "radial" },
+      "caption": "20:52 UTC: the partial eclipse ends."
+    },
+    {
+      "t": 30, "jd": 2460409.37153, "focus": "moon", "fov": 6,
+      "camera": { "position": [-0.04, 0.999, 0.035], "altitudeKm": 11.3, "frame": "earth", "lookAt": "earth", "up": "radial" }
+    }
+  ]
+}

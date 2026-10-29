@@ -15,6 +15,10 @@ export interface DeepLinkViewState {
     mission?: string;
     tour?: string;
     tourStep?: number;
+    /** `?timeline=`: a shipped cinematic id (public/timelines/<id>.json) or an http(s) URL of one. */
+    timeline?: string;
+    /** `?tt=`: seconds into the timeline to start from. */
+    timelineTime?: number;
     /** `?mode=observe` opens straight into Observe mode (camera on Earth). */
     mode?: 'explore' | 'observe';
     /** Observe-mode site, view, field of view and time rate (`lat`, `lon`, `az`, `el`, `fov`, `rate`). */
@@ -165,6 +169,19 @@ function parseTourId(value: string | null): string | undefined {
     return parseMissionId(value);
 }
 
+/** A timeline id like a tour's, or a URL; timelinePlayer.ts resolves it and the page fetches only http(s). */
+function parseTimelineSource(value: string | null): string | undefined {
+    if (!value || value.length > 2048) return undefined;
+    const trimmed = value.trim();
+    if (/^[a-z][a-z0-9-]{0,47}$/.test(trimmed)) return trimmed;
+    try {
+        const url = new URL(trimmed, window.location.href);
+        return url.protocol === 'https:' || url.protocol === 'http:' ? trimmed : undefined;
+    } catch {
+        return undefined;
+    }
+}
+
 function parseMode(value: string | null): 'explore' | 'observe' | undefined {
     if (!value) return undefined;
     const normalized = value.toLowerCase();
@@ -194,13 +211,14 @@ function roundCoord(value: number): number {
 }
 
 /**
- * Camera coordinates. Realistic scale keeps 1e-6 scene units: Earth's radius there is ~0.08
- * units, so the compressed 0.01 rounding would move a pose by an eighth of an Earth radius,
- * and setCameraPose takes doubles, so the extra digits survive the round trip.
+ * Camera coordinates. Realistic scale is true scale and the camera can stand a metre above
+ * the ground, so it keeps 1e-9 scene units (8 cm; a metre is 1.3e-8 units). setCameraPose
+ * takes doubles, and 1e-9 of a coordinate in the thousands is still well inside a double's
+ * 15 significant digits, so the round trip is exact to that.
  */
 function roundPosition(value: number, orbitScale: OrbitScaleMode | undefined): number {
     if (orbitScale === 1) {
-        return Math.round(value * 1e6) / 1e6;
+        return Math.round(value * 1e9) / 1e9;
     }
     return roundCoord(value);
 }
@@ -230,6 +248,8 @@ export function parseDeepLinkFromUrl(search = window.location.search): DeepLinkV
     const mission = parseMissionId(params.get('mission') ?? params.get('probe'));
     const tour = parseTourId(params.get('tour'));
     const tourStep = parseFiniteNumber(params.get('step'));
+    const timeline = parseTimelineSource(params.get('timeline'));
+    const timelineTime = parseFiniteNumber(params.get('tt'));
     const mode = parseMode(params.get('mode'));
     const observer = parseObserver(params);
 
@@ -259,6 +279,8 @@ export function parseDeepLinkFromUrl(search = window.location.search): DeepLinkV
         tourStep: tourStep !== undefined && Number.isInteger(tourStep) && tourStep >= 0
             ? tourStep
             : undefined,
+        timeline,
+        timelineTime: timeline && timelineTime !== undefined && timelineTime >= 0 ? timelineTime : undefined,
         mode,
         observer,
         camera,

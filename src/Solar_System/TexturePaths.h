@@ -1,6 +1,6 @@
 #pragma once
 
-#include "../Auxiliary_Modules/TextureFormatSupport.h"
+#include "../assets/TextureFormatSupport.h"
 
 #include <string>
 

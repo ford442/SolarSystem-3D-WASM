@@ -1,4 +1,9 @@
 #version 300 es
+// NEAR_SURFACE (atmosphere.vs) writes depth per fragment.
+// permutations: NEAR_SURFACE
+#ifdef NEAR_SURFACE
+in float vLogDepth;
+#endif
 
 //
 // Physically based atmosphere from baked lookup tables (Medium/Full presets).
@@ -22,6 +27,7 @@ in vec4 fragPosLightSpace;
 
 out vec4 fragColor;
 
+#include "common/log_depth.glsl"
 #include "common/raytrace.glsl"
 #include "common/ring.glsl"
 #include "common/eclipse.glsl"
@@ -29,8 +35,8 @@ out vec4 fragColor;
 #include "common/atmosphere_lut.glsl"
 
 uniform AtmosphereParams uAtmosphere;  // km, thicknessScale already applied
-uniform sampler2D transmittanceLut;
-uniform sampler2D multiScatteringLut;
+layout(binding = TU_TRANSMITTANCE_LUT) uniform sampler2D transmittanceLut;
+layout(binding = TU_MULTI_SCATTERING_LUT) uniform sampler2D multiScatteringLut;
 
 uniform vec3 camPosition;      // camera relative to the atmosphere centre, scene units
 uniform vec3 lightPos;         // Sun relative to the atmosphere centre, scene units
@@ -58,7 +64,7 @@ uniform float ringParentPlanetRadiusSquared;
 uniform vec3 ringCenter;               // world space
 uniform vec3 ringNormal;
 uniform vec2 ringInnerOuterRadiuses;
-uniform sampler2D ringDiffuse;
+layout(binding = TU_RING) uniform sampler2D ringDiffuse;
 
 uniform bool hasEclipseCaster;
 uniform vec3 eclipseCasterCenter;      // relative to the atmosphere centre, scene units
@@ -103,6 +109,9 @@ float AtmosphereSunVisibility(vec3 positionKm) {
 }
 
 void main() {
+#ifdef NEAR_SURFACE
+    gl_FragDepth = LogFragDepth(vLogDepth); // first: every path that is not discarded writes it
+#endif
     float bottom = uAtmosphere.bottomRadius;
     float top = uAtmosphere.topRadius;
 

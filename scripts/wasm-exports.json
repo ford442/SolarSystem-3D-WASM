@@ -60,5 +60,22 @@
   "_GetCameraHeliocentricY",
   "_GetCameraHeliocentricZ",
   "_GetCameraYaw",
-  "_GetCameraPitch"
+  "_GetCameraPitch",
+  "_SetCameraRoll",
+  "_GetCameraRoll",
+  "_SetCameraFov",
+  "_GetCameraFov",
+  "_AdvanceSimulationTo",
+  "_GetSceneStateJson",
+  "_GetBodyCatalogJson",
+  "_GetSurfaceJson",
+  "_PreloadBodySystem",
+  "_GetPendingAssetCount",
+  "_SetHudOverlays",
+  "_GetHudOverlays",
+  "_BeginCapture",
+  "_StepCaptureFrame",
+  "_EndCapture",
+  "_GetShaderSourceFiles",
+  "_ReloadShaders"
 ]

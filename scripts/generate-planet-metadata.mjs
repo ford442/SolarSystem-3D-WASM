@@ -63,6 +63,16 @@ function normalizeJsonText(text) {
   return stableStringify(JSON.parse(text));
 }
 
+/**
+ * IAU prime-meridian elements of a body: W at J2000 and its rate in degrees per day
+ * (WGCCRE, Archinal et al. 2018). Without a catalog entry the rate follows the sidereal day.
+ */
+function primeMeridian(body) {
+  const o = body.orbit || {};
+  const rate = o.primeMeridianRateDegPerDay ?? (o.siderealRotationDays ? 360 / o.siderealRotationDays : 0);
+  return { w0Deg: o.primeMeridianDegJ2000 ?? 0, rateDegPerDay: rate };
+}
+
 const FOCUS_KINDS = new Set(['star', 'planet', 'dwarf_planet', 'comet']);
 
 function isFocusBody(body) {
@@ -238,12 +248,24 @@ function validateCatalog(catalog) {
     if (body.render?.atmosphere) {
       validateAtmosphere(body);
     }
-    // Spin is evaluated from this epoch angle (OrbitLayout::GetAxialSpinDegrees), so every
-    // focus body needs one; there is no accumulator to fall back on.
+    // Spin is a function of the date: W = W0 + Wdot * (days since J2000) (OrbitLayout::
+    // GetAxialSpinDegrees), so a focus body's rate must agree with its sidereal day. Bodies
+    // with no IAU frame (Eris, Haumea, Makemake, Halley) omit both and spin from W0 = 0 at
+    // 360 / siderealRotationDays.
     if (isFocusBody(body)) {
-      const w0 = body.orbit?.primeMeridianDegJ2000;
-      if (!Number.isFinite(w0) || w0 < 0 || w0 >= 360) {
-        throw new Error(`Body ${body.id} requires orbit.primeMeridianDegJ2000 in [0, 360)`);
+      const spin = primeMeridian(body);
+      if (!Number.isFinite(spin.w0Deg) || spin.w0Deg < 0 || spin.w0Deg >= 360) {
+        throw new Error(`Body ${body.id} orbit.primeMeridianDegJ2000 must be in [0, 360)`);
+      }
+      const sidereal = body.orbit?.siderealRotationDays;
+      if (Number.isFinite(sidereal) && sidereal !== 0 && body.orbit?.primeMeridianRateDegPerDay !== undefined) {
+        const impliedDays = 360 / spin.rateDegPerDay;
+        // Within 1.5%: the fact-sheet day and the IAU rate differ by that much for Neptune.
+        if (Math.sign(impliedDays) !== Math.sign(sidereal) || Math.abs(impliedDays / sidereal - 1) > 0.015) {
+          throw new Error(
+            `Body ${body.id} primeMeridianRateDegPerDay (${spin.rateDegPerDay}) disagrees with siderealRotationDays (${sidereal})`,
+          );
+        }
       }
     }
     // render.oblateness flattens the surface, cloud and atmosphere meshes along the pole
@@ -255,6 +277,18 @@ function validateCatalog(catalog) {
       }
       if (body.kind === 'satellite') {
         throw new Error(`Satellite ${body.id} cannot set render.oblateness`);
+      }
+    }
+    // render.terrain: height tiles close up (src/render/terrain/). They tile the sphere mesh,
+    // so a body drawn with its own mesh (Phobos) cannot have them.
+    const terrain = body.render?.terrain;
+    if (terrain !== undefined) {
+      if (typeof terrain !== 'object' || terrain === null || typeof terrain.attribution !== 'string' ||
+          terrain.attribution.trim() === '') {
+        throw new Error(`Body ${body.id} render.terrain needs an attribution string`);
+      }
+      if (body.render.mesh) {
+        throw new Error(`Body ${body.id} has its own mesh and cannot set render.terrain`);
       }
     }
   }
@@ -422,10 +456,30 @@ function cppFloat(n) {
   return `${text.includes('.') ? text : `${text}.0`}f`;
 }
 
+/** A C++ double literal: no suffix, enough digits to round-trip. */
+function cppDouble(n) {
+  const value = Number(n);
+  if (!Number.isFinite(value)) {
+    throw new Error(`Cannot emit non-finite double: ${n}`);
+  }
+  const text = String(value);
+  return /[.eE]/.test(text) ? text : `${text}.0`;
+}
+
+/** facts.diameterKm / 2: the radius a body is drawn at on realistic (true) scale. */
+function trueRadiusKm(body) {
+  const radiusKm = (body.facts?.diameterKm ?? 0) / 2;
+  if (!(radiusKm > 0)) {
+    throw new Error(`${body.id} needs facts.diameterKm > 0: realistic scale draws every body at its true radius`);
+  }
+  return radiusKm;
+}
+
 /**
  * Generates the body-physics table OrbitLayout::kBodies[] (see OrbitLayout.cpp):
  * heliocentric compressed-art offset, AU distance, orbital period, inclination, and
- * sidereal rotation, prime-meridian angle at J2000, one row per *focus* body in index order (Sun=0 … Halley=15).
+ * sidereal rotation, and the IAU prime-meridian W0 / Wdot (doubles: Wdot times a century of
+ * days is millions of degrees), one row per *focus* body in index order (Sun=0 … Halley=15).
  * Satellites are excluded — their scene orbits live on BodyCatalog::Entry.
  *
  * Axial tilt is applied by CatalogBody from BodyCatalog::Entry.axialTiltDegrees
@@ -437,11 +491,12 @@ function buildOrbitLayoutBodiesInc(catalog) {
   const rows = bodies.map((body) => {
     const o = body.orbit || {};
     const [ox, oy, oz] = o.compressedOffset || [0, 0, 0];
+    const spin = primeMeridian(body);
     return (
       `    {glm::vec3(${cppFloat(ox)}, ${cppFloat(oy)}, ${cppFloat(oz)}), ` +
       `${cppFloat(o.distanceAu)}, ${cppFloat(o.orbitalPeriodDays)}, ` +
       `${cppFloat(o.inclinationDeg)}, ${cppFloat(o.siderealRotationDays)}, ` +
-      `${cppFloat(o.primeMeridianDegJ2000)}}, // ${body.id}`
+      `${cppDouble(spin.w0Deg)}, ${cppDouble(spin.rateDegPerDay)}}, // ${body.id}`
     );
   });
   return [
@@ -528,7 +583,7 @@ function buildBodyCatalogHeader(catalog) {
       `${cppWideString(body.displayName?.en ?? body.id)}, ` +
       `${cppWideString(body.displayName?.ru ?? body.displayName?.en ?? body.id)}, ` +
       `${cppFloat(o.distanceAu)}, ${cppFloat(o.orbitalPeriodDays)}, ` +
-      `${cppFloat(o.earthRadiusScale ?? 1)}, ${cppFloat(o.axialTiltDegrees)}, ` +
+      `${cppFloat(o.earthRadiusScale ?? 1)}, ${cppFloat(trueRadiusKm(body))}, ${cppFloat(o.axialTiltDegrees)}, ` +
       `${cppFloat(r.artTiltXDegrees)}, ${cppFloat(r.oblateness)}, ${cppFloat(o.yawOffsetDegrees)}, ` +
       `${cppFloat(o.artRollDegrees)}, ` +
       `{${!!flags.hasNightTexture}, ${!!flags.hasSpecularMap}, ${!!flags.hasClouds}}, ` +
@@ -546,7 +601,7 @@ function buildBodyCatalogHeader(catalog) {
       `${cppFloat(cloud.scaleFactor)}, ${cppFloat(cloud.spinDegPerSimSecond)}, ` +
       `${cppFloat(cloud.ambientFactor)}}, ` +
       `${!!body.system?.hasCloudLayer}, ${!!body.system?.hasRings}, ` +
-      `${!!body.system?.lightFarUsesPlanetDistance}}, // ${body.id}`
+      `${!!r.terrain}, ${cppNullableString(r.terrain?.attribution)}}, // ${body.id}`
     );
   });
 
@@ -632,6 +687,7 @@ function buildBodyCatalogHeader(catalog) {
     '    float auDistance;',
     '    float orbitalPeriodDays;',
     '    float earthRadiusScale;',
+    '    float radiusKm;         // true equatorial radius (facts.diameterKm / 2): the drawn radius on realistic scale.',
     '    float axialTiltDegrees; // catalog SSOT; Rotate(Z) in CatalogBody.',
     '    float artTiltXDegrees;  // Saturn ring-presentation overlay; else 0.',
     '    float oblateness;       // flattening 1 - polar/equatorial; the mesh radius is equatorial.',
@@ -650,7 +706,8 @@ function buildBodyCatalogHeader(catalog) {
     '    CloudLayer cloudLayer;',
     '    bool hasCloudLayer;',
     '    bool hasRings;',
-    '    bool lightFarUsesPlanetDistance;',
+    '    bool hasTerrain;                // render.terrain: height tiles close up (render/terrain/)',
+    '    const char* terrainAttribution; // their elevation data\'s credit; nullptr without',
     '};',
     '',
     'inline constexpr Entry kEntries[] = {',

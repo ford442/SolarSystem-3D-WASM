@@ -7,6 +7,15 @@
     "description": "KTX2 packs published alongside the .dds tree, built by scripts/convert_textures_ktx2.py. Each pack is a subdirectory of the directories below (e.g. textures_low/astc/). List the published names in VITE_TEXTURE_PACKS so the runtime may select one; an empty list keeps every GPU on .dds.",
     "published": []
   },
+  "terrain": {
+    "description": "Cube-sphere height tiles for the bodies flagged render.terrain, baked by scripts/bake-terrain-tiles.py into terrain/<body>/ (docs/ARCHITECTURE.md §11.3). Each tileset.json records the sha256 of every tile it lists (tilesSha256); a body without one stays its sphere.",
+    "bodies": [
+      "moon",
+      "mars",
+      "mercury",
+      "earth"
+    ]
+  },
   "directories": [
     "textures/",
     "textures_low/",
@@ -916,6 +925,26 @@
     {
       "path": "textures_mid/Vesta_Normal_Mid.dds",
       "sha256": null
+    },
+    {
+      "path": "terrain/moon/tileset.json",
+      "sha256": null,
+      "optional": true
+    },
+    {
+      "path": "terrain/mars/tileset.json",
+      "sha256": null,
+      "optional": true
+    },
+    {
+      "path": "terrain/mercury/tileset.json",
+      "sha256": null,
+      "optional": true
+    },
+    {
+      "path": "terrain/earth/tileset.json",
+      "sha256": null,
+      "optional": true
     }
   ]
 }

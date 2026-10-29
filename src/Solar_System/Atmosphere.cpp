@@ -7,34 +7,24 @@ glm::vec3 ToVec3(const BodyCatalog::Rgb& rgb) {
 }
 } // namespace
 
-Atmosphere::Atmosphere(MeshHolder model, const Shader& shader, const BodyCatalog::AtmosphereRow& row,
-                       std::shared_ptr<SpaceObject> parent, float parentRadius)
-    : OuterShell(std::move(model), shader, std::move(parent), row.oneil.shellScale),
+Atmosphere::Atmosphere(MeshHolder model, const BodyCatalog::AtmosphereRow& row,
+                       std::shared_ptr<SpaceObject> parent, float artParentRadius)
+    : OuterShell(std::move(model), std::move(parent), row.oneil.shellScale),
       _row(&row),
       _body(BodyCatalog::FindById(row.bodyId)),
-      _parentRadius(parentRadius),
+      _parentRadius(artParentRadius),
       // Pulling the inner sphere just under the surface hides the seam where the shell
       // meets the planet mesh.
-      _innerRadius(row.oneil.innerRadiusMinusEpsilon ? parentRadius - 0.00007f : parentRadius) {
+      _innerRadius(row.oneil.innerRadiusMinusEpsilon ? artParentRadius - 0.00007f : artParentRadius) {
     if (_body && BodyShape::IsOblate(*_body)) {
         _bodyToSphere = BodyShape::BodyToSphere(*_body);
         _sphereToBody = BodyShape::SphereToBody(*_body);
     }
 }
 
-Atmosphere::~Atmosphere() {
-    SetLuts(0, 0);
-}
-
-void Atmosphere::SetLuts(unsigned int transmittance, unsigned int multiScattering) {
-    if (_transmittanceLut != 0) {
-        glDeleteTextures(1, &_transmittanceLut);
-    }
-    if (_multiScatteringLut != 0) {
-        glDeleteTextures(1, &_multiScatteringLut);
-    }
-    _transmittanceLut = transmittance;
-    _multiScatteringLut = multiScattering;
+void Atmosphere::SetLuts(GlTexture transmittance, GlTexture multiScattering) {
+    _transmittanceLut = std::move(transmittance);
+    _multiScatteringLut = std::move(multiScattering);
     if (!HasLuts()) {
         _physicalPathActive = false;
     }
@@ -45,12 +35,11 @@ float Atmosphere::ShellScale() const {
         const float topScene = GetPhysicalTopRadiusKm() / GetKmPerSceneUnit();
         return topScene / kShellMeshRadius * kPhysicalShellMargin;
     }
-    return _row->oneil.shellScale;
+    return _row->oneil.shellScale * _parent->SizeFactor();
 }
 
-void Atmosphere::AdjustToParent(float /*timeScale*/) {
-    LoadIdentityModelMatrix();
-    Translate(_parent->GetPosition());
+void Atmosphere::AdjustToParent() {
+    Place(_parent->GetWorldPosition());
     Scale(glm::vec3(ShellScale()));
     // Flatten with the body so the limb follows an oblate cloud deck. The sphere mesh is
     // rotationally symmetric, so the tilt only orients the squash.
@@ -71,12 +60,16 @@ glm::vec3 Atmosphere::GetMieTint() const {
     return ToVec3(_row->oneil.mieTint);
 }
 
+float Atmosphere::GetParentRadius() const {
+    return _parentRadius * _parent->SizeFactor();
+}
+
 float Atmosphere::GetInnerRadius() const {
-    return _innerRadius;
+    return _innerRadius * _parent->SizeFactor();
 }
 
 float Atmosphere::GetOuterRadius() const {
-    return _row->oneil.outerRadius;
+    return _row->oneil.outerRadius * _parent->SizeFactor();
 }
 
 float Atmosphere::GetAtmosphereOuterBoundary() const {
@@ -97,5 +90,6 @@ float Atmosphere::GetPhysicalTopRadiusKm() const {
 }
 
 float Atmosphere::GetKmPerSceneUnit() const {
-    return _parentRadius > 0.0f ? _row->physical.groundRadiusKm / _parentRadius : 1.0f;
+    const float parentRadius = GetParentRadius();
+    return parentRadius > 0.0f ? _row->physical.groundRadiusKm / parentRadius : 1.0f;
 }

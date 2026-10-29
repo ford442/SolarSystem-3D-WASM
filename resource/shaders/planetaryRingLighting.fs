@@ -1,17 +1,14 @@
 #version 300 es
-uniform sampler2D ringTexture;
-uniform sampler2D shadowMap;
+layout(binding = TU_DIFFUSE) uniform sampler2D ringTexture;
+layout(binding = TU_SHADOW_MAP) uniform sampler2D shadowMap;
 
-uniform vec3 lightPos;
 uniform vec3 planetPos;
 uniform vec3 starGlowTint;
 
 uniform float planetRadius;
-uniform float zCoef;
 uniform float bias; // For shadows
 uniform float uSurfaceDim;
 
-uniform vec3 camPos;
 
 in vec3 fPosition;
 in vec3 normal;
@@ -29,6 +26,8 @@ float sphereIntersectDistance;
 
 out vec4 fragColor;
 
+#include "common/frame.glsl"
+#include "common/log_depth.glsl"
 #include "common/shadow_pcf.glsl"
 
 float vecSum(vec3 v) {
@@ -82,13 +81,13 @@ float CalculateShadow(vec4 fragPosLightSpace) {
 
     // Get depth of current fragment from light's perspective
     float currentDepth = projCoords.z;
-    vec3 lightDir = normalize(lightPos - fWorldPosition);
+    vec3 lightDir = normalize(frame.sunPos.xyz - fWorldPosition);
 
     return ApplyPCF(shadowMap, projCoords, currentDepth - bias);
 }
 
 void main() {
-    gl_FragDepth = log2(fLogZ) * zCoef * 0.5;
+    gl_FragDepth = LogFragDepth(fLogZ);
 
     vec4 ringColor = texture(ringTexture, texCoords);
 
@@ -96,7 +95,7 @@ void main() {
         discard;
 
     const float smoothingAmount = 0.0001;
-    float shadow = clamp(-sphereIntersectAmount(normalize(fWorldPosition - lightPos), fWorldPosition, planetPos, planetRadius) / smoothingAmount, 0.0, 1.0);
+    float shadow = clamp(-sphereIntersectAmount(normalize(fWorldPosition - frame.sunPos.xyz), fWorldPosition, planetPos, planetRadius) / smoothingAmount, 0.0, 1.0);
 
     if (shadow > 0.0) { // The ring is obscured by the parent planet
         ringColor.rgb *= 1.0 - shadow;
@@ -104,7 +103,7 @@ void main() {
         return;
     }
 
-    float NdotL = dot(normal, normalize(lightPos - planetPos));
+    float NdotL = dot(normal, normalize(frame.sunPos.xyz - planetPos));
 
     shadow = CalculateShadow(fragPosLightSpace);
     ringColor.rgb *= shadow;

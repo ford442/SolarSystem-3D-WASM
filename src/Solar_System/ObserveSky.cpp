@@ -1,8 +1,9 @@
 #include "ObserveSky.h"
+#include "../gfx/TextureUnits.h"
 
 #include <algorithm>
 #include <cmath>
-#include <iostream>
+#include "../core/Log.h"
 
 namespace {
 
@@ -14,10 +15,7 @@ constexpr float kKindSun = 1.0f;
 constexpr float kKindMoon = 2.0f;
 constexpr float kKindStar = 3.0f;
 
-constexpr int kMoonTextureUnit = 1;
-// Same units as SceneRenderer's physical shell, so the two shaders' LUT bindings read alike.
-constexpr int kTransmittanceUnit = 12;
-constexpr int kMultiScatteringUnit = 13;
+constexpr unsigned int kMoonTextureUnit = Unit(TextureUnit::Moon);
 
 constexpr float kMoonRadiusKm = 1737.4f;
 constexpr float kSunRadiusKm = 695700.0f;
@@ -66,11 +64,11 @@ ObserveSky::ObserveSky() {
     _lineShader = std::make_unique<Shader>("resource/shaders/observeLines.vs", "resource/shaders/observeLines.fs");
 
     // A core-profile draw needs a bound VAO even when every vertex comes from gl_VertexID.
-    glGenVertexArrays(1, &_emptyVao);
+    _emptyVao = GlVertexArray::Create();
 
     const float quad[] = {-1.0f, -1.0f, 1.0f, -1.0f, -1.0f, 1.0f, 1.0f, 1.0f};
-    glGenBuffers(1, &_quadVbo);
-    glBindBuffer(GL_ARRAY_BUFFER, _quadVbo);
+    _quadVbo = GlBuffer::Create();
+    glBindBuffer(GL_ARRAY_BUFFER, _quadVbo.get());
     glBufferData(GL_ARRAY_BUFFER, sizeof(quad), quad, GL_STATIC_DRAW);
     glBindBuffer(GL_ARRAY_BUFFER, 0);
 
@@ -78,29 +76,18 @@ ObserveSky::ObserveSky() {
     InitBatch(_moonBatch, 1);
 }
 
-ObserveSky::~ObserveSky() {
-    for (SpriteBatch* batch : {&_additiveBatch, &_moonBatch, &_starBatch}) {
-        if (batch->vbo) glDeleteBuffers(1, &batch->vbo);
-        if (batch->vao) glDeleteVertexArrays(1, &batch->vao);
-    }
-    if (_lineVbo) glDeleteBuffers(1, &_lineVbo);
-    if (_lineVao) glDeleteVertexArrays(1, &_lineVao);
-    if (_quadVbo) glDeleteBuffers(1, &_quadVbo);
-    if (_emptyVao) glDeleteVertexArrays(1, &_emptyVao);
-}
-
 void ObserveSky::InitBatch(SpriteBatch& batch, int capacity) const {
     batch.capacity = capacity;
     batch.count = 0;
-    glGenVertexArrays(1, &batch.vao);
-    glGenBuffers(1, &batch.vbo);
-    glBindVertexArray(batch.vao);
+    batch.vao = GlVertexArray::Create();
+    batch.vbo = GlBuffer::Create();
+    glBindVertexArray(batch.vao.get());
 
-    glBindBuffer(GL_ARRAY_BUFFER, _quadVbo);
+    glBindBuffer(GL_ARRAY_BUFFER, _quadVbo.get());
     glEnableVertexAttribArray(0);
     glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, 2 * sizeof(float), nullptr);
 
-    glBindBuffer(GL_ARRAY_BUFFER, batch.vbo);
+    glBindBuffer(GL_ARRAY_BUFFER, batch.vbo.get());
     glBufferData(GL_ARRAY_BUFFER, static_cast<GLsizeiptr>(capacity * sizeof(SpriteInstance)), nullptr,
                  GL_DYNAMIC_DRAW);
     const GLsizei stride = static_cast<GLsizei>(sizeof(SpriteInstance));
@@ -119,7 +106,7 @@ void ObserveSky::UploadBatch(SpriteBatch& batch, const std::vector<SpriteInstanc
     if (batch.count == 0) {
         return;
     }
-    glBindBuffer(GL_ARRAY_BUFFER, batch.vbo);
+    glBindBuffer(GL_ARRAY_BUFFER, batch.vbo.get());
     glBufferSubData(GL_ARRAY_BUFFER, 0, static_cast<GLsizeiptr>(batch.count * sizeof(SpriteInstance)),
                     instances.data());
     glBindBuffer(GL_ARRAY_BUFFER, 0);
@@ -129,7 +116,7 @@ void ObserveSky::DrawBatch(const SpriteBatch& batch, int count) const {
     if (count <= 0) {
         return;
     }
-    glBindVertexArray(batch.vao);
+    glBindVertexArray(batch.vao.get());
     glDrawArraysInstanced(GL_TRIANGLE_STRIP, 0, 4, count);
     glBindVertexArray(0);
 }
@@ -143,7 +130,7 @@ void ObserveSky::EnsureStarsLoaded() {
     std::string error;
     if (!StarCatalog::LoadFromFile(kStarCatalogPath, _stars, error)) {
         // Observe still works without stars (planets, Sun and Moon), so this is not fatal.
-        std::cerr << "[Observe] star catalog unavailable (" << error << "); drawing no stars" << std::endl;
+        LOG_WARN("Observe", "star catalog unavailable (%s); drawing no stars", error.c_str());
         return;
     }
 
@@ -163,7 +150,7 @@ void ObserveSky::EnsureStarsLoaded() {
     InitBatch(_starBatch, static_cast<int>(instances.size()));
     UploadBatch(_starBatch, instances);
     _starsLoaded = _starBatch.count > 0;
-    std::cout << "[Observe] Loaded " << _stars.stars.size() << " stars from " << kStarCatalogPath << std::endl;
+    LOG_INFO("Observe", "Loaded %zu stars from %s", _stars.stars.size(), kStarCatalogPath);
 }
 
 void ObserveSky::EnsureConstellationLines() {
@@ -175,7 +162,7 @@ void ObserveSky::EnsureConstellationLines() {
         std::string error;
         if (!StarCatalog::LoadConstellationsFromFile(kConstellationPath, static_cast<int>(_stars.stars.size()),
                                                      _constellations, error)) {
-            std::cerr << "[Observe] constellation lines unavailable (" << error << ")" << std::endl;
+            LOG_WARN("Observe", "constellation lines unavailable (%s)", error.c_str());
             _constellations.clear();
         }
     }
@@ -216,16 +203,16 @@ void ObserveSky::EnsureConstellationLines() {
         }
     }
 
-    if (_lineVao == 0) {
-        glGenVertexArrays(1, &_lineVao);
-        glGenBuffers(1, &_lineVbo);
-        glBindVertexArray(_lineVao);
-        glBindBuffer(GL_ARRAY_BUFFER, _lineVbo);
+    if (!_lineVao) {
+        _lineVao = GlVertexArray::Create();
+        _lineVbo = GlBuffer::Create();
+        glBindVertexArray(_lineVao.get());
+        glBindBuffer(GL_ARRAY_BUFFER, _lineVbo.get());
         glEnableVertexAttribArray(0);
         glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, sizeof(glm::vec3), nullptr);
         glBindVertexArray(0);
     }
-    glBindBuffer(GL_ARRAY_BUFFER, _lineVbo);
+    glBindBuffer(GL_ARRAY_BUFFER, _lineVbo.get());
     glBufferData(GL_ARRAY_BUFFER, static_cast<GLsizeiptr>(vertices.size() * sizeof(glm::vec3)),
                  vertices.empty() ? nullptr : vertices.data(), GL_STATIC_DRAW);
     glBindBuffer(GL_ARRAY_BUFFER, 0);
@@ -324,15 +311,11 @@ void ObserveSky::Render(const Observer::Sky& sky, const Frame& frame, unsigned i
         _skyShader->SetFloat("moonRadiusKm", kMoonRadiusKm);
         _skyShader->SetFloat("sunDistanceKm", static_cast<float>(sun.distanceKm));
         _skyShader->SetFloat("sunRadiusKm", kSunRadiusKm);
-        _skyShader->SetInt("transmittanceLut", kTransmittanceUnit);
-        glActiveTexture(GL_TEXTURE0 + kTransmittanceUnit);
-        glBindTexture(GL_TEXTURE_2D, air->transmittanceLut);
-        _skyShader->SetInt("multiScatteringLut", kMultiScatteringUnit);
-        glActiveTexture(GL_TEXTURE0 + kMultiScatteringUnit);
-        glBindTexture(GL_TEXTURE_2D, air->multiScatteringLut);
-        glActiveTexture(GL_TEXTURE0);
+        // Units come from the shader's `layout(binding = TU_*)` qualifiers (gfx/TextureUnits.h).
+        glBindTextureUnit(Unit(TextureUnit::TransmittanceLut), air->transmittanceLut);
+        glBindTextureUnit(Unit(TextureUnit::MultiScatteringLut), air->multiScatteringLut);
     }
-    glBindVertexArray(_emptyVao);
+    glBindVertexArray(_emptyVao.get());
     glDrawArrays(GL_TRIANGLES, 0, 3);
     glBindVertexArray(0);
 
@@ -409,7 +392,7 @@ void ObserveSky::Render(const Observer::Sky& sky, const Frame& frame, unsigned i
         _lineShader->SetVec4("lineColor", glm::vec4(0.45f, 0.62f, 0.95f, lineAlpha));
         glEnable(GL_BLEND);
         glBlendFunc(GL_SRC_ALPHA, GL_ONE);
-        glBindVertexArray(_lineVao);
+        glBindVertexArray(_lineVao.get());
         glDrawArrays(GL_LINES, 0, _lineVertexCount);
         glBindVertexArray(0);
         _spriteShader->Use();
@@ -446,7 +429,6 @@ void ObserveSky::Render(const Observer::Sky& sky, const Frame& frame, unsigned i
     _spriteShader->SetMat3("moonBodyFromHorizon", moonBodyFromHorizon);
     _spriteShader->SetBool("hasMoonTexture", moonTexture != 0);
     _spriteShader->SetVec3("moonTint", DiscTint(air, moon.apparentAltDeg, sky.site.altM));
-    _spriteShader->SetInt("moonTexture", kMoonTextureUnit);
     if (moonTexture != 0) {
         glActiveTexture(GL_TEXTURE0 + kMoonTextureUnit);
         glBindTexture(GL_TEXTURE_2D, moonTexture);

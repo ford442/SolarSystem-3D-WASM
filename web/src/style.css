@@ -727,6 +727,186 @@ input {
   box-shadow: 0 0 12px rgba(255, 176, 106, 0.45);
 }
 
+/* Cinematic timeline dock (timelineEditor.ts): play, scrub, keyframes, video capture. */
+.timeline-panel {
+  position: fixed;
+  left: 50%;
+  bottom: max(16px, env(safe-area-inset-bottom));
+  transform: translateX(-50%);
+  z-index: 900;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  width: min(760px, calc(100vw - 32px));
+  max-height: min(70vh, 640px);
+  overflow-y: auto;
+  padding: 12px 14px;
+  color: #f7fbff;
+  background: rgba(7, 13, 24, 0.88);
+  border: 1px solid rgba(112, 203, 255, 0.35);
+  border-radius: 14px;
+  box-shadow: 0 14px 40px rgba(0, 0, 0, 0.55);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+}
+
+.timeline-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.timeline-wrap {
+  flex-wrap: wrap;
+}
+
+.timeline-select,
+.timeline-field select,
+.timeline-keys input {
+  min-height: 44px;
+  padding: 7px 11px;
+  color: #f7fbff;
+  background: #101d2d;
+  border: 1px solid rgba(137, 209, 255, 0.38);
+  border-radius: 8px;
+  color-scheme: dark;
+}
+
+.timeline-select {
+  flex: 1;
+  min-width: 0;
+}
+
+.timeline-field {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.9rem;
+}
+
+.timeline-btn {
+  min-height: 44px;
+  padding: 0 14px;
+  color: #dcecf5;
+  background: rgba(255, 255, 255, 0.07);
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  border-radius: 8px;
+  cursor: pointer;
+  touch-action: manipulation;
+  white-space: nowrap;
+}
+
+.timeline-btn:hover {
+  background: rgba(255, 255, 255, 0.13);
+}
+
+.timeline-btn:disabled {
+  cursor: default;
+  opacity: 0.45;
+}
+
+.timeline-btn-primary {
+  color: #e8f7ff;
+  background: rgba(30, 90, 130, 0.35);
+  border-color: rgba(120, 200, 255, 0.35);
+  font-weight: 600;
+}
+
+.timeline-btn-primary:hover {
+  background: rgba(40, 110, 160, 0.45);
+}
+
+.timeline-close {
+  width: 44px;
+  padding: 0;
+  font-size: 1.2rem;
+}
+
+.timeline-file {
+  display: inline-flex;
+  align-items: center;
+}
+
+.timeline-file input {
+  display: none;
+}
+
+.timeline-scrub {
+  flex: 1;
+  min-width: 0;
+  min-height: 44px;
+  accent-color: #55c8f5;
+}
+
+.timeline-time {
+  min-width: 112px;
+  color: #9fdfff;
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+}
+
+.timeline-editor summary {
+  min-height: 36px;
+  color: #9fdfff;
+  cursor: pointer;
+  line-height: 36px;
+}
+
+.timeline-keys {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin: 8px 0;
+  padding: 0;
+  list-style: none;
+}
+
+.timeline-keys li {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.9rem;
+}
+
+.timeline-keys input {
+  width: 92px;
+}
+
+.timeline-keys .timeline-key-label {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  color: #c7dbe8;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.timeline-progress {
+  flex: 1;
+  min-width: 120px;
+  accent-color: #55c8f5;
+}
+
+.timeline-status {
+  min-height: 1.2em;
+  margin: 0;
+  color: #9fdfff;
+  font-size: 0.85rem;
+}
+
+/* With the dock open the caption moves to the top so neither hides the other. */
+body.timeline-open .tour-caption {
+  top: max(16px, env(safe-area-inset-top));
+  bottom: auto;
+}
+
+/* A capture renders at its own size; letterbox it rather than stretch it on screen. */
+body.capturing #canvas {
+  object-fit: contain;
+  background: #000;
+}
+
 @media (max-width: 600px) {
   .explorer-panel {
     top: max(8px, env(safe-area-inset-top));
@@ -738,6 +918,12 @@ input {
     top: max(8px, env(safe-area-inset-top));
     right: max(8px, env(safe-area-inset-right));
     width: min(300px, calc(100vw - 16px));
+  }
+
+  .timeline-panel {
+    bottom: max(8px, env(safe-area-inset-bottom));
+    width: calc(100vw - 16px);
+    padding: 10px;
   }
 
   .settings-toggle,
@@ -919,4 +1105,57 @@ body.observe-mode #orbit-lines-enabled,
 body.observe-mode #magnetic-fields-enabled {
   opacity: 0.45;
   pointer-events: none;
+}
+
+/* Fatal error / context-loss panel (web/src/fatalOverlay.ts). */
+#fatal-panel {
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: min(440px, calc(100vw - 32px));
+  box-sizing: border-box;
+  padding: 20px 22px;
+  background: rgba(0, 0, 0, 0.92);
+  color: #ffffff;
+  font-family: Arial, sans-serif;
+  border: 1px solid rgba(242, 61, 83, 0.6);
+  border-radius: 8px;
+  box-shadow: 0 2px 16px rgba(0, 0, 0, 0.6);
+  z-index: 1100;
+}
+
+#fatal-panel h2 {
+  margin: 0 0 10px;
+  font-size: 20px;
+}
+
+#fatal-panel .fatal-panel-message {
+  margin: 0 0 10px;
+  font-size: 14px;
+  line-height: 1.4;
+}
+
+#fatal-panel .fatal-panel-hints {
+  margin: 0 0 14px;
+  padding-left: 18px;
+  font-size: 13px;
+  line-height: 1.5;
+  color: #cccccc;
+}
+
+#fatal-panel-reload {
+  padding: 8px 18px;
+  font-size: 14px;
+  font-weight: bold;
+  color: #000000;
+  background: #4dd9f0;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+}
+
+#fatal-panel-reload:focus-visible {
+  outline: 2px solid #ffffff;
+  outline-offset: 2px;
 }

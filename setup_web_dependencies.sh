@@ -20,11 +20,18 @@ mkdir -p "$EXTERNAL_DIR"
 
 # --- 1. GLM (Header Only) ---
 GLM_DIR="$EXTERNAL_DIR/glm"
+# Pinned release tag: cloning HEAD made every fresh checkout (and CI run) build against
+# whatever GLM happened to be on master that day.
+GLM_TAG="1.0.3"
 if [ ! -d "$GLM_DIR" ]; then
-    echo "Fetching GLM..."
-    git clone https://github.com/g-truc/glm.git "$GLM_DIR"
+    echo "Fetching GLM $GLM_TAG..."
+    git clone --depth 1 --branch "$GLM_TAG" https://github.com/g-truc/glm.git "$GLM_DIR"
+elif [ -d "$GLM_DIR/.git" ] && [ "$(git -C "$GLM_DIR" describe --tags --exact-match 2>/dev/null)" != "$GLM_TAG" ]; then
+    echo "GLM in $GLM_DIR is not at $GLM_TAG; moving it there..."
+    git -C "$GLM_DIR" fetch --depth 1 origin tag "$GLM_TAG"
+    git -C "$GLM_DIR" -c advice.detachedHead=false checkout "$GLM_TAG"
 else
-    echo "GLM already exists in $GLM_DIR"
+    echo "GLM $GLM_TAG already exists in $GLM_DIR"
 fi
 
 # --- 2. Assimp (Static Library for WebAssembly) ---

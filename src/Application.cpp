@@ -9,40 +9,44 @@
 #include "ResourceManifest.h"
 #include "SimState.h"
 #include "WasmExports.h"
-#include "Auxiliary_Modules/TextureLoadingQueue.h"
+#include "assets/TextureLoadingQueue.h"
 #include "Solar_System/OrbitLayout.h"
+#include "Solar_System/SceneScale.h"
+#include "core/Log.h"
+#include "render/XrPointerRenderer.h"
+#include "render/terrain/TerrainSystem.h"
 #include <algorithm>
 #include <chrono>
 #include <cmath>
 #include <cstdio>
 #include <cstdlib>
-#include <iostream>
 #include <sstream>
-#include <thread>
 
 using namespace std;
 
-Application::Application() : _fpsHandler(240), _renderer(*this) {
-    gSimState = &_simState;
+Application::Application() : _frameTimer(240) {
     SetActiveApplication(this);
     InitSystems();
-    ApplyQualityPreset(gSimState->qualityPreset);
+    ApplyQualityPreset(_simState.qualityPreset);
     InitScene();
 }
 
 Application::~Application() {
     if (GetActiveApplication() == this) {
         SetActiveApplication(nullptr);
-        ResetSimStateToFallback();
     }
     Dispose();
 }
 
 void Application::Exec() {
 #ifdef __EMSCRIPTEN__
+    // No simulated infinite loop: main() heap-allocates the Application, so returning is
+    // safe, and it lets the swap interval be applied now that a main loop exists to time
+    // (emscripten_set_main_loop_timing is a no-op before this call).
     emscripten_set_main_loop_arg([](void* arg) {
         static_cast<Application*>(arg)->RunOneFrame();
-    }, this, 0, 1);
+    }, this, 0, 0);
+    VertSync(_isVertSyncEnabled);
 #else
     while (!glfwWindowShouldClose(_mainWindow)) {
         RunOneFrame();
@@ -51,7 +55,7 @@ void Application::Exec() {
 }
 
 void Application::RunOneFrame() {
-    _fpsHandler.RunFrameTimer();
+    _frameTimer.RunFrameTimer();
 
     if (_appState == AppState::LOADING) {
 #ifdef __EMSCRIPTEN__
@@ -67,7 +71,7 @@ void Application::RunOneFrame() {
         UpdateLoadingProgress();
 
         if (_resourcesPending <= 0) {
-             std::cout << "All resources downloaded. Initializing scene..." << std::endl;
+             LOG_INFO("Loading", "All resources downloaded. Initializing scene...");
              InitSceneObjects();
              _appState = AppState::RUNNING;
         }
@@ -79,40 +83,43 @@ void Application::RunOneFrame() {
             glfwSwapBuffers(_mainWindow);
         }
         glfwPollEvents();
-#ifndef __EMSCRIPTEN__
-        _fpsHandler.WaitForFrameTimer();
-#endif
+        EndFrame();
         return;
     }
 
     const double currentFrame = glfwGetTime();
-    _deltaTime = currentFrame - _lastFrame;
+    // A capture frame is a fixed step after the last, however long encoding it took.
+    _deltaTime = _capture.active ? _capture.stepSeconds : currentFrame - _lastFrame;
     _lastFrame = currentFrame;
+    _simState.animationSeconds += _deltaTime;
+#ifndef __EMSCRIPTEN__
+    PollShaderHotReload(currentFrame);
+#endif
 
     if (_observe.active) {
         // Sky watching runs on wall-clock UTC at timeRate, not the orrery's 3 days per second.
-        gSimState->simDeltaSeconds = 0.0f;
-        if (!gSimState->timePaused) {
+        _simState.simDeltaSeconds = 0.0f;
+        if (!_simState.timePaused) {
             OrbitLayout::SetJulianDate(OrbitLayout::GetJulianDate() +
                                        _deltaTime * _observe.timeRate / 86400.0);
         }
         UpdateObserveFrame();
     } else {
-        gSimState->simDeltaSeconds = gSimState->timePaused ? 0.0f : static_cast<float>(_deltaTime) * gSimState->timeScale;
-        OrbitLayout::Advance(gSimState->simDeltaSeconds);
+        _simState.simDeltaSeconds = _simState.timePaused ? 0.0f : static_cast<float>(_deltaTime) * _simState.timeScale;
+        OrbitLayout::Advance(_simState.simDeltaSeconds);
     }
-#ifdef __EMSCRIPTEN__
-    RefreshPlanetProxyPositions();
-#endif
-
+    // Bodies at this frame's date before the camera reads them (UpdateScene places them again
+    // once the render origin has followed the camera, and catches systems loaded meanwhile).
+    PlaceBodies();
+    CarryCameraWithAnchor();
     _camera.UpdateTransition(_deltaTime);
     UpdateMissionFollow();
 
     ProcessInput(_mainWindow);
+    ConstrainCamera();
     // After everything that moves the camera this frame, before anything reads positions.
     UpdateRenderOrigin();
     UpdatePlanetSystemLoading();
-    UpdateLOD();
     UpdateMusicDucking();
 
 #ifdef __EMSCRIPTEN__
@@ -122,67 +129,361 @@ void Application::RunOneFrame() {
 #ifdef SOLARSYSTEM_USE_SDL_MIXER
         UpdateBackgroundMusic();
 #endif
-        UpdateSearchNearestPlanet();
         glfwPollEvents();
+        EndFrame();
         return;
     }
 #endif
 
     glBindFramebuffer(GL_FRAMEBUFFER, DefaultFramebuffer());
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-    RenderFrameContent();
-
-    if (_observe.active) {
-        _renderer.RenderObserveHud();
-    } else {
-        if (_renderer.isRenderPlanetStarDistances || _renderer.isRenderSatelliteDistances)
-            _renderer.RenderPlanetSatelliteStarDistances();
-        if (_renderer.isRenderHints)
-            _renderer.RenderHints();
-    }
+    RenderFrame(1);
+    _renderer.RenderHud(FrameContextFor(0));
 
     TextureLoadingQueue::GetInstance().ProcessQueue();
-    _renderer.RenderTextureLoadingProgress();
+    if (!_capture.active) {
+        _renderer.RenderTextureLoadingProgress(FrameContextFor(0));
+    }
 
-#ifdef __EMSCRIPTEN__
-    UpdateSearchNearestPlanet();
-#endif
 #ifdef SOLARSYSTEM_USE_SDL_MIXER
     UpdateBackgroundMusic();
 #endif
 
     glfwSwapBuffers(_mainWindow);
     glfwPollEvents();
+    EndFrame();
+}
 
+void Application::EndFrame() {
+    _frameTimer.EndFrame();
 #ifndef __EMSCRIPTEN__
-    _fpsHandler.WaitForFrameTimer();
+    // With vsync on, the swap already paces the loop; the limiter only caps an unsynced one.
+    if (!_isVertSyncEnabled) {
+        _frameTimer.WaitForFrameTimer();
+    }
 #endif
 }
 
-void Application::RenderFrameContent() {
+void Application::UpdateScene(double julianDate) {
+    _renderer.CountSceneUpdate();
+    RefreshPlanetProxyPositions();
+    if (_sun) {
+        _sun->TakeStarSystemCenter();
+    }
+    PlaceSceneComponents();
+
+    for (auto& component : _renderableSceneComponents) {
+        // Shadow frustum tracks the planet's current heliocentric position. Its depth range
+        // is fitted to the component's own bodies — the only casters drawn into its map and
+        // the only receivers that read it — instead of the camera's 0.001–20000, which
+        // wasted precision and clipped everything past 20000 units from the Sun (Uranus and
+        // beyond on realistic scale).
+        const float radius = component.planet->GetRadius();
+        const float fullExtent = radius * 3.0f;
+        std::vector<BoundingSphere> bodies;
+        component.ForEachObject([&](const SpaceObject& object) { bodies.push_back(object.GetBoundingSphere()); });
+        const glm::vec3 toPlanet = component.planet->GetPosition() - _sun->GetPosition();
+        const DepthRange depth = FitDepthRange(_sun->GetPosition(), glm::normalize(toPlanet), bodies,
+                                               0.01f * fullExtent + 0.05f, _camera.GetNear());
+        component.shadowDepthRange = glm::vec2(depth.nearPlane, depth.farPlane - depth.nearPlane);
+
+        // Built in double: the eye is the Sun, tens of thousands of units from the render
+        // origin on realistic scale, and a float lookAt folds that into the light-space x/y
+        // the shadow lookup reads. In double those reduce to the planet's own small offset.
+        const glm::dvec3 lightEye(_sun->GetPosition());
+        const glm::dvec3 lightTarget(component.planet->GetPosition());
+        const glm::mat4 lightView(glm::lookAt(lightEye, lightTarget, glm::dvec3(0.0, 1.0, 0.0)));
+
+        const ShadowFit::Box box = FitShadowBox(component, ShadowFit::LightLookAt(lightEye, lightTarget), fullExtent);
+        const float extent = static_cast<float>(box.halfExtent);
+        const glm::mat4 lightProjection = glm::ortho(static_cast<float>(box.centerX) - extent, static_cast<float>(box.centerX) + extent,
+                                                     static_cast<float>(box.centerY) - extent, static_cast<float>(box.centerY) + extent,
+                                                     depth.nearPlane, depth.farPlane);
+        component.lightSpaceMatrix = lightProjection * lightView;
+    }
+
+    if (_asteroidField) {
+        _asteroidField->Update(julianDate);
+    }
+    if (_kuiperField) {
+        _kuiperField->Update(julianDate);
+    }
+    _missionProbes.resize(_missionCatalog.missions.size());
+    for (size_t i = 0; i < _missionProbes.size(); ++i) {
+        glm::vec3 probe(0.0f);
+        _missionProbes[i] = SampleMissionScenePosition(static_cast<int>(i), probe) ? std::optional(probe) : std::nullopt;
+    }
+    UpdateLOD();
+    UpdateSearchNearestPlanet();
+    // Warm the lazily searched caches here so no pass is the one that pays for a search.
+    GetNextSkyEvent();
     if (_observe.active) {
-        // Ground-level sky pass only: no scene meshes, orbit lines, glow or lens flare.
-        _renderer.RenderObserveSky();
+        CurrentObserveSky();
+    }
+}
+
+ShadowFit::Box Application::FitShadowBox(RenderableSceneComponent& component, const ShadowFit::LightBasis& light,
+                                         float fullExtent) {
+    const ShadowFit::Box full{0.0, 0.0, static_cast<double>(fullExtent)};
+    // The cap is the camera's own frustum: an XR eye pair has two, so it keeps the full box.
+    const double radius = component.planet->GetRadius();
+    const glm::dvec3 center(component.planet->GetPosition());
+    const glm::dvec3 eye(CameraRenderPosition());
+    bool xrActive = false;
+#ifdef __EMSCRIPTEN__
+    xrActive = _xr.active;
+#endif
+    const bool shadows = _simState.shadowQuality > 0 && !xrActive && radius > 0.0;
+    component.shadowVisibleCap =
+        shadows && ShadowFit::UseVisibleCap(component.shadowVisibleCap, glm::distance(eye, center) / radius);
+
+    ShadowFit::Box box = full;
+    if (component.shadowVisibleCap) {
+        ShadowFit::View view;
+        view.eye = eye;
+        view.front = glm::dvec3(_camera.GetFrontVector());
+        view.right = glm::dvec3(_camera.GetRightVector());
+        view.up = glm::dvec3(_camera.GetUpVector());
+        view.tanHalfFovY = std::tan(glm::radians(static_cast<double>(_camera.GetZoom())) * 0.5);
+        view.aspect = _camera.GetAspect();
+
+        // Receivers the old box covered that stand clear of the sphere: the ring and any moon
+        // in the frustum. (Shells hug the planet; the sphere stands for them.)
+        const Frustum frustum(_camera.GetProjectionMatrix() * _camera.GetViewMatrix(glm::vec3(eye)));
+        std::vector<BoundingSphere> extras;
+        const auto addIfSeen = [&](const SpaceObject& object) {
+            const BoundingSphere sphere = object.GetBoundingSphere();
+            const glm::dvec2 offset = light.ToLight(glm::dvec3(sphere.center));
+            if (frustum.Intersects(sphere) && glm::length(offset) - sphere.radius < fullExtent) {
+                extras.push_back(sphere);
+            }
+        };
+        for (const auto& satellite : component.satellites) {
+            addIfSeen(*satellite);
+        }
+        if (component.planetaryRing) {
+            addIfSeen(*component.planetaryRing);
+        }
+
+        const ShadowFit::Box cap = ShadowFit::FitVisibleCap(light, view, center, radius, extras);
+        if (cap.halfExtent >= 0.0) {
+            const ShadowFit::Box fitted = ShadowFit::Quantize(cap, ShadowFit::kMinCapRadii * radius);
+            if (fitted.halfExtent < full.halfExtent) {
+                box = fitted;
+            }
+        }
+    }
+
+    if (static_cast<float>(box.halfExtent) != component.shadowHalfExtent) {
+        LOG_DEBUG("ShadowFit", "light box half-extent %.6g scene units (%s, full %.6g)", box.halfExtent,
+                  component.shadowVisibleCap ? "visible cap" : "full", static_cast<double>(fullExtent));
+        component.shadowHalfExtent = static_cast<float>(box.halfExtent);
+    }
+    return box;
+}
+
+void Application::PlaceBodies() {
+    if (_sun) {
+        _sun->TakeStarSystemCenter();
+    }
+    PlaceSceneComponents();
+}
+
+void Application::PlaceSceneComponents() {
+    const bool physicalAtmosphere = _renderer.PhysicalAtmosphereAvailable();
+    for (auto& component : _renderableSceneComponents) {
+        component.planet->AdjustToParent();
+        for (const auto& satellite : component.satellites) {
+            satellite->AdjustToParent();
+        }
+        if (component.clouds) {
+            component.clouds->AdjustToParent();
+        }
+        for (const auto& renderableAtmosphere : component.atmospheres) {
+            // Before AdjustToParent: the two paths draw different shell sizes.
+            renderableAtmosphere.atmosphere->SetPhysicalPathActive(physicalAtmosphere);
+            renderableAtmosphere.atmosphere->AdjustToParent();
+        }
+        if (component.planetaryRing) {
+            component.planetaryRing->AdjustToParent();
+        }
+    }
+}
+
+void Application::ReportFrameStats() {
+    // At debug level (SOLARSYSTEM_LOG=debug / ?log=debug), log the previous frame's pass
+    // counts every N frames: SOLARSYSTEM_FRAME_STATS=N, 120 by default.
+    static const int every = [] {
+        const char* value = std::getenv("SOLARSYSTEM_FRAME_STATS");
+        return value ? std::max(0, std::atoi(value)) : 120;
+    }();
+    static unsigned long long frame = 0;
+    const unsigned long long uniformCalls = Shader::UniformCallCount();
+    Shader::ResetUniformCallCount();
+    if (every > 0 && frame++ % static_cast<unsigned long long>(every) == 0) {
+        const FramePasses::Stats& stats = _renderer.Stats();
+        LOG_DEBUG("FrameStats",
+                  "updates=%d viewBinds=%d shadowPasses=%d componentDraws=%d bodyDraws=%d culled=%d uniformCalls=%llu",
+                  stats.sceneUpdates, stats.viewBinds, stats.shadowPasses, stats.componentDraws, stats.bodyDraws,
+                  stats.culledComponents, uniformCalls);
+    }
+}
+
+#ifndef __EMSCRIPTEN__
+void Application::PollShaderHotReload(double now) {
+    static const bool enabled = [] {
+        const char* value = std::getenv("SOLARSYSTEM_SHADER_HOT_RELOAD");
+        return !(value && std::string(value) == "0");
+    }();
+    if (!enabled || now - _lastShaderPoll < 0.5) {
         return;
     }
-    _renderer.ConfigureMainShaders();
-    _renderer.skyBox->Render(*_renderer.mainSkyBoxShader);
-    _renderer.RenderOrbitPaths();
-    _renderer.RenderMissionPaths();
-    _renderer.RenderXrPointers();
-    _renderer.RenderStarCorona();
-    _renderer.ProcessSceneComponentsRendering();
-    _renderer.RenderStarCoronaVolume();
-    _renderer.RenderAsteroidField();
-    _renderer.RenderMagneticFields();
-#ifdef __EMSCRIPTEN__
-    if (!_xr.active) {
-        RenderPlanetProxyMarkers();
-        _renderer.RenderStarEffects();
-    }
-#else
-    _renderer.RenderStarEffects();
+    _lastShaderPoll = now;
+    Shader::ReloadChanged();
+}
 #endif
+
+void Application::RenderFrame(int viewCount) {
+    FramePasses::Hooks hooks;
+    hooks.updateScene = [this, viewCount]() -> std::size_t {
+        ReportFrameStats();
+        _renderer.BeginFrame();
+        UpdateScene(OrbitLayout::GetJulianDate());
+        BuildFrameSnapshot(viewCount);
+        UpdateTerrain(viewCount);
+        CullScene(viewCount);
+        return _observe.active ? 0 : _drawOrder.size();
+    };
+    hooks.beginView = [this](int view) { _renderer.BeginView(FrameContextFor(view)); };
+    hooks.background = [this](int view) { _renderer.RenderBackground(FrameContextFor(view)); };
+    hooks.shadowPass = [this](std::size_t draw) {
+        _renderer.ShadowMapPass(FrameContextFor(0), _renderableSceneComponents[_drawOrder[draw]]);
+    };
+    hooks.drawComponent = [this](int view, std::size_t draw) {
+        _renderer.RenderPass(FrameContextFor(view), _renderableSceneComponents[_drawOrder[draw]]);
+    };
+    hooks.foreground = [this](int view) {
+        const FrameContext ctx = FrameContextFor(view);
+        _renderer.RenderForeground(ctx);
+        if (!ctx.xr) {
+            _renderer.RenderMonoEffects(ctx);
+        }
+    };
+    FramePasses::Run(viewCount, hooks);
+}
+
+void Application::CullScene(int viewCount) {
+    std::vector<Frustum> frusta;
+    for (int view = 0; view < viewCount; ++view) {
+        frusta.emplace_back(_frameViews[static_cast<size_t>(view)].projection * _frameViews[static_cast<size_t>(view)].view);
+    }
+    const auto seen = [&](const SpaceObject& object) {
+        const BoundingSphere sphere = object.GetBoundingSphere();
+        return std::any_of(frusta.begin(), frusta.end(), [&](const Frustum& f) { return f.Intersects(sphere); });
+    };
+
+    _drawOrder.clear();
+    int culled = 0;
+    for (size_t i = 0; i < _renderableSceneComponents.size(); ++i) {
+        RenderableSceneComponent& component = _renderableSceneComponents[i];
+        bool any = false;
+        component.ForEachObject([&](SpaceObject& object) {
+            const bool visible = seen(object);
+            object.SetVisible(visible);
+            any = any || visible;
+        });
+        component.visible = any;
+        culled += any ? 0 : 1;
+        if (any || static_cast<int>(i) == _nearestPlanetIndex) {
+            _drawOrder.push_back(i);
+        }
+    }
+    _renderer.CountCulledComponents(culled);
+
+    // Opaque surfaces front to back, so early depth rejects what is behind. Within a
+    // component the order (planet, moons, shells, ring) stays as RenderPass has it.
+    const glm::vec3 eye = CameraRenderPosition();
+    const auto distance = [&](size_t index) {
+        return glm::distance(eye, _renderableSceneComponents[index].planet->GetPosition());
+    };
+    std::stable_sort(_drawOrder.begin(), _drawOrder.end(),
+                     [&](size_t a, size_t b) { return distance(a) < distance(b); });
+}
+
+void Application::BuildFrameSnapshot(int viewCount) {
+    SceneSnapshot& scene = _frameScene;
+    scene.sun = _sun.get();
+    scene.components = &_renderableSceneComponents;
+    scene.nearestComponent = _nearestPlanetIndex;
+    scene.asteroidField = _asteroidField.get();
+    scene.kuiperField = _kuiperField.get();
+    scene.missions = &_missionCatalog;
+    scene.focusedMission = _focusedMissionIndex;
+    scene.missionProbes = &_missionProbes;
+    scene.stagedSystems = &_planetSystemManifests;
+    scene.observeActive = _observe.active;
+    scene.observe = &_observe;
+    scene.observeSky = _observe.active ? &CurrentObserveSky() : nullptr;
+    scene.observeMoonTexture = _observe.active ? ObserveMoonTexture() : 0u;
+    scene.observeEarthAtmosphere = _observe.active ? ObserveEarthAtmosphere() : nullptr;
+    scene.nextSkyEvent = &GetNextSkyEvent();
+
+    // The head: the mono camera, and the axes every eye shares.
+    CameraView head;
+    head.projection = _camera.GetProjectionMatrix();
+    head.headPosition = CameraRenderPosition();
+    head.view = _camera.GetViewMatrix(head.headPosition);
+    head.renderOrigin = OrbitLayout::GetRenderOrigin();
+    head.front = _camera.GetFrontVector();
+    head.right = _camera.GetRightVector();
+    head.up = _camera.GetUpVector();
+    head.nearPlane = _camera.GetNear();
+    head.farPlane = _camera.GetFar();
+    head.aspect = _camera.GetAspect();
+    head.zoomDeg = _camera.GetZoom();
+    head.yawDeg = _camera.GetYaw();
+    head.pitchDeg = _camera.GetPitch();
+    head.logDepthC = _logDepthC;
+    head.zCoef = static_cast<float>(2.0 / glm::log2(static_cast<double>(_logDepthC) * _camera.GetFar() + 1.0));
+    head.viewport = glm::ivec4(0, 0, _displayWidth, _displayHeight);
+
+    const int views = std::clamp(viewCount, 1, static_cast<int>(_frameViews.size()));
+    for (int i = 0; i < views; ++i) {
+        CameraView& view = _frameViews[static_cast<size_t>(i)];
+        view = head;
+#ifdef __EMSCRIPTEN__
+        if (_xr.active) {
+            const XrEyeState& eye = _xr.eyes[i];
+            view.projection = eye.projection;
+            view.view = eye.view;
+            view.viewport = glm::ivec4(eye.viewportX, eye.viewportY, eye.viewportWidth, eye.viewportHeight);
+            view.eye = i;
+        }
+#endif
+        view.eyePosition = glm::vec3(glm::inverse(view.view)[3]);
+    }
+
+    HudState& hud = _frameHud;
+    hud.fps = _frameTimer.GetCurrentFps();
+    hud.fpsColor = CurrentFpsColor();
+    hud.vsync = _isVertSyncEnabled;
+    hud.cameraSpeed = _camera.GetMovementSpeed();
+#ifdef SOLARSYSTEM_USE_SDL_MIXER
+    hud.musicVolumePercent = (_musicMuted ? 0.0f : _musicVolume) * 100.0f;
+#elif !defined(__EMSCRIPTEN__)
+    hud.musicVolumePercent = _soundEngine ? _soundEngine->getSoundVolume() * 100.0f : 0.0f;
+#endif
+    hud.musicTrack = _currentMusicTrack;
+}
+
+FrameContext Application::FrameContextFor(int view) const {
+    const size_t index = static_cast<size_t>(std::clamp(view, 0, static_cast<int>(_frameViews.size()) - 1));
+#ifdef __EMSCRIPTEN__
+    const bool xr = _xr.active;
+#else
+    const bool xr = false;
+#endif
+    return FrameContext{_frameViews[index], _frameScene, _simState, DisplaySize(), xr, DefaultFramebuffer(), &_frameHud};
 }
 
 
@@ -201,17 +502,21 @@ void Application::InitScene() {
 void Application::UpdateLoadingProgress() {
 #ifdef __EMSCRIPTEN__
     const int loaded = _totalResources - _resourcesPending;
-    NotifyLoadingProgress(loaded, _totalResources);
+    NotifyLoadingProgress(loaded, _totalResources, _resourcesFailed);
 #endif
 }
 
 
 void Application::InitSceneObjects() {
     _camera.SetAspect(static_cast<float>(_displayWidth) / static_cast<float>(_displayHeight));
-    _renderer.Init();
+#ifdef __EMSCRIPTEN__
+    TextureImage2D::SetWebAnisotropyCap(_simState.isMobileWeb ? 4.0f : 8.0f);
+#endif
+    _renderer.Init(_simState, _ft, DisplaySize());
+    _ft = nullptr; // Renderer::Init released it once the font was loaded
     LoadMissions();
     {
-        const auto asteroidQuality = GetQualitySettings(gSimState->qualityPreset, gSimState->isMobileWeb);
+        const auto asteroidQuality = GetQualitySettings(_simState.qualityPreset, _simState.isMobileWeb);
         _asteroidField = make_unique<AsteroidField>(AsteroidField::kDefaultSeed,
                                                     asteroidQuality.asteroidInstanceCount);
         _kuiperField = make_unique<AsteroidField>(AsteroidField::kKuiperSeed,
@@ -229,8 +534,26 @@ void Application::InitSceneObjects() {
 
     StartSearchNearestPlanet();
     StartPlayBackgroundMusic();
+    ApplyScaleEnvOverride();
     ApplyCameraPoseEnvOverride();
     ApplyObserveEnvOverride();
+}
+
+void Application::ApplyScaleEnvOverride() {
+    // Runs the same toggle as the web UI on the scene just built, before a pose override, so
+    // SOLARSYSTEM_CAMERA_POSE takes realistic world coordinates when this asks for them.
+    const char* spec = std::getenv("SOLARSYSTEM_SCALE");
+    if (!spec || !*spec) {
+        return;
+    }
+    const std::string mode(spec);
+    if (mode == "realistic" || mode == "1") {
+        ApplyOrbitScaleMode(1);
+    } else if (mode == "compressed" || mode == "0") {
+        ApplyOrbitScaleMode(0);
+    } else {
+        LOG_WARN("OrbitScale", "Unrecognized SOLARSYSTEM_SCALE=\"%s\"; use compressed or realistic", spec);
+    }
 }
 
 void Application::ApplyCameraPoseEnvOverride() {
@@ -248,15 +571,15 @@ void Application::ApplyCameraPoseEnvOverride() {
         values[parsed++] = std::atof(token.c_str());
     }
     if (parsed < 5) {
-        std::cerr << "[Camera] SOLARSYSTEM_CAMERA_POSE needs x,y,z,yaw,pitch[,jd]" << std::endl;
+        LOG_WARN("Camera", "SOLARSYSTEM_CAMERA_POSE needs x,y,z,yaw,pitch[,jd]");
         return;
     }
     if (parsed >= 6 && values[5] > 0.0) {
         OrbitLayout::SetJulianDate(values[5]);
-        gSimState->timePaused = true;
+        _simState.timePaused = true;
     }
-    _camera.SetPosition(glm::vec3(values[0], values[1], values[2]));
-    _camera.SetYawPitch(static_cast<float>(values[3]), static_cast<float>(values[4]));
+    SetCameraHeliocentricPose(glm::dvec3(values[0], values[1], values[2]), static_cast<float>(values[3]),
+                              static_cast<float>(values[4]));
 }
 
 void Application::FocusPlanetByIndex(int idx) {
@@ -265,19 +588,25 @@ void Application::FocusPlanetByIndex(int idx) {
     idx = std::clamp(idx, 0, OrbitLayout::kBodyCount - 1);
     _focusedPlanetIndex = idx;
 
-    glm::vec3 target(0.0f);
+    glm::dvec3 target(0.0);
     float focusRadius = 10.0f;
+    // The art distances below are compressed-scale numbers; realistic scales them with the
+    // body, so a focus frames it the same either way.
+    float sizeFactor = 1.0f;
+    std::shared_ptr<const SpaceObject> anchor;
 
     if (idx == 0) {
         if (_sun) {
-            target = _sun->GetPosition();
+            target = _sun->GetWorldPosition();
+            sizeFactor = _sun->SizeFactor();
+            anchor = _sun;
         }
         focusRadius = 40.0f;
     } else {
         // Match on the planet's own name rather than position in the vector: staged loading
         // pushes components in camera-approach order, so the Nth component is not body N.
         const auto body = static_cast<OrbitLayout::Body>(idx);
-        const Planet* found = nullptr;
+        std::shared_ptr<const Planet> found;
         for (const auto& component : _renderableSceneComponents) {
             if (!component.planet) {
                 continue;
@@ -285,27 +614,37 @@ void Application::FocusPlanetByIndex(int idx) {
             const std::wstring& wideName = component.planet->GetEngName();
             const std::string name(wideName.begin(), wideName.end());
             if (OrbitLayout::BodyFromName(name) == body) {
-                found = component.planet.get();
+                found = component.planet;
                 break;
             }
         }
 
         if (found) {
-            target = found->GetPosition();
-            focusRadius = std::max(found->GetRadius() * 4.0f, 2.0f);
+            target = found->GetWorldPosition();
+            sizeFactor = found->SizeFactor();
+            focusRadius = std::max(found->GetRadius() * 4.0f, 2.0f * sizeFactor) / sizeFactor;
+            anchor = found;
         } else {
-            // Not loaded yet (web staged loading): fly to where the ephemeris says it is.
-            target = OrbitLayout::GetRenderPosition(body);
+            // Not loaded yet (web staged loading): fly to where the ephemeris says it is, and
+            // start its download now rather than when the camera arrives.
+            target = OrbitLayout::GetHeliocentricScenePosition(body);
+            if (const BodyCatalog::Entry* entry = BodyCatalog::FindByIndex(idx)) {
+                sizeFactor = SceneScale::BodySizeFactor(*entry);
+            }
             focusRadius = 20.0f;
+            ActivatePlanetSystem(body);
         }
     }
 
-    const glm::vec3 offset = glm::normalize(glm::vec3(0.7f, 0.3f, 0.7f)) * (focusRadius + 30.0f);
-    const glm::vec3 cameraPos = target + offset;
-    const glm::vec3 lookDir = glm::normalize(target - cameraPos);
+    const glm::vec3 direction = glm::normalize(glm::vec3(0.7f, 0.3f, 0.7f));
+    const glm::dvec3 cameraPos = target + glm::dvec3(direction) * static_cast<double>((focusRadius + 30.0f) * sizeFactor);
+    const glm::vec3 lookDir = -direction;
     const float yaw = glm::degrees(std::atan2(lookDir.z, lookDir.x));
     const float pitch = glm::degrees(std::asin(lookDir.y));
     _camera.StartTransitionTo(cameraPos, yaw, pitch, 2.0f);
+    // Ride along with the body during the flight and after it lands, even from outside the
+    // distance at which the camera would pick it up by itself.
+    SetCameraAnchor(anchor, true);
 
 #ifdef __EMSCRIPTEN__
     NotifyPlanetFocused(idx);
@@ -317,8 +656,12 @@ int Application::GetFocusedPlanetIndex() const {
 }
 
 void Application::StopMissionFollow() {
+    const bool wasFocused = _focusedMissionIndex >= 0;
     _missionFollowActive = false;
     _focusedMissionIndex = -1;
+    if (wasFocused) {
+        NotifyMissionFocused(-1);
+    }
 }
 
 bool Application::SampleMissionHeliocentricPosition(int idx, glm::dvec3& outScene) const {
@@ -344,21 +687,21 @@ bool Application::SampleMissionScenePosition(int idx, glm::vec3& outScene) const
 }
 
 void Application::SetCameraHeliocentricPose(const glm::dvec3& position, float yaw, float pitch) {
-    if (OrbitLayout::GetScaleMode() == OrbitLayout::ScaleMode::Realistic) {
-        // Rebase onto the pose itself: the camera then stores an exact zero instead of a
-        // position tens of thousands of units out, rounded to that distance's float grid.
-        MoveRenderOrigin(position);
-    }
-    _camera.SetPosition(OrbitLayout::ToRenderFrame(position));
+    _camera.CancelTransition();
+    _camera.SetWorldPosition(position);
     _camera.SetYawPitch(yaw, pitch);
+    // A jump: whatever the camera rode along with is somewhere else now. ConstrainCamera
+    // picks the body it arrived next to on the next frame.
+    SetCameraAnchor(nullptr, false);
+    MoveRenderOrigin(position);
 }
 
 glm::dvec3 Application::GetCameraHeliocentricPosition() const {
-    return OrbitLayout::ToHeliocentricScene(_camera.GetPosition());
+    return _camera.GetWorldPosition();
 }
 
 void Application::UpdateRenderOrigin() {
-    MoveRenderOrigin(OrbitLayout::ChooseRenderOrigin(_camera.GetPosition()));
+    MoveRenderOrigin(_camera.GetWorldPosition());
 }
 
 void Application::MoveRenderOrigin(const glm::dvec3& origin) {
@@ -368,11 +711,9 @@ void Application::MoveRenderOrigin(const glm::dvec3& origin) {
     }
     OrbitLayout::SetRenderOrigin(origin);
 
-    // Bodies, overlays and uniforms are re-derived from the ephemeris every frame and need
-    // nothing here. What follows is everything that holds a render-frame position across
-    // frames, moved so it stays put in the heliocentric frame.
+    // Everything that holds a render-frame position across frames, moved so it stays put in
+    // the heliocentric frame. Uniforms, the belts and the probes are re-derived every frame.
     const glm::vec3 shift(origin - previous);
-    _camera.ShiftOrigin(shift);
 #ifdef __EMSCRIPTEN__
     // webxr.ts composed this frame's eye views from the camera before the shift.
     const glm::mat4 undoShift = glm::translate(glm::mat4(1.0f), shift);
@@ -380,17 +721,19 @@ void Application::MoveRenderOrigin(const glm::dvec3& origin) {
         eye.view = eye.view * undoShift;
     }
 #endif
-    if (_renderer.xrPointerRenderer) {
-        _renderer.xrPointerRenderer->ShiftOrigin(shift);
+    if (XrPointerRenderer* pointers = _renderer.GetXrPointers()) {
+        pointers->ShiftOrigin(shift);
     }
+    // Re-derive the bodies' translations now rather than in UpdateScene: staged loading and
+    // the LOD manager compare them with the camera before this frame's UpdateScene runs.
     if (_sun) {
-        _sun->TakeStarSystemCenter();
+        _sun->Rebase();
     }
-    // Re-place the bodies now rather than at draw time: the LOD manager and staged loading
-    // compare them with the (already shifted) camera before this frame draws.
-    _renderer.PlaceSceneComponents();
+    for (auto& component : _renderableSceneComponents) {
+        component.ForEachObject([](SpaceObject& object) { object.Rebase(); });
+    }
     RefreshPlanetProxyPositions();
-    _renderer.RebuildMissionPaths();
+    _renderer.FollowMissionPathOrigin(_missionCatalog, _simState.qualityPreset);
 }
 
 void Application::FocusMissionByIndex(int idx) {
@@ -405,14 +748,15 @@ void Application::FocusMissionByIndex(int idx) {
     _focusedPlanetIndex = -1;
     _focusedMissionIndex = idx;
     _missionFollowActive = true;
+    NotifyMissionFocused(idx);
 
-    glm::vec3 target(0.0f);
-    if (!SampleMissionScenePosition(idx, target)) {
+    glm::dvec3 target(0.0);
+    if (!SampleMissionHeliocentricPosition(idx, target)) {
         return;
     }
-    const glm::vec3 offset = glm::normalize(glm::vec3(0.7f, 0.3f, 0.7f)) * 45.0f;
-    const glm::vec3 cameraPos = target + offset;
-    const glm::vec3 lookDir = glm::normalize(target - cameraPos);
+    const glm::vec3 direction = glm::normalize(glm::vec3(0.7f, 0.3f, 0.7f));
+    const glm::dvec3 cameraPos = target + glm::dvec3(direction) * 45.0;
+    const glm::vec3 lookDir = -direction;
     const float yaw = glm::degrees(std::atan2(lookDir.z, lookDir.x));
     const float pitch = glm::degrees(std::asin(glm::clamp(lookDir.y, -1.0f, 1.0f)));
     _camera.StartTransitionTo(cameraPos, yaw, pitch, 2.0f);
@@ -462,52 +806,47 @@ void Application::UpdateMissionFollow() {
     if (!_missionFollowActive || _focusedMissionIndex < 0 || _camera.IsTransitionActive()) {
         return;
     }
-    glm::vec3 target(0.0f);
-    if (!SampleMissionScenePosition(_focusedMissionIndex, target)) {
+    glm::dvec3 target(0.0);
+    if (!SampleMissionHeliocentricPosition(_focusedMissionIndex, target)) {
         return;
     }
-    const glm::vec3 offset = glm::normalize(glm::vec3(0.7f, 0.3f, 0.7f)) * 45.0f;
-    const glm::vec3 cameraPos = target + offset;
-    const glm::vec3 lookDir = glm::normalize(target - cameraPos);
+    const glm::vec3 direction = glm::normalize(glm::vec3(0.7f, 0.3f, 0.7f));
+    const glm::vec3 lookDir = -direction;
     const float yaw = glm::degrees(std::atan2(lookDir.z, lookDir.x));
     const float pitch = glm::degrees(std::asin(glm::clamp(lookDir.y, -1.0f, 1.0f)));
-    _camera.SetPosition(cameraPos);
+    _camera.SetWorldPosition(target + glm::dvec3(direction) * 45.0);
     _camera.SetYawPitch(yaw, pitch);
 }
 
 void Application::SetXrControllerRay(int hand, float ox, float oy, float oz, float dx, float dy, float dz,
                                      int visible) {
-    if (!_renderer.xrPointerRenderer) {
+    XrPointerRenderer* pointers = _renderer.GetXrPointers();
+    if (!pointers) {
         return;
     }
-    _renderer.xrPointerRenderer->SetRay(hand, glm::vec3(ox, oy, oz), glm::vec3(dx, dy, dz), visible != 0);
+    pointers->SetRay(hand, glm::vec3(ox, oy, oz), glm::vec3(dx, dy, dz), visible != 0);
 }
 
 void Application::SetOrbitLinesEnabled(bool enabled) { _renderer.SetOrbitLinesEnabled(enabled); }
 bool Application::GetOrbitLinesEnabled() const { return _renderer.GetOrbitLinesEnabled(); }
-void Application::SetMagneticFieldsEnabled(bool enabled) { _renderer.SetMagneticFieldsEnabled(enabled); }
+void Application::SetMagneticFieldsEnabled(bool enabled) { _renderer.SetMagneticFieldsEnabled(enabled, _simState.qualityPreset); }
 bool Application::GetMagneticFieldsEnabled() const { return _renderer.GetMagneticFieldsEnabled(); }
-void Application::ForEachEnabledMagneticField(
-    const std::function<void(const SpaceObject& object, const MagneticFieldParams& params)>& fn) const {
-    _renderer.ForEachEnabledMagneticField(fn);
-}
 
 void Application::LoadMissionCatalog() {
     std::string error;
     if (!MissionCatalog::LoadFromFile("resource/missions/catalog.json", _missionCatalog, error)) {
-        std::cout << "[Missions] " << error << std::endl;
+        LOG_WARN("Missions", "%s", error.c_str());
         _missionCatalog = {};
         return;
     }
-    std::cout << "[Missions] Loaded " << _missionCatalog.missions.size()
-              << " trajectory path(s) from catalog.json" << std::endl;
+    LOG_INFO("Missions", "Loaded %zu trajectory path(s) from catalog.json", _missionCatalog.missions.size());
 }
 
 void Application::LoadMissions() {
     if (_missionCatalog.missions.empty()) {
         LoadMissionCatalog();
     }
-    _renderer.RebuildMissionPaths();
+    _renderer.RebuildMissionPaths(_missionCatalog, _simState.qualityPreset);
 }
 
 const SkyEvents::Conjunction& Application::GetNextConjunction() const {
@@ -550,72 +889,42 @@ int Application::GetNearestPlanetIndexForJs() const {
     if (_nearestPlanetIndex < 0) {
         return -1;
     }
-    return static_cast<int>(_nearestPlanetIndex) + 1;
+    return _nearestPlanetIndex + 1;
 }
 
 void Application::StartSearchNearestPlanet() {
     _isSearchNearestPlanet = true;
-
-#ifdef __EMSCRIPTEN__
-    _nearestPlanetSearchFrameCounter = 0;
-#else
-    auto searchNearestPlanet = [=]() {
-        return min_element(_renderableSceneComponents.begin(), _renderableSceneComponents.end(),
-                           [=](const RenderableSceneComponent& left, const RenderableSceneComponent& right)
-        {
-            return CalculateSpaceObjectDistance(left.planet.get()) < CalculateSpaceObjectDistance(right.planet.get());
-        });
-    };
-
-    _searchNearestPlanetThread = make_unique<thread>([=]() {
-        while (_isSearchNearestPlanet) {
-            auto nearestPlanetIt = searchNearestPlanet();
-            if (nearestPlanetIt != _renderableSceneComponents.end()) {
-                _nearestPlanetIndex = distance(_renderableSceneComponents.begin(), nearestPlanetIt);
-            } else {
-                _nearestPlanetIndex = -1;
-            }
-
-            this_thread::sleep_for(25ms);
-        }
-    });
-#endif
 }
 
 void Application::UpdateSearchNearestPlanet() {
-#ifdef __EMSCRIPTEN__
-    if (_isSearchNearestPlanet && ++_nearestPlanetSearchFrameCounter >= 60) {
-        _nearestPlanetSearchFrameCounter = 0;
-
-        auto nearestPlanetIt = min_element(_renderableSceneComponents.begin(), _renderableSceneComponents.end(),
-                           [this](const RenderableSceneComponent& left, const RenderableSceneComponent& right)
-        {
-            return CalculateSpaceObjectDistance(left.planet.get()) < CalculateSpaceObjectDistance(right.planet.get());
-        });
-
-        if (nearestPlanetIt != _renderableSceneComponents.end()) {
-            _nearestPlanetIndex = distance(_renderableSceneComponents.begin(), nearestPlanetIt);
-        } else {
-            _nearestPlanetIndex = -1;
-        }
+    // A min over a few dozen distances: cheap enough for every frame, and on the main thread
+    // it never races the planet list or the camera (it used to run on its own thread natively).
+    if (!_isSearchNearestPlanet) {
+        return;
     }
-#endif
-}
+    auto nearestPlanetIt = min_element(_renderableSceneComponents.begin(), _renderableSceneComponents.end(),
+                       [this](const RenderableSceneComponent& left, const RenderableSceneComponent& right)
+    {
+        return CalculateSpaceObjectDistance(left.planet.get()) < CalculateSpaceObjectDistance(right.planet.get());
+    });
 
-void Application::StopSearchNearestPlanet() {
-    _isSearchNearestPlanet = false;
-#ifndef __EMSCRIPTEN__
-    if (_searchNearestPlanetThread)
-        _searchNearestPlanetThread->join();
-#endif
+    const int previous = _nearestPlanetIndex;
+    if (nearestPlanetIt != _renderableSceneComponents.end()) {
+        _nearestPlanetIndex = static_cast<int>(distance(_renderableSceneComponents.begin(), nearestPlanetIt));
+    } else {
+        _nearestPlanetIndex = -1;
+    }
+    if (_nearestPlanetIndex != previous) {
+        NotifyNearestPlanetChanged(GetNearestPlanetIndexForJs());
+    }
 }
 
 float Application::CalculateSpaceObjectDistance(const SpaceObject* spaceObject) const {
-    return glm::distance(_camera.GetPosition(), spaceObject->GetPosition());
+    return static_cast<float>(glm::distance(_camera.GetWorldPosition(), spaceObject->GetWorldPosition()));
 }
 
 glm::vec3 Application::CurrentFpsColor() const {
-    const uint16_t fps = _fpsHandler.GetCurrentFps();
+    const uint16_t fps = _frameTimer.GetCurrentFps();
 
     if (fps < 30)
         return {0.949, 0.239, 0.325};

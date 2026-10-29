@@ -15,7 +15,7 @@ const kDegToRad = kPi / 180;
 const kJ2000 = 2451545.0;
 const kDaysPerCentury = 36525.0;
 
-// JPL SSD Table 1 (1800–2050), same numbers as src/Auxiliary_Modules/Ephemeris.cpp.
+// JPL SSD Table 1 (1800–2050), same numbers as src/astro/Ephemeris.cpp.
 const kStandish = {
   earth: [1.00000261, 0.00000562, 0.01671123, -0.00004392, -0.00001531, -0.01294668,
     100.46457166, 35999.37244981, 102.93768193, 0.32327364, 0.0, 0.0],

@@ -5,9 +5,9 @@
 #include <glm/glm.hpp>
 #include <glm/gtc/matrix_transform.hpp>
 
-#include "Auxiliary_Modules/Ephemeris.h"
-#include "Auxiliary_Modules/Observer.h"
-#include "Auxiliary_Modules/SkyEvents.h"
+#include "astro/Ephemeris.h"
+#include "astro/Observer.h"
+#include "astro/SkyEvents.h"
 #include "Solar_System/BodyCatalog.generated.h"
 #include "Solar_System/OrbitLayout.h"
 
@@ -236,14 +236,61 @@ TEST_F(OrbitLayoutTest, AxialSpinIsLinearAndRetrogradeForVenus) {
     EXPECT_LT(OrbitLayout::GetSiderealRotationDays(OrbitLayout::Body::Venus), 0.0f);
     EXPECT_LT(OrbitLayout::GetSiderealRotationDays(OrbitLayout::Body::Uranus), 0.0f);
 
-    // Spins are wrapped to [0, 360), so compare a step small enough not to wrap.
-    const float venusBefore = OrbitLayout::GetAxialSpinDegrees(OrbitLayout::Body::Venus);
-    const float marsBefore = OrbitLayout::GetAxialSpinDegrees(OrbitLayout::Body::Mars);
-    OrbitLayout::SetJulianDate(OrbitLayout::GetJulianDate() + 1.0);
-    const float venusStep = OrbitLayout::GetAxialSpinDegrees(OrbitLayout::Body::Venus) - venusBefore;
-    const float marsStep = OrbitLayout::GetAxialSpinDegrees(OrbitLayout::Body::Mars) - marsBefore;
-    EXPECT_NEAR(venusStep, 360.0f / -243.025f, 1e-3f);
-    EXPECT_NEAR(std::remainder(marsStep, 360.0f), std::remainder(360.0f / 1.025957f, 360.0f), 1e-3f);
+    // Spins are wrapped to [0, 360), so compare the remainder of a one-day step. The rates
+    // are the IAU Wdot: Venus and Uranus turn the other way with no special case.
+    const double start = OrbitLayout::GetJulianDate();
+    const auto step = [&](OrbitLayout::Body body) {
+        const double before = OrbitLayout::AxialSpinDegreesAt(body, start);
+        return std::remainder(OrbitLayout::AxialSpinDegreesAt(body, start + 1.0) - before, 360.0);
+    };
+    EXPECT_NEAR(step(OrbitLayout::Body::Venus), -1.4813688, 1e-9);
+    EXPECT_NEAR(step(OrbitLayout::Body::Uranus), std::remainder(-501.1600928, 360.0), 1e-9);
+    EXPECT_NEAR(step(OrbitLayout::Body::Mars), std::remainder(350.891982443297, 360.0), 1e-9);
+    EXPECT_NEAR(step(OrbitLayout::Body::Jupiter), std::remainder(870.536, 360.0), 1e-9);
+}
+
+TEST_F(OrbitLayoutTest, SpinAtJ2000IsTheIauPrimeMeridianAngle) {
+    // Public IAU WGCCRE 2015 W0 (Archinal et al. 2018), degrees.
+    struct Row {
+        OrbitLayout::Body body;
+        double w0;
+    };
+    for (const Row& row : {Row{OrbitLayout::Body::Mercury, 329.5988}, Row{OrbitLayout::Body::Venus, 160.20},
+                           Row{OrbitLayout::Body::Mars, 176.049863}, Row{OrbitLayout::Body::Jupiter, 284.95},
+                           Row{OrbitLayout::Body::Saturn, 38.90}, Row{OrbitLayout::Body::Uranus, 203.81},
+                           Row{OrbitLayout::Body::Neptune, 249.978}, Row{OrbitLayout::Body::Pluto, 302.695}}) {
+        EXPECT_NEAR(OrbitLayout::AxialSpinDegreesAt(row.body, Ephemeris::kJ2000), row.w0, 1e-9)
+            << static_cast<int>(row.body);
+    }
+}
+
+TEST_F(OrbitLayoutTest, SpinIsAPureFunctionOfTheDate) {
+    // The same JD gives the same spin however the process got there: a fresh start with a
+    // shared ?date=, a long-running session, and a scrub away and back all agree exactly.
+    const double jd = Ephemeris::JulianDateFromYmd(2031, 5, 17) + 0.3125;
+    const OrbitLayout::Body bodies[] = {OrbitLayout::Body::Mercury, OrbitLayout::Body::Venus,
+                                        OrbitLayout::Body::Earth,   OrbitLayout::Body::Mars,
+                                        OrbitLayout::Body::Jupiter, OrbitLayout::Body::Saturn,
+                                        OrbitLayout::Body::Uranus,  OrbitLayout::Body::Neptune,
+                                        OrbitLayout::Body::Pluto,   OrbitLayout::Body::Ceres,
+                                        OrbitLayout::Body::Eris,    OrbitLayout::Body::Halley};
+
+    OrbitLayout::ResetForTests();
+    OrbitLayout::SetJulianDate(jd);
+    float fresh[std::size(bodies)];
+    for (size_t i = 0; i < std::size(bodies); ++i) {
+        fresh[i] = OrbitLayout::GetAxialSpinDegrees(bodies[i]);
+    }
+
+    OrbitLayout::ResetForTests();
+    OrbitLayout::Advance(333.0f); // history: a session that has been running
+    OrbitLayout::SetJulianDate(jd + 12345.678);
+    OrbitLayout::SetJulianDate(jd);
+    for (size_t i = 0; i < std::size(bodies); ++i) {
+        EXPECT_EQ(OrbitLayout::GetAxialSpinDegrees(bodies[i]), fresh[i]) << static_cast<int>(bodies[i]);
+        EXPECT_GE(fresh[i], 0.0f);
+        EXPECT_LT(fresh[i], 360.0f);
+    }
 }
 
 TEST_F(OrbitLayoutTest, AdvanceUpdatesJulianDate) {
@@ -268,17 +315,16 @@ struct LonLat {
  */
 LonLat RenderedSubSolarPoint() {
     const BodyCatalog::Entry* earth = BodyCatalog::FindById("earth");
-    glm::mat4 model(1.0f);
-    model = glm::rotate(model, glm::radians(earth->axialTiltDegrees), glm::vec3(0.0f, 0.0f, 1.0f));
+    glm::dmat4 model(1.0);
+    model = glm::rotate(model, glm::radians(static_cast<double>(earth->axialTiltDegrees)), glm::dvec3(0.0, 0.0, 1.0));
     if (earth->artTiltXDegrees != 0.0f) {
-        model = glm::rotate(model, glm::radians(earth->artTiltXDegrees), glm::vec3(1.0f, 0.0f, 0.0f));
+        model = glm::rotate(model, glm::radians(static_cast<double>(earth->artTiltXDegrees)), glm::dvec3(1.0, 0.0, 0.0));
     }
-    model = glm::rotate(model, glm::radians(OrbitLayout::GetAxialSpinDegrees(OrbitLayout::Body::Earth)),
-                        glm::vec3(0.0f, 1.0f, 0.0f));
+    model = glm::rotate(model, glm::radians(OrbitLayout::AxialSpinDegreesAt(OrbitLayout::Body::Earth, OrbitLayout::GetJulianDate())),
+                        glm::dvec3(0.0, 1.0, 0.0));
     const glm::dvec3 toSun = glm::normalize(-OrbitLayout::GetHeliocentricScenePosition(OrbitLayout::Body::Earth));
-    const glm::vec3 local = glm::transpose(glm::mat3(model)) * glm::vec3(toSun);
-    return {glm::degrees(-std::atan2(static_cast<double>(local.z), static_cast<double>(local.x))),
-            glm::degrees(std::asin(static_cast<double>(local.y)))};
+    const glm::dvec3 local = glm::transpose(glm::dmat3(model)) * toSun;
+    return {glm::degrees(-std::atan2(local.z, local.x)), glm::degrees(std::asin(local.y))};
 }
 
 /** The real sub-solar point: Sun direction in the Earth-fixed frame via Observer (GMST). */
@@ -298,53 +344,52 @@ double AngleDiffDeg(double a, double b) {
 } // namespace
 
 TEST_F(OrbitLayoutTest, EarthTextureShowsTheTrueSubSolarLongitudeAllYear) {
-    // A constant prime-meridian offset on GMST could not do this: the scene is a mirror of
-    // the ecliptic, so the old spin's residual swung by ~180 deg over a year.
+    // GMST plus a constant offset cannot do this: the scene is a mirror of the ecliptic and
+    // the drawn pole is art, so such a spin is right at one instant and off by ~2 degrees a
+    // day from there. Earth's spin is solved so the longitude is right on every date, in
+    // both scale modes. This is what locks kEarthTextureCentreLonDeg: with a different
+    // centre every date here is off by the difference.
     for (const auto mode : {OrbitLayout::ScaleMode::Compressed, OrbitLayout::ScaleMode::Realistic}) {
         OrbitLayout::SetScaleMode(mode);
-        for (int step = 0; step < 8; ++step) {
-            const double jd = Ephemeris::JulianDateFromYmd(2024, 1, 1) + 45.7 * step + 0.13 * step;
+        for (int step = 0; step < 16; ++step) {
+            const double jd = Ephemeris::JulianDateFromYmd(2024, 1, 1) + 23.17 * step + 0.13 * step;
             OrbitLayout::SetJulianDate(jd);
-            const LonLat drawn = RenderedSubSolarPoint();
-            const LonLat truth = TrueSubSolarPoint(jd);
-            EXPECT_NEAR(AngleDiffDeg(drawn.lonDeg, truth.lonDeg), 0.0, 0.5) << "jd " << jd;
+            EXPECT_NEAR(AngleDiffDeg(RenderedSubSolarPoint().lonDeg, TrueSubSolarPoint(jd).lonDeg), 0.0, 0.01)
+                << "jd " << jd;
         }
     }
 }
 
-TEST_F(OrbitLayoutTest, EarthSubSolarLongitudeMatchesAlmanacAtNoonUtc) {
-    // Independent of Observer: at 12:00 UTC the Sun is over longitude -EoT * 0.25 deg/min
-    // (apparent minus mean solar time). Almanac equation of time: 2025-02-11 -14.2 min,
-    // 2025-11-03 +16.4 min. Zeroing or breaking the calibration lands tens of degrees off.
-    struct Anchor { int y, m, d; double eotMinutes; };
-    for (const Anchor& anchor : {Anchor{2025, 2, 11, -14.2}, Anchor{2025, 11, 3, 16.4}}) {
-        OrbitLayout::SetJulianDate(Ephemeris::JulianDateFromYmd(anchor.y, anchor.m, anchor.d) + 0.5);
-        EXPECT_NEAR(AngleDiffDeg(RenderedSubSolarPoint().lonDeg, -anchor.eotMinutes * 0.25), 0.0, 0.5)
-            << anchor.y << "-" << anchor.m << "-" << anchor.d;
+TEST_F(OrbitLayoutTest, EarthTextureMatchesPublishedAlmanacSubSolarLongitudes) {
+    // Independent of Observer: the sub-solar longitude is -15 * (UT - 12h + EoT) degrees east,
+    // with the equation of time from the USNO / Astronomical Almanac tables (to ~0.1 minute,
+    // 0.03 degrees). The two instants are the 2024 March equinox (20 Mar 03:06 UTC, EoT
+    // -7.4 min) and June solstice (20 Jun 20:51 UTC, EoT -1.4 min), 0.25 degrees allowed for
+    // the rounded tables (measured: 0.005° and 0.10°).
+    struct Anchor {
+        double jd;
+        double eotMinutes;
+    };
+    const Anchor anchors[] = {
+        {Ephemeris::JulianDateFromYmd(2024, 3, 20) + 3.1 / 24.0, -7.4},
+        {Ephemeris::JulianDateFromYmd(2024, 6, 20) + 20.85 / 24.0, -1.4},
+    };
+    for (const Anchor& anchor : anchors) {
+        OrbitLayout::SetJulianDate(anchor.jd);
+        const double utHours = std::fmod(anchor.jd - 0.5, 1.0) * 24.0;
+        const double expected = std::remainder(-15.0 * (utHours - 12.0 + anchor.eotMinutes / 60.0), 360.0);
+        EXPECT_NEAR(AngleDiffDeg(RenderedSubSolarPoint().lonDeg, expected), 0.0, 0.25) << "jd " << anchor.jd;
     }
 }
 
-TEST_F(OrbitLayoutTest, EverySpinIsAFunctionOfTheDate) {
-    // Scrub forward with Advance (the frame loop's path) and jump back: nothing accumulates,
-    // so every body, Jupiter included, is exactly where it was.
+TEST_F(OrbitLayoutTest, EarthSpinIsADateFunctionAndTurnsAtTheSiderealRate) {
     const double epoch = Ephemeris::JulianDateFromYmd(2017, 8, 21) + 0.77;
-    OrbitLayout::SetJulianDate(epoch);
-    float before[OrbitLayout::kBodyCount];
-    for (int i = 0; i < OrbitLayout::kBodyCount; ++i) {
-        before[i] = OrbitLayout::GetAxialSpinDegrees(static_cast<OrbitLayout::Body>(i));
-    }
-    for (int frame = 0; frame < 500; ++frame) {
-        OrbitLayout::Advance(0.37f);
-    }
-    EXPECT_NE(OrbitLayout::GetAxialSpinDegrees(OrbitLayout::Body::Jupiter), before[static_cast<int>(OrbitLayout::Body::Jupiter)]);
-    OrbitLayout::SetJulianDate(epoch);
-    for (int i = 0; i < OrbitLayout::kBodyCount; ++i) {
-        EXPECT_FLOAT_EQ(OrbitLayout::GetAxialSpinDegrees(static_cast<OrbitLayout::Body>(i)), before[i]) << "body " << i;
-    }
+    const auto spin = [](double jd) { return OrbitLayout::AxialSpinDegreesAt(OrbitLayout::Body::Earth, jd); };
+
+    EXPECT_EQ(spin(epoch), spin(epoch));
+    // Within the Sun's own motion of the sidereal rate (360.9856 degrees a day): the spin
+    // that holds a longitude under the Sun runs about 2 * 0.9856 degrees a day slower.
+    const double perDay = std::remainder(spin(epoch + 1.0) - spin(epoch), 360.0);
+    EXPECT_NEAR(perDay, std::remainder(360.9856235, 360.0), 3.0);
 }
 
-TEST_F(OrbitLayoutTest, SpinsStartFromTheCatalogPrimeMeridianAtJ2000) {
-    OrbitLayout::SetJulianDate(Ephemeris::kJ2000);
-    EXPECT_NEAR(OrbitLayout::GetAxialSpinDegrees(OrbitLayout::Body::Jupiter), 284.95f, 1e-3f); // IAU System III W0
-    EXPECT_NEAR(OrbitLayout::GetAxialSpinDegrees(OrbitLayout::Body::Mars), 176.049863f, 1e-3f);
-}

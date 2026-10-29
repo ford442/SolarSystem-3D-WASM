@@ -4,7 +4,7 @@
 
 #include <glm/glm.hpp>
 
-#include "Auxiliary_Modules/Ephemeris.h"
+#include "astro/Ephemeris.h"
 #include "Solar_System/BodyCatalog.generated.h"
 #include "Solar_System/EclipseCaster.h"
 #include "Solar_System/SatelliteOrbit.h"

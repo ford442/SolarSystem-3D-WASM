@@ -1,0 +1,40 @@
+{
+  "id": "descent-to-earth",
+  "title": "Seamless descent to 1 m above Earth",
+  "description": "True scale, one fixed instant: from 1.5 million km out straight down to a metre above the ground on the sunlit side, with no loading step and no change of scale. Terrain detail waits for streamed terrain (Olympus Mons is the next cinematic).",
+  "view": { "orbitScale": 1, "orbitLines": false },
+  "durationSec": 44,
+  "keyframes": [
+    {
+      "t": 0, "jd": 2460483.0, "focus": "earth", "path": "polar", "fov": 30,
+      "camera": { "position": [0, 0.5, 0.866], "altitudeKm": 1500000, "frame": "sun", "lookAt": "earth" },
+      "overlays": { "orbitLines": false, "magneticFields": false },
+      "caption": "1.5 million km out, on true scale. Earth is a speck."
+    },
+    {
+      "t": 8, "focus": "earth", "path": "polar",
+      "camera": { "position": [0, 0.5, 0.866], "altitudeKm": 60000, "frame": "sun", "lookAt": "earth" },
+      "caption": "60,000 km: beyond the geostationary ring."
+    },
+    {
+      "t": 16, "focus": "earth", "path": "polar", "fov": 40,
+      "camera": { "position": [0, 0.5, 0.866], "altitudeKm": 2000, "frame": "sun", "lookAt": "earth" },
+      "caption": "2,000 km."
+    },
+    {
+      "t": 24, "focus": "earth", "path": "polar",
+      "camera": { "position": [0, 0.5, 0.866], "altitudeKm": 25, "frame": "sun", "lookAt": "earth" },
+      "caption": "25 km, under the clouds."
+    },
+    {
+      "t": 31, "focus": "earth", "path": "polar", "fov": 45,
+      "camera": { "position": [0, 0.5, 0.866], "altitudeKm": 0.3, "frame": "sun", "horizon": { "azimuthDeg": 180, "elevationDeg": -8 } },
+      "caption": "300 m. Every position is a double; the render origin rides with the camera."
+    },
+    {
+      "t": 40, "focus": "earth", "path": "polar",
+      "camera": { "position": [0, 0.5, 0.866], "altitudeKm": 0.001, "frame": "sun", "horizon": { "azimuthDeg": 180, "elevationDeg": 1 } },
+      "caption": "One metre above the ground, on the same true-scale Solar System."
+    }
+  ]
+}

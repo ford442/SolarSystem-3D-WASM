@@ -1,4 +1,9 @@
 #version 300 es
+// NEAR_SURFACE (atmosphere.vs) writes depth per fragment.
+// permutations: NEAR_SURFACE
+#ifdef NEAR_SURFACE
+in float vLogDepth;
+#endif
 
 //
 // Atmospheric scattering fragment shader
@@ -12,10 +17,10 @@ in vec3 fPosition;
 in mat3 modelMat3;
 in vec4 fragPosLightSpace;
 
-uniform sampler2D ringDiffuse;
-uniform sampler2D shadowMap;
-uniform float farPlane;
-uniform float bias; // For shadows
+layout(binding = TU_RING) uniform sampler2D ringDiffuse;
+layout(binding = TU_SHADOW_MAP) uniform sampler2D shadowMap;
+uniform float bias; // For shadows, in shadow-map depth units
+uniform vec2 shadowDepthRange; // this component's light frustum: near, far - near (scene units)
 uniform float uSurfaceDim;
 uniform float earthSizeCoefficient;
 uniform bool isUseToneMapping;
@@ -60,6 +65,8 @@ uniform float SCALE_L_FACTOR;
 
 out vec4 fragColor;
 
+#include "common/frame.glsl"
+#include "common/log_depth.glsl"
 #include "common/raytrace.glsl"
 #include "common/ring.glsl"
 #include "common/phase.glsl"
@@ -152,7 +159,7 @@ float CalculateShadow(vec4 fragPosLightSpace) {
         float u;
         if (RingCrossing(fWorldPosition, lightDir, lightDir, ringCenter, ringNormal, ringInnerOuterRadiuses, u)) {
             // If some planet obscures the ring
-            if (shadow > 0.0 && length(lightPos - ringCenter) - (closestDepth - bias) * farPlane > ringInnerOuterRadiuses.y) {
+            if (shadow > 0.0 && length(lightPos - ringCenter) - (shadowDepthRange.x + (closestDepth - bias) * shadowDepthRange.y) > ringInnerOuterRadiuses.y) {
                 return shadow;
             }
 
@@ -175,6 +182,9 @@ float criticalLengthFactor() {
 }
 
 void main() {
+#ifdef NEAR_SURFACE
+    gl_FragDepth = LogFragDepth(vLogDepth); // first: every path that is not discarded writes it
+#endif
     float shadow = CalculateShadow(fragPosLightSpace);
 
     if (shadow > 0.0)

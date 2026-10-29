@@ -1,8 +1,8 @@
 #version 300 es
+#include "common/frame.glsl"
 #include "common/noise_simplex4d.glsl"
 
 uniform vec3 starShiftColor;
-uniform float deltaTime;
 uniform float maxSize;
 
 in vec3 fPosition;
@@ -20,7 +20,7 @@ void main() {
     const float irregularityMultiplier = 4.0;   // The higher the number, the more irregularities and bigger ones. (Might be more GPU intensive when higher, 4 seems fine for the normal PC)
 
     /* Don't edit these */
-    float t = deltaTime * 10.0 - length(fPosition);
+    float t = (frame.time * 0.002) * 10.0 - length(fPosition);
 
     // Offset normal with noise
     float ox = snoise(vec4(fPosition, t) * frequency);

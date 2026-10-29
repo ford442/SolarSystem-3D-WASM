@@ -106,6 +106,18 @@ test('WASM module boots and staged loading reacts to camera pose', async ({ page
   await expect(page.locator('#tour-stop')).not.toHaveAttribute('hidden');
   await page.locator('#tour-stop').evaluate((el: HTMLButtonElement) => el.click());
 
+  // Focus from C++ (the F7 = Saturn preset) reaches the explorer through Module['onPlanetFocused']
+  // on the module instance. The explorer used to poll every 750 ms, so a sub-750 ms deadline
+  // proves the event path, not the old timer.
+  await page.locator('#canvas').hover();
+  await page.keyboard.press('F7');
+  await page.waitForFunction(
+    () => document.querySelector('#explorer-body-list [data-planet-index="6"]')?.classList.contains('is-selected') === true,
+    undefined,
+    { timeout: 500 },
+  );
+  await expect(page.locator('#planet-info-title')).toHaveText('Saturn');
+
   // Every preset must switch cleanly: Low falls back to the O'Neil atmosphere and the flat
   // corona, Medium/Full draw the LUT atmosphere and the sliced corona (ARCHITECTURE §9.2).
   // A shader or LUT problem would surface as a console error or a missing tier line.
@@ -222,4 +234,65 @@ test('Observe mode puts the camera on Earth, ignores movement, and restores Expl
   });
   await expect(page.locator('#observe-controls')).toBeHidden();
   expect(consoleErrors).toEqual([]);
+});
+
+test('Losing the WebGL context shows a reload panel that keeps the view', async ({ page, baseURL }) => {
+  const response = await page.goto(`${baseURL ?? '/'}?planet=mars`, { waitUntil: 'domcontentloaded' });
+  expect(response?.ok()).toBeTruthy();
+  await page.waitForFunction(() => typeof window.setCameraPose === 'function', undefined, {
+    timeout: 45_000,
+  });
+
+  await page.evaluate(() => {
+    const canvas = document.getElementById('canvas') as HTMLCanvasElement;
+    canvas.getContext('webgl2')?.getExtension('WEBGL_lose_context')?.loseContext();
+  });
+
+  const panel = page.locator('#fatal-panel');
+  await expect(panel).toBeVisible({ timeout: 5_000 });
+  await expect(panel).toContainText('Graphics context lost');
+
+  // Reload carries the current view as a deep link rather than reloading the bare URL.
+  await page.locator('#fatal-panel-reload').click();
+  await page.waitForURL(/[?&]quality=/, { timeout: 10_000 });
+});
+
+test('Context is single-sampled (HDR resolves it) and a reload reads fetched assets from the Cache API', async ({ page, baseURL }) => {
+  const textureRequests: string[] = [];
+  const consoleLogs: string[] = [];
+  page.on('request', (request) => {
+    if (/\/resource\/textures[^/]*\/Main_SkyBox\//.test(request.url())) textureRequests.push(request.url());
+  });
+  page.on('console', (message) => consoleLogs.push(message.text()));
+
+  const load = async () => {
+    await page.goto(baseURL ?? '/', { waitUntil: 'domcontentloaded' });
+    await page.waitForFunction(() => typeof window.setCameraPose === 'function', undefined, { timeout: 45_000 });
+  };
+
+  await load();
+  const attributes = await page.evaluate(() => {
+    const gl = document.querySelector('canvas')!.getContext('webgl2')!;
+    return { ...gl.getContextAttributes(), samples: gl.getParameter(gl.SAMPLES) as number };
+  });
+  // HDR tiers antialias in the tone-map pass; a multisampled default framebuffer would be wasted.
+  expect(attributes.antialias).toBe(false);
+  expect(attributes.samples).toBe(0);
+  await expect.poll(() => consoleLogs.some((line) => line.includes('AA=FXAA in HDR tone-map')), { timeout: 15_000 }).toBe(true);
+  expect(textureRequests.length).toBeGreaterThan(0);
+  // Downloads are still landing after the module is up; reload only once the six skybox faces are stored.
+  await expect.poll(() => page.evaluate(async () => {
+    let stored = 0;
+    for (const name of await caches.keys()) {
+      stored += (await (await caches.open(name)).keys()).filter((request) => request.url.includes('/Main_SkyBox/')).length;
+    }
+    return stored;
+  }), { timeout: 30_000 }).toBeGreaterThanOrEqual(6);
+
+  textureRequests.length = 0;
+  consoleLogs.length = 0;
+  await load();
+  await expect.poll(() => consoleLogs.filter((line) => line.includes('[AssetCache] hit')).length, { timeout: 15_000 })
+    .toBeGreaterThanOrEqual(6);
+  expect(textureRequests).toEqual([]);
 });

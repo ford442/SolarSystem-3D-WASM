@@ -9,6 +9,7 @@ in vec3 fLocal;
 
 out vec4 fragColor;
 
+#include "common/frame.glsl"
 #include "common/raytrace.glsl"
 #include "common/noise_simplex4d.glsl"
 
@@ -19,7 +20,6 @@ uniform float coronaExtent;
 uniform float nearMargin;    // nearest slice depth past the camera, solar radii
 uniform vec3 coronaColor;
 uniform float coronaIntensity;
-uniform float time;
 
 void main() {
     float r = length(fLocal);
@@ -46,7 +46,7 @@ void main() {
     // Streamers: noise on the direction only (plus a slow drift along r), so features stay
     // radial and read as rays; strongest toward the solar equator (world XZ plane).
     vec3 direction = fLocal / r;
-    float rays = noise(vec4(direction * 5.0, r * 0.08 + time), 3, 1.0, 0.5);
+    float rays = noise(vec4(direction * 5.0, r * 0.08 + (frame.time * 0.004)), 3, 1.0, 0.5);
     float streamer = 0.25 + 2.2 * pow(clamp(0.5 + 0.5 * rays, 0.0, 1.0), 4.0);
     float equator = 1.0 - 0.6 * direction.y * direction.y;
     float structure = mix(1.0, streamer * equator, smoothstep(1.02, 1.4, r));

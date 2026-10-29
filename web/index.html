@@ -224,6 +224,7 @@
             <button id="tour-play" class="settings-share" type="button">Play inner-system tour</button>
             <button id="tour-stop" class="settings-reset" type="button" hidden>Stop tour</button>
             <button id="tour-copy-step" class="settings-share" type="button" hidden>Copy link to this tour step</button>
+            <button id="timeline-open" class="settings-share" type="button">Cinematics and video…</button>
           </div>
           <button id="enter-vr" class="settings-vr" type="button" hidden>Enter VR</button>
           <button id="exit-vr" class="settings-vr settings-vr-exit" type="button" hidden>Exit VR</button>
@@ -232,6 +233,59 @@
       </div>
     </aside>
     <div id="tour-caption" class="tour-caption" hidden></div>
+    <section id="timeline-panel" class="timeline-panel" aria-label="Cinematic timeline" hidden>
+      <div class="timeline-row">
+        <select id="timeline-select" class="timeline-select" aria-label="Timeline"></select>
+        <button id="timeline-play" class="timeline-btn timeline-btn-primary" type="button">Play</button>
+        <button id="timeline-stop" class="timeline-btn" type="button" title="Stop and give the camera back">Stop</button>
+        <button id="timeline-close" class="timeline-btn timeline-close" type="button" aria-label="Close the timeline panel">×</button>
+      </div>
+      <div class="timeline-row">
+        <input id="timeline-scrub" class="timeline-scrub" type="range" min="0" max="1" step="0.01" value="0" aria-label="Timeline position" />
+        <output id="timeline-time" class="timeline-time" for="timeline-scrub">0.0 / 0.0 s</output>
+      </div>
+      <details class="timeline-editor">
+        <summary>Keyframes</summary>
+        <div class="timeline-row timeline-wrap">
+          <label class="timeline-field">Focus <select id="timeline-focus"></select></label>
+          <label class="timeline-field">Units
+            <select id="timeline-units">
+              <option value="radii">radii</option>
+              <option value="km">km</option>
+              <option value="scene">scene</option>
+            </select>
+          </label>
+          <button id="timeline-add-key" class="timeline-btn timeline-btn-primary" type="button">Add keyframe at current pose</button>
+        </div>
+        <ol id="timeline-keys" class="timeline-keys"></ol>
+        <div class="timeline-row timeline-wrap">
+          <button id="timeline-new" class="timeline-btn" type="button">New timeline</button>
+          <button id="timeline-export" class="timeline-btn" type="button">Export JSON</button>
+          <label class="timeline-btn timeline-file">Import JSON<input id="timeline-import" type="file" accept=".json,application/json" /></label>
+          <button id="timeline-copy-link" class="timeline-btn" type="button">Copy link</button>
+        </div>
+      </details>
+      <div class="timeline-row timeline-wrap">
+        <label class="timeline-field">Video
+          <select id="capture-size">
+            <option value="canvas">Window size</option>
+            <option value="1280x720">1280 × 720</option>
+            <option value="1920x1080" selected>1920 × 1080</option>
+            <option value="3840x2160">3840 × 2160</option>
+          </select>
+        </label>
+        <label class="timeline-field">
+          <select id="capture-fps">
+            <option value="30">30 fps</option>
+            <option value="60" selected>60 fps</option>
+          </select>
+        </label>
+        <button id="capture-start" class="timeline-btn timeline-btn-primary" type="button">Record video</button>
+        <button id="capture-cancel" class="timeline-btn" type="button" hidden>Cancel</button>
+        <progress id="capture-progress" class="timeline-progress" max="1" value="0" hidden></progress>
+      </div>
+      <p id="timeline-status" class="timeline-status" aria-live="polite"></p>
+    </section>
     <div id="telescope-overlay" class="telescope-overlay" hidden>
       <div class="telescope-field" aria-hidden="true"></div>
       <p id="telescope-label" class="telescope-label"></p>

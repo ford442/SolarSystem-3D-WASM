@@ -42,7 +42,7 @@ The build script:
 3. Builds with `emmake make`
 4. Deploys artifacts: `SolarSystem.js` → `web/src/`, `SolarSystem.wasm` and `SolarSystem.data` → `web/public/`
 
-The CMakeLists.txt has separate configurations for EMSCRIPTEN vs native builds, using Emscripten ports for GLFW, SDL2, SDL2_image, and FreeType (no SDL_mixer).
+The CMakeLists.txt has separate configurations for EMSCRIPTEN vs native builds, using Emscripten ports for GLFW and FreeType only (no SDL, SDL_image or SDL_mixer on web — `SDL_image.h`, `IMG_Init` and `LoadWindowIcon` are native-only).
 
 ### Native Build (Windows)
 
@@ -63,25 +63,34 @@ The CMakeLists.txt has separate configurations for EMSCRIPTEN vs native builds, 
   - `Application.cpp` — lifecycle (ctor/dtor, `InitScene`/`InitSceneObjects`) and the frame loop
   - `PlatformWindow.cpp` — GLFW/SDL/GL bring-up, window icon, resize, vsync, `Dispose`
   - `InputHandler.cpp` — polled input plus the mouse/scroll/key callbacks
+  - `CameraController.cpp` — per-frame camera navigation: co-moving anchor, altitude-scaled speed, the surface floor, clip planes (math in `core/CameraNavigation`)
   - `AudioPlayer.cpp` — native background music (SDL_mixer on Linux, irrKlang on Windows); web music is `web/src/music.ts`, C++ only reports `MusicDuckAmount()` via `onMusicDuck`
   - `RenderSettings.cpp` — quality/shadow presets, orbit scale mode, texture LOD manager
   - `StarSystemFactory.cpp` / `PlanetSystemLoader.cpp` — scene construction and staged web loading
   - `XrSession.cpp` — WebXR eye state and the stereo render pass (web only)
+  - `TerrainController.cpp` — terrain fetch hook, per-frame tile selection into the frame snapshot, the `[Terrain]` log line
+  - `Cinematics.cpp` — what web timelines and capture call: body catalog / scene state JSON, surface queries, system preload, HUD mask, `BeginCapture`/`StepCaptureFrame`/`EndCapture` (ARCHITECTURE §11.2)
 - `Renderer.h` — The `Renderer` class: shadow/color/overlay/HDR draw passes and the GPU
   resources they own (shaders, shadow FBO, HDR, skybox, lens flare, text renderer, orbit/
-  mission/magnetic-field overlay meshes). `Application` holds one (`_renderer`) and reaches it
-  through public fields/methods; `Renderer` reaches back into scene state it doesn't own
-  (camera, planet list, sun, mission/asteroid data) via a `friend`-granted `Application&`
-  rather than duplicating storage — see the comment at the top of Renderer.h.
+  mission/magnetic-field overlay meshes), all private. `Application` holds one (`_renderer`).
+  Every pass takes a `FrameContext` (`FrameContext.h`: `CameraView`, `SceneSnapshot`,
+  `SimState`, display size, XR flag), which `Application::BuildFrameSnapshot` fills after
+  `UpdateScene`. The renderer has no reference back to `Application`, and there is no global
+  `SimState`: anything a pass needs goes into the snapshot.
+  - `FramePasses.h` — the GL-free frame order: simulate once, then per-component shadow pass followed by every view's colour pass (unit-tested). `Application::CullScene` drops components no view sees (bounding spheres vs `gfx/Frustum.h`) and orders the rest front to back; each light frustum's depth range is fitted to its component's bodies (ARCHITECTURE §7.5)
+  - Scene objects hold no shader: a pass calls `SpaceObject::Draw(shader)` with the program it bound
   - `SceneRenderer.cpp` — shadow/color passes for planets, atmospheres, rings, clouds, text overlays
   - `SceneOverlayRenderer.cpp` — magnetic field ribbons, orbit paths, mission paths, asteroid belt
-- `SystemModules.h` — Convenience headers bundling system includes
+- `SystemModules.h` — Convenience headers bundling system includes (GL itself comes from `gfx/GlPlatform.h`)
 
-**Auxiliary Modules** (`Auxiliary_Modules/`)
-- Graphics: `Shader`, `Mesh`, `MeshHolder`, `TextureImage2D`
-- Camera system: `Camera` with acceleration/zoom, `FPS_Handler`
-- Rendering: `ShadowMapFBO` (PCF/ray-traced shadows), `LensFlare`, `HDR`, `TextRenderer`
-- Async loading: `WebResourceFetcher` (Emscripten-specific async file loading via callback-based `emscripten_async_wget2`; the blocking `emscripten_wget_data` path is gone — see "No blocking fetches" below)
+**Subsystem folders** (ARCHITECTURE §7.2; there is no `Auxiliary_Modules/` any more)
+- `core/` — `Log` (`LOG_*`), `Camera` (double world position) with acceleration/zoom, `CameraNavigation` (GL-free floor/speed/clip/anchor math), `FrameTimer`
+- `gfx/` — every GL object: `GlHandle` (the only `glGen*`/`glDelete*`), `Shader`/`ShaderLibrary`/`ShaderSource`, `Mesh`/`MeshHolder`, `LineStripBatch`, `TextureImage2D`, `FloatLutTexture`, `ShadowMapFBO`, `HDR`, `FrameUniforms`, `TextureUnits.h`, `Frustum.h`, `GlCapabilities`
+- `render/` — features built on `gfx/`: `LensFlare`, `TextRenderer`, orbit/mission/XR-pointer/magnetic-field renderers, field-line bloom
+- `assets/` — `WebResourceFetcher` (callback-based `emscripten_async_wget2`; the blocking `emscripten_wget_data` path is gone — see "No blocking fetches" below), `TextureLoadingQueue`, `TextureLODController`, `PlanetManifestLoader`, `TextureFormatSupport`, `BlockCompression`
+- `render/terrain/` — cube-sphere height tiles for `render.terrain` bodies (Moon, Mars, Mercury, Earth): GL-free `CubeSphere`/`TerrainTile`/`TerrainQuadtree`/`TileCache`/`TerrainSystem` (unit-tested in `test_terrain_quadtree.cpp`) plus the GL `TerrainRenderer`; `TerrainController.cpp` runs it per frame, `terrain.vs`/`terrain.fs` share the catalog material through `common/planet_surface.glsl`. Tiles are baked offline (`scripts/bake-terrain-tiles.py`), never committed; Low never fetches one (ARCHITECTURE §11.3)
+- `astro/` — GL-free: `Ephemeris`, `SkyEvents`, `Observer`, `LunarTheory`, `StarCatalog`, `MissionCatalog`, `MagneticField*` models, `SeatedView.h`
+- Headers carry no `using namespace`, and `Renderer.h` forward-declares the GPU helpers it holds by `unique_ptr` — include their headers in the `.cpp` that uses them. `scripts/check-source-rules.sh` and `scripts/check-gl-handles.sh` (CI) enforce both rules plus "no `std::cout`/`std::cerr` in `src/`"
 
 **Solar System** (`Solar_System/`)
 - Base classes:
@@ -115,6 +124,7 @@ The CMakeLists.txt has separate configurations for EMSCRIPTEN vs native builds, 
   3. Exposes `updateLoadingProgress()` for C++ to call
   4. Configures module locateFile() to resolve WASM/data files under Vite's base path
   5. Initializes the module with canvas and callbacks
+- `src/timeline.ts` / `timelinePlayer.ts` / `timelineEditor.ts` / `capture.ts` — cinematic timelines (`public/timelines/*.json`, `?timeline=`), their dock, and deterministic WebCodecs + mp4-muxer capture (ARCHITECTURE §11.2). `timeline.ts` is pure and unit-tested: `npm run test:unit` (Vitest, `src/**/*.test.ts`)
 - `src/style.css` — Loading screen and UI styling
 - `vite.config.ts` — Vite configuration for module/ES6 export compatibility
 - `tsconfig.json` — TypeScript configuration
@@ -123,12 +133,12 @@ The CMakeLists.txt has separate configurations for EMSCRIPTEN vs native builds, 
 ### Key Integration Points
 
 **Progress Tracking (C++ ↔ Web)**
-- C++ calls `Module['updateLoadingProgress'](loaded, total)` from an `EM_ASM` block in `JsBridge.cpp` (same for `onSettingsChanged` / `updateStreamingProgress` / `onPlanetFocused`); `web/src/wasmCallbacks.ts` installs them on `Module`
+- C++ calls `Module['updateLoadingProgress'](loaded, total, failed)` from an `EM_ASM` block in `JsBridge.cpp` (same for `onSettingsChanged` / `updateStreamingProgress` / `onPlanetFocused` / `onNearestPlanetChanged` / `onMissionFocused`); `web/src/wasmCallbacks.ts` installs them on the module instance (`setModuleInstance`). The build is `MODULARIZE`, so there is no global `Module` — writing to `globalThis.Module` reaches nothing
 - Bracket notation is load-bearing: Release links with `--closure 1`, which renames dotted property reads. A new bridge written as `Module.foo` is silently renamed and never fires in Release while working in Debug
 - Web receives `WebResourceFetcher` events and updates progress bar
 
 **Asset Resolution**
-- Shaders, fonts, icons, and the baked atmosphere LUTs (`resource/atmosphere/`) preloaded into Emscripten virtual filesystem via `--preload-file`
+- Shaders, fonts, missions, sky and the baked atmosphere LUTs (`resource/atmosphere/`) preloaded into Emscripten virtual filesystem via `--preload-file`
 - Textures lazy-loaded at runtime via `WebResourceFetcher`
 - Web sets `window.__solarSystemAssetBase` for runtime asset fetch base URL
 
@@ -140,8 +150,12 @@ The CMakeLists.txt has separate configurations for EMSCRIPTEN vs native builds, 
 
 - **Catalog-driven celestial bodies**: planets and moons are `CatalogBody`/`CatalogSatellite` rows from `planets.catalog.json`, and all of them bind their material through `CatalogMaterial::BindMaterial`. The only dedicated classes left are for the Sun, the ring meshes, cloud shells, and atmospheres (list in ARCHITECTURE §9.1). Atmosphere numbers are catalog data too (`render.atmosphere`, ARCHITECTURE §9.2).
 - **Baked atmosphere LUTs**: `render.atmosphere.physical` is baked by `tools/atmosphere_lut_baker` into `resource/atmosphere/*.ktx2`, which are committed. After editing it, rerun the generator and the baker; the `AtmosphereLutsFresh` ctest fails on a stale bake.
-- **Render origin**: scene floats are relative to a double render origin near the camera (`OrbitLayout::ToRenderFrame` / `GetRenderPosition`), not to the Sun; on compressed scale the origin is the Sun. Subtract in double before anything becomes a `glm::vec3`, and anything that keeps a render-frame position across frames must be shifted in `Application::MoveRenderOrigin` (ARCHITECTURE §11.1).
-- **Poses are functions of the date**: planets (`OrbitLayout`), moons (`SatelliteOrbit::EphemerisOffset` / `MeanAnomalyAt`), and spins (`OrbitLayout::GetAxialSpinDegrees` from catalog `primeMeridianDegJ2000`, `SpinDegreesAt` for moons) derive from `OrbitLayout::GetJulianDate()`. Do not add per-frame accumulators — they break date-scrubber jumps.
+- **Precision and scale** (ARCHITECTURE §11.1): world positions are heliocentric doubles (`GetWorldPosition`, `Camera::GetWorldPosition`); the render origin sits on the camera every frame in both modes, so scene floats are world minus camera taken in double (`OrbitLayout::ToRenderFrame`) and the view matrix has no translation. Realistic scale is true scale (Earth 0.081 units); compressed is a per-body remap, and art lengths tied to a body multiply by `SpaceObject::SizeFactor()`. Don't keep a render-frame position across frames (shift it in `Application::MoveRenderOrigin`, or better store the world position). Close to a body its programs use the `NEAR_SURFACE` permutation (fragment log depth, relative-to-eye vertices, `gfx/SurfacePatch` under a camera metres up). Native `SOLARSYSTEM_SCALE=realistic` switches scale at start-up.
+- **Poses are functions of the date**: planets (`OrbitLayout`), moons (`SatelliteOrbit::EphemerisOffset` / `MeanAnomalyAt`), and spins (`SpinDegreesAt`) derive from `OrbitLayout::GetJulianDate()`. Do not add per-frame accumulators — they break date-scrubber jumps. Planet spins are date functions too: `OrbitLayout::AxialSpinDegreesAt(body, jd)` evaluates the catalog's IAU `primeMeridianDegJ2000` + `primeMeridianRateDegPerDay` (Earth is solved for the true sub-solar longitude, ARCHITECTURE §11), and there is no `g_axialSpinDeg`. A hovering camera (inside `CameraNavigation::kHoverRadii`) co-rotates with its anchor via `CarryEye`; the light box fits the visible cap near a planet (`gfx/ShadowFit.h`, ARCHITECTURE §7.5).
+- **Animation time is the frame-delta sum**: animated shaders and overlays read `SimState::animationSeconds` (FrameUBO `time`), not `glfwGetTime()`, so a capture that steps a fixed 1/fps per frame is deterministic. Don't read wall-clock time in a pass.
+- **Context is MSAA-free when HDR is on; the tone-map pass antialiases**: `ContextMsaaSamples()` returns 0 for any tier with HDR, and `hdr.fs` runs FXAA on the tone-mapped value (ARCHITECTURE §9.6). `web/src/webglContext.ts` is the only place web context attributes are set — don't add a second table in C++.
+- **Fetched assets are cached by the page, not by C++**: `WebResourceFetcher` calls `window['__solarSystemFetchAsset']` (`web/src/assetCache.ts`, Cache API, named by asset base) when present and only writes the bytes to MEMFS (ARCHITECTURE §6.1.1). Preloaded `.data` is unaffected. Off under `npm run dev`; `?assetcache=0|1` overrides.
+- **Preload edits relink**: `--preload-file` dirs and `scripts/wasm-exports.json` are `LINK_DEPENDS`. A directory added to the preload list also needs adding to `SOLAR_EM_PRELOAD_DIRS` in `CMakeLists.txt`.
 - **Lazy texture loading**: Large DDS textures are not preloaded; `WebResourceFetcher` fetches them on-demand to avoid blocking initialization.
 - **No blocking fetches**: every download goes through callback-based `WebResourceFetcher::DownloadFile` (`emscripten_async_wget2`), and C++ only ever reads files that are already resident in MEMFS. That keeps the build free of `ASYNCIFY`/`JSPI` and lets it use native `-fwasm-exceptions`. Anything that needs a new asset must stage it through `DownloadFile` (core resources, a planet manifest, or `TextureLoadingQueue`) before the code that reads it runs — see `docs/plans/PORTING_GUIDE.md` §3b.
 - **Separate build paths**: CMakeLists.txt uses `if(EMSCRIPTEN)` to toggle library linking and compiler flags, avoiding duplication of core logic.
@@ -169,11 +183,15 @@ Ceres, Vesta, Eris/Haumea/Makemake, 1P/Halley (kind `comet`), Mercury–Pluto, t
 
 ### Modifying Shaders
 - Shaders are in `resource/shaders/`
-- Changes are reflected immediately in web (dev mode with Vite)
 - Every shader is authored once as `#version 300 es`; native `Shader.cpp` rewrites the directive to `#version 460 core` at load (ARCHITECTURE §9.1)
 - Shared helpers live in `resource/shaders/common/` and are pulled in with `#include "common/x.glsl"` (expanded once per stage by `ShaderSource`, with `#line` so errors name the right file); `common/preamble.glsl` supplies the precision defaults. Don't paste a helper into a shader that can include it — `test_shader_source.cpp` fails on duplicate definitions
-- `SOLARSYSTEM_SHADER_SELFTEST=1 ./build/SolarSystem` compiles every stage as both `460 core` and `300 es` and exits (under Mesa/Xvfb also set `MESA_GLSL_VERSION_OVERRIDE=460`)
-- Native reads `resource/shaders/` from disk at runtime — restart the app, no recompile needed
+- Samplers name their unit: `layout(binding = TU_SHADOW_MAP) uniform sampler2D shadowMap;`. The `TU_*` names come from `src/gfx/TextureUnits.h` via the generated `common/texture_units.glsl` (`npm run generate:texture-units`, checked in CI). ShaderSource strips the qualifier and Shader sets the unit once at link, so C++ never `SetInt`s a sampler; bind with `glBindTextureUnit(Unit(TextureUnit::X), tex)`
+- Depth is logarithmic everywhere: `ApplyLogDepth(gl_Position)` from `common/log_depth.glsl` in a vertex shader, or, under `NEAR_SURFACE`, `PrepareLogFragDepth` in the vertex stage and `gl_FragDepth = LogFragDepth(...)` in the fragment stage (ARCHITECTURE §11.1)
+- Per-view values (view/proj matrices, eye and Sun position, near/far planes, zCoef, logDepthC, time) live in `FrameUBO` (`#include "common/frame.glsl"`, read as `frame.view` etc.), uploaded once per view by `Renderer::BeginView`. Don't add `uniform mat4 projection/view` or `zCoef` to a lit shader
+- `Shader::Set*` takes a `string_view`, looks up a link-time location table, and skips the GL call when the value is unchanged. At debug level the `[FrameStats]` line logs pass counts and `glUniform*` calls every N frames (`SOLARSYSTEM_FRAME_STATS=N`, default 120)
+- Per-material switches are `#define` permutations, not `uniform bool`s: a stage tests `#ifdef HAS_CLOUDS` and lists its switches on a `// permutations: …` line; programs are `ShaderSpec`s (files + defines) built once by `ShaderLibrary`. planetLighting's variant comes from `CatalogMaterial::Variant` per draw (ARCHITECTURE §9.1)
+- `SOLARSYSTEM_SHADER_SELFTEST=1 ./build/SolarSystem` compiles every stage as both `460 core` and `300 es`, once per subset of its declared permutations, and exits (under Mesa/Xvfb also set `MESA_GLSL_VERSION_OVERRIDE=460`)
+- Hot reload: native polls `resource/shaders/` mtimes every 0.5 s and rebuilds changed programs in place (`SOLARSYSTEM_SHADER_HOT_RELOAD=0` disables); under `npm run dev` call `await window.__solarSystem.reloadShaders()` in the console. A failed compile keeps the old program
 
 ### Adjusting Graphics Settings (Shadows, Scattering, etc.)
 - Most parameters are exposed in the UI (accessed via GUI)
@@ -187,11 +205,15 @@ cd web
 npm run dev
 # Browser opens; changes to TypeScript auto-reload
 # For C++ changes, rebuild via build-web.sh and refresh
+npm run test:unit    # Vitest (timeline interpolation); no WASM build needed
 ```
+
+To check a timeline shot without real-time playback, `window.solarSystemTimeline.load('<id>')` then `snapshot(t, width, height)` returns a PNG data URL drawn through the capture path.
 
 ## Debugging Notes
 
-- **Emscripten console output**: Appears in browser DevTools Console
+- **Logging**: use `LOG_DEBUG/INFO/WARN/ERROR("Category", fmt, ...)` from `src/core/Log.h`, not `std::cout`/`std::cerr`; lines read `[Category] …` (tests grep for them). Level: `SOLARSYSTEM_LOG=debug` native, `?log=debug` web. Native Debug builds get a KHR_debug context whose messages arrive as `[GL] 0x…` (`SOLARSYSTEM_GL_DEBUG=1/0` overrides). See ARCHITECTURE §7.6
+- **Emscripten console output**: Appears in browser DevTools Console (`console.debug` lines need the Verbose filter)
 - **WebResourceFetcher errors**: Check Network tab for CORS or 404 errors
 - **Memory issues**: If the app crashes during texture load, check Emscripten memory ceiling and Browser console for OOM messages
 - **Performance**: Use WebGL profiling in DevTools; consider LOD (Level of Detail) for distant objects if needed
@@ -200,7 +222,7 @@ npm run dev
 ## Dependencies & Third-Party
 
 **C++ Libraries**
-- GLFW, SDL2, SDL2_image — Window/input management (Emscripten ports provide these)
+- GLFW — Window/input management (Emscripten port on web); SDL2/SDL2_image are native-only (window icon)
 - Assimp — 3D model loading (pre-built WASM version in `external/assimp/build-wasm/`)
 - GLM — Math library (header-only, in `external/glm/`)
 - FreeType — Font rendering (Emscripten port)

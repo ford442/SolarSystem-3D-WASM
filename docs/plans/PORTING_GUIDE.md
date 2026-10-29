@@ -25,7 +25,7 @@ This project has been successfully ported to WebAssembly! The following changes 
 This will generate:
 - `SolarSystem.js` - Emscripten's ES module glue code (`MODULARIZE=1` + `EXPORT_ES6=1`; no standalone `SolarSystem.html` shell is produced)
 - `SolarSystem.wasm` - The WebAssembly binary
-- `SolarSystem.data` - Preloaded assets (shaders, fonts, icons, low-res textures)
+- `SolarSystem.data` - Preloaded assets (shaders, fonts, missions, sky, atmosphere LUTs, low-res textures). `resource/icons` (14 MB) is native-only and is not preloaded
 - It deploys `SolarSystem.js` to `web/src/` and `SolarSystem.wasm` / `SolarSystem.data` to `web/public/`.
 
 ### Running
@@ -44,7 +44,10 @@ Then open `http://localhost:5173/solar-system/` (dev) or the `preview` URL Vite 
 ### ✅ CMakeLists.txt Changes
 The build system now properly handles Emscripten-specific configuration:
 - Uses `-s USE_GLFW=3` for GLFW support
-- Uses `-s USE_SDL=2` and `-s USE_SDL_IMAGE=2` for SDL support
+- No SDL ports: `SDL2`/`SDL2_image` are native-only (window icon, audio); `PlatformWindow.cpp` guards `SDL_image.h`, `IMG_Init` and `IMG_Quit` the same way as `LoadWindowIcon`
+- `-msimd128` (compile and link), `-sENVIRONMENT=web`, `-sSTACK_SIZE=1MB`; Release adds `--closure 1` and `--emit-symbol-map` (`SolarSystem.js.symbols`), Debug adds `-gsource-map`
+- `--preload-file` paths and `scripts/wasm-exports.json` are registered as `LINK_DEPENDS` (directories via `file(GLOB_RECURSE … CONFIGURE_DEPENDS)`), so editing a preloaded file relinks
+- `GROWABLE_ARRAYBUFFERS` stays 0 and there are no pthread flags
 - No audio port: music is an `HTMLAudioElement` in `web/src/music.ts` (SDL_mixer's Emscripten backend used a deprecated ScriptProcessorNode)
 - Uses `-s USE_FREETYPE=1` for text rendering
 - Uses `-s FULL_ES3=1` for WebGL 2.0 support
@@ -80,8 +83,8 @@ Audio is a browser media concern on web:
 Threads have been converted to frame-based logic for web compatibility:
 
 **Nearest Planet Search:**
-- Native: Uses `std::thread` running continuously
-- Web: Runs every 60 frames (~1 second at 60fps) in `UpdateSearchNearestPlanet()`
+- Both: `UpdateSearchNearestPlanet()` once per frame on the main thread (the native thread raced
+  the planet list and camera); web reports changes through `Module['onNearestPlanetChanged']`
 
 **Background Music:**
 - Native: Uses `std::thread` with volume fading logic
@@ -209,9 +212,10 @@ The historical blocker was Closure's property renaming mangling the `Module.foo`
 with **bracket notation**, which Closure never renames:
 
 * `JsBridge.cpp` — `Module['onSettingsChanged']`, `Module['updateLoadingProgress']`,
-  `Module['updateStreamingProgress']`, `Module['onPlanetFocused']`. The TypeScript side
-  (`web/src/wasmCallbacks.ts`) already assigns these through string keys, so the two
-  halves agree by construction.
+  `Module['updateStreamingProgress']`, `Module['onPlanetFocused']`,
+  `Module['onNearestPlanetChanged']`, `Module['onMissionFocused']`. The TypeScript side
+  (`web/src/wasmCallbacks.ts`) assigns these through string keys on the module instance
+  (`setModuleInstance`, called from `bootstrap.ts`), so the two halves agree by construction.
 * `QualitySettings.cpp` — `window['__solarSystemInit']` and its
   `['isMobileWeb']` / `['qualityPreset']` / `['backingStoreScale']` fields.
 * `WebResourceFetcher.cpp` — `window['__solarSystemAssetBase']`.
@@ -292,21 +296,26 @@ reads it at build time.
 
 `web/src/webglContext.ts` is the single owner of this decision, keyed off one three-way
 `WebGlCostTier` (`lowMobile` / `medium` / `full`) mirroring `GetQualitySettings()`'s existing
-mobile-forces-cheapest-tier rule (`requestedMsaaSamples` is already 0 for every mobile preset
-and only 4 for desktop "full" — see `QualitySettings.cpp`), so `antialias` here can't drift
-from the MSAA the C++ quality tier already assumed:
+mobile-forces-cheapest-tier rule. `antialias` is `false` for every tier: the default
+framebuffer is only multisampled when HDR is off *and* the tier asks for samples
+(`ContextMsaaSamples()` in `QualitySettings.cpp`), and no tier is both today. With HDR on the
+colour pass draws into `gfx/HDR`'s single-sampled texture, so context MSAA would only resolve an
+already-resolved image; medium and full antialias with FXAA in the tone-map pass (`hdr.fs`):
 
 | Attribute | lowMobile | medium | full |
 | :--- | :--- | :--- | :--- |
 | `powerPreference` | `low-power` | `high-performance` | `high-performance` |
 | `alpha` | `false` | `false` | `false` |
-| `antialias` | `false` | `false` | `true` |
+| `antialias` | `false` | `false` | `false` |
+| `premultipliedAlpha` | `false` | `false` | `false` |
 | backing-store scale | `min(dpr, 1)` | `min(dpr, 1.5)` | `min(dpr, 2)` |
 
 `bootstrap.ts` logs both the requested and actual (`gl.getContextAttributes()`) attributes to
-the console on load. `GLFW_SAMPLES` is no longer set on web (it would be ignored anyway once a
-context is preinitialized); the quality-preset MSAA logging in `QualitySettings.cpp` still
-applies (WebGL contexts can't be recreated, so MSAA still needs a page reload to change).
+the console on load. `GLFW_SAMPLES` is not set on web (it would be ignored anyway once a
+context is preinitialized). At startup C++ logs `[Quality] Context samples: requested N,
+GL_SAMPLES=M; …` and the `[Quality] Active tier` line prints `AA=FXAA in HDR tone-map` /
+`context MSAA` / `none` from the path that actually runs, not from the request. WebGL contexts
+can't be recreated, so a change of context samples still needs a page reload.
 
 ### Resize / DPI
 
@@ -400,7 +409,7 @@ are now three layers:
 
 3. **Software BC decode (the compatibility path).** With no pack published — the default,
    and every native build — a GPU without S3TC now CPU-decodes the DXT blocks to RGBA8
-   (`src/Auxiliary_Modules/BlockCompression.cpp`) and uploads that, instead of falling
+   (`src/assets/BlockCompression.cpp`) and uploads that, instead of falling
    back to the checkerboard. It costs 4 bytes per texel of GPU memory and a decode pass
    per mip, so it is a stopgap that keeps the *existing* DDS content usable everywhere;
    publishing an ASTC/ETC2 pack is what turns it back into a real compressed upload.
@@ -431,8 +440,8 @@ The codebase uses `#ifdef __EMSCRIPTEN__` to conditionally compile platform-spec
 | Dependency | Native | Web | Status |
 | :--- | :--- | :--- | :--- |
 | **GLFW** | ✅ Linked | ✅ `-s USE_GLFW=3` | Working |
-| **SDL2** | ✅ Linked | ✅ `-s USE_SDL=2` | Working |
-| **SDL_image** | ✅ Linked | ✅ `-s USE_SDL_IMAGE=2` | Working |
+| **SDL2** | ✅ Linked | ❌ Not linked | Native only |
+| **SDL_image** | ✅ Linked (window icon) | ❌ Not linked | Native only |
 | **SDL_mixer** | ✅ Linux only | ❌ Not linked (web uses `HTMLAudioElement`) | Working |
 | **GLEW** | ✅ Required | ❌ Not needed | N/A on web |
 | **irrKlang** | ✅ Audio engine | ❌ Unsupported | Replaced |

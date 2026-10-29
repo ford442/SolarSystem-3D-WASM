@@ -1,0 +1,415 @@
+// GL-touching tests (#149): a hidden GLFW window with a real 4.6 core context. Run them under
+// Xvfb/llvmpipe in CI (see native-linux-build.yml); without a display every test skips.
+#include <gtest/gtest.h>
+
+#include "gfx/GlPlatform.h"
+#include <GLFW/glfw3.h>
+
+#include "Solar_System/CatalogMaterial.h"
+#include "core/Log.h"
+#include "gfx/FrameUniforms.h"
+#include "gfx/GlCapabilities.h"
+#include "gfx/GlHandle.h"
+#include "gfx/HDR.h"
+#include "gfx/LineStripBatch.h"
+#include "gfx/Shader.h"
+#include "gfx/ShadowMapFBO.h"
+#include "gfx/TextureImage2D.h"
+#include "gfx/TextureUnits.h"
+#include "render/terrain/TerrainRenderer.h"
+
+#include <glm/gtc/matrix_transform.hpp>
+
+#include <array>
+#include <cmath>
+#include <cstdlib>
+#include <filesystem>
+#include <memory>
+#include <string>
+#include <vector>
+
+namespace {
+
+GLFWwindow* g_window = nullptr;
+
+class GlContextEnvironment : public ::testing::Environment {
+public:
+    void SetUp() override {
+        // Shaders and textures are read by repo-relative path, as the app does.
+        std::filesystem::current_path(SOLARSYSTEM_SOURCE_DIR);
+        if (!glfwInit()) {
+            return;
+        }
+        glfwWindowHint(GLFW_VISIBLE, GLFW_FALSE);
+        glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 4);
+        glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 6);
+        glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
+        g_window = glfwCreateWindow(64, 64, "SolarSystemGlTests", nullptr, nullptr);
+        if (!g_window) {
+            glfwTerminate();
+            return;
+        }
+        glfwMakeContextCurrent(g_window);
+        glewExperimental = GL_TRUE;
+        if (glewInit() != GLEW_OK) {
+            glfwDestroyWindow(g_window);
+            g_window = nullptr;
+            glfwTerminate();
+        }
+    }
+
+    void TearDown() override {
+        if (g_window) {
+            glfwDestroyWindow(g_window);
+            glfwTerminate();
+            g_window = nullptr;
+        }
+    }
+};
+
+const ::testing::Environment* const g_environment =
+    ::testing::AddGlobalTestEnvironment(new GlContextEnvironment);
+
+#define REQUIRE_GL_CONTEXT()                                                                         \
+    do {                                                                                             \
+        if (!g_window) {                                                                             \
+            GTEST_SKIP() << "no GL 4.6 context (run under Xvfb with MESA_GL_VERSION_OVERRIDE=4.6)";   \
+        }                                                                                            \
+    } while (0)
+
+GLuint CurrentProgram() {
+    GLint program = 0;
+    glGetIntegerv(GL_CURRENT_PROGRAM, &program);
+    return static_cast<GLuint>(program);
+}
+
+GLenum FramebufferStatus(GLuint fbo) {
+    glBindFramebuffer(GL_FRAMEBUFFER, fbo);
+    const GLenum status = glCheckFramebufferStatus(GL_FRAMEBUFFER);
+    glBindFramebuffer(GL_FRAMEBUFFER, 0);
+    return status;
+}
+
+const Shader& PlanetProgram(unsigned variant) {
+    static std::array<std::unique_ptr<Shader>, CatalogMaterial::kVariantCount> programs;
+    if (!programs[variant]) {
+        programs[variant] = std::make_unique<Shader>("resource/shaders/planetLighting.vs",
+                                                     "resource/shaders/planetLighting.fs",
+                                                     CatalogMaterial::Defines(variant));
+    }
+    return *programs[variant];
+}
+
+} // namespace
+
+TEST(GlHandle, CreatesMovesAndDeletesARealObject) {
+    REQUIRE_GL_CONTEXT();
+    GlBuffer buffer = GlBuffer::Create();
+    ASSERT_TRUE(buffer);
+    const GLuint id = buffer.get();
+    glBindBuffer(GL_ARRAY_BUFFER, id); // a generated name becomes a buffer object on first bind
+    glBindBuffer(GL_ARRAY_BUFFER, 0);
+    EXPECT_TRUE(glIsBuffer(id));
+
+    GlBuffer moved = std::move(buffer);
+    EXPECT_FALSE(buffer); // NOLINT(bugprone-use-after-move): the moved-from handle must be empty
+    EXPECT_EQ(moved.get(), id);
+    EXPECT_TRUE(glIsBuffer(id));
+
+    moved.reset();
+    EXPECT_FALSE(moved);
+    EXPECT_FALSE(glIsBuffer(id));
+    EXPECT_EQ(glGetError(), static_cast<GLenum>(GL_NO_ERROR));
+}
+
+TEST(Shader, EveryPlanetVariantLinksAndReadsFrameUboAtItsBinding) {
+    REQUIRE_GL_CONTEXT();
+    for (unsigned variant = 0; variant < CatalogMaterial::kVariantCount; ++variant) {
+        SCOPED_TRACE(variant);
+        const Shader& shader = PlanetProgram(variant);
+        shader.Use();
+        const GLuint program = CurrentProgram();
+        ASSERT_NE(program, 0u);
+        EXPECT_TRUE(shader.UsesFrameUniforms());
+        const GLuint block = glGetUniformBlockIndex(program, "FrameUBO");
+        ASSERT_NE(block, GL_INVALID_INDEX);
+        GLint binding = -1;
+        glGetActiveUniformBlockiv(program, block, GL_UNIFORM_BLOCK_BINDING, &binding);
+        EXPECT_EQ(binding, static_cast<GLint>(FrameUniformBuffer::kBinding));
+    }
+    EXPECT_EQ(glGetError(), static_cast<GLenum>(GL_NO_ERROR));
+}
+
+TEST(Shader, SamplerUnitsComeFromTheirLayoutBindingName) {
+    REQUIRE_GL_CONTEXT();
+    const Shader& shader = PlanetProgram(CatalogMaterial::kNightTexture | CatalogMaterial::kSpecularMap);
+    shader.Use();
+    const GLuint program = CurrentProgram();
+    const auto unitOf = [program](const char* sampler) {
+        GLint unit = -1;
+        glGetUniformiv(program, glGetUniformLocation(program, sampler), &unit);
+        return unit;
+    };
+    EXPECT_EQ(unitOf("mainDiffuseTexture"), static_cast<GLint>(Unit(TextureUnit::Diffuse)));
+    EXPECT_EQ(unitOf("normalMap"), static_cast<GLint>(Unit(TextureUnit::Normal)));
+    EXPECT_EQ(unitOf("nightTexture"), static_cast<GLint>(Unit(TextureUnit::Night)));
+    EXPECT_EQ(unitOf("specularMap"), static_cast<GLint>(Unit(TextureUnit::Specular)));
+    EXPECT_EQ(unitOf("shadowMap"), static_cast<GLint>(Unit(TextureUnit::ShadowMap)));
+}
+
+TEST(Shader, UniformCacheSkipsUnchangedValuesAndUnknownNames) {
+    REQUIRE_GL_CONTEXT();
+    const Shader& shader = PlanetProgram(0);
+    shader.Use();
+    const auto callsFor = [](auto&& set) {
+        const unsigned long long before = Shader::UniformCallCount();
+        set();
+        return Shader::UniformCallCount() - before;
+    };
+    shader.SetFloat("ambientFactor", 0.123f);
+    EXPECT_EQ(callsFor([&] { shader.SetFloat("ambientFactor", 0.123f); }), 0u);
+    EXPECT_EQ(callsFor([&] { shader.SetFloat("ambientFactor", 0.5f); }), 1u);
+    EXPECT_EQ(callsFor([&] { shader.SetFloat("noSuchUniform", 1.0f); }), 0u);
+
+    GLfloat value = 0.0f;
+    glGetUniformfv(CurrentProgram(), glGetUniformLocation(CurrentProgram(), "ambientFactor"), &value);
+    EXPECT_FLOAT_EQ(value, 0.5f);
+}
+
+TEST(Framebuffers, ShadowMapAndHdrTargetsAreComplete) {
+    REQUIRE_GL_CONTEXT();
+    ShadowMapFBO shadowMap(256, 256);
+    EXPECT_EQ(FramebufferStatus(shadowMap.GetFBO()), static_cast<GLenum>(GL_FRAMEBUFFER_COMPLETE));
+    shadowMap.Resize(512, 128);
+    EXPECT_EQ(shadowMap.GetShadowMapWidth(), 512);
+    EXPECT_EQ(FramebufferStatus(shadowMap.GetFBO()), static_cast<GLenum>(GL_FRAMEBUFFER_COMPLETE));
+
+    const Shader hdrShader("resource/shaders/passThrough.vs", "resource/shaders/hdr.fs");
+    HDR hdr(hdrShader, 64, 48);
+    ASSERT_EQ(hdr.IsEnabled(), GetGlCapabilities().colorBufferFloat);
+    if (hdr.IsEnabled()) {
+        EXPECT_EQ(FramebufferStatus(hdr.GetHdrFBO()), static_cast<GLenum>(GL_FRAMEBUFFER_COMPLETE));
+        hdr.Resize(32, 32);
+        EXPECT_EQ(FramebufferStatus(hdr.GetHdrFBO()), static_cast<GLenum>(GL_FRAMEBUFFER_COMPLETE));
+    }
+    EXPECT_EQ(glGetError(), static_cast<GLenum>(GL_NO_ERROR));
+}
+
+TEST(Hdr, TheToneMapPassAntialiasesAHardEdgeAndLeavesFlatAreasAlone) {
+    REQUIRE_GL_CONTEXT();
+    constexpr int kSize = 32;
+    const Shader hdrShader("resource/shaders/passThrough.vs", "resource/shaders/hdr.fs");
+    HDR hdr(hdrShader, kSize, kSize);
+    if (!hdr.IsEnabled()) {
+        GTEST_SKIP() << "no renderable float color buffers";
+    }
+
+    // A staircase diagonal in the HDR target: bright (value 4) where x < y, black elsewhere.
+    // Scissored clears give hard, aliased steps with no rasteriser involved.
+    glBindFramebuffer(GL_FRAMEBUFFER, hdr.GetHdrFBO());
+    glViewport(0, 0, kSize, kSize);
+    glEnable(GL_SCISSOR_TEST);
+    glScissor(0, 0, kSize, kSize);
+    glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
+    glClear(GL_COLOR_BUFFER_BIT);
+    glClearColor(4.0f, 4.0f, 4.0f, 1.0f);
+    for (int y = 0; y < kSize; ++y) {
+        glScissor(0, y, y, 1);
+        glClear(GL_COLOR_BUFFER_BIT);
+    }
+    glDisable(GL_SCISSOR_TEST);
+
+    GlTexture color = GlTexture::Create();
+    glBindTexture(GL_TEXTURE_2D, color.get());
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA8, kSize, kSize, 0, GL_RGBA, GL_UNSIGNED_BYTE, nullptr);
+    GlFramebuffer target = GlFramebuffer::Create();
+    glBindFramebuffer(GL_FRAMEBUFFER, target.get());
+    glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, color.get(), 0);
+    ASSERT_EQ(glCheckFramebufferStatus(GL_FRAMEBUFFER), static_cast<GLenum>(GL_FRAMEBUFFER_COMPLETE));
+    glDisable(GL_DEPTH_TEST);
+    glDisable(GL_CULL_FACE);
+    hdr.Render(1.0f, 1.0f); // gamma 1: the displayed value is the tone-mapped one
+
+    std::vector<unsigned char> pixels(kSize * kSize * 4);
+    glReadPixels(0, 0, kSize, kSize, GL_RGBA, GL_UNSIGNED_BYTE, pixels.data());
+    glBindFramebuffer(GL_FRAMEBUFFER, 0);
+    const auto red = [&](int x, int y) { return static_cast<int>(pixels[(y * kSize + x) * 4]); };
+
+    const int flatDark = red(kSize - 4, 3);
+    const int flatBright = red(3, kSize - 4);
+    EXPECT_EQ(flatDark, 0);                  // 1 - exp(0)
+    EXPECT_NEAR(flatBright, 250, 2);         // 1 - exp(-4), untouched away from the edge
+    EXPECT_NEAR(red(0, kSize - 1), 250, 2);  // a corner tap must clamp, not wrap to the dark side
+
+    // Without the resolve every pixel is one of the two flat values; on the edge there are
+    // now in-between ones.
+    int blended = 0;
+    for (int y = 0; y < kSize; ++y) {
+        for (int x = 0; x < kSize; ++x) {
+            const int value = red(x, y);
+            if (value > 15 && value < 235) {
+                ++blended;
+            }
+        }
+    }
+    EXPECT_GE(blended, kSize / 2) << "the tone-map pass left the staircase aliased";
+    EXPECT_EQ(glGetError(), static_cast<GLenum>(GL_NO_ERROR));
+}
+
+TEST(Draw, ALineStripBatchQuadFillsTheTarget) {
+    REQUIRE_GL_CONTEXT();
+    constexpr int kSize = 16;
+    GlTexture color = GlTexture::Create();
+    glBindTexture(GL_TEXTURE_2D, color.get());
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA8, kSize, kSize, 0, GL_RGBA, GL_UNSIGNED_BYTE, nullptr);
+    GlFramebuffer fbo = GlFramebuffer::Create();
+    glBindFramebuffer(GL_FRAMEBUFFER, fbo.get());
+    glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, color.get(), 0);
+    ASSERT_EQ(glCheckFramebufferStatus(GL_FRAMEBUFFER), static_cast<GLenum>(GL_FRAMEBUFFER_COMPLETE));
+    glViewport(0, 0, kSize, kSize);
+    glDisable(GL_DEPTH_TEST);
+    glDisable(GL_CULL_FACE);
+    glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
+    glClear(GL_COLOR_BUFFER_BIT);
+
+    // The full clip-space square, through the same VAO layout every ribbon shader reads.
+    const glm::vec3 corners[4] = {{-1.0f, -1.0f, 0.0f}, {-1.0f, 1.0f, 0.0f}, {1.0f, -1.0f, 0.0f}, {1.0f, 1.0f, 0.0f}};
+    std::vector<RibbonVertex> verts;
+    LineStripBatch::AppendQuad(verts, corners, glm::vec3(0.0f, 0.0f, 1.0f));
+    LineStripBatch batch;
+    batch.Upload(verts);
+    ASSERT_EQ(batch.VertexCount(), 6);
+
+    const Shader shader("resource/shaders/orbitPath.vs", "resource/shaders/orbitPath.fs");
+    shader.Use();
+    shader.SetMat4("model", glm::mat4(1.0f));
+    shader.SetMat4("view", glm::mat4(1.0f));
+    shader.SetMat4("projection", glm::mat4(1.0f));
+    shader.SetVec4("color", glm::vec4(1.0f, 0.5f, 0.0f, 1.0f));
+    batch.Draw();
+
+    std::array<unsigned char, 4> centre{}, corner{};
+    glReadPixels(kSize / 2, kSize / 2, 1, 1, GL_RGBA, GL_UNSIGNED_BYTE, centre.data());
+    glReadPixels(0, 0, 1, 1, GL_RGBA, GL_UNSIGNED_BYTE, corner.data());
+    glBindFramebuffer(GL_FRAMEBUFFER, 0);
+    EXPECT_EQ(centre[0], 255);
+    EXPECT_NEAR(centre[1], 128, 1);
+    EXPECT_EQ(centre[2], 0);
+    EXPECT_EQ(corner[0], 255); // both triangles drawn, not just one
+    EXPECT_EQ(glGetError(), static_cast<GLenum>(GL_NO_ERROR));
+}
+
+TEST(TextureImage2D, UploadsAPlaceholderDds) {
+    REQUIRE_GL_CONTEXT();
+    // The fallback checkerboard is also 4x4, so only the log tells a real upload from it.
+    std::vector<std::string> warnings;
+    Log::SetSinkForTesting([&warnings](Log::Level level, const std::string& line) {
+        if (level >= Log::Level::Warn) {
+            warnings.push_back(line);
+        }
+    });
+    const TextureImage2D texture("resource/textures_low/Mercury_Diffuse_Low.dds");
+    Log::SetSinkForTesting({});
+    EXPECT_EQ(warnings, std::vector<std::string>{});
+    ASSERT_NE(texture.GetTexture(), 0u);
+    EXPECT_TRUE(glIsTexture(texture.GetTexture()));
+    EXPECT_EQ(texture.GetWidth(), 4u);
+    EXPECT_EQ(texture.GetHeight(), 4u);
+    EXPECT_EQ(glGetError(), static_cast<GLenum>(GL_NO_ERROR));
+}
+
+TEST(Terrain, EveryProgramLinksWithItsSamplerUnits) {
+    REQUIRE_GL_CONTEXT();
+    // Kept for the run, as PlanetProgram keeps its: a program deleted while Shader still
+    // tracks it as current would have its name reused by the next one.
+    static std::vector<std::unique_ptr<Shader>> programs;
+    for (unsigned variant = 0; variant < CatalogMaterial::kVariantCount; ++variant) {
+        SCOPED_TRACE(variant);
+        programs.push_back(std::make_unique<Shader>("resource/shaders/terrain.vs", "resource/shaders/terrain.fs",
+                                                    CatalogMaterial::Defines(variant)));
+        const Shader& shader = *programs.back();
+        shader.Use();
+        const GLuint program = CurrentProgram();
+        ASSERT_NE(program, 0u);
+        EXPECT_TRUE(shader.UsesFrameUniforms());
+        GLint unit = -1;
+        glGetUniformiv(program, glGetUniformLocation(program, "heightTile"), &unit);
+        EXPECT_EQ(unit, static_cast<GLint>(Unit(TextureUnit::TerrainHeight)));
+        glGetUniformiv(program, glGetUniformLocation(program, "mainDiffuseTexture"), &unit);
+        EXPECT_EQ(unit, static_cast<GLint>(Unit(TextureUnit::Diffuse)));
+    }
+    programs.push_back(std::make_unique<Shader>("resource/shaders/terrain.vs", "resource/shaders/shadowMap.fs",
+                                                std::vector<std::string>{"SHADOW_PASS"}));
+    programs.back()->Use();
+    EXPECT_NE(CurrentProgram(), 0u);
+    EXPECT_EQ(glGetError(), static_cast<GLenum>(GL_NO_ERROR));
+}
+
+// terrain.vs places a tile where CubeSphere says, on the GPU: a level-0 face is the bulging
+// square of the cube face on the unit sphere, and a level-1 tile one quadrant of it.
+TEST(Terrain, ATileDrawsWhereTheCubeSpherePutsIt) {
+    REQUIRE_GL_CONTEXT();
+    static constexpr int kSize = 64;
+    GlTexture color = GlTexture::Create();
+    glBindTexture(GL_TEXTURE_2D, color.get());
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA8, kSize, kSize, 0, GL_RGBA, GL_UNSIGNED_BYTE, nullptr);
+    GlFramebuffer fbo = GlFramebuffer::Create();
+    glBindFramebuffer(GL_FRAMEBUFFER, fbo.get());
+    glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, color.get(), 0);
+    ASSERT_EQ(glCheckFramebufferStatus(GL_FRAMEBUFFER), static_cast<GLenum>(GL_FRAMEBUFFER_COMPLETE));
+    glViewport(0, 0, kSize, kSize);
+    glDisable(GL_DEPTH_TEST);
+    glDisable(GL_CULL_FACE);
+
+    // Looking down -Z at the unit sphere: x, y in [-1, 1] fill the target.
+    FrameUniformData frame;
+    frame.view = glm::lookAt(glm::vec3(0.0f, 0.0f, 3.0f), glm::vec3(0.0f), glm::vec3(0.0f, 1.0f, 0.0f));
+    frame.proj = glm::ortho(-1.0f, 1.0f, -1.0f, 1.0f, 0.1f, 10.0f);
+    frame.viewProj = frame.proj * frame.view;
+    frame.farPlane = 10.0f;
+    frame.zCoef = static_cast<float>(2.0 / std::log2(10.0 + 1.0));
+    FrameUniformBuffer frameBuffer;
+    frameBuffer.Upload(0, frame);
+    frameBuffer.Bind(0);
+
+    static const Shader shader("resource/shaders/terrain.vs", "resource/shaders/terrain.fs");
+    shader.Use();
+    TerrainRenderer renderer;
+    const auto coverage = [&](const Terrain::TileKey& key) {
+        const Terrain::HeightTile tile = Terrain::FlatTile(key);
+        Terrain::ActiveBody body;
+        body.frame.meshRadius = 1.0;
+        Terrain::DrawTile draw;
+        draw.tile = &tile;
+        draw.frame = Terrain::MakeTileFrame(key, 1.0);
+        draw.center = draw.frame.centerModel;
+        draw.skirtDepth = 0.01;
+        body.selection.tiles.push_back(draw);
+        glClearColor(0.0f, 0.0f, 0.0f, 0.0f);
+        glClear(GL_COLOR_BUFFER_BIT);
+        EXPECT_EQ(renderer.Draw(shader, body, glm::mat4(1.0f), TerrainRenderer::Pass::ColourFar), 1);
+        std::vector<unsigned char> pixels(kSize * kSize * 4);
+        glReadPixels(0, 0, kSize, kSize, GL_RGBA, GL_UNSIGNED_BYTE, pixels.data());
+        // Drawn = alpha 1 (terrain.fs writes it; the clear is 0), at NDC (x, y).
+        return [pixels](double x, double y) {
+            const int i = static_cast<int>((x + 1.0) * 0.5 * kSize);
+            const int j = static_cast<int>((y + 1.0) * 0.5 * kSize);
+            return pixels[static_cast<std::size_t>((j * kSize + i) * 4 + 3)] == 255;
+        };
+    };
+
+    const auto face = coverage(Terrain::TileKey{4, 0, 0, 0}); // +Z: u = +X, v = +Y
+    EXPECT_TRUE(face(0.0, 0.0));
+    EXPECT_TRUE(face(0.66, 0.0));  // the edge bulges out to 1/√2 at its middle
+    EXPECT_TRUE(face(0.0, -0.66));
+    EXPECT_FALSE(face(0.64, 0.64)); // past the corner at 1/√3
+    EXPECT_FALSE(face(0.75, 0.0));
+
+    const auto quadrant = coverage(Terrain::TileKey{4, 1, 1, 1}); // s, t in [0, 1]
+    EXPECT_TRUE(quadrant(0.3, 0.3));
+    EXPECT_FALSE(quadrant(-0.3, 0.3));
+    EXPECT_FALSE(quadrant(0.3, -0.3));
+    EXPECT_FALSE(quadrant(-0.3, -0.3));
+    glBindFramebuffer(GL_FRAMEBUFFER, 0);
+    EXPECT_EQ(glGetError(), static_cast<GLenum>(GL_NO_ERROR));
+}

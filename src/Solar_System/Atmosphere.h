@@ -2,6 +2,7 @@
 #define SOLARSYSTEM_ATMOSPHERE_H
 #include "OuterShell.h"
 #include "BodyCatalog.generated.h"
+#include "../gfx/GlHandle.h"
 
 /**
  * A planet's (or Titan's) atmosphere shell, configured from its catalog row
@@ -16,20 +17,20 @@
  */
 class Atmosphere : public OuterShell {
 public:
-    Atmosphere(MeshHolder model, const Shader& shader, const BodyCatalog::AtmosphereRow& row,
-               std::shared_ptr<SpaceObject> parent, float parentRadius);
-    ~Atmosphere() override;
+    Atmosphere(MeshHolder model, const BodyCatalog::AtmosphereRow& row,
+               std::shared_ptr<SpaceObject> parent, float artParentRadius);
     Atmosphere(const Atmosphere&) = delete;
     Atmosphere& operator=(const Atmosphere&) = delete;
 
-    void AdjustToParent(float timeScale = 0.0f) override;
+    void AdjustToParent() override;
 
     const BodyCatalog::AtmosphereRow& GetRow() const { return *_row; }
     glm::vec3 GetAtmosphereColor() const;
     glm::vec3 GetMieTint() const;
     float GetInnerRadius() const;
     float GetOuterRadius() const;
-    float GetParentRadius() const { return _parentRadius; }
+    /** The body's drawn radius: the art radius times the body's SizeFactor. */
+    float GetParentRadius() const;
     /** Distance from the centre inside which the camera is "in" the shell being drawn. */
     float GetAtmosphereOuterBoundary() const;
     /** Whether a scene-space point is inside the shell being drawn (oblate-aware). */
@@ -44,10 +45,10 @@ public:
     const glm::mat3& GetSphereToBody() const { return _sphereToBody; }
 
     /** Takes ownership of both LUT textures (0 = not loaded). */
-    void SetLuts(unsigned int transmittance, unsigned int multiScattering);
-    bool HasLuts() const { return _transmittanceLut != 0 && _multiScatteringLut != 0; }
-    unsigned int GetTransmittanceLut() const { return _transmittanceLut; }
-    unsigned int GetMultiScatteringLut() const { return _multiScatteringLut; }
+    void SetLuts(GlTexture transmittance, GlTexture multiScattering);
+    bool HasLuts() const { return _transmittanceLut && _multiScatteringLut; }
+    unsigned int GetTransmittanceLut() const { return _transmittanceLut.get(); }
+    unsigned int GetMultiScatteringLut() const { return _multiScatteringLut.get(); }
 
     /** Physical path on/off for this frame; changes the shell size. */
     void SetPhysicalPathActive(bool active) { _physicalPathActive = active && HasLuts(); }
@@ -62,8 +63,9 @@ private:
     const BodyCatalog::AtmosphereRow* _row;
     const BodyCatalog::Entry* _body; // the row's body; nullptr only for a malformed catalog
     glm::mat3 _bodyToSphere{1.0f}, _sphereToBody{1.0f};
+    // Compressed-scale (art) lengths; the getters scale them with the parent's SizeFactor.
     float _parentRadius, _innerRadius;
-    unsigned int _transmittanceLut = 0, _multiScatteringLut = 0;
+    GlTexture _transmittanceLut, _multiScatteringLut;
     bool _physicalPathActive = false;
 
     // sphere.obj's radius. The shell mesh is this sphere scaled by the active path's factor.

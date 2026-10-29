@@ -81,12 +81,13 @@
         ],
         "inclinationDeg": 0,
         "siderealRotationDays": 25.38,
-        "primeMeridianDegJ2000": 84.176,
         "orbitalPeriodDays": null,
         "distanceAu": 0,
         "axialTiltDegrees": 0,
         "earthRadiusScale": 1,
-        "rotationRate": 0.005
+        "rotationRate": 0.005,
+        "primeMeridianDegJ2000": 84.176,
+        "primeMeridianRateDegPerDay": 14.1844
       },
       "includeInCompanion": false
     },
@@ -120,12 +121,13 @@
         ],
         "inclinationDeg": 7,
         "siderealRotationDays": 58.646,
-        "primeMeridianDegJ2000": 329.5988,
         "orbitalPeriodDays": 88,
         "distanceAu": 0.387,
         "axialTiltDegrees": 0,
         "earthRadiusScale": 0.38,
-        "rotationRate": 0.003
+        "rotationRate": 0.003,
+        "primeMeridianDegJ2000": 329.5988,
+        "primeMeridianRateDegPerDay": 6.1385108
       },
       "system": {
         "name": "Mercury",
@@ -151,6 +153,9 @@
       },
       "includeInCompanion": true,
       "render": {
+        "terrain": {
+          "attribution": "Heights: MESSENGER MLA/MDIS global DEM (NASA/JHUAPL/Carnegie Institution of Washington/USGS), public domain. Faces the DEM does not cover stay the sphere."
+        },
         "shaderFlags": {
           "hasNightTexture": false,
           "hasSpecularMap": true,
@@ -194,12 +199,13 @@
         ],
         "inclinationDeg": 3.4,
         "siderealRotationDays": -243.025,
-        "primeMeridianDegJ2000": 160.2,
         "orbitalPeriodDays": 224.7,
         "distanceAu": 0.723,
         "axialTiltDegrees": 177.3,
         "earthRadiusScale": 0.95,
-        "rotationRate": -0.003
+        "rotationRate": -0.003,
+        "primeMeridianDegJ2000": 160.2,
+        "primeMeridianRateDegPerDay": -1.4813688
       },
       "system": {
         "name": "Venus",
@@ -293,12 +299,13 @@
         ],
         "inclinationDeg": 0,
         "siderealRotationDays": 0.99726968,
-        "primeMeridianDegJ2000": 190.147,
         "orbitalPeriodDays": 365.25,
         "distanceAu": 1,
         "axialTiltDegrees": -23.4,
         "earthRadiusScale": 1,
-        "rotationRate": 0.0075
+        "rotationRate": 0.0075,
+        "primeMeridianDegJ2000": 190.147,
+        "primeMeridianRateDegPerDay": 360.9856235
       },
       "system": {
         "name": "Earth",
@@ -334,6 +341,9 @@
       },
       "includeInCompanion": true,
       "render": {
+        "terrain": {
+          "attribution": "Heights: SRTM v3 (NASA/USGS) on land and ETOPO 2022 bathymetry (NOAA NCEI) at sea, both public domain."
+        },
         "shaderFlags": {
           "hasNightTexture": true,
           "hasSpecularMap": true,
@@ -412,12 +422,13 @@
         ],
         "inclinationDeg": 1.9,
         "siderealRotationDays": 1.025957,
-        "primeMeridianDegJ2000": 176.049863,
         "orbitalPeriodDays": 687,
         "distanceAu": 1.524,
         "axialTiltDegrees": -25.2,
         "earthRadiusScale": 0.53,
-        "rotationRate": 0.0065
+        "rotationRate": 0.0065,
+        "primeMeridianDegJ2000": 176.049863,
+        "primeMeridianRateDegPerDay": 350.891982443297
       },
       "system": {
         "name": "Mars",
@@ -428,8 +439,7 @@
           -1732,
           0,
           1000
-        ],
-        "lightFarUsesPlanetDistance": true
+        ]
       },
       "assets": {
         "requiredLow": [
@@ -448,6 +458,9 @@
       },
       "includeInCompanion": true,
       "render": {
+        "terrain": {
+          "attribution": "Heights: MGS MOLA MEGDR (NASA/JPL/GSFC), public domain."
+        },
         "shaderFlags": {
           "hasNightTexture": false,
           "hasSpecularMap": false,
@@ -517,12 +530,13 @@
         ],
         "inclinationDeg": 1.3,
         "siderealRotationDays": 0.41354,
-        "primeMeridianDegJ2000": 284.95,
         "orbitalPeriodDays": 4333,
         "distanceAu": 5.203,
         "axialTiltDegrees": -3.1,
         "earthRadiusScale": 11.2,
-        "rotationRate": 0.02
+        "rotationRate": 0.02,
+        "primeMeridianDegJ2000": 284.95,
+        "primeMeridianRateDegPerDay": 870.536
       },
       "system": {
         "name": "Jupiter",
@@ -630,12 +644,13 @@
         ],
         "inclinationDeg": 2.5,
         "siderealRotationDays": 0.44401,
-        "primeMeridianDegJ2000": 38.9,
         "orbitalPeriodDays": 10759,
         "distanceAu": 9.537,
         "axialTiltDegrees": -26.7,
         "earthRadiusScale": 9.45,
-        "rotationRate": 0.018
+        "rotationRate": 0.018,
+        "primeMeridianDegJ2000": 38.9,
+        "primeMeridianRateDegPerDay": 810.7939024
       },
       "system": {
         "name": "Saturn",
@@ -751,12 +766,13 @@
         ],
         "inclinationDeg": 0.8,
         "siderealRotationDays": -0.71833,
-        "primeMeridianDegJ2000": 203.81,
         "orbitalPeriodDays": 30687,
         "distanceAu": 19.191,
         "axialTiltDegrees": -97.8,
         "earthRadiusScale": 4,
-        "rotationRate": -0.012
+        "rotationRate": -0.012,
+        "primeMeridianDegJ2000": 203.81,
+        "primeMeridianRateDegPerDay": -501.1600928
       },
       "system": {
         "name": "Uranus",
@@ -878,12 +894,13 @@
         ],
         "inclinationDeg": 1.8,
         "siderealRotationDays": 0.67125,
-        "primeMeridianDegJ2000": 249.978,
         "orbitalPeriodDays": 60190,
         "distanceAu": 30.069,
         "axialTiltDegrees": -28.3,
         "earthRadiusScale": 3.88,
-        "rotationRate": 0.014
+        "rotationRate": 0.014,
+        "primeMeridianDegJ2000": 249.978,
+        "primeMeridianRateDegPerDay": 541.1397757
       },
       "system": {
         "name": "Neptune",
@@ -994,12 +1011,13 @@
         ],
         "inclinationDeg": 17.2,
         "siderealRotationDays": 6.3872,
-        "primeMeridianDegJ2000": 302.695,
         "orbitalPeriodDays": 90560,
         "distanceAu": 39.482,
         "axialTiltDegrees": -122.5,
         "earthRadiusScale": 0.18,
-        "rotationRate": 0.002
+        "rotationRate": 0.002,
+        "primeMeridianDegJ2000": 302.695,
+        "primeMeridianRateDegPerDay": 56.3625225
       },
       "system": {
         "name": "Pluto",
@@ -1083,12 +1101,13 @@
         ],
         "inclinationDeg": 10.59,
         "siderealRotationDays": 0.3781,
-        "primeMeridianDegJ2000": 170.309,
         "orbitalPeriodDays": 1679.85,
         "distanceAu": 2.7656,
         "axialTiltDegrees": 4,
         "earthRadiusScale": 0.0736,
-        "rotationRate": 0.0132
+        "rotationRate": 0.0132,
+        "primeMeridianDegJ2000": 170.309,
+        "primeMeridianRateDegPerDay": 952.1532
       },
       "system": {
         "name": "Ceres",
@@ -1156,12 +1175,13 @@
         ],
         "inclinationDeg": 7.14,
         "siderealRotationDays": 0.2226,
-        "primeMeridianDegJ2000": 285.39,
         "orbitalPeriodDays": 1325.39,
         "distanceAu": 2.3614,
         "axialTiltDegrees": 27,
         "earthRadiusScale": 0.0412,
-        "rotationRate": 0.0224
+        "rotationRate": 0.0224,
+        "primeMeridianDegJ2000": 285.39,
+        "primeMeridianRateDegPerDay": 1617.3329
       },
       "system": {
         "name": "Vesta",
@@ -1229,7 +1249,6 @@
         ],
         "inclinationDeg": 44.04,
         "siderealRotationDays": 15.786,
-        "primeMeridianDegJ2000": 0,
         "orbitalPeriodDays": 203830,
         "distanceAu": 67.86,
         "axialTiltDegrees": 78,
@@ -1302,7 +1321,6 @@
         ],
         "inclinationDeg": 28.21,
         "siderealRotationDays": 0.1631,
-        "primeMeridianDegJ2000": 0,
         "orbitalPeriodDays": 103774,
         "distanceAu": 43.12,
         "axialTiltDegrees": 126,
@@ -1375,7 +1393,6 @@
         ],
         "inclinationDeg": 29.03,
         "siderealRotationDays": 0.9511,
-        "primeMeridianDegJ2000": 0,
         "orbitalPeriodDays": 111845,
         "distanceAu": 45.51,
         "axialTiltDegrees": 0,
@@ -1448,7 +1465,6 @@
         ],
         "inclinationDeg": 162.26,
         "siderealRotationDays": 2.2,
-        "primeMeridianDegJ2000": 0,
         "orbitalPeriodDays": 27510,
         "distanceAu": 17.83,
         "axialTiltDegrees": 0,
@@ -1546,6 +1562,9 @@
       },
       "includeInCompanion": false,
       "render": {
+        "terrain": {
+          "attribution": "Heights: LRO LOLA LDEM (NASA/GSFC/LOLA Science Team), public domain."
+        },
         "shaderFlags": {
           "hasNightTexture": false,
           "hasSpecularMap": false,
