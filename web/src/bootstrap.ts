@@ -69,6 +69,7 @@ const observeElements = {
     lookMoonButton: document.getElementById('observe-look-moon') as HTMLButtonElement,
     eclipseButton: document.getElementById('observe-eclipse') as HTMLButtonElement,
     eyepieceSelect: document.getElementById('observe-eyepiece') as HTMLSelectElement,
+    constellationsToggle: document.getElementById('observe-constellations') as HTMLInputElement,
     telescopeOverlay: document.getElementById('telescope-overlay') as HTMLElement,
     telescopeLabel: document.getElementById('telescope-label') as HTMLElement,
     readout: document.getElementById('observe-readout') as HTMLElement,

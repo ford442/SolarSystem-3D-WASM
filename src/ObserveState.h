@@ -15,6 +15,7 @@ struct ObserveState {
     bool active = false;
     Observer::Site site{51.4769, 0.0, 0.0}; // Greenwich, the default when nothing else is chosen
     double timeRate = 1.0;                  // simulated seconds per wall second; 1 = real time
+    bool constellations = true;             // stick figures over the star field
 
     // Explore-mode camera, restored when Observe is left. Heliocentric (double), not the
     // render frame: the render origin follows the camera to Earth while Observe is active.

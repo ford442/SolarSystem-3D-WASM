@@ -520,3 +520,123 @@ TEST(ObserverTest, TotalityLastsMinutesAtCasperAndCoverageRisesMonotonically) {
     EXPECT_NEAR(lastTotal - firstTotal, 146.0, 15.0);       // published duration 2m26s
     EXPECT_NEAR(firstTotal, 17 * 3600 + 42 * 60 + 36, 25.0); // second contact ~17:42:36
 }
+
+// --- Refraction and extinction -------------------------------------------------------------
+
+namespace {
+
+/** Bennett (1982): refraction in arcmin for an *apparent* altitude; the inverse of Saemundsson. */
+double bennettArcmin(double apparentAltDeg) {
+    return 1.0 / std::tan((apparentAltDeg + 7.31 / (apparentAltDeg + 4.4)) * kDegToRad);
+}
+
+} // namespace
+
+TEST(ObserverRefractionTest, AGeometricHorizonSunIsShownAboutHalfADegreeUp) {
+    // Meeus ch. 16: a body on the geometric horizon is lifted ~29' (and one on the apparent
+    // horizon sits ~34' below it, the classic almanac value).
+    EXPECT_NEAR(Observer::RefractionArcmin(0.0), 29.0, 0.5);
+    EXPECT_NEAR(Observer::ApparentAltitudeDeg(0.0), 0.5, 0.05);
+    EXPECT_NEAR(bennettArcmin(0.0), 34.5, 0.2);
+
+    // And through a real sky: find the instant the Sun's centre crosses the geometric horizon
+    // at sunset and check where it is drawn.
+    const Observer::Site site{40.0, -105.0, 0.0};
+    double lo = Ephemeris::JulianDateFromYmd(2025, 3, 20) + 0.9; // ~ 15:36 local, still up
+    double hi = lo + 0.15;                                         // ~ 19:12 local, set
+    ASSERT_GT(Observer::ComputeSky(lo, site).bodies[Observer::kSkySun].altDeg, 0.0);
+    ASSERT_LT(Observer::ComputeSky(hi, site).bodies[Observer::kSkySun].altDeg, 0.0);
+    for (int i = 0; i < 50; ++i) {
+        const double mid = 0.5 * (lo + hi);
+        (Observer::ComputeSky(mid, site).bodies[Observer::kSkySun].altDeg > 0.0 ? lo : hi) = mid;
+    }
+    const Observer::SkyBody sun = Observer::ComputeSky(lo, site).bodies[Observer::kSkySun];
+    EXPECT_NEAR(sun.altDeg, 0.0, 1e-6);
+    EXPECT_NEAR(sun.apparentAltDeg, 0.48, 0.03);
+    double alt = 0.0, az = 0.0;
+    Observer::AltAzFromDirection(sun.apparentDir, alt, az);
+    EXPECT_NEAR(alt, sun.apparentAltDeg, 1e-6);
+    EXPECT_NEAR(angleDiffDeg(az, sun.azDeg), 0.0, 1e-6); // lifted straight up, azimuth kept
+    // The apparent disc is still almost a full diameter clear of the horizon: refraction is
+    // what makes the Sun set late by about its own size.
+    EXPECT_GT(sun.apparentAltDeg - sun.angRadiusDeg, 0.15);
+}
+
+TEST(ObserverRefractionTest, SaemundssonInvertsBennettAndVanishesAtTheZenith) {
+    for (double h = -0.5; h <= 89.0; h += 0.5) {
+        const double apparent = Observer::ApparentAltitudeDeg(h);
+        EXPECT_NEAR(Observer::RefractionArcmin(h), bennettArcmin(apparent), 0.12) << "h " << h;
+    }
+    EXPECT_NEAR(Observer::RefractionArcmin(45.0), 1.0, 0.05);
+    EXPECT_NEAR(Observer::RefractionArcmin(90.0), 0.0, 1e-3);
+    EXPECT_GE(Observer::RefractionArcmin(90.0), 0.0);
+}
+
+TEST(ObserverRefractionTest, ApparentAltitudeRisesMonotonicallyAndFadesBelowTheHorizon) {
+    double previous = -100.0;
+    for (double h = -10.0; h <= 90.0; h += 0.05) {
+        const double apparent = Observer::ApparentAltitudeDeg(h);
+        EXPECT_GT(apparent, previous) << "h " << h;
+        EXPECT_GE(apparent, h);
+        previous = apparent;
+    }
+    EXPECT_DOUBLE_EQ(Observer::RefractionArcmin(-6.0), 0.0);
+    EXPECT_NEAR(Observer::RefractionArcmin(-1.0), Observer::RefractionArcmin(-1.0 - 1e-9), 1e-6); // continuous
+}
+
+TEST(ObserverRefractionTest, PressureAndTemperatureScaleIt) {
+    const double standard = Observer::RefractionArcmin(5.0);
+    EXPECT_NEAR(Observer::RefractionArcmin(5.0, 505.0, 10.0), 0.5 * standard, 1e-9);
+    EXPECT_LT(Observer::RefractionArcmin(5.0, 1010.0, 40.0), standard); // warm air bends less
+}
+
+TEST(ObserverRefractionTest, AirmassAndExtinctionFollowKastenYoung) {
+    EXPECT_NEAR(Observer::Airmass(90.0), 1.0, 1e-3);
+    EXPECT_NEAR(Observer::Airmass(30.0), 2.0, 0.01);
+    EXPECT_NEAR(Observer::Airmass(0.0), 38.0, 0.2);
+    EXPECT_NEAR(Observer::ExtinctionMagnitudes(90.0), 0.0, 1e-3);
+    EXPECT_NEAR(Observer::ExtinctionMagnitudes(30.0), Observer::kExtinctionMagPerAirmass, 0.01);
+    EXPECT_GT(Observer::ExtinctionMagnitudes(0.0), 7.0); // a horizon star is ~7 mag fainter
+}
+
+TEST(ObserverRefractionTest, SkyBodiesCarryApparentPositionsAndExtinction) {
+    const Observer::Site site{51.4769, 0.0, 0.0};
+    const Observer::Sky sky = Observer::ComputeSky(kEquinoxNoonJd, site);
+    for (const Observer::SkyBody& body : sky.bodies) {
+        EXPECT_NEAR(body.apparentAltDeg, Observer::ApparentAltitudeDeg(body.altDeg), 1e-12) << body.name;
+        EXPECT_NEAR(body.extinctionMag, Observer::ExtinctionMagnitudes(body.apparentAltDeg), 1e-12) << body.name;
+        double alt = 0.0, az = 0.0;
+        Observer::AltAzFromDirection(body.apparentDir, alt, az);
+        EXPECT_NEAR(alt, body.apparentAltDeg, 1e-6) << body.name;
+    }
+    // BodyAltitudeDeg reports what an observer sees.
+    double alt = 0.0;
+    ASSERT_TRUE(Observer::BodyAltitudeDeg(0, kEquinoxNoonJd, site, alt));
+    EXPECT_DOUBLE_EQ(alt, sky.bodies[Observer::kSkySun].apparentAltDeg);
+}
+
+#ifdef SOLARSYSTEM_SOURCE_DIR
+#include <fstream>
+#include <sstream>
+
+// Stars and constellation lines are refracted on the GPU (common/refraction.glsl); it must use
+// the same formula as the sprites refracted here, or a star would sit beside its line.
+TEST(ObserverRefractionTest, TheShaderCopyUsesTheSameCoefficients) {
+    std::ifstream file(std::string(SOLARSYSTEM_SOURCE_DIR) + "/resource/shaders/common/refraction.glsl");
+    ASSERT_TRUE(file.good());
+    std::stringstream buffer;
+    buffer << file.rdbuf();
+    const std::string glsl = buffer.str();
+    for (const char* needle : {"SAEMUNDSSON_A = 1.02;", "SAEMUNDSSON_B = 10.3;", "SAEMUNDSSON_C = 5.11;",
+                               "REFRACTION_HOLD_BELOW_DEG = -1.0;", "REFRACTION_ZERO_BELOW_DEG = -5.0;",
+                               "EXTINCTION_MAG_PER_AIRMASS = 0.2;"}) {
+        EXPECT_NE(glsl.find(needle), std::string::npos) << needle;
+    }
+    EXPECT_DOUBLE_EQ(Observer::kSaemundssonA, 1.02);
+    EXPECT_DOUBLE_EQ(Observer::kSaemundssonB, 10.3);
+    EXPECT_DOUBLE_EQ(Observer::kSaemundssonC, 5.11);
+    EXPECT_DOUBLE_EQ(Observer::kRefractionHoldBelowDeg, -1.0);
+    EXPECT_DOUBLE_EQ(Observer::kRefractionZeroBelowDeg, -5.0);
+    EXPECT_DOUBLE_EQ(Observer::kExtinctionMagPerAirmass, 0.2);
+}
+#endif

@@ -15,6 +15,7 @@ uniform float sunCoverage;  // fraction of the Sun's disc covered by the Moon, 0
 uniform mat3 moonBodyFromHorizon; // horizon frame → selenographic axes (X lon 0, Y lon +90 E, Z north)
 layout(binding = TU_MOON) uniform sampler2D moonTexture;
 uniform bool hasMoonTexture;
+uniform vec3 moonTint;      // the air the Moon is seen through (ObserveSky::DiscTint)
 
 const float PI = 3.14159265358979;
 // Longitude at the centre of the diffuse map. Standard lunar maps (NASA LRO/LROC, Solar System
@@ -59,9 +60,9 @@ void main() {
         } else {
             // Faint maria-like mottling until the Moon's texture has loaded.
             float mottle = 0.86 + 0.14 * sin(du.x * 5.0 + 1.3) * sin(du.y * 4.0 - 0.7);
-            albedo = vColor.rgb * mottle;
+            albedo = vec3(0.80, 0.79, 0.76) * mottle;
         }
-        vec3 color = albedo * (lit + 0.035);
+        vec3 color = albedo * moonTint * (lit + 0.035);
         float edge = 1.0 - smoothstep(0.97, 1.0, sqrt(r2));
 
         // The dark side hides stars at night, but against a daytime sky it should read as sky,
@@ -91,7 +92,7 @@ void main() {
                        (0.85 * exp(-(r - 1.0) * 2.4) + 0.28 * exp(-(r - 1.0) * 0.7));
         float intensity = r < 1.0 ? disc : halo + corona;
         vec3 tint = mix(vec3(1.0, 0.95, 0.85), vec3(0.92, 0.95, 1.0), totality);
-        fragColor = vec4(tint * intensity, aboveHorizon);
+        fragColor = vec4(tint * vColor.rgb * intensity, aboveHorizon); // vColor: the air's tint
     } else if (vParams.y > 0.0) {
         // A planet a telescope field resolves: a disc lit from the Sun, whose direction from the
         // planet is the phase angle (z) away from the viewer, toward the bright limb at angle w

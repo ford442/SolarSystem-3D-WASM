@@ -136,9 +136,13 @@
                 <span>Telescope</span>
                 <select id="observe-eyepiece"></select>
               </label>
+              <label class="settings-switch" for="observe-constellations">
+                <span>Constellation lines</span>
+                <input id="observe-constellations" type="checkbox" checked />
+              </label>
               <button id="observe-eclipse" class="settings-share" type="button">2017 total eclipse (Casper, WY)</button>
               <p id="observe-readout" class="observe-readout" aria-live="off"></p>
-              <small class="observe-disclaimer">Visualization, not an almanac: planets ~arcminute, Sun and Moon a few arcseconds, no refraction, times in UTC. Drag to look, scroll to zoom.</small>
+              <small class="observe-disclaimer">Visualization, not an almanac: planets ~arcminute, Sun and Moon a few arcseconds, standard-atmosphere refraction, times in UTC. Drag to look, scroll to zoom.</small>
             </div>
           </section>
 

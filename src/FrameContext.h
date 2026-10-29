@@ -13,6 +13,7 @@
 #include <vector>
 
 class AsteroidField;
+class Atmosphere;
 class SpaceObject;
 class Star;
 namespace Terrain {
@@ -65,6 +66,8 @@ struct SceneSnapshot {
     const ObserveState* observe = nullptr;
     const Observer::Sky* observeSky = nullptr;
     unsigned int observeMoonTexture = 0;
+    // Earth's shell once its LUTs are resident: Observe's daytime sky. Null draws the gradient.
+    const Atmosphere* observeEarthAtmosphere = nullptr;
     const SkyEvents::SkyEvent* nextSkyEvent = nullptr;
 
     // Bodies flagged render.terrain that the camera is near (src/render/terrain/). `tiles`

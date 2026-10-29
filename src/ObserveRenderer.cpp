@@ -4,6 +4,7 @@
 #include "astro/SeatedView.h"
 #include "astro/Observer.h"
 #include "render/TextRenderer.h"
+#include "Solar_System/Atmosphere.h"
 #include "Solar_System/OrbitLayout.h"
 #include <algorithm>
 #include <cmath>
@@ -16,6 +17,10 @@ namespace {
 constexpr float kSkyNear = 0.1f;
 constexpr float kSkyFar = 10.0f;
 constexpr double kDegToRad = 3.14159265358979323846 / 180.0;
+// The catalog exposure is tuned for the limit seen from space, where a grazing ray crosses far
+// more air than a ground observer's zenith ray. From inside the shell the eye adapts to the
+// sky itself, so it is raised by this display factor (no new bake: exposure is not in the LUTs).
+constexpr float kGroundExposureScale = 3.0f;
 
 std::wstring widen(const std::string& ascii) {
     return std::wstring(ascii.begin(), ascii.end());
@@ -48,7 +53,20 @@ void Renderer::RenderObserveSky(const FrameContext& ctx) {
     frame.viewportHeight = ctx.view.viewport.w;
     _observeFrame = frame;
 
-    _observeSky->Render(*ctx.scene.observeSky, frame, ctx.scene.observeMoonTexture);
+    // Daytime sky: Earth's LUT atmosphere from inside the shell, on the presets that run the
+    // physical path for the planets too (_pbrAtmosphereSteps is 0 on Low); else the gradient.
+    ObserveSky::Air air;
+    const ObserveSky::Air* airPtr = nullptr;
+    if (const Atmosphere* earthAir = ctx.scene.observeEarthAtmosphere; earthAir && _pbrAtmosphereSteps > 0) {
+        air.transmittanceLut = earthAir->GetTransmittanceLut();
+        air.multiScatteringLut = earthAir->GetMultiScatteringLut();
+        air.params = AtmosphereModel::FromCatalog(earthAir->GetRow().physical);
+        air.exposure = earthAir->GetRow().physical.exposure * kGroundExposureScale;
+        air.steps = _pbrAtmosphereSteps;
+        airPtr = &air;
+    }
+    _observeSky->SetConstellationsVisible(ctx.scene.observe && ctx.scene.observe->constellations);
+    _observeSky->Render(*ctx.scene.observeSky, frame, ctx.scene.observeMoonTexture, airPtr);
 
 #ifdef __EMSCRIPTEN__
     if (ctx.xr) {
@@ -95,15 +113,15 @@ void Renderer::RenderObserveLabels(const FrameContext& ctx, float width, float h
     const glm::vec3 labelColor(0.80f, 0.88f, 1.0f);
     for (int slot = 0; slot < Observer::kSkyBodyCount; ++slot) {
         const Observer::SkyBody& body = sky.bodies[slot];
-        if (body.altDeg < -0.5) {
+        if (body.apparentAltDeg < -0.5) {
             continue;
         }
-        if (slot >= Observer::kSkyMercury && static_cast<float>(body.magnitude) > limit + 0.5f) {
+        if (slot >= Observer::kSkyMercury && static_cast<float>(body.magnitude + body.extinctionMag) > limit + 0.5f) {
             continue;
         }
         glm::vec2 px;
-        const glm::vec3 dir(static_cast<float>(body.dir[0]), static_cast<float>(body.dir[1]),
-                            static_cast<float>(body.dir[2]));
+        const glm::vec3 dir(static_cast<float>(body.apparentDir[0]), static_cast<float>(body.apparentDir[1]),
+                            static_cast<float>(body.apparentDir[2]));
         if (ObserveSky::ProjectToPixels(dir, _observeFrame, px) && px.x > 0.0f && px.x < width &&
             px.y > 0.0f && px.y < height) {
             // Clear of the disc when a narrow field makes it big (the Moon at a few degrees, planets
@@ -133,9 +151,14 @@ void Renderer::RenderObserveLabels(const FrameContext& ctx, float width, float h
             const double ra = star.raDeg * kDegToRad;
             const double dec = star.decDeg * kDegToRad;
             const double equatorial[3] = {std::cos(dec) * std::cos(ra), std::cos(dec) * std::sin(ra), std::sin(dec)};
-            double horizon[3];
-            toHorizon.Apply(equatorial, horizon);
+            double geometric[3], horizon[3];
+            toHorizon.Apply(equatorial, geometric);
+            Observer::RefractDirection(geometric, horizon); // where observeSprite.vs draws it
             if (horizon[1] < 0.0) {
+                continue;
+            }
+            const double apparentAltDeg = std::asin(std::clamp(horizon[1], -1.0, 1.0)) / kDegToRad;
+            if (star.vmag + Observer::ExtinctionMagnitudes(apparentAltDeg) > limit - 0.5f) {
                 continue;
             }
             glm::vec2 px;
@@ -198,6 +221,10 @@ void Renderer::RenderObserveHud(const FrameContext& ctx) {
                          0.01f * width, 0.02f * height, 0.35f, textColor);
 
     glDisable(GL_BLEND);
+}
+
+int Renderer::ObserveConstellationSegments() const {
+    return _observeSky ? _observeSky->ConstellationSegmentCount() : 0;
 }
 
 int Renderer::ObserveStarsDrawn() const {

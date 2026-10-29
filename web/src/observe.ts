@@ -7,7 +7,8 @@ import type { SolarSystemRuntime } from './wasmBridge';
  * ObserveSky in C++. Everything here is UI around the typed runtime façade.
  *
  * Positions are a visualization, not an almanac: Standish planet series (~arcminute), a mean-
- * element Moon, UTC fed straight into sidereal time, and no refraction or nutation.
+ * element Moon, UTC fed straight into sidereal time, no nutation, and refraction for a standard
+ * atmosphere (1010 hPa, 10 °C) rather than the weather.
  */
 export interface ObserveState {
     active: boolean;
@@ -31,6 +32,9 @@ export interface ObserveState {
     /** Fraction (0–1) of the Sun's disc the Moon covers from this site; 1 is totality. */
     sunCoverage: number;
     starCount: number;
+    /** Whether the constellation stick figures are on, and how many segments the tier draws. */
+    constellations: boolean;
+    constellationSegments: number;
     /** Selenographic longitude/latitude of the sub-Earth point (the Moon's libration), degrees. */
     moonLibLonDeg: number;
     moonLibLatDeg: number;
@@ -120,7 +124,7 @@ export function eyepieceFieldDeg(fovDeg: number, viewportWidth: number, viewport
 }
 
 export const OBSERVE_DISCLAIMER =
-    'Visualization, not an almanac: planets ~arcminute, Sun and Moon a few arcseconds, no refraction, times are UTC.';
+    'Visualization, not an almanac: planets ~arcminute, Sun and Moon a few arcseconds, standard-atmosphere refraction, times are UTC.';
 
 const INACTIVE_STATE: ObserveState = {
     active: false,
@@ -142,6 +146,8 @@ const INACTIVE_STATE: ObserveState = {
     moonIllum: 0,
     sunCoverage: 0,
     starCount: 0,
+    constellations: true,
+    constellationSegments: 0,
     moonLibLonDeg: 0,
     moonLibLatDeg: 0,
     eventVisibility: 'none',
@@ -177,6 +183,8 @@ export function parseObserveStateJson(json: string): ObserveState {
             moonIllum: finite(raw.moonIllum, 0),
             sunCoverage: finite(raw.sunCoverage, 0),
             starCount: finite(raw.starCount, 0),
+            constellations: raw.constellations !== false,
+            constellationSegments: finite(raw.constellationSegments, 0),
             moonLibLonDeg: finite(raw.moonLibLonDeg, 0),
             moonLibLatDeg: finite(raw.moonLibLatDeg, 0),
             eventVisibility: raw.eventVisibility === 'above' || raw.eventVisibility === 'below'
@@ -256,6 +264,7 @@ export interface ObservePanelElements {
     lookMoonButton: HTMLButtonElement;
     eclipseButton: HTMLButtonElement;
     eyepieceSelect: HTMLSelectElement;
+    constellationsToggle: HTMLInputElement;
     telescopeOverlay: HTMLElement;
     telescopeLabel: HTMLElement;
     readout: HTMLElement;
@@ -298,6 +307,7 @@ interface PersistedObserve {
     latDeg?: number;
     lonDeg?: number;
     rate?: number;
+    constellations?: boolean;
 }
 
 function readPersisted(): PersistedObserve {
@@ -310,6 +320,7 @@ function readPersisted(): PersistedObserve {
             latDeg: typeof parsed.latDeg === 'number' && Number.isFinite(parsed.latDeg) ? parsed.latDeg : undefined,
             lonDeg: typeof parsed.lonDeg === 'number' && Number.isFinite(parsed.lonDeg) ? parsed.lonDeg : undefined,
             rate: typeof parsed.rate === 'number' && Number.isFinite(parsed.rate) ? parsed.rate : undefined,
+            constellations: typeof parsed.constellations === 'boolean' ? parsed.constellations : undefined,
         };
     } catch {
         return {};
@@ -344,6 +355,7 @@ export function initObservePanel(options: ObservePanelOptions): ObservePanelCont
         lookMoonButton,
         eclipseButton,
         eyepieceSelect,
+        constellationsToggle,
         telescopeOverlay,
         telescopeLabel,
         readout,
@@ -383,6 +395,7 @@ export function initObservePanel(options: ObservePanelOptions): ObservePanelCont
     latDeg = clampLatitude(latDeg);
     lonDeg = normalizeLongitude(lonDeg);
     let rate = link.rate ?? saved.rate ?? 1;
+    let constellations = saved.constellations ?? true;
 
     function matchingSiteId(lat: number, lon: number): string {
         const match = OBSERVER_SITES.find(
@@ -396,7 +409,7 @@ export function initObservePanel(options: ObservePanelOptions): ObservePanelCont
     }
 
     function persist(): void {
-        writePersisted({ siteId: activeSiteId, latDeg, lonDeg, rate });
+        writePersisted({ siteId: activeSiteId, latDeg, lonDeg, rate, constellations });
     }
 
     function showSiteFields(): void {
@@ -520,11 +533,17 @@ export function initObservePanel(options: ObservePanelOptions): ObservePanelCont
             `Sun ${state.sunAltDeg.toFixed(1)}° (${sunState}) · ` +
             `Moon ${state.moonAltDeg.toFixed(1)}°, ${Math.round(state.moonIllum * 100)}% lit · ` +
             `${state.starCount} stars` +
+            (state.constellations && state.constellationSegments > 0 ? `, ${state.constellationSegments} figure lines` : '') +
             (state.sunCoverage > 0.001 ? ` · ${eclipseLabel(state.sunCoverage)}` : '');
     }
 
     // A shared link pins the epoch; the first entry from it holds still instead of jumping to now.
     let pinnedEpochPending = options.startInObserve && options.epochFromLink;
+
+    function applyConstellations(): void {
+        constellationsToggle.checked = constellations;
+        runtime.setObserveConstellations(constellations);
+    }
 
     function enterObserve(): void {
         applySite();
@@ -647,6 +666,13 @@ export function initObservePanel(options: ObservePanelOptions): ObservePanelCont
             : `Naked eye: ${formatFov(nakedEyeFov)}° field`;
     });
 
+    constellationsToggle.addEventListener('change', () => {
+        constellations = constellationsToggle.checked;
+        applyConstellations();
+        persist();
+        refresh();
+    });
+
     lookSunButton.addEventListener('click', () => {
         const state = runtime.getObserveState();
         lookAt(state.sunAzDeg, state.sunAltDeg);
@@ -680,6 +706,7 @@ export function initObservePanel(options: ObservePanelOptions): ObservePanelCont
 
     showSiteFields();
     showRate();
+    applyConstellations();
     renderMode(false);
 
     if (options.startInObserve) {

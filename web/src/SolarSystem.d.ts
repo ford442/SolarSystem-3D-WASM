@@ -270,6 +270,11 @@ export interface SolarSystemCwrap {
     argTypes: ['number'],
   ): (...args: number[]) => void;
   (
+    ident: 'SetObserveConstellations',
+    returnType: null,
+    argTypes: ['number'],
+  ): (...args: number[]) => void;
+  (
     ident: 'GetObserveStateJson',
     returnType: 'string',
     argTypes: [],
@@ -484,6 +489,7 @@ export type SettingsChangeField =
   | 'observeMode'
   | 'observeSite'
   | 'observeTimeRate'
+  | 'observeConstellations'
   | 'orbitScaleMode';
 
 export interface SolarSystemModuleConfig {
@@ -579,6 +585,7 @@ export interface SolarSystemModule {
   _SetObserveView: (...args: number[]) => void;
   _SetObserveFov: (...args: number[]) => void;
   _SetObserveTimeRate: (...args: number[]) => void;
+  _SetObserveConstellations: (...args: number[]) => void;
   _GetObserveStateJson: () => number;
   _SetOrbitLines: (...args: number[]) => void;
   _GetOrbitLines: () => number;

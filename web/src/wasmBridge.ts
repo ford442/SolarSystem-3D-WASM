@@ -214,6 +214,8 @@ export interface SolarSystemRuntime {
     setObserveFov(fovDeg: number): void;
     /** Simulated seconds per wall second while running (1 = real time). */
     setObserveTimeRate(rate: number): void;
+    /** Constellation stick figures over the star field. */
+    setObserveConstellations(visible: boolean): void;
     getObserveState(): ObserveState;
     focusMission(index: number): void;
     getFocusedMissionIndex(): number;
@@ -336,6 +338,7 @@ export function createSolarSystemRuntime(instance: SolarSystemModule): SolarSyst
         setObserveView: (azimuthDeg, elevationDeg) => exports.setObserveView(azimuthDeg, elevationDeg),
         setObserveFov: (fovDeg) => exports.setObserveFov(fovDeg),
         setObserveTimeRate: (rate) => exports.setObserveTimeRate(rate),
+        setObserveConstellations: (visible) => exports.setObserveConstellations(visible ? 1 : 0),
         getObserveState: () => parseObserveStateJson(exports.getObserveStateJson()),
         focusMission: (index) => {
             exports.focusMission(index);

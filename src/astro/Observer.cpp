@@ -283,6 +283,57 @@ Mat3 MoonBodyAxesEquatorialJ2000(double julianDate) {
     return axes;
 }
 
+double RefractionArcmin(double geometricAltDeg, double pressureHpa, double temperatureC) {
+    const auto saemundsson = [](double h) {
+        return kSaemundssonA / std::tan((h + kSaemundssonB / (h + kSaemundssonC)) * kDegToRad);
+    };
+    double r = 0.0;
+    if (geometricAltDeg >= kRefractionHoldBelowDeg) {
+        r = saemundsson(std::min(geometricAltDeg, 90.0));
+    } else {
+        const double fade = (geometricAltDeg - kRefractionZeroBelowDeg) /
+                            (kRefractionHoldBelowDeg - kRefractionZeroBelowDeg);
+        r = saemundsson(kRefractionHoldBelowDeg) * std::clamp(fade, 0.0, 1.0);
+    }
+    // Meeus 16.A: scale by pressure and inverse absolute temperature. The formula dips just
+    // below zero at the zenith; refraction never pushes a body down.
+    const double scale = (pressureHpa / kRefractionPressureHpa) *
+                         ((273.0 + kRefractionTemperatureC) / (273.0 + temperatureC));
+    return std::max(0.0, r * scale);
+}
+
+double ApparentAltitudeDeg(double geometricAltDeg) {
+    return geometricAltDeg + RefractionArcmin(geometricAltDeg) / 60.0;
+}
+
+void RefractDirection(const double geometric[3], double apparent[3]) {
+    double u[3];
+    normalize3(geometric, u);
+    const double horizontal = std::sqrt(u[0] * u[0] + u[2] * u[2]);
+    if (horizontal < 1e-12) {
+        apparent[0] = u[0];
+        apparent[1] = u[1];
+        apparent[2] = u[2];
+        return; // the zenith (or nadir): no azimuth to lift along, and no refraction anyway
+    }
+    const double alt = std::atan2(u[1], horizontal) * kRadToDeg;
+    const double lifted = std::min(ApparentAltitudeDeg(alt), 90.0) * kDegToRad;
+    const double c = std::cos(lifted) / horizontal;
+    apparent[0] = u[0] * c;
+    apparent[1] = std::sin(lifted);
+    apparent[2] = u[2] * c;
+}
+
+double Airmass(double apparentAltDeg) {
+    // Kasten & Young's fit stays finite at the horizon; below it, hold the horizon value.
+    const double h = std::clamp(apparentAltDeg, 0.0, 90.0);
+    return 1.0 / (std::sin(h * kDegToRad) + 0.50572 * std::pow(h + 6.07995, -1.6364));
+}
+
+double ExtinctionMagnitudes(double apparentAltDeg) {
+    return kExtinctionMagPerAirmass * (Airmass(apparentAltDeg) - 1.0);
+}
+
 std::string FormatUtc(double julianDateUtc) {
     // Round to the second first so 23:59:59.7 rolls into the next day instead of printing 60 s.
     const double shifted = julianDateUtc + 0.5 + 0.5 / 86400.0;
@@ -381,6 +432,9 @@ Sky ComputeSky(double julianDateUtc, const Site& site) {
         body.distanceKm = length3(horizon);
         normalize3(horizon, body.dir);
         AltAzFromDirection(body.dir, body.altDeg, body.azDeg);
+        RefractDirection(body.dir, body.apparentDir);
+        body.apparentAltDeg = ApparentAltitudeDeg(body.altDeg);
+        body.extinctionMag = ExtinctionMagnitudes(body.apparentAltDeg);
 
         if (entry.slot == kSkySun) {
             body.angRadiusDeg = std::asin(std::min(1.0, kSunRadiusKm / geoDistKm)) * kRadToDeg;
@@ -446,7 +500,7 @@ bool BodyAltitudeDeg(int ephemerisIndex, double julianDateUtc, const Site& site,
     const Sky sky = ComputeSky(julianDateUtc, site);
     for (const SkyBody& body : sky.bodies) {
         if (body.ephemerisIndex == ephemerisIndex) {
-            altDeg = body.altDeg;
+            altDeg = body.apparentAltDeg;
             return true;
         }
     }

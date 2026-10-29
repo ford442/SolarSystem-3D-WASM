@@ -33,7 +33,150 @@ void skipSpace(const std::string& s, size_t& i) {
     }
 }
 
+/** The quoted string starting at `i` (which must be a `"`); advances past it. */
+bool readString(const std::string& s, size_t& i, std::string& out) {
+    if (i >= s.size() || s[i] != '"') {
+        return false;
+    }
+    const size_t end = s.find('"', i + 1);
+    if (end == std::string::npos) {
+        return false;
+    }
+    out = s.substr(i + 1, end - i - 1);
+    i = end + 1;
+    return true;
+}
+
+/** `"key":` at or after `i` and before `limit`; leaves `i` just past the colon. */
+bool seekKey(const std::string& s, size_t& i, size_t limit, const char* key) {
+    const std::string needle = std::string("\"") + key + "\"";
+    const size_t at = s.find(needle, i);
+    if (at == std::string::npos || at >= limit) {
+        return false;
+    }
+    const size_t colon = s.find(':', at + needle.size());
+    if (colon == std::string::npos || colon >= limit) {
+        return false;
+    }
+    i = colon + 1;
+    skipSpace(s, i);
+    return true;
+}
+
 } // namespace
+
+bool ParseConstellations(const std::string& json, int starCount, std::vector<Constellation>& out,
+                         std::string& errorOut) {
+    out.clear();
+    errorOut.clear();
+
+    size_t i = 0;
+    if (!seekKey(json, i, json.size(), "starCount")) {
+        errorOut = "missing \"starCount\"";
+        return false;
+    }
+    if (std::atoi(json.c_str() + i) != starCount) {
+        errorOut = "\"starCount\" does not match the star catalog (regenerate constellation_lines.json)";
+        return false;
+    }
+
+    size_t at = openAfterKey(json, "constellations", '[');
+    if (at == std::string::npos) {
+        errorOut = "missing \"constellations\" array";
+        return false;
+    }
+    while (true) {
+        skipSpace(json, at);
+        if (at >= json.size()) {
+            out.clear();
+            errorOut = "unterminated \"constellations\" array";
+            return false;
+        }
+        if (json[at] == ']') {
+            break;
+        }
+        if (json[at] == ',') {
+            ++at;
+            continue;
+        }
+        if (json[at] != '{') {
+            out.clear();
+            errorOut = "bad constellation entry";
+            return false;
+        }
+        const size_t close = json.find('}', at);
+        if (close == std::string::npos) {
+            out.clear();
+            errorOut = "unterminated constellation entry";
+            return false;
+        }
+        Constellation figure;
+        size_t k = at;
+        if (!seekKey(json, k, close, "id") || !readString(json, k, figure.id)) {
+            out.clear();
+            errorOut = "constellation without an \"id\"";
+            return false;
+        }
+        k = at;
+        figure.core = seekKey(json, k, close, "core") && json.compare(k, 4, "true") == 0;
+        k = at;
+        if (!seekKey(json, k, close, "lines") || json[k] != '[') {
+            out.clear();
+            errorOut = figure.id + ": missing \"lines\"";
+            return false;
+        }
+        ++k;
+        while (true) {
+            skipSpace(json, k);
+            if (k >= close) {
+                out.clear();
+                errorOut = figure.id + ": unterminated \"lines\"";
+                return false;
+            }
+            if (json[k] == ']') {
+                break;
+            }
+            char* end = nullptr;
+            const long value = std::strtol(json.c_str() + k, &end, 10);
+            if (end == json.c_str() + k || value < 0 || value >= starCount) {
+                out.clear();
+                errorOut = figure.id + ": line index outside the star catalog";
+                return false;
+            }
+            figure.lines.push_back(static_cast<int>(value));
+            k = static_cast<size_t>(end - json.c_str());
+            skipSpace(json, k);
+            if (json[k] == ',') {
+                ++k;
+            }
+        }
+        if (figure.lines.empty() || figure.lines.size() % 2 != 0) {
+            out.clear();
+            errorOut = figure.id + ": \"lines\" is not a list of pairs";
+            return false;
+        }
+        out.push_back(std::move(figure));
+        at = close + 1;
+    }
+    if (out.empty()) {
+        errorOut = "no constellations";
+        return false;
+    }
+    return true;
+}
+
+bool LoadConstellationsFromFile(const std::string& path, int starCount, std::vector<Constellation>& out,
+                                std::string& errorOut) {
+    std::ifstream in(path);
+    if (!in) {
+        out.clear();
+        errorOut = "cannot open " + path;
+        return false;
+    }
+    std::ostringstream ss;
+    ss << in.rdbuf();
+    return ParseConstellations(ss.str(), starCount, out, errorOut);
+}
 
 bool Parse(const std::string& json, Catalog& out, std::string& errorOut) {
     out = {};

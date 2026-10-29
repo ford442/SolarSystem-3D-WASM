@@ -127,6 +127,7 @@ public:
     XrPointerRenderer* GetXrPointers() { return _xrPointerRenderer.get(); }
     /** Brightest catalog stars Observe draws right now (0 without its shaders). */
     int ObserveStarsDrawn() const;
+    int ObserveConstellationSegments() const;
     /** Delete the GPU copies of terrain tiles the cache evicted (Terrain::TileCache::TakeEvicted). */
     void ForgetTerrainTiles(const std::vector<uint64_t>& uids);
     /** Terrain tiles with a GPU copy, for the [Terrain] log line. */

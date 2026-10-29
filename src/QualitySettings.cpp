@@ -55,15 +55,15 @@ QualityTierSettings GetQualitySettings(int preset, bool mobile) {
     // rather than shader cost decides.
     if (mobile) {
         switch (preset) {
-            case 0: return {1024, 0, 0, false, false, 0, 400, 0, TextureLodTier::Low, false, 0, false, 0, 500, 3, 0, 0.0f, 0, "low"};
-            case 1: return {2048, 2, 0, true, true, 1, 900, 400, TextureLodTier::Mid, true, 8, false, 0, 1500, 3, 32, 12.0f, 4, "medium"};
-            default: return {3000, 2, 0, true, true, 1, 1400, 800, TextureLodTier::High, true, 12, true, 16, 2500, 4, 48, 10.0f, 4, "full"};
+            case 0: return {1024, 0, 0, false, false, 0, 400, 0, TextureLodTier::Low, false, 0, false, 0, 500, 3, 0, 0.0f, 0, true, "low"};
+            case 1: return {2048, 2, 0, true, true, 1, 900, 400, TextureLodTier::Mid, true, 8, false, 0, 1500, 3, 32, 12.0f, 4, false, "medium"};
+            default: return {3000, 2, 0, true, true, 1, 1400, 800, TextureLodTier::High, true, 12, true, 16, 2500, 4, 48, 10.0f, 4, false, "full"};
         }
     }
     switch (preset) {
-        case 0: return {1024, 0, 0, false, false, 0, 600, 0, TextureLodTier::Low, false, 0, false, 0, 500, 3, 0, 0.0f, 0, "low"};
-        case 1: return {2048, 2, 0, true, true, 1, 1800, 800, TextureLodTier::Mid, true, 8, true, 16, 2000, 4, 64, 8.0f, 6, "medium"};
-        default: return {3000, 4, 4, true, true, 2, 4000, 2000, TextureLodTier::High, true, 16, true, 32, 5000, 5, 128, 6.0f, 8, "full"};
+        case 0: return {1024, 0, 0, false, false, 0, 600, 0, TextureLodTier::Low, false, 0, false, 0, 500, 3, 0, 0.0f, 0, true, "low"};
+        case 1: return {2048, 2, 0, true, true, 1, 1800, 800, TextureLodTier::Mid, true, 8, true, 16, 2000, 4, 64, 8.0f, 6, false, "medium"};
+        default: return {3000, 4, 4, true, true, 2, 4000, 2000, TextureLodTier::High, true, 16, true, 32, 5000, 5, 128, 6.0f, 8, false, "full"};
     }
 }
 
@@ -100,14 +100,14 @@ void LogQualityTier(const QualityTierSettings& settings, bool hdrEnabled, int sh
     LOG_INFO("Quality",
              "Active tier: %s | shadows=%s (~%.1f MiB depth) | terrain=%s | HDR=%s | field bloom=%s | high-res concurrency=%d"
              " | max texture LOD=%s | LOD distance multiplier=%g | AA=%s (context samples=%d) | asteroids=%d | kuiper=%d"
-             " | atmosphere=%s | corona=%s | observe stars=%d",
+             " | atmosphere=%s | corona=%s | observe stars=%d%s",
              settings.name, shadows.c_str(), shadowMemoryMiB, terrain, hdrEnabled ? "on" : "off (direct composite)",
              bloom.c_str(), settings.maxConcurrentTextureLoads,
              TextureLodTierName(settings.maxTextureLodTier), std::strcmp(settings.name, "medium") == 0 ? 1.5 : 1.0,
              AntialiasPathName(ResolveAntialiasPath(hdrEnabled, contextSamples)), contextSamples,
              settings.asteroidInstanceCount,
              settings.kuiperInstanceCount, atmosphere.c_str(), corona.c_str(),
-             settings.observeStarCount);
+             settings.observeStarCount, settings.observeCoreConstellationsOnly ? " (20 figures)" : "");
 #ifdef __EMSCRIPTEN__
     LOG_INFO("Quality", "WebGL context samples are fixed when the context is created; reload with ?quality=%s to change them.",
              settings.name);

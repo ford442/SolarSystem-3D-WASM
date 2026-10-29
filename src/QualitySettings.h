@@ -41,6 +41,9 @@ struct QualityTierSettings {
     int terrainBudgetMiB;
     float terrainPixelError;
     int terrainMaxInFlight;
+    // Observe's constellation lines: only the 20 `core` figures of constellation_lines.json
+    // (Low), or all of them. Either way a segment is drawn only if both its stars are.
+    bool observeCoreConstellationsOnly;
     const char* name;
 };
 

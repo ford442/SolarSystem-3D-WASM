@@ -5,6 +5,7 @@
 #include "../gfx/Shader.h"
 #include "../gfx/GlHandle.h"
 #include "../astro/StarCatalog.h"
+#include "AtmosphereModel.h"
 #include <glm/glm.hpp>
 #include <algorithm>
 #include <memory>
@@ -18,7 +19,11 @@
  * It deliberately does not use scene meshes: at scene scale the Sun is ~9x too small and the
  * Moon ~5x too big, and the skybox cubemap's frame against J2000 is undocumented. Everything
  * here comes from Observer::ComputeSky, so there is no depth buffer — layers are drawn back
- * to front (sky/ground, additive point sprites and the Sun, then the opaque-ish Moon).
+ * to front (sky/ground, constellation lines, additive point sprites and the Sun, then the
+ * opaque-ish Moon). Bodies are drawn at their refracted (apparent) positions.
+ *
+ * The sky is Earth's baked LUT atmosphere seen from inside the shell when an `Air` is passed
+ * (the presets with enablePbrAtmosphere), else the analytic gradient. See docs/ARCHITECTURE.md.
  */
 class ObserveSky {
 public:
@@ -30,6 +35,15 @@ public:
         int viewportHeight = 1;
     };
 
+    /** Earth's physical atmosphere for the daytime sky. */
+    struct Air {
+        unsigned int transmittanceLut = 0;
+        unsigned int multiScatteringLut = 0;
+        AtmosphereModel::Params params;
+        float exposure = 1.0f;  // the catalog's render.atmosphere.physical.exposure
+        int steps = 0;          // view-ray samples; 0 draws the gradient sky
+    };
+
     ObserveSky();
 
     ObserveSky(const ObserveSky&) = delete;
@@ -39,10 +53,26 @@ public:
      * `moonTexture` is the Moon's equirectangular diffuse map (GL_TEXTURE_2D, longitude 0 at the
      * centre, north at the top); 0 draws the plain lit disc until the Moon's system has loaded.
      */
-    void Render(const Observer::Sky& sky, const Frame& frame, unsigned int moonTexture = 0);
+    void Render(const Observer::Sky& sky, const Frame& frame, unsigned int moonTexture = 0,
+                const Air* air = nullptr);
+
+    /**
+     * Colour factor for the Sun or Moon disc seen through the air at `apparentAltDeg`: the hue
+     * of the LUT model's transmittance along the view ray, with its strength compressed (the
+     * eye adapts to a setting Sun; a straight 1-2% would leave a dim brown dot). White above
+     * the air or with no physical atmosphere.
+     */
+    static glm::vec3 DiscTint(const Air* air, double apparentAltDeg, double observerAltitudeM);
 
     /** Cap on how many of the brightest catalog stars are drawn (a quality tier's prefix). */
     void SetStarLimit(int count) { _starLimit = count < 0 ? 0 : count; }
+    /** Constellation stick figures on/off (the Observe panel's toggle). */
+    void SetConstellationsVisible(bool visible) { _constellationsVisible = visible; }
+    bool ConstellationsVisible() const { return _constellationsVisible; }
+    /** Only the 20 `core` figures (the Low preset). */
+    void SetCoreConstellationsOnly(bool coreOnly) { _coreConstellationsOnly = coreOnly; }
+    /** Line segments the current star limit and figure set draw (0 until the files have loaded). */
+    int ConstellationSegmentCount() const { return _lineSegmentCount; }
     /** Stars actually submitted last frame: the limit clamped to the catalog size. */
     int DrawnStarCount() const { return _starsLoaded ? std::min(_starLimit, _starBatch.count) : 0; }
     /** The star catalog, loaded on first use; empty if resource/sky/bright_stars.json is missing. */
@@ -77,9 +107,12 @@ private:
     void DrawBatch(const SpriteBatch& batch, int count) const;
     /** Read the catalog and upload it once, the first time a frame needs stars. */
     void EnsureStarsLoaded();
+    /** (Re)build the line VBO for the current star limit and figure set. */
+    void EnsureConstellationLines();
 
     std::unique_ptr<Shader> _skyShader;
     std::unique_ptr<Shader> _spriteShader;
+    std::unique_ptr<Shader> _lineShader;
     GlVertexArray _emptyVao;
     GlBuffer _quadVbo;
     SpriteBatch _additiveBatch; // planets plus the Sun
@@ -89,6 +122,16 @@ private:
     bool _starsLoaded = false;
     bool _starsTried = false;
     int _starLimit = 5000;
+    std::vector<StarCatalog::Constellation> _constellations;
+    bool _constellationsTried = false;
+    bool _constellationsVisible = true;
+    bool _coreConstellationsOnly = false;
+    GlVertexArray _lineVao;
+    GlBuffer _lineVbo;
+    int _lineVertexCount = 0;
+    int _lineSegmentCount = 0;
+    int _linesBuiltForLimit = -1;
+    bool _linesBuiltCoreOnly = false;
     std::vector<SpriteInstance> _scratch;
 };
 

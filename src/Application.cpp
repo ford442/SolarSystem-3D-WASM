@@ -425,6 +425,7 @@ void Application::BuildFrameSnapshot(int viewCount) {
     scene.observe = &_observe;
     scene.observeSky = _observe.active ? &CurrentObserveSky() : nullptr;
     scene.observeMoonTexture = _observe.active ? ObserveMoonTexture() : 0u;
+    scene.observeEarthAtmosphere = _observe.active ? ObserveEarthAtmosphere() : nullptr;
     scene.nextSkyEvent = &GetNextSkyEvent();
 
     // The head: the mono camera, and the axes every eye shares.
