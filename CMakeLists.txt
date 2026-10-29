@@ -183,6 +183,11 @@ if(EMSCRIPTEN)
     set(SOLAR_EM_CODEGEN_FLAGS -msimd128)
 
     # Compile-only: warnings would just be dead arguments on the link line.
+    # Codegen: WebAssembly SIMD (Chrome 91+, Firefox 89+, Safari 16.4+). It has to be on
+    # the compile and the link line, or LTO drops the vector ops. The users are the CPU DXT
+    # decode (BlockCompression.cpp), the magnetic-field tracer and the belt update.
+    set(SOLAR_EM_CODEGEN_FLAGS -msimd128)
+
     set(SOLAR_EM_WARNING_FLAGS -Wall -Wextra)
 
     # Link-only: memory, preloads, module shape, JS interop.
@@ -201,6 +206,10 @@ if(EMSCRIPTEN)
         # The default 64 KB stack is small for recursive JSON parsing and Assimp.
         "SHELL:-sSTACK_SIZE=1MB"
         "SHELL:-sALLOW_MEMORY_GROWTH=1"
+        # This target is only ever a page: no Node / shell / worker branches in the glue.
+        "SHELL:-sENVIRONMENT=web"
+        # The default 64 KB stack is small for recursive JSON parsing and Assimp.
+        "SHELL:-sSTACK_SIZE=1MB"
         # Explicit default: fixed-buffer growth (new ArrayBuffer + view refresh on
         # grow), not resizable-ArrayBuffer growth. Current Chrome WebGL/DOM APIs
         # reject views backed by a resizable buffer (see web/src/bootstrap.ts history).
@@ -257,12 +266,14 @@ if(EMSCRIPTEN)
         ${SOLAR_EM_PORT_FLAGS}
         ${SOLAR_EM_CODEGEN_FLAGS}
         ${SOLAR_EM_WARNING_FLAGS}
+        ${SOLAR_EM_CODEGEN_FLAGS}
         ${SOLAR_EM_COMPILE_OPT_FLAGS}
     )
     target_link_options(${PROJECT_NAME} PRIVATE
         ${SOLAR_EM_PORT_FLAGS}
         ${SOLAR_EM_CODEGEN_FLAGS}
         ${SOLAR_EM_LINK_FLAGS}
+        ${SOLAR_EM_CODEGEN_FLAGS}
         ${SOLAR_EM_LINK_OPT_FLAGS}
     )
 

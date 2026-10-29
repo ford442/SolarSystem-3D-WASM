@@ -898,6 +898,34 @@ directories and `scripts/wasm-exports.json` are `LINK_DEPENDS` in `CMakeLists.tx
 
 **Catalog-only bodies first:** if the world needs nothing but a diffuse/normal (optional
 specular) texture set, an orbit, and catalog tilt, skip the list below — add a catalog entry
+### 9.6 Antialiasing and the context attributes
+
+Context attributes are fixed for the life of the page and chosen once from the initial quality
+tier: native with `GLFW_SAMPLES` (`PlatformWindow.cpp`), web in `web/src/webglContext.ts`
+(`Module.contextAttributes` and GLFW hints are ignored by the Emscripten port; the context is
+created in TypeScript and handed in as `preinitializedWebGLContext`). Everything else about them
+(`alpha: false`, `stencil: false`, `preserveDrawingBuffer: false` because capture reads the canvas
+in the same turn as `StepCaptureFrame`, `xrCompatible: true`, `powerPreference`) stays there too.
+
+With HDR on, the colour pass draws into `gfx/HDR`'s single-sampled texture and `hdr.fs` writes the
+default framebuffer. Default-framebuffer MSAA would resolve an image that was already resolved, so
+**a tier with HDR asks the context for no samples** (`ContextMsaaSamples()`), and the tone-map pass
+antialiases instead: `hdr.fs` runs FXAA on the *tone-mapped* value (so an HDR sun many times
+brighter than its neighbours does not decide every edge test), with the HDR texture clamped to
+edge. Only a tier without HDR (low) may keep a multisampled context. Startup logs
+`[Quality] Context samples: requested N, GL_SAMPLES=M` and the `Active tier` line prints
+`AA=<path>` from `ResolveAntialiasPath(hdrEnabled, GL_SAMPLES)`. If `HDR::InitFBO` refuses (no
+float render targets) the path becomes `none`: the context was created without samples.
+
+### 9.7 Web link flags
+
+Release: `-O3 -flto --closure 1 --emit-symbol-map` (minified stacks map back through
+`SolarSystem.js.symbols`); Debug: `-O0 -g -gsource-map`. Both: `-msimd128`, `-sENVIRONMENT=web`,
+`-sSTACK_SIZE=1MB`, `-fwasm-exceptions`. `GROWABLE_ARRAYBUFFERS=0` (Chrome's WebGL/DOM APIs reject
+views over a resizable `ArrayBuffer`) and no pthread / `SHARED_MEMORY` flags. `--preload-file`
+directories and `scripts/wasm-exports.json` are `LINK_DEPENDS` in `CMakeLists.txt`.
+`SDL2`/`SDL2_image` are native-only.
+
 with a `render` block, textures, and an `initTag` on `initTagAllowlist`. Codegen updates
 `BodyCatalog.generated.h`; `InitCatalogSystem` / `MakePlanetInitFunc` pick it up with **no new
 `.h/.cpp`**. If it is a new *focus* body, also add an `OrbitLayout::Body` value, a
