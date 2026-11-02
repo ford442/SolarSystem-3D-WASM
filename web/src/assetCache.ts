@@ -72,10 +72,16 @@ export function createAssetFetcher(options: AssetFetcherOptions): AssetFetcher {
             try {
                 const cache = await cacheStorage.open(name);
                 // Drop caches left by other asset bases (an older deploy) in the background.
-                void cacheStorage.keys().then((keys) => Promise.all(
-                    keys.filter((key) => key.startsWith(CACHE_PREFIX) && key !== name)
-                        .map((key) => cacheStorage.delete(key)),
-                )).catch(() => {});
+                void cacheStorage
+                    .keys()
+                    .then((keys) =>
+                        Promise.all(
+                            keys
+                                .filter((key) => key.startsWith(CACHE_PREFIX) && key !== name)
+                                .map((key) => cacheStorage.delete(key)),
+                        ),
+                    )
+                    .catch(() => {});
                 return cache;
             } catch (error) {
                 log(`[AssetCache] unavailable (${String(error)}); fetching without it`);
@@ -116,10 +122,13 @@ export function createAssetFetcher(options: AssetFetcherOptions): AssetFetcher {
             try {
                 // A fresh Response over the bytes we already hold: the stored entry is exactly
                 // what is handed to MEMFS, and nothing is left to be cut short mid-write.
-                await cache.put(key, new Response(body, {
-                    status: 200,
-                    headers: { 'content-type': response.headers.get('content-type') ?? 'application/octet-stream' },
-                }));
+                await cache.put(
+                    key,
+                    new Response(body, {
+                        status: 200,
+                        headers: { 'content-type': response.headers.get('content-type') ?? 'application/octet-stream' },
+                    }),
+                );
             } catch (error) {
                 log(`[AssetCache] could not store ${key}: ${String(error)}`); // quota, private mode
             }

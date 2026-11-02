@@ -1,0 +1,30 @@
+# clang-tidy for src/. Needs build/compile_commands.json (any preset writes one):
+#   cmake --preset native-release && clang-tidy -p build src/gfx/Shader.cpp
+# CI runs it on the lines a PR changes (clang-tidy-diff), so the two error checks below bind
+# new code without demanding a repo-wide sweep first: misc-include-cleaner still has ~1500
+# findings in older files, which is why it is not run over the whole tree.
+Checks: >
+  -*,
+  modernize-*,
+  bugprone-*,
+  performance-*,
+  cppcoreguidelines-owning-memory,
+  misc-include-cleaner,
+  -modernize-use-trailing-return-type,
+  -modernize-use-nodiscard,
+  -modernize-avoid-c-arrays,
+  -performance-enum-size,
+  -performance-no-int-to-ptr,
+  -bugprone-easily-swappable-parameters
+
+# Everything else is advice; these two are rules (ownership is RAII, includes are what is used).
+WarningsAsErrors: 'cppcoreguidelines-owning-memory,misc-include-cleaner'
+
+# Our headers, not vendored src/3rdparty/ or system ones.
+HeaderFilterRegex: '/src/(core|gfx|render|assets|astro|Solar_System)/|/src/[^/]+\.h$'
+
+CheckOptions:
+  # GL, GLFW and glm come through gfx/GlPlatform.h and the project's own wrappers; do not ask
+  # for their internal headers (glm/detail/type_vec3.hpp, GL/glew.h ...) to be included directly.
+  - key: misc-include-cleaner.IgnoreHeaders
+    value: 'glm/.*;GL/.*;GLFW/.*;SDL2?/.*;SDL_.*;emscripten/.*;freetype/.*;ft2build.h;assimp/.*'

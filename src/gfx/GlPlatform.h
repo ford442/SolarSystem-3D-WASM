@@ -3,7 +3,7 @@
 
 // The one place that picks the GL header for the build. Native links GLEW (desktop GL 4.6);
 // Emscripten's GL/glew.h shim maps onto its WebGL 2 / GLES 3.0 bindings.
-#include <GL/glew.h>
+#include <GL/glew.h> // IWYU pragma: export
 
 #ifdef __EMSCRIPTEN__
 // Emscripten's glew/SDL_opengl declare DSA entry points that WebGL 2 does not

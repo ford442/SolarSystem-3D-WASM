@@ -29,6 +29,10 @@
 #include "render/XrPointerRenderer.h"
 #include "render/terrain/TerrainRenderer.h"
 #include "Solar_System/SkyBox.h"
+#include "gfx/Shader.h"
+#include "gfx/GlPlatform.h"
+#include "Solar_System/ObserveSky.h"
+#include "Solar_System/Star.h"
 #include <algorithm>
 #include <array>
 #include <deque>
@@ -36,8 +40,11 @@
 #include <optional>
 #include <sstream>
 #include <string>
-
-using namespace std;
+#include <ios>
+#include <iterator>
+#include <memory>
+#include <utility>
+#include <vector>
 
 Renderer::Renderer() = default;
 Renderer::~Renderer() = default;
@@ -54,8 +61,9 @@ float ShadowBias(const RenderableSceneComponent& component, float sceneUnits) {
     return sceneUnits / component.shadowDepthRange.y;
 }
 
-ShaderSpec Program(const char* vertex, const char* fragment, vector<string> defines = {}) {
-    return ShaderSpec(string("resource/shaders/") + vertex, string("resource/shaders/") + fragment, std::move(defines));
+ShaderSpec Program(const char* vertex, const char* fragment, std::vector<std::string> defines = {}) {
+    return ShaderSpec(std::string("resource/shaders/") + vertex, std::string("resource/shaders/") + fragment,
+                      std::move(defines));
 }
 
 ShaderSpec PlanetSpec(unsigned variant) {
@@ -67,11 +75,11 @@ ShaderSpec TerrainSpec(unsigned variant) {
     return Program("terrain.vs", "terrain.fs", CatalogMaterial::Defines(variant));
 }
 
-const vector<string> kNearSurfaceDefine{"NEAR_SURFACE"};
+const std::vector<std::string> kNearSurfaceDefine{"NEAR_SURFACE"};
 
 // Every planetLighting variant some catalog row can draw with (CatalogMaterial::PossibleVariants).
-vector<unsigned> CatalogPlanetVariants() {
-    vector<unsigned> variants{0};
+std::vector<unsigned> CatalogPlanetVariants() {
+    std::vector<unsigned> variants{0};
     for (const BodyCatalog::Entry& entry : BodyCatalog::kEntries) {
         for (const unsigned variant : CatalogMaterial::PossibleVariants(CatalogMaterial::Material::FromEntry(entry))) {
             if (std::find(variants.begin(), variants.end(), variant) == variants.end()) {
@@ -87,7 +95,7 @@ vector<unsigned> CatalogPlanetVariants() {
 void Renderer::Init(const SimState& sim, FT_Library ft, glm::ivec2 display) {
     const auto qualitySettings = GetQualitySettings(
         sim.shadowQuality == 0 ? sim.qualityPreset : sim.shadowQuality - 1, sim.isMobileWeb);
-    _shadowMapFBO = make_unique<ShadowMapFBO>(qualitySettings.shadowResolution, qualitySettings.shadowResolution);
+    _shadowMapFBO = std::make_unique<ShadowMapFBO>(qualitySettings.shadowResolution, qualitySettings.shadowResolution);
 
     // Submit every program before waiting on any: with KHR_parallel_shader_compile the
     // driver compiles them side by side, and Get() below only waits for what is left.
@@ -104,7 +112,7 @@ void Renderer::Init(const SimState& sim, FT_Library ft, glm::ivec2 display) {
     const ShaderSpec lensFlareSpec = Program("lensFlare.vs", "lensFlare.fs");
     const ShaderSpec starGlowSpec = Program("starGlow.vs", "starGlow.fs");
     const ShaderSpec coronaVolumeSpec = Program("starCoronaVolume.vs", "starCoronaVolume.fs");
-    const vector<unsigned> planetVariants = CatalogPlanetVariants();
+    const std::vector<unsigned> planetVariants = CatalogPlanetVariants();
     for (const ShaderSpec* spec : {&hdrSpec, &textSpec, &shadowSpec, &skyBoxSpec, &starSpec, &coronaSpec,
                                    &atmosphereSpec, &pbrAtmosphereSpec, &cloudsSpec, &ringSpec, &lensFlareSpec,
                                    &starGlowSpec, &coronaVolumeSpec}) {
@@ -115,7 +123,7 @@ void Renderer::Init(const SimState& sim, FT_Library ft, glm::ivec2 display) {
     }
     _hdrEnabled = qualitySettings.enableHdr;
     _hdrShader = &_shaders.Get(hdrSpec);
-    _hdr = make_unique<HDR>(*_hdrShader, display.x, display.y, _hdrEnabled);
+    _hdr = std::make_unique<HDR>(*_hdrShader, display.x, display.y, _hdrEnabled);
     _hudProjection = glm::ortho(0.0f, static_cast<float>(display.x), 0.0f, static_cast<float>(display.y));
     // HDR turns itself off when the GPU cannot give it a complete float FBO; follow it,
     // otherwise the composite path would keep sampling an empty buffer.
@@ -123,7 +131,7 @@ void Renderer::Init(const SimState& sim, FT_Library ft, glm::ivec2 display) {
     LogQualityTier(qualitySettings, _hdrEnabled, sim.shadowQuality, sim.contextSamples);
 
     _mainTextShader = &_shaders.Get(textSpec);
-    _textRenderer = make_unique<TextRenderer>(ft, "resource/fonts/Arial.ttf");
+    _textRenderer = std::make_unique<TextRenderer>(ft, "resource/fonts/Arial.ttf");
     FT_Done_FreeType(ft);
     _shadowMapShader = &_shaders.Get(shadowSpec);
     _mainSkyBoxShader = &_shaders.Get(skyBoxSpec);
@@ -155,38 +163,32 @@ void Renderer::Init(const SimState& sim, FT_Library ft, glm::ivec2 display) {
     // After every program is built: a missing skybox face aborts start-up (native has no
     // checkerboard fallback), and the native CI smoke run should still have compiled the
     // shaders by then.
-    _skyBox = make_unique<SkyBox>(GetSkyBoxFaces());
-    _lensFlare = make_unique<LensFlare>(*_lensFlareShader, TextureImage2D(TexturePaths::Resolve("resource/textures_low/flares_bright_Low.dds")),
-            FlaresInfo {4,
-            {
-                FlareSprite{false, 1.0, 7.0, 0},
-                FlareSprite{false, 1.35, 0.3, 1},
-                FlareSprite{false, 1.5, 0.4, 4},
-                FlareSprite{false, 1.7, 0.6, 5},
-                FlareSprite{false, 1.9, 1.2, 6},
-                FlareSprite{false, 2.1, 0.4, 2},
-                FlareSprite{false, 2.25, 0.2, 3},
-                FlareSprite{false, 2.75, 2.0, 7}
-            }});
+    _skyBox = std::make_unique<SkyBox>(GetSkyBoxFaces());
+    _lensFlare = std::make_unique<LensFlare>(
+        *_lensFlareShader, TextureImage2D(TexturePaths::Resolve("resource/textures_low/flares_bright_Low.dds")),
+        FlaresInfo{4,
+                   {FlareSprite{false, 1.0, 7.0, 0}, FlareSprite{false, 1.35, 0.3, 1}, FlareSprite{false, 1.5, 0.4, 4},
+                    FlareSprite{false, 1.7, 0.6, 5}, FlareSprite{false, 1.9, 1.2, 6}, FlareSprite{false, 2.1, 0.4, 2},
+                    FlareSprite{false, 2.25, 0.2, 3}, FlareSprite{false, 2.75, 2.0, 7}}});
     try {
-        _observeSky = make_unique<ObserveSky>();
+        _observeSky = std::make_unique<ObserveSky>();
     } catch (const std::exception& error) {
         LOG_WARN("Observe", "sky shaders unavailable (%s); Observe mode will draw an empty sky", error.what());
         _observeSky.reset();
     }
-    _orbitPathRenderer = make_unique<OrbitPathRenderer>();
-    _surfacePatch = make_unique<SurfacePatchMesh>();
+    _orbitPathRenderer = std::make_unique<OrbitPathRenderer>();
+    _surfacePatch = std::make_unique<SurfacePatchMesh>();
     _surfacePatchKey = SurfacePatchKey{};
     // Its programs compile on first use, once a terrain body is within reach (DrawLitBody).
-    _terrainRenderer = make_unique<TerrainRenderer>();
+    _terrainRenderer = std::make_unique<TerrainRenderer>();
     _terrainVariants.fill(nullptr);
     _terrainShadowShader = nullptr;
-    _xrPointerRenderer = make_unique<XrPointerRenderer>();
-    _magneticFieldRenderer = make_unique<MagneticFieldLineRenderer>();
+    _xrPointerRenderer = std::make_unique<XrPointerRenderer>();
+    _magneticFieldRenderer = std::make_unique<MagneticFieldLineRenderer>();
     {
         const auto fieldQuality = GetQualitySettings(sim.qualityPreset, sim.isMobileWeb);
-        _magneticFieldBloom = make_unique<MagneticFieldBloom>(display.x, display.y,
-                                                              fieldQuality.enableMagneticBloom);
+        _magneticFieldBloom =
+            std::make_unique<MagneticFieldBloom>(display.x, display.y, fieldQuality.enableMagneticBloom);
         ApplyEffectQuality(fieldQuality);
     }
 }
@@ -769,7 +771,7 @@ void Renderer::RenderStarEffects(const FrameContext& ctx) const {
     const RenderableSceneComponent* nearest = ctx.scene.Nearest();
     const PlanetaryRing* nearestPlanetaryRing = nearest ? nearest->planetaryRing.get() : nullptr;
 
-    optional<RingCameraInfo> ringCameraInfo;
+    std::optional<RingCameraInfo> ringCameraInfo;
     if (nearestPlanetaryRing) {
         ringCameraInfo = {ctx.view.headPosition, nearestPlanetaryRing->GetPosition(), nearestPlanetaryRing->GetRingNormal(),
                           glm::vec2(nearestPlanetaryRing->GetInnerRadius(), nearestPlanetaryRing->GetOuterRadius()),
@@ -883,8 +885,10 @@ void Renderer::RenderSpaceObjectDistance(const FrameContext& ctx, const SpaceObj
         _distanceInfoCache.push_back(L' ');
     }
 
-    wstring distance(to_wstring(static_cast<uint16_t>(glm::distance(ctx.view.headPosition, spaceObject->GetPosition()))));
-    _distanceInfoCache.insert(_distanceInfoCache.end(), make_move_iterator(distance.begin()), make_move_iterator(distance.end()));
+    std::wstring distance(
+        std::to_wstring(static_cast<uint16_t>(glm::distance(ctx.view.headPosition, spaceObject->GetPosition()))));
+    _distanceInfoCache.insert(_distanceInfoCache.end(), std::make_move_iterator(distance.begin()),
+                              std::make_move_iterator(distance.end()));
 
     _mainTextShader->Use();
     _mainTextShader->SetVec3("particleCenterWorldSpace", spaceObject->GetPosition());
@@ -893,7 +897,7 @@ void Renderer::RenderSpaceObjectDistance(const FrameContext& ctx, const SpaceObj
 }
 
 void Renderer::RenderHints(const FrameContext& ctx) const {
-    static const string gpuHintString = string(reinterpret_cast<const char *>(glGetString(GL_RENDERER)));
+    static const std::string gpuHintString = std::string(reinterpret_cast<const char*>(glGetString(GL_RENDERER)));
     static constexpr glm::vec3 textColor = glm::vec3(0.98431, 0.80784, 0.69412);
 
     glDisable(GL_DEPTH_TEST);
@@ -907,23 +911,24 @@ void Renderer::RenderHints(const FrameContext& ctx) const {
     // Reuse pre-allocated containers to eliminate per-frame heap allocations
     _fpsHintCache.clear();
     _fpsHintCache.emplace_back(L"FPS: ");
-    _fpsHintCache.emplace_back(to_wstring(ctx.hud->fps));
+    _fpsHintCache.emplace_back(std::to_wstring(ctx.hud->fps));
 
     _gpuHintCache.clear();
-    _gpuHintCache.emplace_back(wstring(gpuHintString.begin(), gpuHintString.end()));
+    _gpuHintCache.emplace_back(std::wstring(gpuHintString.begin(), gpuHintString.end()));
 
 #ifndef __EMSCRIPTEN__ // web: volume and track live in the settings panel (web/src/music.ts)
     _soundVolumeHintCache.clear();
-    stringstream soundVolumeStream;
-    soundVolumeStream << fixed << setprecision(0) << ctx.hud->musicVolumePercent;
-    string soundVolume = soundVolumeStream.str();
-    _soundVolumeHintCache.emplace_back(wstring(L"Sound volume(PgUp/PgDown): ").append(soundVolume.begin(), soundVolume.end()).append(L" %"));
+    std::stringstream soundVolumeStream;
+    soundVolumeStream << std::fixed << std::setprecision(0) << ctx.hud->musicVolumePercent;
+    std::string soundVolume = soundVolumeStream.str();
+    _soundVolumeHintCache.emplace_back(
+        std::wstring(L"Sound volume(PgUp/PgDown): ").append(soundVolume.begin(), soundVolume.end()).append(L" %"));
 
     _tmpStringCache.clear();
-    _tmpStringCache.emplace_back(wstring(ctx.hud->musicTrack.begin(), ctx.hud->musicTrack.end()));
+    _tmpStringCache.emplace_back(std::wstring(ctx.hud->musicTrack.begin(), ctx.hud->musicTrack.end()));
 #endif
 
-    deque<wstring> timeRunHint;
+    std::deque<std::wstring> timeRunHint;
     timeRunHint.emplace_back(L"Time (P:pause, +/-:scale, .:step): ");
     std::wstringstream wss;
     wss << (ctx.sim.timePaused ? L"paused" : L"run") << L" x" << static_cast<int>(ctx.sim.timeScale);
@@ -936,64 +941,65 @@ void Renderer::RenderHints(const FrameContext& ctx) const {
     timeRunHint.emplace_back(wss.str());
 
     // Sky event driven by the ephemeris, not a baked animation — see SkyEvents.h.
-    deque<wstring> conjunctionHint;
+    std::deque<std::wstring> conjunctionHint;
     if (const SkyEvents::SkyEvent* next = ctx.scene.nextSkyEvent; next && next->valid) {
         const std::string line = SkyEvents::FormatEvent(*next);
         conjunctionHint.emplace_back(line.begin(), line.end()); // ASCII only, see SkyEvents
     }
 
-    deque<wstring> planetStarHint;
+    std::deque<std::wstring> planetStarHint;
     planetStarHint.emplace_back(L"Planet/Star distances(Z): ");
     planetStarHint.emplace_back((_overlayToggles.planetStarDistances) ? L"On" : L"Off");
 
-    deque<wstring> satelliteHint;
+    std::deque<std::wstring> satelliteHint;
     satelliteHint.emplace_back(L"Satellite distances(X): ");
     satelliteHint.emplace_back((_overlayToggles.satelliteDistances) ? L"On" : L"Off");
 
 #ifdef __EMSCRIPTEN__
     // Indicate low-res start + high-res streaming (visual in streaming-progress + on-screen when active)
-    deque<wstring> textureHint;
+    std::deque<std::wstring> textureHint;
     textureHint.emplace_back(L"Web: low-res start; high-res streams when close (see HUD)");
 #endif
 
-    deque<wstring> cameraSpeedHint;
+    std::deque<std::wstring> cameraSpeedHint;
     cameraSpeedHint.emplace_back(L"Camera speed(1/2): ");
-    cameraSpeedHint.emplace_back(to_wstring(ctx.hud->cameraSpeed));
+    cameraSpeedHint.emplace_back(std::to_wstring(ctx.hud->cameraSpeed));
 
-    deque<wstring> smoothCameraHint;
+    std::deque<std::wstring> smoothCameraHint;
     smoothCameraHint.emplace_back(L"Smooth camera(Arrows)");
 
-    deque<wstring> smoothZoomHint;
+    std::deque<std::wstring> smoothZoomHint;
     smoothZoomHint.emplace_back(L"Smooth zoom(V/B)");
 
-    deque<wstring> movementHint;
+    std::deque<std::wstring> movementHint;
     movementHint.emplace_back(L"Move up/down(SPACE/C)");
 
-    deque<wstring> speedBostHint;
+    std::deque<std::wstring> speedBostHint;
     speedBostHint.emplace_back(L"Speed boost(SHIFT)");
 
-    deque<wstring> starExposureHint;
+    std::deque<std::wstring> starExposureHint;
     starExposureHint.emplace_back(L"Star Exposure(3/4): ");
-    starExposureHint.emplace_back(to_wstring(_starTuning.exposure));
+    starExposureHint.emplace_back(std::to_wstring(_starTuning.exposure));
 
-    deque<wstring> starGammaHint;
+    std::deque<std::wstring> starGammaHint;
     starGammaHint.emplace_back(L"Star Gamma(5/6): ");
-    starGammaHint.emplace_back(to_wstring(_starTuning.gamma));
+    starGammaHint.emplace_back(std::to_wstring(_starTuning.gamma));
 
-    deque<wstring> starTemperatureHint;
-    stringstream  starTemperatureStream;
-    starTemperatureStream << fixed << setprecision(0) << _starTuning.temperatureKelvin;
-    string starTemperatureStr = starTemperatureStream.str();
-    starTemperatureHint.emplace_back(wstring(L"Star Temperature(7/8): ").append(make_move_iterator(starTemperatureStr.begin()),
-                                                                                make_move_iterator(starTemperatureStr.end())));
-    deque<wstring> vertSyncHint;
+    std::deque<std::wstring> starTemperatureHint;
+    std::stringstream starTemperatureStream;
+    starTemperatureStream << std::fixed << std::setprecision(0) << _starTuning.temperatureKelvin;
+    std::string starTemperatureStr = starTemperatureStream.str();
+    starTemperatureHint.emplace_back(std::wstring(L"Star Temperature(7/8): ")
+                                         .append(std::make_move_iterator(starTemperatureStr.begin()),
+                                                 std::make_move_iterator(starTemperatureStr.end())));
+    std::deque<std::wstring> vertSyncHint;
     vertSyncHint.emplace_back(L"Vert Sync(F1): ");
     vertSyncHint.emplace_back((ctx.hud->vsync) ? L"On" : L"Off");
 
-    deque<wstring> textHints;
+    std::deque<std::wstring> textHints;
     textHints.emplace_back(L"Text hints(TAB)");
 
-    deque<wstring> magneticHint;
+    std::deque<std::wstring> magneticHint;
     magneticHint.emplace_back(L"Magnetic fields(M): ");
     magneticHint.emplace_back(_magneticFieldsEnabled ? L"On" : L"Off");
 
@@ -1031,12 +1037,12 @@ void Renderer::RenderHints(const FrameContext& ctx) const {
 }
 
 void Renderer::RenderTextureLoadingProgress(const FrameContext& ctx) const {
-    auto& queue = TextureLoadingQueue::GetInstance();
-    const int queued    = queue.GetQueuedCount();
-    const int completed = queue.GetTotalProcessed();
-    const int total     = queue.GetTotalQueued();
-    const int active    = queue.GetActiveLoadCount();
-    const std::string& currentPath = queue.GetCurrentLoadingPath();
+    auto& loadingQueue = TextureLoadingQueue::GetInstance();
+    const int queued = loadingQueue.GetQueuedCount();
+    const int completed = loadingQueue.GetTotalProcessed();
+    const int total = loadingQueue.GetTotalQueued();
+    const int active = loadingQueue.GetActiveLoadCount();
+    const std::string& currentPath = loadingQueue.GetCurrentLoadingPath();
     // 0=generic, 1=mid, 2=high — mirrors streaming UI labels in progressOverlay.ts
     int tierCode = 0;
     if (currentPath.find("textures_mid/") != std::string::npos) {
@@ -1268,7 +1274,7 @@ void Renderer::SetMeshAnchor(const Shader& program, const SpaceObject& object, c
 }
 
 void Renderer::DrawSurfacePatch(const Shader& program, const SpaceObject& body, const CameraView& view) {
-    const vector<string>& defines = program.Spec().defines;
+    const std::vector<std::string>& defines = program.Spec().defines;
     if (!_surfacePatch || std::find(defines.begin(), defines.end(), kNearSurfaceDefine[0]) == defines.end()) {
         return; // a fallback program would place the eye-relative positions as model ones
     }

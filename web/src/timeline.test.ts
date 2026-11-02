@@ -29,14 +29,14 @@ const dot = (a: Vec3, b: Vec3): number => a[0] * b[0] + a[1] * b[1] + a[2] * b[2
 const unit = (a: Vec3): Vec3 => [a[0] / norm(a), a[1] / norm(a), a[2] / norm(a)];
 
 function scene(
-    bodies: Record<string, BodyState>,
+    bodies: Partial<Record<string, BodyState>>,
     surfaceRadius?: (focus: string, direction: Vec3) => number,
     facetNormal?: (focus: string, direction: Vec3) => Vec3,
 ): SceneSample {
     return {
         body: (focus) => bodies[focus] ?? null,
         surface: (focus, direction) => ({
-            radius: surfaceRadius ? surfaceRadius(focus, direction) : bodies[focus]?.radius ?? 0,
+            radius: surfaceRadius ? surfaceRadius(focus, direction) : (bodies[focus]?.radius ?? 0),
             normal: facetNormal ? facetNormal(focus, direction) : unit(direction),
         }),
     };
@@ -49,8 +49,11 @@ function timeline(keyframes: TimelineKeyframe[]): Timeline {
     return { id: 'test', title: 'Test', durationSec: keyframes[keyframes.length - 1].t, keyframes };
 }
 
-const key = (t: number, position: Vec3, extra: Partial<TimelineKeyframe> = {}): TimelineKeyframe =>
-    ({ t, camera: { position, rotation: [0, 0, 0, 1] }, ...extra });
+const key = (t: number, position: Vec3, extra: Partial<TimelineKeyframe> = {}): TimelineKeyframe => ({
+    t,
+    camera: { position, rotation: [0, 0, 0, 1] },
+    ...extra,
+});
 
 function frame(tl: Timeline, t: number, sample: SceneSample = atSun, startJd = 2451545) {
     const result = createTimelineEvaluator(tl, { startJd }).frameAt(t, sample);
@@ -116,8 +119,12 @@ describe('position splines', () => {
             const reference = evaluator.frameAt(t, scene({ sun: SUN, jupiter: { ...jupiter, position: [0, 0, 0] } }));
             expect(dist(offset, reference!.position)).toBeLessThan(1e-9);
         }
-        expect(dist(sub(evaluator.frameAt(10, scene({ sun: SUN, jupiter: bodyAt(200) }))!.position, bodyAt(200).position), [1.5, 0, 0]))
-            .toBeLessThan(1e-12);
+        expect(
+            dist(
+                sub(evaluator.frameAt(10, scene({ sun: SUN, jupiter: bodyAt(200) }))!.position, bodyAt(200).position),
+                [1.5, 0, 0],
+            ),
+        ).toBeLessThan(1e-12);
     });
 
     it('places offsets in a frame aimed at another body', () => {
@@ -125,11 +132,15 @@ describe('position splines', () => {
         const moon: BodyState = { position: [100, 0, 30], radius: 0.5, radiusKm: 1737 };
         const sample = scene({ sun: SUN, earth, moon });
         // +Z of the frame points from the Moon to Earth (world -Z here), +Y is ecliptic north.
-        const tl = timeline([{ t: 0, focus: 'moon', camera: { position: [0, 1, 2], units: 'radii', frame: 'earth', lookAt: 'earth' } }]);
+        const tl = timeline([
+            { t: 0, focus: 'moon', camera: { position: [0, 1, 2], units: 'radii', frame: 'earth', lookAt: 'earth' } },
+        ]);
         const f = frame(tl, 0, sample);
         expect(dist(f.position, [100, 0.5, 29])).toBeLessThan(1e-12);
         // Right-handed: x = y × z = (0,1,0) × (0,0,-1) = (-1,0,0).
-        const side = timeline([{ t: 0, focus: 'moon', camera: { position: [1, 0, 0], units: 'radii', frame: 'earth' } }]);
+        const side = timeline([
+            { t: 0, focus: 'moon', camera: { position: [1, 0, 0], units: 'radii', frame: 'earth' } },
+        ]);
         expect(dist(frame(side, 0, sample).position, [99.5, 0, 30])).toBeLessThan(1e-12);
     });
 
@@ -186,7 +197,9 @@ describe('polar descent', () => {
 
     it('levels the horizon with radial up', () => {
         const horizon = timeline([
-            down(0, 1, { camera: { position: [0.2, 1, 0.4], altitudeKm: 0.001, horizon: { azimuthDeg: 30, elevationDeg: 0 } } }),
+            down(0, 1, {
+                camera: { position: [0.2, 1, 0.4], altitudeKm: 0.001, horizon: { azimuthDeg: 30, elevationDeg: 0 } },
+            }),
         ]);
         const f = frame(horizon, 0, sample);
         const radial = unit(sub(f.position, EARTH.position));
@@ -210,9 +223,16 @@ describe('polar descent', () => {
             ]);
         };
         const faceted = scene({ sun: SUN, earth: EARTH }, undefined, (_focus, direction) => tilted(direction));
-        const at = (altitudeKm: number) => frame(timeline([down(0, altitudeKm, {
-            camera: { position: [0.2, 1, 0.4], altitudeKm, horizon: { azimuthDeg: 30, elevationDeg: 0 } },
-        })]), 0, faceted);
+        const at = (altitudeKm: number) =>
+            frame(
+                timeline([
+                    down(0, altitudeKm, {
+                        camera: { position: [0.2, 1, 0.4], altitudeKm, horizon: { azimuthDeg: 30, elevationDeg: 0 } },
+                    }),
+                ]),
+                0,
+                faceted,
+            );
 
         const ground = at(0.001);
         const normal = tilted(sub(ground.position, EARTH.position));
@@ -252,9 +272,10 @@ describe('rotations', () => {
         const qs = [0, 30, 60, 90].map((deg) => about([0.3, 1, 0.2], deg));
         for (let u = 0; u <= 1; u += 0.125) {
             expect(angleBetween(squad(qs[0], qs[1], qs[2], qs[3], u), slerp(qs[1], qs[2], u))).toBeLessThan(1e-9);
-            const flipped = qs.map((q, i) => (i % 2 ? q.map((v) => -v) as Quat : q));
-            expect(angleBetween(squad(flipped[0], flipped[1], flipped[2], flipped[3], u), slerp(qs[1], qs[2], u)))
-                .toBeLessThan(1e-9);
+            const flipped = qs.map((q, i) => (i % 2 ? (q.map((v) => -v) as Quat) : q));
+            expect(
+                angleBetween(squad(flipped[0], flipped[1], flipped[2], flipped[3], u), slerp(qs[1], qs[2], u)),
+            ).toBeLessThan(1e-9);
         }
     });
 
@@ -265,7 +286,8 @@ describe('rotations', () => {
             key(2, [2, 0, 0], { camera: { position: [2, 0, 0], rotation: about([1, 1, 0], 120) } }),
         ]);
         const h = 1e-4;
-        const rate = (t0: number, t1: number) => angleBetween(frame(tl, t0).rotation, frame(tl, t1).rotation) / (t1 - t0);
+        const rate = (t0: number, t1: number) =>
+            angleBetween(frame(tl, t0).rotation, frame(tl, t1).rotation) / (t1 - t0);
         expect(rate(1, 1 + h)).toBeCloseTo(rate(1 - h, 1), 2);
     });
 
@@ -310,8 +332,12 @@ describe('rotations', () => {
 
 describe('date track', () => {
     it('hits anchored dates and never runs backwards between increasing ones', () => {
-        const tl = timeline([key(0, [0, 0, 0], { jd: 100 }), key(1, [1, 0, 0], { jd: 101 }), key(5, [2, 0, 0], { jd: 3000 }),
-            key(6, [3, 0, 0], { jd: 3000.5 })]);
+        const tl = timeline([
+            key(0, [0, 0, 0], { jd: 100 }),
+            key(1, [1, 0, 0], { jd: 101 }),
+            key(5, [2, 0, 0], { jd: 3000 }),
+            key(6, [3, 0, 0], { jd: 3000.5 }),
+        ]);
         const evaluator = createTimelineEvaluator(tl, { startJd: 0 });
         expect(evaluator.dateAt(0)).toBe(100);
         expect(evaluator.dateAt(5)).toBeCloseTo(3000, 9);
@@ -325,8 +351,12 @@ describe('date track', () => {
     });
 
     it('starts at the current date and advances at timeScale where keys give none', () => {
-        const tl = timeline([key(0, [0, 0, 0], { timeScale: 10 }), key(3, [1, 0, 0]), key(4, [2, 0, 0], { timeScale: 0 }),
-            key(9, [3, 0, 0])]);
+        const tl = timeline([
+            key(0, [0, 0, 0], { timeScale: 10 }),
+            key(3, [1, 0, 0]),
+            key(4, [2, 0, 0], { timeScale: 0 }),
+            key(9, [3, 0, 0]),
+        ]);
         const evaluator = createTimelineEvaluator(tl, { startJd: 2460000 });
         expect(evaluator.dateAt(0)).toBe(2460000);
         expect(evaluator.dateAt(3)).toBeCloseTo(2460000 + 30 * DAYS_PER_SECOND_AT_1X, 9);
@@ -335,8 +365,14 @@ describe('date track', () => {
     });
 
     it('interpolates undated keys between dated ones until a timeScale is set', () => {
-        const tl = timeline([key(0, [0, 0, 0], { jd: 1000 }), key(1, [1, 0, 0]), key(3, [2, 0, 0]), key(4, [3, 0, 0], { jd: 1400 }),
-            key(5, [4, 0, 0], { timeScale: 1 }), key(7, [5, 0, 0])]);
+        const tl = timeline([
+            key(0, [0, 0, 0], { jd: 1000 }),
+            key(1, [1, 0, 0]),
+            key(3, [2, 0, 0]),
+            key(4, [3, 0, 0], { jd: 1400 }),
+            key(5, [4, 0, 0], { timeScale: 1 }),
+            key(7, [5, 0, 0]),
+        ]);
         const evaluator = createTimelineEvaluator(tl, { startJd: 0 });
         expect(evaluator.dateAt(1)).toBeCloseTo(1100, 9);
         expect(evaluator.dateAt(3)).toBeCloseTo(1300, 9);
@@ -345,8 +381,12 @@ describe('date track', () => {
     });
 
     it('eases or steps a segment on request', () => {
-        const tl = timeline([key(0, [0, 0, 0], { jd: 0, dateEase: 'ease-in-out' }), key(2, [1, 0, 0], { jd: 100, dateEase: 'step' }),
-            key(4, [2, 0, 0], { jd: 200, dateEase: 'linear' }), key(6, [3, 0, 0], { jd: 300 })]);
+        const tl = timeline([
+            key(0, [0, 0, 0], { jd: 0, dateEase: 'ease-in-out' }),
+            key(2, [1, 0, 0], { jd: 100, dateEase: 'step' }),
+            key(4, [2, 0, 0], { jd: 200, dateEase: 'linear' }),
+            key(6, [3, 0, 0], { jd: 300 }),
+        ]);
         const evaluator = createTimelineEvaluator(tl, { startJd: 0 });
         expect(evaluator.dateAt(1)).toBeCloseTo(50, 9);
         expect(evaluator.dateAt(0.2)).toBeLessThan(10 * 0.2 * 0.5);
@@ -384,8 +424,16 @@ describe('keyframes from poses', () => {
         const earth: BodyState = { position: [1234.5, 6.7, -890.1], radius: 0.0809, radiusKm: 6371 };
         const position: Vec3 = [1234.5 + 0.2, 6.7 + 0.01, -890.1 - 0.05];
         const key = keyframeFromPose({
-            t: 0, jd: 2460409.26, focus: 'earth', units: 'radii', focusState: earth,
-            position, yaw: 123, pitch: -12, roll: 7, fov: 30,
+            t: 0,
+            jd: 2460409.26,
+            focus: 'earth',
+            units: 'radii',
+            focusState: earth,
+            position,
+            yaw: 123,
+            pitch: -12,
+            roll: 7,
+            fov: 30,
         });
         const f = frame(timeline([key]), 0, scene({ sun: SUN, earth }));
         expect(dist(f.position, position)).toBeLessThan(1e-10);
@@ -411,7 +459,16 @@ describe('parsing', () => {
         [{ ...valid, id: 'Bad Id' }, /id/],
         [{ ...valid, keyframes: [] }, /non-empty/],
         [{ ...valid, keyframes: [{ t: 0, camera: { position: [1, 2] } }] }, /position/],
-        [{ ...valid, keyframes: [{ t: 0, camera: { position: [0, 0, 0] } }, { t: 0, camera: { position: [0, 0, 0] } }] }, /later/],
+        [
+            {
+                ...valid,
+                keyframes: [
+                    { t: 0, camera: { position: [0, 0, 0] } },
+                    { t: 0, camera: { position: [0, 0, 0] } },
+                ],
+            },
+            /later/,
+        ],
         [{ ...valid, keyframes: [{ t: 0, focus: 'Earth!', camera: { position: [0, 0, 0] } }] }, /focus/],
         [{ ...valid, keyframes: [{ t: 0, camera: { position: [0, 0, 0], rotation: [0, 0, 0, 0] } }] }, /rotation/],
         [{ ...valid, keyframes: [{ t: 0, tension: 2, camera: { position: [0, 0, 0] } }] }, /tension/],

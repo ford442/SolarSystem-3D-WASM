@@ -14,6 +14,11 @@
     "test:textures": "node verify-textures.js",
     "test:smoke": "playwright test",
     "test:unit": "vitest run",
+    "test:scripts": "node --test \"../scripts/**/*.test.mjs\"",
+    "lint": "eslint src",
+    "lint:fix": "eslint src --fix",
+    "format": "prettier --write src e2e",
+    "format:check": "prettier --check src e2e",
     "generate:wasm-exports": "node ../scripts/generate-wasm-exports.mjs",
     "generate:wasm-exports:check": "node ../scripts/generate-wasm-exports.mjs --check",
     "generate:planet-metadata": "node ../scripts/generate-planet-metadata.mjs",
@@ -23,9 +28,13 @@
     "prebuild": "npm run generate:planet-metadata"
   },
   "devDependencies": {
+    "@eslint/js": "^10.0.1",
     "@playwright/test": "^1.61.1",
+    "eslint": "^10.14.0",
+    "prettier": "^3.9.10",
     "puppeteer": "^25.1.0",
     "typescript": "~5.9.3",
+    "typescript-eslint": "^8.72.1",
     "vite": "^7.2.4",
     "vitest": "^5.0.3"
   },

@@ -88,12 +88,18 @@ export function createFocusDirectory(runtime: SolarSystemRuntime): FocusDirector
         missions,
         body: (focus) => byId.get(focus),
         missionIndex: (focus) =>
-            focus.startsWith('mission:') ? missions.find((mission) => mission.id === focus.slice(8))?.index ?? -1 : -1,
+            focus.startsWith('mission:')
+                ? (missions.find((mission) => mission.id === focus.slice(8))?.index ?? -1)
+                : -1,
     };
 }
 
 /** The scene a timeline reads, from one GetSceneStateJson snapshot plus surface queries. */
-export function sampleScene(runtime: SolarSystemRuntime, directory: FocusDirectory, state: SceneStateSnapshot): SceneSample {
+export function sampleScene(
+    runtime: SolarSystemRuntime,
+    directory: FocusDirectory,
+    state: SceneStateSnapshot,
+): SceneSample {
     const body = (focus: string): BodyState | null => {
         const mission = directory.missionIndex(focus);
         if (mission >= 0) {
@@ -149,7 +155,8 @@ export function createTimelinePlayer(options: {
     let timeline: Timeline | null = null;
     let evaluator: TimelineEvaluator | null = null;
     let directory: FocusDirectory | null = null;
-    let saved: { paused: boolean; fov: number; hud: number; orbitLines: boolean; magneticFields: boolean } | null = null;
+    let saved: { paused: boolean; fov: number; hud: number; orbitLines: boolean; magneticFields: boolean } | null =
+        null;
     let startJd = 0;
     let applied: Required<TimelineOverlays> | null = null;
     let caption = '';

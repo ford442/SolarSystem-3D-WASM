@@ -7,9 +7,15 @@
 #include "Solar_System/AtmosphereModel.h"
 #include "gfx/FloatLutTexture.h"
 #include "core/Log.h"
+#include "Solar_System/CatalogBody.h"
+#include "Solar_System/Planet.h"
+#include "Solar_System/Satellite.h"
+#include "Solar_System/Saturn_System/SaturnRing.h"
+#include "Solar_System/Uranus_System/UranusRing.h"
+#include "Solar_System/Sun/Sun.h"
 #include <unordered_set>
-
-using namespace std;
+#include <memory>
+#include <utility>
 
 namespace {
 
@@ -92,7 +98,7 @@ void Application::InitStarSystem() {
 
     StarInfo sunInfo(*_sphereModel, TextureImage2D(TexturePaths::Resolve("resource/textures_low/Star_Spectrum_Low.dds")),
                      _renderer.GetStarTuning().temperatureKelvin, 696342.0, glm::vec3(0.99607843, 0.890196078, 0.725490196), L"Sun", L"Солнце");
-    _sun = make_shared<Sun>(std::move(sunInfo));
+    _sun = std::make_shared<Sun>(std::move(sunInfo));
     _sun->SetMagneticField(MagneticFieldCatalog::IntrinsicParamsForBody(OrbitLayout::Body::Sun));
 
 #ifdef __EMSCRIPTEN__
@@ -130,14 +136,14 @@ void Application::InitCatalogSystem(const MeshHolder& sphereModel, const std::st
     }
 
     PlanetInfo info = MakePlanetInfo(sphereModel, *primary);
-    shared_ptr<Planet> planet = make_shared<CatalogBody>(std::move(info), _sun, *primary);
+    std::shared_ptr<Planet> planet = std::make_shared<CatalogBody>(std::move(info), _sun, *primary);
     planet->SetMagneticField(
         MagneticFieldCatalog::IntrinsicParamsForBody(static_cast<OrbitLayout::Body>(primary->index)));
 
-    vector<shared_ptr<Satellite>> satellites;
+    std::vector<std::shared_ptr<Satellite>> satellites;
     // Moons whose catalog row carries render.atmosphere (Titan). Their shells render with
     // this component, after the primary's.
-    vector<pair<shared_ptr<Satellite>, const BodyCatalog::AtmosphereRow*>> satelliteAtmospheres;
+    std::vector<std::pair<std::shared_ptr<Satellite>, const BodyCatalog::AtmosphereRow*>> satelliteAtmospheres;
     for (const BodyCatalog::Entry& entry : BodyCatalog::kEntries) {
         if (entry.kind != BodyCatalog::Kind::Satellite || !entry.parentId ||
             !BodyCatalog::StrEq(entry.parentId, primary->id)) {
@@ -146,14 +152,14 @@ void Application::InitCatalogSystem(const MeshHolder& sphereModel, const std::st
         if (entry.meshPath) {
             MeshHolder mesh(entry.meshPath);
             SatelliteInfo satInfo = MakeSatelliteInfo(mesh, entry);
-            auto sat = make_shared<CatalogSatellite>(std::move(satInfo), planet, entry);
+            auto sat = std::make_shared<CatalogSatellite>(std::move(satInfo), planet, entry);
             if (const auto* row = BodyCatalog::FindAtmosphere(entry.id)) {
                 satelliteAtmospheres.emplace_back(sat, row);
             }
             satellites.push_back(std::move(sat));
         } else {
             SatelliteInfo satInfo = MakeSatelliteInfo(sphereModel, entry);
-            auto sat = make_shared<CatalogSatellite>(std::move(satInfo), planet, entry);
+            auto sat = std::make_shared<CatalogSatellite>(std::move(satInfo), planet, entry);
             if (const auto* row = BodyCatalog::FindAtmosphere(entry.id)) {
                 satelliteAtmospheres.emplace_back(sat, row);
             }
@@ -177,7 +183,7 @@ void Application::InitCatalogSystem(const MeshHolder& sphereModel, const std::st
         CloudsInfo cloudsInfo(sphereModel, primary->cloudLayer.scaleFactor,
                               TextureImage2D(GetTexturePath(cloudDiffuse.low, cloudDiffuse.high)),
                               TextureImage2D(GetTexturePath(cloudNormal.low, cloudNormal.high)));
-        component.clouds = make_unique<CatalogClouds>(std::move(cloudsInfo), planet, *primary);
+        component.clouds = std::make_unique<CatalogClouds>(std::move(cloudsInfo), planet, *primary);
     }
 
     if (primary->hasRings) {
@@ -187,9 +193,9 @@ void Application::InitCatalogSystem(const MeshHolder& sphereModel, const std::st
             PlanetaryRingInfo ringInfo(ringModel, ringSpec->innerRadius, ringSpec->outerRadius,
                                        TextureImage2D(GetTexturePath(ringTex.low, ringTex.high)));
             if (BodyCatalog::StrEq(primary->id, "saturn")) {
-                component.planetaryRing = make_unique<SaturnRing>(std::move(ringInfo), planet);
+                component.planetaryRing = std::make_unique<SaturnRing>(std::move(ringInfo), planet);
             } else if (BodyCatalog::StrEq(primary->id, "uranus")) {
-                component.planetaryRing = make_unique<UranusRing>(std::move(ringInfo), planet);
+                component.planetaryRing = std::make_unique<UranusRing>(std::move(ringInfo), planet);
             }
         }
     }

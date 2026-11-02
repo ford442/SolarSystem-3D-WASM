@@ -13,11 +13,11 @@ import { createCachedCwrapExports } from './wasmBridge.exports.js';
 import { clearWasmCallback, emitWasmCallback, registerWasmCallbacks } from './wasmCallbacks.js';
 
 /**
- * Planet index conventions (FocusPlanet / GetFocusedPlanetIndex):
- * - 0 = Sun, 1 = Mercury … 9 = Pluto, 10 = Ceres, 11 = Vesta, 12 = Eris, 13 = Haumea,
- *   14 = Makemake, 15 = 1P/Halley (matches deepLink PLANET_IDS).
- * GetNearestPlanetIndex returns 1–15 for the nearest loaded planet, or -1 when unknown
- * (C++ adds +1 offset via GetNearestPlanetIndexForJs).
+ * Planet index conventions (FocusPlanet / GetFocusedPlanetIndex): the focus index of every
+ * body is generated into ./generated/planetIds.ts (PLANET_IDS) from planets.catalog.json and
+ * matches OrbitLayout::Body — Sun=0 … Vesta=11 are frozen, then Eris … 1P/Halley.
+ * GetNearestPlanetIndex returns 1–MAX_PLANET_INDEX for the nearest loaded planet, or -1 when
+ * unknown (C++ adds +1 offset via GetNearestPlanetIndexForJs).
  */
 export type { PlanetIndex, QualityPreset, SettingsChangeField, ShadowQuality, OrbitScaleMode };
 export type { NextConjunction };
@@ -133,10 +133,13 @@ function parseBodyCatalogJson(json: string): BodyCatalogEntry[] {
     try {
         const raw = JSON.parse(json) as unknown;
         return Array.isArray(raw)
-            ? raw.filter((entry): entry is BodyCatalogEntry =>
-                typeof entry === 'object' && entry !== null
-                && typeof (entry as BodyCatalogEntry).id === 'string'
-                && Number.isInteger((entry as BodyCatalogEntry).index))
+            ? raw.filter(
+                  (entry): entry is BodyCatalogEntry =>
+                      typeof entry === 'object' &&
+                      entry !== null &&
+                      typeof (entry as BodyCatalogEntry).id === 'string' &&
+                      Number.isInteger((entry as BodyCatalogEntry).index),
+              )
             : [];
     } catch {
         return [];
@@ -164,7 +167,7 @@ function parseSurfaceJson(json: string): SurfacePoint {
 
 /** Map quality preset + shadows toggle to C++ shadow quality (0=off, 1–3 = low…full). */
 export function shadowQualityForPreset(preset: QualityPreset, shadowsEnabled: boolean): ShadowQuality {
-    return shadowsEnabled ? (preset + 1) as ShadowQuality : 0;
+    return shadowsEnabled ? ((preset + 1) as ShadowQuality) : 0;
 }
 
 export interface CameraPose {
@@ -243,7 +246,16 @@ export interface SolarSystemRuntime {
     getCameraPosition(): { x: number; y: number; z: number };
     getCameraYaw(): number;
     getCameraPitch(): number;
-    setXrControllerRay(hand: number, ox: number, oy: number, oz: number, dx: number, dy: number, dz: number, visible: boolean): void;
+    setXrControllerRay(
+        hand: number,
+        ox: number,
+        oy: number,
+        oz: number,
+        dx: number,
+        dy: number,
+        dz: number,
+        visible: boolean,
+    ): void;
     /** Roll about the view direction, degrees (timelines only; 0 restores the level camera). */
     setCameraRoll(rollDeg: number): void;
     getCameraRoll(): number;
@@ -403,7 +415,11 @@ export function createSolarSystemRuntime(instance: SolarSystemModule): SolarSyst
         beginCapture: (width, height) => exports.beginCapture(width, height) !== 0,
         stepCaptureFrame: exports.stepCaptureFrame,
         endCapture: exports.endCapture,
-        getShaderSourceFiles: () => exports.getShaderSourceFiles().split('\n').filter((path) => path.length > 0),
+        getShaderSourceFiles: () =>
+            exports
+                .getShaderSourceFiles()
+                .split('\n')
+                .filter((path) => path.length > 0),
         reloadChangedShaders: exports.reloadShaders,
     };
 
@@ -424,9 +440,7 @@ export function exposeConsoleHelpers(runtime: SolarSystemRuntime): void {
     window.getObserveState = runtime.getObserveState.bind(runtime);
 }
 
-export function subscribeSettingsChanges(
-    handler: (field: SettingsChangeField) => void,
-): () => void {
+export function subscribeSettingsChanges(handler: (field: SettingsChangeField) => void): () => void {
     const wrapped = (field: string) => handler(field as SettingsChangeField);
     registerWasmCallbacks({ onSettingsChanged: wrapped });
     return () => {

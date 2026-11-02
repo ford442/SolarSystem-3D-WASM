@@ -1,4 +1,5 @@
 #include "TextRenderer.h"
+#include <utility>
 
 TextRenderer::TextRenderer(FT_Library ft, const std::string& fontPath) : _ft(ft){
     LoadFont(fontPath);
@@ -206,10 +207,9 @@ void TextRenderer::LoadFont(const std::string& fontPath) {
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
 
         Character character = {
-                std::move(texture),
-                glm::ivec2(face->glyph->bitmap.width, face->glyph->bitmap.rows),
-                glm::ivec2(face->glyph->bitmap_left, face->glyph->bitmap_top),
-                face->glyph->advance.x
+            std::move(texture), glm::ivec2(face->glyph->bitmap.width, face->glyph->bitmap.rows),
+            glm::ivec2(face->glyph->bitmap_left, face->glyph->bitmap_top),
+            static_cast<int>(face->glyph->advance.x) // 26.6 fixed point, always small
         };
 
         _characters.emplace(c, std::move(character));

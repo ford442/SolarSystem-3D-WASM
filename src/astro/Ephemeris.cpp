@@ -14,7 +14,6 @@ namespace {
 constexpr double kPi = 3.14159265358979323846;
 constexpr double kTwoPi = 6.28318530717958647692;
 constexpr double kDegToRad = kPi / 180.0;
-constexpr double kRadToDeg = 180.0 / kPi;
 constexpr double kDaysPerCentury = 36525.0;
 constexpr double kKmPerAu = 149597870.7;
 constexpr int kMoonId = 16;

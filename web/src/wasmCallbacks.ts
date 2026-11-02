@@ -1,5 +1,3 @@
-import type { SettingsChangeField } from './SolarSystem.js';
-
 export interface WasmModuleCallbacks {
     /** `failed` counts core resources that failed to download; they are already included in `loaded`. */
     updateLoadingProgress?: (loaded: number, total: number, failed?: number) => void;
@@ -7,7 +5,8 @@ export interface WasmModuleCallbacks {
     onPlanetFocused?: (index: number) => void;
     /** 0–1 gain for scene proximity, reported by C++ (Application::UpdateMusicDucking). */
     onMusicDuck?: (duck: number) => void;
-    onSettingsChanged?: (field: SettingsChangeField | string) => void;
+    /** A SettingsChangeField, but C++ owns the string, so an unknown field arrives as a plain string. */
+    onSettingsChanged?: (field: string) => void;
     /** JS planet index (GetNearestPlanetIndex convention) whenever the nearest body changes; -1 for none. */
     onNearestPlanetChanged?: (index: number) => void;
     /** Mission index whenever mission follow starts or stops (-1 when it stops). */

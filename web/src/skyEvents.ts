@@ -4,12 +4,7 @@ import { isoDateFromJulianDate } from './ephemeris';
  * Kinds mirror SkyEvents::EventKind in C++. The slug is what GetNextSkyEventJson emits;
  * keep the two lists in step or the chip silently falls back to the generic label.
  */
-export type SkyEventKind =
-    | 'conjunction'
-    | 'solarEclipse'
-    | 'lunarEclipse'
-    | 'transit'
-    | 'shadowTransit';
+export type SkyEventKind = 'conjunction' | 'solarEclipse' | 'lunarEclipse' | 'transit' | 'shadowTransit';
 
 /**
  * One ephemeris-derived alignment, as assembled by SkyEvents::SkyEvent in C++.

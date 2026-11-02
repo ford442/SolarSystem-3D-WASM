@@ -119,7 +119,9 @@ void EnsureDirectoryExists(const std::string& path) {
 }
 
 // Shared completion for both web transfer paths (the cache hook and emscripten_async_wget2).
-void FinishDownload(DownloadContext* context, bool success, int status) {
+// The context crosses the C callback boundary as `void* arg` (StartTransfer releases it there);
+// the callbacks adopt it back into a unique_ptr, so this function owns it from here on.
+void FinishDownload(std::unique_ptr<DownloadContext> context, bool success, int status) {
     if (success) {
         LOG_DEBUG("WebResourceFetcher", "Successfully downloaded: %s -> %s", context->resolvedUrl.c_str(),
                   context->virtualPath.c_str());
@@ -128,17 +130,17 @@ void FinishDownload(DownloadContext* context, bool success, int status) {
                  context->virtualPath.c_str(), status);
     }
     const std::string virtualPath = context->virtualPath;
-    delete context;
+    context.reset();
     CompleteTransfer(virtualPath, success);
 }
 
 // Callback wrappers for emscripten_async_wget2
 void OnLoad2(unsigned int /*handle*/, void* arg, const char* /*file*/) {
-    FinishDownload(static_cast<DownloadContext*>(arg), true, 0);
+    FinishDownload(std::unique_ptr<DownloadContext>(static_cast<DownloadContext*>(arg)), true, 0);
 }
 
 void OnError2(unsigned int /*handle*/, void* arg, int status) {
-    FinishDownload(static_cast<DownloadContext*>(arg), false, status);
+    FinishDownload(std::unique_ptr<DownloadContext>(static_cast<DownloadContext*>(arg)), false, status);
 }
 
 // The Cache API path: web/src/assetCache.ts, installed as window['__solarSystemFetchAsset']
@@ -196,12 +198,12 @@ EM_JS(void, StartHookedDownload, (const char* urlPtr, const char* pathPtr, void*
 // can return while the staged downloads are still in flight.
 void OnHookedLoad(void* arg) {
     emscripten_runtime_keepalive_pop();
-    FinishDownload(static_cast<DownloadContext*>(arg), true, 0);
+    FinishDownload(std::unique_ptr<DownloadContext>(static_cast<DownloadContext*>(arg)), true, 0);
 }
 
 void OnHookedError(void* arg, int status) {
     emscripten_runtime_keepalive_pop();
-    FinishDownload(static_cast<DownloadContext*>(arg), false, status);
+    FinishDownload(std::unique_ptr<DownloadContext>(static_cast<DownloadContext*>(arg)), false, status);
 }
 
 // Matching the signature emscripten_async_wget2 expects: void (*)(unsigned int, void *, int)
@@ -217,16 +219,18 @@ void StartTransfer(const std::string& url, const std::string& virtualPath) {
     const std::string resolvedUrl = ResolveResourceUrl(url);
     LOG_DEBUG("WebResourceFetcher", "Starting download: %s to %s", resolvedUrl.c_str(), virtualPath.c_str());
 
-    auto* context = new DownloadContext{resolvedUrl, virtualPath};
+    // Owned until it is handed to the C API below as its `void* arg`, then adopted back by FinishDownload.
+    auto context = std::make_unique<DownloadContext>(DownloadContext{resolvedUrl, virtualPath});
 
     if (HasAssetFetchHook()) {
         emscripten_runtime_keepalive_push();
-        StartHookedDownload(resolvedUrl.c_str(), virtualPath.c_str(), context, OnHookedLoad, OnHookedError);
+        StartHookedDownload(resolvedUrl.c_str(), virtualPath.c_str(), context.release(), OnHookedLoad, OnHookedError);
         return;
     }
 
     // emscripten_async_wget2(url, file, requesttype, param, userdata, onload, onerror, onprogress)
-    emscripten_async_wget2(resolvedUrl.c_str(), virtualPath.c_str(), "GET", nullptr, context, OnLoad2, OnError2, OnProgress2);
+    emscripten_async_wget2(resolvedUrl.c_str(), virtualPath.c_str(), "GET", nullptr, context.release(), OnLoad2,
+                           OnError2, OnProgress2);
 }
 } // namespace
 

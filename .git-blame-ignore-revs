@@ -1,0 +1,5 @@
+# Mechanical reformats; hide them from git blame.
+# git config blame.ignoreRevsFile .git-blame-ignore-revs
+
+# web: apply Prettier
+22180976494b205825143a766652f89759ed4faf

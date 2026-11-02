@@ -9,9 +9,13 @@ external/
 
 # Build directories
 build/
-build-web/
+build-web*/
 build-test*/
 build-check/
+
+# Local scratch: headless capture output, deploy virtualenvs
+headless_chrome/
+.venv*/
 
 # Emscripten output
 *.wasm
@@ -33,3 +37,7 @@ _codeql_detected_source_root
 resource/textures/
 resource/sounds/
 .aider*
+
+# Playwright output
+web/test-results/
+web/playwright-report/

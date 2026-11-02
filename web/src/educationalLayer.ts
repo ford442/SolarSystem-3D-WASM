@@ -1,4 +1,5 @@
 import { copyShareableLink, type DeepLinkViewState } from './deepLink.js';
+import { getClipboard } from './dom.js';
 import { isoDateFromJulianDate } from './ephemeris.js';
 import { createTourPlayer, loadTour, type TourPlayer } from './tourPlayer.js';
 import type { SolarSystemRuntime } from './wasmBridge.js';
@@ -102,17 +103,19 @@ export function initEducationalLayer(options: {
     };
 
     tourPlay.addEventListener('click', () => {
-        void loadTour('inner-system').then((tour) => {
-            if (!tour) {
+        void loadTour('inner-system')
+            .then((tour) => {
+                if (!tour) {
+                    settingsStatus.textContent = 'Could not load tour';
+                    return;
+                }
+                player.play(tour, 0);
+                setTourPlaying(true);
+            })
+            .catch((error: unknown) => {
+                console.warn('[Tour] load failed:', error);
                 settingsStatus.textContent = 'Could not load tour';
-                return;
-            }
-            player.play(tour, 0);
-            setTourPlaying(true);
-        }).catch((error: unknown) => {
-            console.warn('[Tour] load failed:', error);
-            settingsStatus.textContent = 'Could not load tour';
-        });
+            });
     });
 
     tourStop.addEventListener('click', () => {
@@ -136,21 +139,24 @@ export function initEducationalLayer(options: {
             getFocusedMission: () => runtime.getFocusedMission(),
             getCameraPose: () => runtime.getCameraPose(),
             isoDateFromJulianDate,
-        }).then((link) => {
-            const url = new URL(link);
-            if (tour) {
-                url.searchParams.set('tour', tour.id);
-                if (step >= 0) {
-                    url.searchParams.set('step', String(step));
+        })
+            .then((link) => {
+                const url = new URL(link);
+                if (tour) {
+                    url.searchParams.set('tour', tour.id);
+                    if (step >= 0) {
+                        url.searchParams.set('step', String(step));
+                    }
                 }
-            }
-            return navigator.clipboard?.writeText(url.toString()) ?? Promise.resolve();
-        }).then(() => {
-            settingsStatus.textContent = 'Tour step link copied';
-        }).catch((error: unknown) => {
-            console.warn('[Tour] copy failed:', error);
-            settingsStatus.textContent = 'Could not copy tour step';
-        });
+                return getClipboard()?.writeText(url.toString()) ?? Promise.resolve();
+            })
+            .then(() => {
+                settingsStatus.textContent = 'Tour step link copied';
+            })
+            .catch((error: unknown) => {
+                console.warn('[Tour] copy failed:', error);
+                settingsStatus.textContent = 'Could not copy tour step';
+            });
     });
 
     window.startTour = (id = 'inner-system') => {

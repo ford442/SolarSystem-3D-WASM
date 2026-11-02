@@ -364,8 +364,12 @@ export interface KbParams {
  * the reflection of the other one (a straight run-out at the ends).
  */
 export function kbTangents(
-    previous: Vec3 | null, current: Vec3, next: Vec3 | null,
-    tPrevious: number, tCurrent: number, tNext: number,
+    previous: Vec3 | null,
+    current: Vec3,
+    next: Vec3 | null,
+    tPrevious: number,
+    tCurrent: number,
+    tNext: number,
     params: KbParams = {},
 ): { incoming: Vec3; outgoing: Vec3 } {
     if (!previous && !next) {
@@ -380,12 +384,12 @@ export function kbTangents(
     const b = params.bias ?? 0;
     const d0 = sub(current, prev);
     const d1 = sub(nxt, current);
-    const outgoing = add(scale(d0, (1 - t) * (1 + c) * (1 + b) / 2), scale(d1, (1 - t) * (1 - c) * (1 - b) / 2));
-    const incoming = add(scale(d0, (1 - t) * (1 - c) * (1 + b) / 2), scale(d1, (1 - t) * (1 + c) * (1 - b) / 2));
+    const outgoing = add(scale(d0, ((1 - t) * (1 + c) * (1 + b)) / 2), scale(d1, ((1 - t) * (1 - c) * (1 - b)) / 2));
+    const incoming = add(scale(d0, ((1 - t) * (1 - c) * (1 + b)) / 2), scale(d1, ((1 - t) * (1 + c) * (1 - b)) / 2));
     const sum = h0 + h1;
     return {
-        outgoing: scale(outgoing, sum > 0 ? 2 * h1 / sum : 1),
-        incoming: scale(incoming, sum > 0 ? 2 * h0 / sum : 1),
+        outgoing: scale(outgoing, sum > 0 ? (2 * h1) / sum : 1),
+        incoming: scale(incoming, sum > 0 ? (2 * h0) / sum : 1),
     };
 }
 
@@ -425,12 +429,18 @@ export function monotoneSlopes(times: readonly number[], values: readonly number
 
 function ease(kind: DateEase, u: number): number {
     switch (kind) {
-    case 'linear': return u;
-    case 'ease-in': return u * u * u;
-    case 'ease-out': return 1 - (1 - u) ** 3;
-    case 'ease-in-out': return u < 0.5 ? 4 * u * u * u : 1 - (-2 * u + 2) ** 3 / 2;
-    case 'step': return 0;
-    case 'smooth': return u;
+        case 'linear':
+            return u;
+        case 'ease-in':
+            return u * u * u;
+        case 'ease-out':
+            return 1 - (1 - u) ** 3;
+        case 'ease-in-out':
+            return u < 0.5 ? 4 * u * u * u : 1 - (-2 * u + 2) ** 3 / 2;
+        case 'step':
+            return 0;
+        case 'smooth':
+            return u;
     }
 }
 
@@ -447,12 +457,12 @@ function isVec3(value: unknown): value is Vec3 {
 }
 
 function isQuat(value: unknown): value is Quat {
-    return Array.isArray(value) && value.length === 4 && value.every(isFiniteNumber)
-        && Math.hypot(...(value as number[])) > 1e-9;
+    return Array.isArray(value) && value.length === 4 && value.every(isFiniteNumber) && Math.hypot(...value) > 1e-9;
 }
 
 const isFocus = (value: unknown): value is string =>
-    typeof value === 'string' && (value.startsWith('mission:') ? ID_PATTERN.test(value.slice(8)) : ID_PATTERN.test(value));
+    typeof value === 'string' &&
+    (value.startsWith('mission:') ? ID_PATTERN.test(value.slice(8)) : ID_PATTERN.test(value));
 
 function parseKeyframe(raw: unknown, index: number): TimelineKeyframe | string {
     if (typeof raw !== 'object' || raw === null) {
@@ -609,7 +619,7 @@ export function parseTimeline(raw: unknown): TimelineParseResult {
     }
     const last = keyframes[keyframes.length - 1].t;
     const durationSec = isFiniteNumber(record.durationSec) && record.durationSec >= last ? record.durationSec : last;
-    const view = typeof record.view === 'object' && record.view !== null ? record.view as TourStepView : undefined;
+    const view = typeof record.view === 'object' && record.view !== null ? (record.view as TourStepView) : undefined;
     return {
         ok: true,
         timeline: {
@@ -644,7 +654,11 @@ interface Control {
     world: Vec3;
 }
 
-const ECLIPTIC_AXES: [Vec3, Vec3, Vec3] = [[1, 0, 0], [0, 1, 0], [0, 0, 1]];
+const ECLIPTIC_AXES: [Vec3, Vec3, Vec3] = [
+    [1, 0, 0],
+    [0, 1, 0],
+    [0, 0, 1],
+];
 
 /** Axes with +Z from `center` towards `target` and +Y as near ecliptic north as that allows. */
 function frameAxes(center: Vec3, target: Vec3): [Vec3, Vec3, Vec3] {
@@ -669,9 +683,12 @@ function kmScale(state: BodyState): number {
 
 function unitScale(units: LengthUnits | undefined, state: BodyState): number {
     switch (units ?? 'scene') {
-    case 'radii': return state.radius > 0 ? state.radius : 1;
-    case 'km': return kmScale(state);
-    default: return 1;
+        case 'radii':
+            return state.radius > 0 ? state.radius : 1;
+        case 'km':
+            return kmScale(state);
+        default:
+            return 1;
     }
 }
 
@@ -731,7 +748,10 @@ function keyRotation(control: Control, eye: Vec3, scene: SceneSample): Quat {
         // underfoot), ecliptic north's, then +X's.
         const onHorizon = (direction: Vec3): Vec3 => sub(direction, scale(radialUp, dot(direction, radialUp)));
         let north = onHorizon(normalizeOr(sub(sun, eye), [0, 1, 0]));
-        for (const fallback of [[0, 1, 0], [1, 0, 0]] as Vec3[]) {
+        for (const fallback of [
+            [0, 1, 0],
+            [1, 0, 0],
+        ] as Vec3[]) {
             if (length(north) < 1e-6) {
                 north = onHorizon(fallback);
             }
@@ -748,14 +768,20 @@ function keyRotation(control: Control, eye: Vec3, scene: SceneSample): Quat {
     if (typeof camera.lookAt === 'string') {
         target = scene.body(camera.lookAt)?.position ?? control.center;
     } else if (camera.lookAt) {
-        target = add(control.center, scale(inAxes(control.axes, camera.lookAt), unitScale(camera.units, control.state)));
+        target = add(
+            control.center,
+            scale(inAxes(control.axes, camera.lookAt), unitScale(camera.units, control.state)),
+        );
     }
     const up: Vec3 = camera.up === 'radial' ? radialUp : [0, 1, 0];
     return quatFromFrontUp(sub(target, eye), up);
 }
 
 /** Overlays and caption in force at key `index` (steps, carried forward). */
-function stepState(keys: readonly TimelineKeyframe[], index: number): { overlays: Required<TimelineOverlays>; caption: string } {
+function stepState(
+    keys: readonly TimelineKeyframe[],
+    index: number,
+): { overlays: Required<TimelineOverlays>; caption: string } {
     const overlays = { ...DEFAULT_OVERLAYS };
     let caption = '';
     for (let i = 0; i <= index; ++i) {
@@ -786,9 +812,11 @@ export function createTimelineEvaluator(timeline: Timeline, options: EvaluatorOp
         // Undated keys pending..upTo: their share of the way to `target`, or held without one.
         const before = dates[pending - 1];
         for (let k = pending; k <= upTo; ++k) {
-            dates[k] = target === null
-                ? before
-                : before + (target - before) * (times[k] - times[pending - 1]) / (times[upTo + 1] - times[pending - 1]);
+            dates[k] =
+                target === null
+                    ? before
+                    : before +
+                      ((target - before) * (times[k] - times[pending - 1])) / (times[upTo + 1] - times[pending - 1]);
         }
         pending = -1;
     };
@@ -858,7 +886,12 @@ export function createTimelineEvaluator(timeline: Timeline, options: EvaluatorOp
     };
 
     /** World position on segment i at u, from the controls resolved at this date. */
-    const positionAt = (controls: Map<number, Control | null>, i: number, u: number, scene: SceneSample): Vec3 | null => {
+    const positionAt = (
+        controls: Map<number, Control | null>,
+        i: number,
+        u: number,
+        scene: SceneSample,
+    ): Vec3 | null => {
         const c1 = controls.get(i) ?? null;
         const c2 = controls.get(i + 1) ?? null;
         if (!c1) {
@@ -881,7 +914,9 @@ export function createTimelineEvaluator(timeline: Timeline, options: EvaluatorOp
             const direction = (c: Control): Vec3 => normalizeOr(sub(c.world, center), [0, 1, 0]);
             const logHeight = (c: Control): number => {
                 const d = direction(c);
-                return Math.log(Math.max(length(sub(c.world, center)) - scene.surface(c.focus, d).radius, MIN_ALTITUDE));
+                return Math.log(
+                    Math.max(length(sub(c.world, center)) - scene.surface(c.focus, d).radius, MIN_ALTITUDE),
+                );
             };
             const d1 = direction(c1);
             const d2 = direction(c2);
@@ -989,7 +1024,10 @@ export function keyframeFromPose(options: {
     roll: number;
     fov: number;
 }): TimelineKeyframe {
-    const offset = scale(sub(options.position, options.focusState.position), 1 / unitScale(options.units, options.focusState));
+    const offset = scale(
+        sub(options.position, options.focusState.position),
+        1 / unitScale(options.units, options.focusState),
+    );
     // Twelve significant digits keep a metre on realistic scale and the JSON readable.
     const tidy = (value: number): number => Number(value.toPrecision(12));
     const rotation = quatFromYawPitchRoll(options.yaw, options.pitch, options.roll).map(tidy) as Quat;

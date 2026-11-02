@@ -1,4 +1,6 @@
-import type { OrbitScaleMode, PlanetIndex, QualityPreset } from './SolarSystem.js';
+import type { OrbitScaleMode, QualityPreset } from './SolarSystem.js';
+import { getClipboard } from './dom.js';
+import { MAX_PLANET_INDEX, PLANET_ID_BY_INDEX, PLANET_IDS, type PlanetIndex } from './generated/planetIds.js';
 
 export interface DeepLinkViewState {
     quality?: QualityPreset;
@@ -75,33 +77,6 @@ export interface DeepLinkRuntimeReaders {
     isoDateFromJulianDate?: (jd: number) => string;
 }
 
-const PLANET_IDS: Record<string, PlanetIndex> = {
-    sun: 0,
-    mercury: 1,
-    venus: 2,
-    earth: 3,
-    mars: 4,
-    jupiter: 5,
-    saturn: 6,
-    uranus: 7,
-    neptune: 8,
-    pluto: 9,
-    ceres: 10,
-    vesta: 11,
-    eris: 12,
-    haumea: 13,
-    makemake: 14,
-    // 1P/Halley at its last perihelion: ?planet=halley&date=1986-02-09
-    halley: 15,
-};
-
-/** Highest focus index (OrbitLayout::kBodyCount - 1). */
-const MAX_PLANET_INDEX = 15;
-
-const PLANET_ID_BY_INDEX = Object.fromEntries(
-    Object.entries(PLANET_IDS).map(([id, index]) => [index, id]),
-) as Record<PlanetIndex, string>;
-
 function parseFiniteNumber(value: string | null): number | undefined {
     if (!value) return undefined;
     const parsed = Number(value);
@@ -134,8 +109,9 @@ function parseQuality(value: string | null): QualityPreset | undefined {
 function parsePlanetIndex(value: string | null): PlanetIndex | undefined {
     if (!value) return undefined;
     const normalized = value.toLowerCase();
-    if (normalized in PLANET_IDS) {
-        return PLANET_IDS[normalized];
+    // Own keys only: `'constructor' in PLANET_IDS` is true for a plain object.
+    if (Object.hasOwn(PLANET_IDS, normalized)) {
+        return PLANET_IDS[normalized as keyof typeof PLANET_IDS];
     }
     const asNumber = Number(value);
     if (Number.isInteger(asNumber) && asNumber >= 0 && asNumber <= MAX_PLANET_INDEX) {
@@ -258,10 +234,10 @@ export function parseDeepLinkFromUrl(search = window.location.search): DeepLinkV
     const z = parseFiniteNumber(params.get('z'));
     const yaw = parseFiniteNumber(params.get('yaw'));
     const pitch = parseFiniteNumber(params.get('pitch'));
-    const camera = x !== undefined && y !== undefined && z !== undefined
-        && yaw !== undefined && pitch !== undefined
-        ? { x, y, z, yaw, pitch }
-        : undefined;
+    const camera =
+        x !== undefined && y !== undefined && z !== undefined && yaw !== undefined && pitch !== undefined
+            ? { x, y, z, yaw, pitch }
+            : undefined;
 
     return {
         quality,
@@ -276,9 +252,7 @@ export function parseDeepLinkFromUrl(search = window.location.search): DeepLinkV
         planet,
         mission,
         tour,
-        tourStep: tourStep !== undefined && Number.isInteger(tourStep) && tourStep >= 0
-            ? tourStep
-            : undefined,
+        tourStep: tourStep !== undefined && Number.isInteger(tourStep) && tourStep >= 0 ? tourStep : undefined,
         timeline,
         timelineTime: timeline && timelineTime !== undefined && timelineTime >= 0 ? timelineTime : undefined,
         mode,
@@ -292,10 +266,7 @@ export function hasDeepLinkViewState(state: DeepLinkViewState): boolean {
 }
 
 /** Build a shareable URL for the current simulation view. */
-export function buildShareableUrl(
-    readers: DeepLinkRuntimeReaders,
-    baseUrl = window.location.href,
-): string {
+export function buildShareableUrl(readers: DeepLinkRuntimeReaders, baseUrl = window.location.href): string {
     const url = new URL(baseUrl);
     url.search = '';
 
@@ -386,8 +357,9 @@ export async function copyShareableLink(
     baseUrl = window.location.href,
 ): Promise<string> {
     const link = buildShareableUrl(readers, baseUrl);
-    if (navigator.clipboard?.writeText) {
-        await navigator.clipboard.writeText(link);
+    const clipboard = getClipboard();
+    if (clipboard) {
+        await clipboard.writeText(link);
     } else {
         const textarea = document.createElement('textarea');
         textarea.value = link;
@@ -396,6 +368,8 @@ export async function copyShareableLink(
         textarea.style.left = '-9999px';
         document.body.appendChild(textarea);
         textarea.select();
+        // Legacy path for non-secure contexts, where navigator.clipboard does not exist.
+        // eslint-disable-next-line @typescript-eslint/no-deprecated -- no replacement without a secure context
         document.execCommand('copy');
         textarea.remove();
     }

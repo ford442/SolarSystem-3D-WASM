@@ -24,24 +24,26 @@ export async function reloadShaders(
         throw new Error('reloadShaders: the module does not export FS');
     }
     const files = runtime.getShaderSourceFiles().filter((path) => path.startsWith(SHADER_DIR));
-    await Promise.all(files.map(async (path) => {
-        const url = new URL(DEV_SHADER_ROUTE + path.slice(SHADER_DIR.length), baseUrl);
-        const response = await fetch(url, { cache: 'no-store' });
-        if (!response.ok) {
-            throw new Error(`reloadShaders: ${url} answered ${response.status}`);
-        }
-        const text = await response.text();
-        let current: string | undefined;
-        try {
-            current = fs.readFile(path, { encoding: 'utf8' });
-        } catch {
-            // Not in MEMFS yet (a file added since startup): write it.
-        }
-        // A write moves the file's mtime, which is what marks its programs for a rebuild.
-        if (current !== text) {
-            fs.writeFile(path, text);
-        }
-    }));
+    await Promise.all(
+        files.map(async (path) => {
+            const url = new URL(DEV_SHADER_ROUTE + path.slice(SHADER_DIR.length), baseUrl);
+            const response = await fetch(url, { cache: 'no-store' });
+            if (!response.ok) {
+                throw new Error(`reloadShaders: ${url} answered ${response.status}`);
+            }
+            const text = await response.text();
+            let current: string | undefined;
+            try {
+                current = fs.readFile(path, { encoding: 'utf8' });
+            } catch {
+                // Not in MEMFS yet (a file added since startup): write it.
+            }
+            // A write moves the file's mtime, which is what marks its programs for a rebuild.
+            if (current !== text) {
+                fs.writeFile(path, text);
+            }
+        }),
+    );
     const reloaded = runtime.reloadChangedShaders();
     console.log(`[shaders] ${reloaded} program(s) rebuilt from ${files.length} file(s)`);
     return reloaded;

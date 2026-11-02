@@ -1,4 +1,6 @@
-import type { OrbitScaleMode, PlanetIndex } from './SolarSystem.js';
+import type { OrbitScaleMode } from './SolarSystem.js';
+import { queryRequiredIn } from './dom.js';
+import type { PlanetIndex } from './generated/planetIds.js';
 import { bindConjunctionChip, type NextConjunction } from './conjunction.js';
 import { registerWasmCallbacks } from './wasmCallbacks.js';
 
@@ -22,12 +24,15 @@ export interface PlanetFactsFile {
     version: number;
     sceneNote?: string;
     bodies: PlanetFactBody[];
-    scaleModes: Record<string, {
-        label: string;
-        labelRu?: string;
-        description: string;
-        descriptionRu?: string;
-    }>;
+    scaleModes: Record<
+        string,
+        {
+            label: string;
+            labelRu?: string;
+            description: string;
+            descriptionRu?: string;
+        }
+    >;
 }
 
 export interface PlanetExplorerBindings {
@@ -107,18 +112,17 @@ function detectLocale(): ExplorerLocale {
 }
 
 function formatDiameter(km: number, locale: ExplorerLocale): string {
-    const formatted = km >= 10000
-        ? km.toLocaleString(locale === 'ru' ? 'ru-RU' : 'en-US')
-        : km.toLocaleString(locale === 'ru' ? 'ru-RU' : 'en-US', { maximumFractionDigits: 0 });
+    const formatted =
+        km >= 10000
+            ? km.toLocaleString(locale === 'ru' ? 'ru-RU' : 'en-US')
+            : km.toLocaleString(locale === 'ru' ? 'ru-RU' : 'en-US', { maximumFractionDigits: 0 });
     return `${formatted} km`;
 }
 
 function formatOrbitalPeriod(days: number | null, locale: ExplorerLocale): string {
     if (days === null) return '—';
     if (days < 400) {
-        return locale === 'ru'
-            ? `${days.toLocaleString('ru-RU')} сут.`
-            : `${days.toLocaleString()} days`;
+        return locale === 'ru' ? `${days.toLocaleString('ru-RU')} сут.` : `${days.toLocaleString()} days`;
     }
     const years = days / 365.25;
     if (years < 10) {
@@ -138,9 +142,7 @@ function formatDayLength(days: number | undefined, locale: ExplorerLocale): stri
     if (hours < 48) {
         return `${hours.toFixed(1)} h${suffix}`;
     }
-    return locale === 'ru'
-        ? `${absDays.toFixed(2)} сут.${suffix}`
-        : `${absDays.toFixed(2)} days${suffix}`;
+    return locale === 'ru' ? `${absDays.toFixed(2)} сут.${suffix}` : `${absDays.toFixed(2)} days${suffix}`;
 }
 
 function formatSceneDistance(units: number, locale: ExplorerLocale): string {
@@ -163,25 +165,25 @@ export class PlanetExplorer {
         this.locale = detectLocale();
         this.elements = {
             panel: root,
-            toggle: root.querySelector('#explorer-toggle') as HTMLButtonElement,
-            toggleIcon: root.querySelector('.explorer-toggle-icon') as HTMLElement,
-            bodyList: root.querySelector('#explorer-body-list') as HTMLElement,
-            card: root.querySelector('#planet-info-card') as HTMLElement,
-            cardHeader: root.querySelector('#planet-info-header') as HTMLElement,
-            cardTitle: root.querySelector('#planet-info-title') as HTMLElement,
-            cardDismiss: root.querySelector('#planet-info-dismiss') as HTMLButtonElement,
-            cardSummary: root.querySelector('#planet-info-summary') as HTMLElement,
-            cardFacts: root.querySelector('#planet-info-facts') as HTMLElement,
-            scaleSelect: root.querySelector('#orbit-scale-mode') as HTMLSelectElement,
-            scaleHelp: root.querySelector('#orbit-scale-help') as HTMLElement,
-            conjunctionChip: root.querySelector('#explorer-conjunction') as HTMLElement,
-            conjunctionText: root.querySelector('#explorer-conjunction-text') as HTMLElement,
-            conjunctionJump: root.querySelector('#explorer-conjunction-jump') as HTMLButtonElement,
-            status: root.querySelector('#explorer-status') as HTMLElement,
+            toggle: queryRequiredIn(root, '#explorer-toggle', HTMLButtonElement),
+            toggleIcon: queryRequiredIn(root, '.explorer-toggle-icon', HTMLElement),
+            bodyList: queryRequiredIn(root, '#explorer-body-list', HTMLElement),
+            card: queryRequiredIn(root, '#planet-info-card', HTMLElement),
+            cardHeader: queryRequiredIn(root, '#planet-info-header', HTMLElement),
+            cardTitle: queryRequiredIn(root, '#planet-info-title', HTMLElement),
+            cardDismiss: queryRequiredIn(root, '#planet-info-dismiss', HTMLButtonElement),
+            cardSummary: queryRequiredIn(root, '#planet-info-summary', HTMLElement),
+            cardFacts: queryRequiredIn(root, '#planet-info-facts', HTMLElement),
+            scaleSelect: queryRequiredIn(root, '#orbit-scale-mode', HTMLSelectElement),
+            scaleHelp: queryRequiredIn(root, '#orbit-scale-help', HTMLElement),
+            conjunctionChip: queryRequiredIn(root, '#explorer-conjunction', HTMLElement),
+            conjunctionText: queryRequiredIn(root, '#explorer-conjunction-text', HTMLElement),
+            conjunctionJump: queryRequiredIn(root, '#explorer-conjunction-jump', HTMLButtonElement),
+            status: queryRequiredIn(root, '#explorer-status', HTMLElement),
         };
 
         this.elements.toggle.addEventListener('click', () => {
-            this.setCollapsed(this.elements.panel.classList.contains('is-collapsed') === false);
+            this.setCollapsed(!this.elements.panel.classList.contains('is-collapsed'));
         });
 
         this.elements.cardDismiss.addEventListener('click', () => {
@@ -210,12 +212,15 @@ export class PlanetExplorer {
         this.bindings = bindings;
         this.skipPlanetRestore = options?.skipPlanetRestore ?? false;
         this.initialOrbitScale = options?.initialOrbitScale;
-        const factsUrl = new URL('planet_facts.json', new URL(import.meta.env.BASE_URL, window.location.href)).toString();
+        const factsUrl = new URL(
+            'planet_facts.json',
+            new URL(import.meta.env.BASE_URL, window.location.href),
+        ).toString();
         const response = await fetch(factsUrl);
         if (!response.ok) {
             throw new Error(`Failed to load planet facts (${response.status})`);
         }
-        this.facts = await response.json() as PlanetFactsFile;
+        this.facts = (await response.json()) as PlanetFactsFile;
         this.elements.cardDismiss.setAttribute('aria-label', LABELS[this.locale].dismissCard);
         this.renderBodyList();
         if (!this.skipPlanetRestore) {
@@ -295,13 +300,7 @@ export class PlanetExplorer {
     }
 
     private bindConjunction(): void {
-        if (
-            !this.elements.conjunctionChip
-            || !this.elements.conjunctionText
-            || !this.elements.conjunctionJump
-            || !this.bindings.getNextConjunction
-            || !this.bindings.setSimulationEpoch
-        ) {
+        if (!this.bindings.getNextConjunction || !this.bindings.setSimulationEpoch) {
             return;
         }
         const { refresh } = bindConjunctionChip({
@@ -318,9 +317,8 @@ export class PlanetExplorer {
         const mode = Number(this.elements.scaleSelect.value);
         const key = mode === 1 ? 'realistic' : 'compressed';
         const entry = this.facts?.scaleModes[key];
-        const description = this.locale === 'ru'
-            ? entry?.descriptionRu ?? entry?.description ?? ''
-            : entry?.description ?? '';
+        const description =
+            this.locale === 'ru' ? (entry?.descriptionRu ?? entry?.description ?? '') : (entry?.description ?? '');
         this.elements.scaleHelp.textContent = description;
     }
 
@@ -436,11 +434,14 @@ export class PlanetExplorer {
 
     private persistState(): void {
         try {
-            window.localStorage.setItem(EXPLORER_STORAGE_KEY, JSON.stringify({
-                collapsed: this.elements.panel.classList.contains('is-collapsed'),
-                selectedIndex: this.selectedIndex,
-                scaleMode: Number(this.elements.scaleSelect.value),
-            }));
+            window.localStorage.setItem(
+                EXPLORER_STORAGE_KEY,
+                JSON.stringify({
+                    collapsed: this.elements.panel.classList.contains('is-collapsed'),
+                    selectedIndex: this.selectedIndex,
+                    scaleMode: Number(this.elements.scaleSelect.value),
+                }),
+            );
         } catch {
             // ignore storage failures
         }

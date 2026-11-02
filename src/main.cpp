@@ -24,7 +24,7 @@ int main(int, char**) {
     // emscripten_set_main_loop) cannot run Application::~Application and clear
     // WasmExports' activeApplication while the browser main loop still renders.
     try {
-        auto* application = new Application();
+        auto* application = new Application(); // NOLINT(cppcoreguidelines-owning-memory): lives for the page
         application->Exec();
     }
     catch (const std::exception& err) {

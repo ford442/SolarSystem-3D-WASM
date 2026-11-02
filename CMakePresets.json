@@ -1,0 +1,152 @@
+{
+  "version": 6,
+  "cmakeMinimumRequired": {
+    "major": 3,
+    "minor": 25,
+    "patch": 0
+  },
+  "configurePresets": [
+    {
+      "name": "common",
+      "hidden": true,
+      "cacheVariables": {
+        "CMAKE_EXPORT_COMPILE_COMMANDS": "ON"
+      },
+      "description": "Every build writes compile_commands.json (clangd, clang-tidy)."
+    },
+    {
+      "name": "native",
+      "hidden": true,
+      "inherits": "common",
+      "description": "Desktop OpenGL 4.6 build (GLFW, SDL2, assimp from the system)",
+      "generator": "Ninja"
+    },
+    {
+      "name": "native-release",
+      "displayName": "Native, Release",
+      "inherits": "native",
+      "binaryDir": "${sourceDir}/build",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Release"
+      }
+    },
+    {
+      "name": "native-debug",
+      "displayName": "Native, Debug",
+      "inherits": "native",
+      "binaryDir": "${sourceDir}/cmake-build-debug",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Debug"
+      }
+    },
+    {
+      "name": "native-tests",
+      "displayName": "Native, unit tests (+ atmosphere LUT baker)",
+      "inherits": "native",
+      "binaryDir": "${sourceDir}/build-test",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Release",
+        "SOLARSYSTEM_BUILD_TESTS": "ON"
+      }
+    },
+    {
+      "name": "web",
+      "hidden": true,
+      "inherits": "common",
+      "description": "Emscripten/WebAssembly build with the generator CMake picks (Unix Makefiles), as build-web.sh always did. The toolchain is found through $EMSDK (source emsdk_env.sh); build-web.sh derives it from emcc when unset.",
+      "toolchainFile": "$env{EMSDK}/upstream/emscripten/cmake/Modules/Platform/Emscripten.cmake"
+    },
+    {
+      "name": "web-release",
+      "displayName": "Web, Release (-O3 -flto --closure 1)",
+      "inherits": "web",
+      "binaryDir": "${sourceDir}/build-web",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Release"
+      }
+    },
+    {
+      "name": "web-debug",
+      "displayName": "Web, Debug (-O0 -g, assertions, source maps)",
+      "inherits": "web",
+      "binaryDir": "${sourceDir}/build-web-debug",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Debug"
+      }
+    }
+  ],
+  "buildPresets": [
+    {
+      "name": "native-release",
+      "configurePreset": "native-release"
+    },
+    {
+      "name": "native-debug",
+      "configurePreset": "native-debug"
+    },
+    {
+      "name": "native-tests",
+      "configurePreset": "native-tests",
+      "targets": [
+        "SolarSystemTests",
+        "SolarSystemGlTests",
+        "atmosphere_lut_baker"
+      ]
+    },
+    {
+      "name": "web-release",
+      "configurePreset": "web-release"
+    },
+    {
+      "name": "web-debug",
+      "configurePreset": "web-debug"
+    }
+  ],
+  "testPresets": [
+    {
+      "name": "native-tests",
+      "configurePreset": "native-tests",
+      "output": {
+        "outputOnFailure": true
+      },
+      "filter": {
+        "exclude": {
+          "name": "^gl\\."
+        }
+      }
+    },
+    {
+      "name": "native-gl-tests",
+      "displayName": "GL tests (need a GL 4.6 context, e.g. xvfb-run with Mesa)",
+      "configurePreset": "native-tests",
+      "output": {
+        "outputOnFailure": true
+      },
+      "filter": {
+        "include": {
+          "name": "^gl\\."
+        }
+      }
+    }
+  ],
+  "workflowPresets": [
+    {
+      "name": "native-tests",
+      "displayName": "Configure, build and run the unit tests",
+      "steps": [
+        {
+          "type": "configure",
+          "name": "native-tests"
+        },
+        {
+          "type": "build",
+          "name": "native-tests"
+        },
+        {
+          "type": "test",
+          "name": "native-tests"
+        }
+      ]
+    }
+  ]
+}

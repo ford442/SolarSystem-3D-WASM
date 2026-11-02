@@ -3,6 +3,23 @@ project(SolarSystem)
 
 set(CMAKE_CXX_STANDARD 17)
 
+# clangd, clang-tidy and IDEs read build/compile_commands.json; always write it.
+set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
+
+# Warnings are errors in CI only (the workflows pass -DSOLARSYSTEM_WERROR=ON); locally a new
+# compiler's new warning should not stop you building. Applied to the game target below.
+option(SOLARSYSTEM_WERROR "Treat compiler warnings as errors (CI)" OFF)
+
+# ccache when it is installed. Emscripten is left out on purpose: emcc is a wrapper script,
+# so build-web.sh hands ccache to it through EM_COMPILER_WRAPPER instead.
+if(NOT EMSCRIPTEN)
+    find_program(SOLARSYSTEM_CCACHE ccache)
+    if(SOLARSYSTEM_CCACHE AND NOT CMAKE_CXX_COMPILER_LAUNCHER)
+        set(CMAKE_C_COMPILER_LAUNCHER "${SOLARSYSTEM_CCACHE}")
+        set(CMAKE_CXX_COMPILER_LAUNCHER "${SOLARSYSTEM_CCACHE}")
+    endif()
+endif()
+
 if(EXISTS "${CMAKE_SOURCE_DIR}/external/glm")
     include_directories(${CMAKE_SOURCE_DIR}/external/glm)
 endif()
@@ -192,7 +209,11 @@ if(EMSCRIPTEN)
     # Sounds are LFS-excluded — do not preload (CI/sandbox).
     set(SOLAR_EM_LINK_FLAGS
         "SHELL:-sUSE_GLFW=3"
-        "SHELL:-sFULL_ES3=1"
+        # No -sFULL_ES3: it only adds JS emulation for what WebGL 2 lacks (glMapBuffer*,
+        # glGetBufferSubData, client-side vertex arrays) and taxes every buffer call. Nothing in
+        # src/ uses those: attribute pointers are VBO offsets and glDrawElements takes nullptr, as
+        # the desktop 4.6 core profile (same source) requires. A regression is a link error, not
+        # a silent slowdown. WebGL 2 itself comes from MIN/MAX_WEBGL_VERSION.
         "SHELL:-sMAX_WEBGL_VERSION=2"
         "SHELL:-sMIN_WEBGL_VERSION=2"
         "SHELL:-sGL_ENABLE_GET_PROC_ADDRESS=1"
@@ -324,6 +345,15 @@ endif()
 
 if(NOT EMSCRIPTEN AND NOT MSVC)
     target_compile_options(${PROJECT_NAME} PRIVATE -Wall -Wextra)
+endif()
+
+# Emscripten already passes -Wall -Wextra (SOLAR_EM_WARNING_FLAGS); MSVC has /W3 by default.
+if(SOLARSYSTEM_WERROR)
+    if(MSVC)
+        target_compile_options(${PROJECT_NAME} PRIVATE /WX)
+    else()
+        target_compile_options(${PROJECT_NAME} PRIVATE -Werror)
+    endif()
 endif()
 
 option(SOLARSYSTEM_BUILD_TESTS "Build native unit tests" OFF)

@@ -51,6 +51,22 @@ The CMakeLists.txt has separate configurations for EMSCRIPTEN vs native builds, 
 # Executable appears in build/ with required DLLs
 ```
 
+### Presets, checks and formatting
+
+`CMakePresets.json` has `native-release` (what `build.sh` runs), `native-debug`, `native-tests`, `web-release`
+and `web-debug`; `build-web.sh` wraps the web ones. All write `compile_commands.json`.
+`cmake --workflow --preset native-tests` configures, builds and runs the unit tests.
+
+- C++: `.clang-format` captures the existing style and CI checks only the lines a PR changes
+  (`git clang-format origin/main`); `.clang-tidy` makes `cppcoreguidelines-owning-memory` and
+  `misc-include-cleaner` errors, also on changed lines only (`clang-tidy-diff`). Warnings are errors in CI
+  (`-DSOLARSYSTEM_WERROR=ON`, native and Emscripten). `scripts/check-source-rules.sh` bans `using namespace` in `src/`.
+- Web: `npm run lint` (typescript-eslint strict-type-checked), `npm run format:check` (Prettier), `npm run test:unit`
+  (Vitest), `npm run test:scripts` (the wasm-export generator). DOM lookups go through `web/src/dom.ts`
+  `queryRequired(id, HTMLButtonElement)`, which throws a named error at startup if `index.html` drifts.
+- Generated, never hand-edited: `web/src/SolarSystem.d.ts` signature blocks and `wasmBridge.exports.ts` (from the C
+  declarations in `WasmExports.cpp`), `web/src/generated/planetIds.ts` (from `planets.catalog.json`).
+
 ## Code Architecture
 
 ### C++ Source Structure (`src/`)

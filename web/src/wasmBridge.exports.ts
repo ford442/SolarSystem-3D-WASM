@@ -2,59 +2,59 @@
 import type { SolarSystemCwrap } from './SolarSystem.js';
 
 export interface CachedCwrapExports {
-    setCameraPose: (...args: number[]) => void;
-    setQualityPreset: (...args: number[]) => void;
+    setCameraPose: (x: number, y: number, z: number, yaw: number, pitch: number) => void;
+    setQualityPreset: (preset: number) => void;
     getQualityPreset: () => number;
-    setTimeScale: (...args: number[]) => void;
+    setTimeScale: (scale: number) => void;
     getTimeScale: () => number;
-    setPaused: (...args: number[]) => void;
+    setPaused: (paused: number) => void;
     getPaused: () => number;
-    setSimulationEpoch: (...args: number[]) => void;
+    setSimulationEpoch: (julianDate: number) => void;
     getSimulationEpoch: () => number;
-    setShadowQuality: (...args: number[]) => void;
+    setShadowQuality: (quality: number) => void;
     getShadowQuality: () => number;
-    setTouchMovement: (...args: number[]) => void;
-    addTouchLook: (...args: number[]) => void;
-    addTouchZoom: (...args: number[]) => void;
+    setTouchMovement: (forward: number, right: number, vertical: number) => void;
+    addTouchLook: (deltaX: number, deltaY: number) => void;
+    addTouchZoom: (delta: number) => void;
     isMobileWeb: () => number;
-    focusPlanet: (...args: number[]) => void;
-    focusMission: (...args: number[]) => void;
+    focusPlanet: (idx: number) => void;
+    focusMission: (idx: number) => void;
     getFocusedMissionIndex: () => number;
     getMissionCount: () => number;
     getMissionCatalogJson: () => string;
     getFocusedMissionJson: () => string;
-    setOrbitScaleMode: (...args: number[]) => void;
+    setOrbitScaleMode: (mode: number) => void;
     getOrbitScaleMode: () => number;
     getNearestPlanetIndex: () => number;
     getFocusedPlanetIndex: () => number;
-    getPlanetSceneDistance: (...args: number[]) => number;
+    getPlanetSceneDistance: (idx: number) => number;
     getNextConjunctionJulianDate: () => number;
     getNextConjunctionBodyA: () => number;
     getNextConjunctionBodyB: () => number;
     getNextConjunctionSeparationDeg: () => number;
     getNextSkyEventJson: () => string;
-    setObserveMode: (...args: number[]) => void;
+    setObserveMode: (enabled: number) => void;
     getObserveMode: () => number;
-    setObserverSite: (...args: number[]) => void;
-    setObserveView: (...args: number[]) => void;
-    setObserveFov: (...args: number[]) => void;
-    setObserveTimeRate: (...args: number[]) => void;
-    setObserveConstellations: (...args: number[]) => void;
+    setObserverSite: (latDeg: number, lonDeg: number, altM: number) => void;
+    setObserveView: (azimuthDeg: number, elevationDeg: number) => void;
+    setObserveFov: (fovDeg: number) => void;
+    setObserveTimeRate: (rate: number) => void;
+    setObserveConstellations: (visible: number) => void;
     getObserveStateJson: () => string;
-    setOrbitLines: (...args: number[]) => void;
+    setOrbitLines: (enabled: number) => void;
     getOrbitLines: () => number;
-    setMagneticFields: (...args: number[]) => void;
+    setMagneticFields: (enabled: number) => void;
     getMagneticFields: () => number;
-    setMagneticFieldMode: (...args: number[]) => void;
+    setMagneticFieldMode: (enabled: number) => void;
     getMagneticFieldMode: () => number;
-    setXrSessionActive: (...args: number[]) => void;
-    setXrBaseLayerFramebuffer: (...args: number[]) => void;
-    setXrEyeCount: (...args: number[]) => void;
-    setXrEyeViewport: (...args: number[]) => void;
+    setXrSessionActive: (active: number) => void;
+    setXrBaseLayerFramebuffer: (framebuffer: number) => void;
+    setXrEyeCount: (count: number) => void;
+    setXrEyeViewport: (eye: number, x: number, y: number, width: number, height: number) => void;
     getXrMatrixScratch: () => number;
-    commitXrEyeMatrices: (...args: number[]) => void;
+    commitXrEyeMatrices: (eye: number) => void;
     runXrFrame: () => void;
-    setXrControllerRay: (...args: number[]) => void;
+    setXrControllerRay: (hand: number, ox: number, oy: number, oz: number, dx: number, dy: number, dz: number, visible: number) => void;
     getCameraPositionX: () => number;
     getCameraPositionY: () => number;
     getCameraPositionZ: () => number;
@@ -63,20 +63,20 @@ export interface CachedCwrapExports {
     getCameraHeliocentricZ: () => number;
     getCameraYaw: () => number;
     getCameraPitch: () => number;
-    setCameraRoll: (...args: number[]) => void;
+    setCameraRoll: (roll: number) => void;
     getCameraRoll: () => number;
-    setCameraFov: (...args: number[]) => void;
+    setCameraFov: (fovDeg: number) => void;
     getCameraFov: () => number;
-    advanceSimulationTo: (...args: number[]) => void;
+    advanceSimulationTo: (julianDate: number) => void;
     getSceneStateJson: () => string;
     getBodyCatalogJson: () => string;
-    getSurfaceJson: (...args: number[]) => string;
-    preloadBodySystem: (...args: number[]) => void;
+    getSurfaceJson: (bodyIndex: number, dx: number, dy: number, dz: number) => string;
+    preloadBodySystem: (bodyIndex: number) => void;
     getPendingAssetCount: () => number;
-    setHudOverlays: (...args: number[]) => void;
+    setHudOverlays: (mask: number) => void;
     getHudOverlays: () => number;
-    beginCapture: (...args: number[]) => number;
-    stepCaptureFrame: (...args: number[]) => void;
+    beginCapture: (width: number, height: number) => number;
+    stepCaptureFrame: (deltaSeconds: number) => void;
     endCapture: () => void;
     getShaderSourceFiles: () => string;
     reloadShaders: () => number;
@@ -84,84 +84,84 @@ export interface CachedCwrapExports {
 
 export function createCachedCwrapExports(cwrap: SolarSystemCwrap): CachedCwrapExports {
     return {
-    setCameraPose: cwrap('SetCameraPose', null, ['number', 'number', 'number', 'number', 'number']) as (...args: number[]) => void,
-    setQualityPreset: cwrap('SetQualityPreset', null, ['number']) as (...args: number[]) => void,
-    getQualityPreset: cwrap('GetQualityPreset', 'number', []) as () => number,
-    setTimeScale: cwrap('SetTimeScale', null, ['number']) as (...args: number[]) => void,
-    getTimeScale: cwrap('GetTimeScale', 'number', []) as () => number,
-    setPaused: cwrap('SetPaused', null, ['number']) as (...args: number[]) => void,
-    getPaused: cwrap('GetPaused', 'number', []) as () => number,
-    setSimulationEpoch: cwrap('SetSimulationEpoch', null, ['number']) as (...args: number[]) => void,
-    getSimulationEpoch: cwrap('GetSimulationEpoch', 'number', []) as () => number,
-    setShadowQuality: cwrap('SetShadowQuality', null, ['number']) as (...args: number[]) => void,
-    getShadowQuality: cwrap('GetShadowQuality', 'number', []) as () => number,
-    setTouchMovement: cwrap('SetTouchMovement', null, ['number', 'number', 'number']) as (...args: number[]) => void,
-    addTouchLook: cwrap('AddTouchLook', null, ['number', 'number']) as (...args: number[]) => void,
-    addTouchZoom: cwrap('AddTouchZoom', null, ['number']) as (...args: number[]) => void,
-    isMobileWeb: cwrap('IsMobileWeb', 'number', []) as () => number,
-    focusPlanet: cwrap('FocusPlanet', null, ['number']) as (...args: number[]) => void,
-    focusMission: cwrap('FocusMission', null, ['number']) as (...args: number[]) => void,
-    getFocusedMissionIndex: cwrap('GetFocusedMissionIndex', 'number', []) as () => number,
-    getMissionCount: cwrap('GetMissionCount', 'number', []) as () => number,
-    getMissionCatalogJson: cwrap('GetMissionCatalogJson', 'string', []) as () => string,
-    getFocusedMissionJson: cwrap('GetFocusedMissionJson', 'string', []) as () => string,
-    setOrbitScaleMode: cwrap('SetOrbitScaleMode', null, ['number']) as (...args: number[]) => void,
-    getOrbitScaleMode: cwrap('GetOrbitScaleMode', 'number', []) as () => number,
-    getNearestPlanetIndex: cwrap('GetNearestPlanetIndex', 'number', []) as () => number,
-    getFocusedPlanetIndex: cwrap('GetFocusedPlanetIndex', 'number', []) as () => number,
-    getPlanetSceneDistance: cwrap('GetPlanetSceneDistance', 'number', ['number']) as (...args: number[]) => number,
-    getNextConjunctionJulianDate: cwrap('GetNextConjunctionJulianDate', 'number', []) as () => number,
-    getNextConjunctionBodyA: cwrap('GetNextConjunctionBodyA', 'number', []) as () => number,
-    getNextConjunctionBodyB: cwrap('GetNextConjunctionBodyB', 'number', []) as () => number,
-    getNextConjunctionSeparationDeg: cwrap('GetNextConjunctionSeparationDeg', 'number', []) as () => number,
-    getNextSkyEventJson: cwrap('GetNextSkyEventJson', 'string', []) as () => string,
-    setObserveMode: cwrap('SetObserveMode', null, ['number']) as (...args: number[]) => void,
-    getObserveMode: cwrap('GetObserveMode', 'number', []) as () => number,
-    setObserverSite: cwrap('SetObserverSite', null, ['number', 'number', 'number']) as (...args: number[]) => void,
-    setObserveView: cwrap('SetObserveView', null, ['number', 'number']) as (...args: number[]) => void,
-    setObserveFov: cwrap('SetObserveFov', null, ['number']) as (...args: number[]) => void,
-    setObserveTimeRate: cwrap('SetObserveTimeRate', null, ['number']) as (...args: number[]) => void,
-    setObserveConstellations: cwrap('SetObserveConstellations', null, ['number']) as (...args: number[]) => void,
-    getObserveStateJson: cwrap('GetObserveStateJson', 'string', []) as () => string,
-    setOrbitLines: cwrap('SetOrbitLines', null, ['number']) as (...args: number[]) => void,
-    getOrbitLines: cwrap('GetOrbitLines', 'number', []) as () => number,
-    setMagneticFields: cwrap('SetMagneticFields', null, ['number']) as (...args: number[]) => void,
-    getMagneticFields: cwrap('GetMagneticFields', 'number', []) as () => number,
-    setMagneticFieldMode: cwrap('SetMagneticFieldMode', null, ['number']) as (...args: number[]) => void,
-    getMagneticFieldMode: cwrap('GetMagneticFieldMode', 'number', []) as () => number,
-    setXrSessionActive: cwrap('SetXrSessionActive', null, ['number']) as (...args: number[]) => void,
-    setXrBaseLayerFramebuffer: cwrap('SetXrBaseLayerFramebuffer', null, ['number']) as (...args: number[]) => void,
-    setXrEyeCount: cwrap('SetXrEyeCount', null, ['number']) as (...args: number[]) => void,
-    setXrEyeViewport: cwrap('SetXrEyeViewport', null, ['number', 'number', 'number', 'number', 'number']) as (...args: number[]) => void,
-    getXrMatrixScratch: cwrap('GetXrMatrixScratch', 'number', []) as () => number,
-    commitXrEyeMatrices: cwrap('CommitXrEyeMatrices', null, ['number']) as (...args: number[]) => void,
-    runXrFrame: cwrap('RunXrFrame', null, []) as () => void,
-    setXrControllerRay: cwrap('SetXrControllerRay', null, ['number', 'number', 'number', 'number', 'number', 'number', 'number', 'number']) as (...args: number[]) => void,
-    getCameraPositionX: cwrap('GetCameraPositionX', 'number', []) as () => number,
-    getCameraPositionY: cwrap('GetCameraPositionY', 'number', []) as () => number,
-    getCameraPositionZ: cwrap('GetCameraPositionZ', 'number', []) as () => number,
-    getCameraHeliocentricX: cwrap('GetCameraHeliocentricX', 'number', []) as () => number,
-    getCameraHeliocentricY: cwrap('GetCameraHeliocentricY', 'number', []) as () => number,
-    getCameraHeliocentricZ: cwrap('GetCameraHeliocentricZ', 'number', []) as () => number,
-    getCameraYaw: cwrap('GetCameraYaw', 'number', []) as () => number,
-    getCameraPitch: cwrap('GetCameraPitch', 'number', []) as () => number,
-    setCameraRoll: cwrap('SetCameraRoll', null, ['number']) as (...args: number[]) => void,
-    getCameraRoll: cwrap('GetCameraRoll', 'number', []) as () => number,
-    setCameraFov: cwrap('SetCameraFov', null, ['number']) as (...args: number[]) => void,
-    getCameraFov: cwrap('GetCameraFov', 'number', []) as () => number,
-    advanceSimulationTo: cwrap('AdvanceSimulationTo', null, ['number']) as (...args: number[]) => void,
-    getSceneStateJson: cwrap('GetSceneStateJson', 'string', []) as () => string,
-    getBodyCatalogJson: cwrap('GetBodyCatalogJson', 'string', []) as () => string,
-    getSurfaceJson: cwrap('GetSurfaceJson', 'string', ['number', 'number', 'number', 'number']) as (...args: number[]) => string,
-    preloadBodySystem: cwrap('PreloadBodySystem', null, ['number']) as (...args: number[]) => void,
-    getPendingAssetCount: cwrap('GetPendingAssetCount', 'number', []) as () => number,
-    setHudOverlays: cwrap('SetHudOverlays', null, ['number']) as (...args: number[]) => void,
-    getHudOverlays: cwrap('GetHudOverlays', 'number', []) as () => number,
-    beginCapture: cwrap('BeginCapture', 'number', ['number', 'number']) as (...args: number[]) => number,
-    stepCaptureFrame: cwrap('StepCaptureFrame', null, ['number']) as (...args: number[]) => void,
-    endCapture: cwrap('EndCapture', null, []) as () => void,
-    getShaderSourceFiles: cwrap('GetShaderSourceFiles', 'string', []) as () => string,
-    reloadShaders: cwrap('ReloadShaders', 'number', []) as () => number,
+    setCameraPose: cwrap('SetCameraPose', null, ['number', 'number', 'number', 'number', 'number']),
+    setQualityPreset: cwrap('SetQualityPreset', null, ['number']),
+    getQualityPreset: cwrap('GetQualityPreset', 'number', []),
+    setTimeScale: cwrap('SetTimeScale', null, ['number']),
+    getTimeScale: cwrap('GetTimeScale', 'number', []),
+    setPaused: cwrap('SetPaused', null, ['number']),
+    getPaused: cwrap('GetPaused', 'number', []),
+    setSimulationEpoch: cwrap('SetSimulationEpoch', null, ['number']),
+    getSimulationEpoch: cwrap('GetSimulationEpoch', 'number', []),
+    setShadowQuality: cwrap('SetShadowQuality', null, ['number']),
+    getShadowQuality: cwrap('GetShadowQuality', 'number', []),
+    setTouchMovement: cwrap('SetTouchMovement', null, ['number', 'number', 'number']),
+    addTouchLook: cwrap('AddTouchLook', null, ['number', 'number']),
+    addTouchZoom: cwrap('AddTouchZoom', null, ['number']),
+    isMobileWeb: cwrap('IsMobileWeb', 'number', []),
+    focusPlanet: cwrap('FocusPlanet', null, ['number']),
+    focusMission: cwrap('FocusMission', null, ['number']),
+    getFocusedMissionIndex: cwrap('GetFocusedMissionIndex', 'number', []),
+    getMissionCount: cwrap('GetMissionCount', 'number', []),
+    getMissionCatalogJson: cwrap('GetMissionCatalogJson', 'string', []),
+    getFocusedMissionJson: cwrap('GetFocusedMissionJson', 'string', []),
+    setOrbitScaleMode: cwrap('SetOrbitScaleMode', null, ['number']),
+    getOrbitScaleMode: cwrap('GetOrbitScaleMode', 'number', []),
+    getNearestPlanetIndex: cwrap('GetNearestPlanetIndex', 'number', []),
+    getFocusedPlanetIndex: cwrap('GetFocusedPlanetIndex', 'number', []),
+    getPlanetSceneDistance: cwrap('GetPlanetSceneDistance', 'number', ['number']),
+    getNextConjunctionJulianDate: cwrap('GetNextConjunctionJulianDate', 'number', []),
+    getNextConjunctionBodyA: cwrap('GetNextConjunctionBodyA', 'number', []),
+    getNextConjunctionBodyB: cwrap('GetNextConjunctionBodyB', 'number', []),
+    getNextConjunctionSeparationDeg: cwrap('GetNextConjunctionSeparationDeg', 'number', []),
+    getNextSkyEventJson: cwrap('GetNextSkyEventJson', 'string', []),
+    setObserveMode: cwrap('SetObserveMode', null, ['number']),
+    getObserveMode: cwrap('GetObserveMode', 'number', []),
+    setObserverSite: cwrap('SetObserverSite', null, ['number', 'number', 'number']),
+    setObserveView: cwrap('SetObserveView', null, ['number', 'number']),
+    setObserveFov: cwrap('SetObserveFov', null, ['number']),
+    setObserveTimeRate: cwrap('SetObserveTimeRate', null, ['number']),
+    setObserveConstellations: cwrap('SetObserveConstellations', null, ['number']),
+    getObserveStateJson: cwrap('GetObserveStateJson', 'string', []),
+    setOrbitLines: cwrap('SetOrbitLines', null, ['number']),
+    getOrbitLines: cwrap('GetOrbitLines', 'number', []),
+    setMagneticFields: cwrap('SetMagneticFields', null, ['number']),
+    getMagneticFields: cwrap('GetMagneticFields', 'number', []),
+    setMagneticFieldMode: cwrap('SetMagneticFieldMode', null, ['number']),
+    getMagneticFieldMode: cwrap('GetMagneticFieldMode', 'number', []),
+    setXrSessionActive: cwrap('SetXrSessionActive', null, ['number']),
+    setXrBaseLayerFramebuffer: cwrap('SetXrBaseLayerFramebuffer', null, ['number']),
+    setXrEyeCount: cwrap('SetXrEyeCount', null, ['number']),
+    setXrEyeViewport: cwrap('SetXrEyeViewport', null, ['number', 'number', 'number', 'number', 'number']),
+    getXrMatrixScratch: cwrap('GetXrMatrixScratch', 'number', []),
+    commitXrEyeMatrices: cwrap('CommitXrEyeMatrices', null, ['number']),
+    runXrFrame: cwrap('RunXrFrame', null, []),
+    setXrControllerRay: cwrap('SetXrControllerRay', null, ['number', 'number', 'number', 'number', 'number', 'number', 'number', 'number']),
+    getCameraPositionX: cwrap('GetCameraPositionX', 'number', []),
+    getCameraPositionY: cwrap('GetCameraPositionY', 'number', []),
+    getCameraPositionZ: cwrap('GetCameraPositionZ', 'number', []),
+    getCameraHeliocentricX: cwrap('GetCameraHeliocentricX', 'number', []),
+    getCameraHeliocentricY: cwrap('GetCameraHeliocentricY', 'number', []),
+    getCameraHeliocentricZ: cwrap('GetCameraHeliocentricZ', 'number', []),
+    getCameraYaw: cwrap('GetCameraYaw', 'number', []),
+    getCameraPitch: cwrap('GetCameraPitch', 'number', []),
+    setCameraRoll: cwrap('SetCameraRoll', null, ['number']),
+    getCameraRoll: cwrap('GetCameraRoll', 'number', []),
+    setCameraFov: cwrap('SetCameraFov', null, ['number']),
+    getCameraFov: cwrap('GetCameraFov', 'number', []),
+    advanceSimulationTo: cwrap('AdvanceSimulationTo', null, ['number']),
+    getSceneStateJson: cwrap('GetSceneStateJson', 'string', []),
+    getBodyCatalogJson: cwrap('GetBodyCatalogJson', 'string', []),
+    getSurfaceJson: cwrap('GetSurfaceJson', 'string', ['number', 'number', 'number', 'number']),
+    preloadBodySystem: cwrap('PreloadBodySystem', null, ['number']),
+    getPendingAssetCount: cwrap('GetPendingAssetCount', 'number', []),
+    setHudOverlays: cwrap('SetHudOverlays', null, ['number']),
+    getHudOverlays: cwrap('GetHudOverlays', 'number', []),
+    beginCapture: cwrap('BeginCapture', 'number', ['number', 'number']),
+    stepCaptureFrame: cwrap('StepCaptureFrame', null, ['number']),
+    endCapture: cwrap('EndCapture', null, []),
+    getShaderSourceFiles: cwrap('GetShaderSourceFiles', 'string', []),
+    reloadShaders: cwrap('ReloadShaders', 'number', []),
     };
 }
 
