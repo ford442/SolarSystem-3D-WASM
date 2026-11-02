@@ -29,7 +29,7 @@ const dot = (a: Vec3, b: Vec3): number => a[0] * b[0] + a[1] * b[1] + a[2] * b[2
 const unit = (a: Vec3): Vec3 => [a[0] / norm(a), a[1] / norm(a), a[2] / norm(a)];
 
 function scene(
-    bodies: Record<string, BodyState>,
+    bodies: Partial<Record<string, BodyState>>,
     surfaceRadius?: (focus: string, direction: Vec3) => number,
     facetNormal?: (focus: string, direction: Vec3) => Vec3,
 ): SceneSample {

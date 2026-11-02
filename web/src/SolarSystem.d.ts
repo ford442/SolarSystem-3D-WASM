@@ -460,8 +460,9 @@ export interface SolarSystemModuleConfig {
  * WASM side can bind, so they must be inserted into this table first.
  */
 export interface EmscriptenGL {
-  framebuffers: (WebGLFramebuffer | null)[];
-  getNewId: (table: unknown[]) => number;
+  // Emscripten-internal: optional because a future toolchain may stop exposing them.
+  framebuffers?: (WebGLFramebuffer | null)[];
+  getNewId?: (table: unknown[]) => number;
 }
 
 /** The slice of Emscripten's FS the dev shader reload uses (EXPORTED_RUNTIME_METHODS 'FS'). */

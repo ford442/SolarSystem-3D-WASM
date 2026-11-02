@@ -150,7 +150,7 @@ export async function initWebXr(options: {
   }
 
   console.log('[WebXR] Checking immersive-vr support…');
-  let supported = false;
+  let supported: boolean;
   try {
     supported = await Promise.race([
       xr.isSessionSupported('immersive-vr'),
@@ -267,7 +267,7 @@ export async function initWebXr(options: {
         leftConnected = true;
       }
 
-      const rayPose = frame.getPose?.(source.targetRaySpace, referenceSpace) ?? null;
+      const rayPose = frame.getPose(source.targetRaySpace, referenceSpace);
       if (rayPose && bindings.setXrControllerRay) {
         const pos = rayPose.transform.position;
         const ori = rayPose.transform.orientation;
@@ -288,8 +288,9 @@ export async function initWebXr(options: {
         continue;
       }
       // xr-standard: axes 2/3 = thumbstick; fall back to 0/1.
-      const ax = clampAxis(pad.axes[2] ?? pad.axes[0] ?? 0);
-      const ay = clampAxis(pad.axes[3] ?? pad.axes[1] ?? 0);
+      // `.at()` is undefined past the end; pad.axes[n] is typed number but is undefined on a 2-axis pad.
+      const ax = clampAxis(pad.axes.at(2) ?? pad.axes.at(0) ?? 0);
+      const ay = clampAxis(pad.axes.at(3) ?? pad.axes.at(1) ?? 0);
 
       if (handedness === 'left' || handedness === 'none') {
         if (observing) {
@@ -302,7 +303,8 @@ export async function initWebXr(options: {
             vertical += 0.85;
           }
         }
-      } else if (handedness === 'right') {
+      } else {
+        // handedness === 'right'
         if (!observing) {
           vertical += -ay;
         }
@@ -372,7 +374,7 @@ export async function initWebXr(options: {
     }
   };
 
-  const onXrFrame = (time: number, frame: XRFrame) => {
+  const onXrFrame = (_time: number, frame: XRFrame) => {
     if (!session || !referenceSpace || !gl) {
       return;
     }
@@ -414,11 +416,11 @@ export async function initWebXr(options: {
 
       // view.transform.inverse.matrix: stage → eye (column-major).
       // Combined with T(-camera) so touch/controller flight still moves the stage.
-      const xrView = view.transform.inverse.matrix as Float32Array;
+      const xrView = view.transform.inverse.matrix;
       scratchView.set(xrView);
       multiplyMat4(scratchView, scratchPlayerInv, scratchCombined);
 
-      const proj = view.projectionMatrix as Float32Array;
+      const proj = view.projectionMatrix;
       const heap = bindings.getHeapF32();
       heap.set(scratchCombined, scratchBase);
       heap.set(proj, scratchBase + 16);
@@ -426,7 +428,6 @@ export async function initWebXr(options: {
     }
 
     bindings.runXrFrame();
-    void time;
   };
 
   const startSession = async () => {

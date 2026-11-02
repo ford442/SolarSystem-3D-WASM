@@ -1,4 +1,5 @@
 import { copyShareableLink, type DeepLinkViewState } from './deepLink.js';
+import { getClipboard } from './dom.js';
 import { isoDateFromJulianDate } from './ephemeris.js';
 import { createTourPlayer, loadTour, type TourPlayer } from './tourPlayer.js';
 import type { SolarSystemRuntime } from './wasmBridge.js';
@@ -144,7 +145,7 @@ export function initEducationalLayer(options: {
                     url.searchParams.set('step', String(step));
                 }
             }
-            return navigator.clipboard?.writeText(url.toString()) ?? Promise.resolve();
+            return getClipboard()?.writeText(url.toString()) ?? Promise.resolve();
         }).then(() => {
             settingsStatus.textContent = 'Tour step link copied';
         }).catch((error: unknown) => {

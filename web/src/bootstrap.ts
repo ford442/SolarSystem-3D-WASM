@@ -1,6 +1,7 @@
 import './style.css';
 import Module, { type SolarSystemModule, type SolarSystemModuleConfig } from './SolarSystem.js';
 import { buildShareableUrl, parseDeepLinkFromUrl } from './deepLink';
+import { queryRequired, queryRequiredIn } from './dom';
 import { isoDateFromJulianDate } from './ephemeris';
 import { showFatalPanel } from './fatalOverlay';
 import { initEducationalLayer } from './educationalLayer';
@@ -22,72 +23,72 @@ import { installWasmCallbacksOnConfig, setModuleInstance } from './wasmCallbacks
 import { assetCacheEnabled, createAssetFetcher } from './assetCache';
 import { computeWebGlSizing } from './webglContext';
 
-const canvas = document.getElementById('canvas') as HTMLCanvasElement;
-const loadingContainer = document.getElementById('loading-container') as HTMLElement;
-const progressBar = document.getElementById('progress-bar') as HTMLElement;
-const progressText = document.getElementById('progress-text') as HTMLElement;
-const streamingProgress = document.getElementById('streaming-progress') as HTMLElement;
-const streamingText = document.getElementById('streaming-text') as HTMLElement;
-const streamingBar = document.getElementById('streaming-progress-bar') as HTMLElement;
-const settingsPanel = document.getElementById('settings-panel') as HTMLElement;
-const settingsToggle = document.getElementById('settings-toggle') as HTMLButtonElement;
-const settingsToggleIcon = settingsToggle.querySelector('.settings-toggle-icon') as HTMLElement;
-const settingsFieldset = document.getElementById('settings-fieldset') as HTMLFieldSetElement;
-const qualitySelect = document.getElementById('quality-preset') as HTMLSelectElement;
-const timeScaleInput = document.getElementById('time-scale') as HTMLInputElement;
-const timeScaleValue = document.getElementById('time-scale-value') as HTMLOutputElement;
-const simulationDateInput = document.getElementById('simulation-date') as HTMLInputElement;
-const simulationDateSet = document.getElementById('simulation-date-set') as HTMLButtonElement;
-const simulationDateNow = document.getElementById('simulation-date-now') as HTMLButtonElement;
-const pausedInput = document.getElementById('simulation-paused') as HTMLInputElement;
-const shadowsInput = document.getElementById('shadows-enabled') as HTMLInputElement;
-const orbitLinesInput = document.getElementById('orbit-lines-enabled') as HTMLInputElement;
-const magneticFieldsInput = document.getElementById('magnetic-fields-enabled') as HTMLInputElement;
-const musicVolumeInput = document.getElementById('music-volume') as HTMLInputElement;
-const musicVolumeValue = document.getElementById('music-volume-value') as HTMLOutputElement;
-const musicMutedInput = document.getElementById('music-muted') as HTMLInputElement;
-const settingsReset = document.getElementById('settings-reset') as HTMLButtonElement;
-const copyViewLinkButton = document.getElementById('copy-view-link') as HTMLButtonElement;
-const settingsStatus = document.getElementById('settings-status') as HTMLElement;
-const skyEventChip = document.getElementById('next-sky-event') as HTMLElement;
-const skyEventText = document.getElementById('next-sky-event-text') as HTMLElement;
-const skyEventJump = document.getElementById('next-sky-event-jump') as HTMLButtonElement;
-const skyEventLandmark = document.getElementById('next-sky-event-landmark') as HTMLButtonElement;
+const canvas = queryRequired('canvas', HTMLCanvasElement);
+const loadingContainer = queryRequired('loading-container');
+const progressBar = queryRequired('progress-bar');
+const progressText = queryRequired('progress-text');
+const streamingProgress = queryRequired('streaming-progress');
+const streamingText = queryRequired('streaming-text');
+const streamingBar = queryRequired('streaming-progress-bar');
+const settingsPanel = queryRequired('settings-panel');
+const settingsToggle = queryRequired('settings-toggle', HTMLButtonElement);
+const settingsToggleIcon = queryRequiredIn(settingsToggle, '.settings-toggle-icon', HTMLElement);
+const settingsFieldset = queryRequired('settings-fieldset', HTMLFieldSetElement);
+const qualitySelect = queryRequired('quality-preset', HTMLSelectElement);
+const timeScaleInput = queryRequired('time-scale', HTMLInputElement);
+const timeScaleValue = queryRequired('time-scale-value', HTMLOutputElement);
+const simulationDateInput = queryRequired('simulation-date', HTMLInputElement);
+const simulationDateSet = queryRequired('simulation-date-set', HTMLButtonElement);
+const simulationDateNow = queryRequired('simulation-date-now', HTMLButtonElement);
+const pausedInput = queryRequired('simulation-paused', HTMLInputElement);
+const shadowsInput = queryRequired('shadows-enabled', HTMLInputElement);
+const orbitLinesInput = queryRequired('orbit-lines-enabled', HTMLInputElement);
+const magneticFieldsInput = queryRequired('magnetic-fields-enabled', HTMLInputElement);
+const musicVolumeInput = queryRequired('music-volume', HTMLInputElement);
+const musicVolumeValue = queryRequired('music-volume-value', HTMLOutputElement);
+const musicMutedInput = queryRequired('music-muted', HTMLInputElement);
+const settingsReset = queryRequired('settings-reset', HTMLButtonElement);
+const copyViewLinkButton = queryRequired('copy-view-link', HTMLButtonElement);
+const settingsStatus = queryRequired('settings-status');
+const skyEventChip = queryRequired('next-sky-event');
+const skyEventText = queryRequired('next-sky-event-text');
+const skyEventJump = queryRequired('next-sky-event-jump', HTMLButtonElement);
+const skyEventLandmark = queryRequired('next-sky-event-landmark', HTMLButtonElement);
 const observeElements = {
-    exploreButton: document.getElementById('mode-explore') as HTMLButtonElement,
-    observeButton: document.getElementById('mode-observe') as HTMLButtonElement,
-    controls: document.getElementById('observe-controls') as HTMLElement,
-    siteSelect: document.getElementById('observe-site') as HTMLSelectElement,
-    latInput: document.getElementById('observe-lat') as HTMLInputElement,
-    lonInput: document.getElementById('observe-lon') as HTMLInputElement,
-    locateButton: document.getElementById('observe-locate') as HTMLButtonElement,
-    timeInput: document.getElementById('observe-time') as HTMLInputElement,
-    rateSelect: document.getElementById('observe-rate') as HTMLSelectElement,
+    exploreButton: queryRequired('mode-explore', HTMLButtonElement),
+    observeButton: queryRequired('mode-observe', HTMLButtonElement),
+    controls: queryRequired('observe-controls'),
+    siteSelect: queryRequired('observe-site', HTMLSelectElement),
+    latInput: queryRequired('observe-lat', HTMLInputElement),
+    lonInput: queryRequired('observe-lon', HTMLInputElement),
+    locateButton: queryRequired('observe-locate', HTMLButtonElement),
+    timeInput: queryRequired('observe-time', HTMLInputElement),
+    rateSelect: queryRequired('observe-rate', HTMLSelectElement),
     stepButtons: Array.from(document.querySelectorAll<HTMLButtonElement>('[data-step-days]')),
-    nowButton: document.getElementById('observe-now') as HTMLButtonElement,
-    lookSunButton: document.getElementById('observe-look-sun') as HTMLButtonElement,
-    lookMoonButton: document.getElementById('observe-look-moon') as HTMLButtonElement,
-    eclipseButton: document.getElementById('observe-eclipse') as HTMLButtonElement,
-    eyepieceSelect: document.getElementById('observe-eyepiece') as HTMLSelectElement,
-    constellationsToggle: document.getElementById('observe-constellations') as HTMLInputElement,
-    telescopeOverlay: document.getElementById('telescope-overlay') as HTMLElement,
-    telescopeLabel: document.getElementById('telescope-label') as HTMLElement,
-    readout: document.getElementById('observe-readout') as HTMLElement,
+    nowButton: queryRequired('observe-now', HTMLButtonElement),
+    lookSunButton: queryRequired('observe-look-sun', HTMLButtonElement),
+    lookMoonButton: queryRequired('observe-look-moon', HTMLButtonElement),
+    eclipseButton: queryRequired('observe-eclipse', HTMLButtonElement),
+    eyepieceSelect: queryRequired('observe-eyepiece', HTMLSelectElement),
+    constellationsToggle: queryRequired('observe-constellations', HTMLInputElement),
+    telescopeOverlay: queryRequired('telescope-overlay'),
+    telescopeLabel: queryRequired('telescope-label'),
+    readout: queryRequired('observe-readout'),
     dateInput: simulationDateInput,
     status: settingsStatus,
 };
-const enterVrButton = document.getElementById('enter-vr') as HTMLButtonElement;
-const exitVrButton = document.getElementById('exit-vr') as HTMLButtonElement;
-const explorerPanel = document.getElementById('explorer-panel') as HTMLElement;
-const explorerMissions = document.getElementById('explorer-missions') as HTMLElement;
-const explorerMissionList = document.getElementById('explorer-mission-list') as HTMLElement;
-const tourPlay = document.getElementById('tour-play') as HTMLButtonElement;
-const tourStop = document.getElementById('tour-stop') as HTMLButtonElement;
-const tourCopyStep = document.getElementById('tour-copy-step') as HTMLButtonElement;
-const tourCaption = document.getElementById('tour-caption') as HTMLElement;
-const xrHud = document.getElementById('xr-hud') as HTMLElement;
-const xrTooltip = document.getElementById('xr-tooltip') as HTMLElement;
-const xrControllers = document.getElementById('xr-controllers') as HTMLElement;
+const enterVrButton = queryRequired('enter-vr', HTMLButtonElement);
+const exitVrButton = queryRequired('exit-vr', HTMLButtonElement);
+const explorerPanel = queryRequired('explorer-panel');
+const explorerMissions = queryRequired('explorer-missions');
+const explorerMissionList = queryRequired('explorer-mission-list');
+const tourPlay = queryRequired('tour-play', HTMLButtonElement);
+const tourStop = queryRequired('tour-stop', HTMLButtonElement);
+const tourCopyStep = queryRequired('tour-copy-step', HTMLButtonElement);
+const tourCaption = queryRequired('tour-caption');
+const xrHud = queryRequired('xr-hud');
+const xrTooltip = queryRequired('xr-tooltip');
+const xrControllers = queryRequired('xr-controllers');
 
 const deployedBaseUrl = new URL(import.meta.env.BASE_URL, window.location.href);
 const isMobileDevice = isMobileLikeDevice();
@@ -98,7 +99,7 @@ const runtimeAssetBase = import.meta.env.VITE_ASSET_BASE?.trim() || deployedBase
 // picks its preferred pack (BC7 > BC3 > ASTC > ETC2) and uses it only if it appears
 // here; with none published it stays on .dds, and a GPU without S3TC falls back to the
 // software BC decoder. See scripts/convert_textures_ktx2.py and docs/ARCHITECTURE.md.
-const publishedTexturePacks: string[] = String(import.meta.env.VITE_TEXTURE_PACKS ?? '')
+const publishedTexturePacks: string[] = (import.meta.env.VITE_TEXTURE_PACKS ?? '')
     .split(',')
     .map((pack: string) => pack.trim())
     .filter((pack: string) => pack.length > 0);
@@ -144,7 +145,7 @@ publishInitConfig(initConfig);
 // supported hook Emscripten actually honors: GLFW reuses this context as-is instead of
 // creating its own. See docs/plans/PORTING_GUIDE.md and web/src/webglContext.ts.
 const { contextOptions, tier } = computeWebGlSizing(initConfig);
-const preinitializedWebGLContext = canvas.getContext('webgl2', contextOptions) as WebGL2RenderingContext | null;
+const preinitializedWebGLContext = canvas.getContext('webgl2', contextOptions);
 if (preinitializedWebGLContext) {
     console.log(
         `[WebGL] tier=${tier} requested`, contextOptions,

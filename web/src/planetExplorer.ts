@@ -1,4 +1,5 @@
 import type { OrbitScaleMode } from './SolarSystem.js';
+import { queryRequiredIn } from './dom.js';
 import type { PlanetIndex } from './generated/planetIds.js';
 import { bindConjunctionChip, type NextConjunction } from './conjunction.js';
 import { registerWasmCallbacks } from './wasmCallbacks.js';
@@ -164,25 +165,25 @@ export class PlanetExplorer {
         this.locale = detectLocale();
         this.elements = {
             panel: root,
-            toggle: root.querySelector('#explorer-toggle') as HTMLButtonElement,
-            toggleIcon: root.querySelector('.explorer-toggle-icon') as HTMLElement,
-            bodyList: root.querySelector('#explorer-body-list') as HTMLElement,
-            card: root.querySelector('#planet-info-card') as HTMLElement,
-            cardHeader: root.querySelector('#planet-info-header') as HTMLElement,
-            cardTitle: root.querySelector('#planet-info-title') as HTMLElement,
-            cardDismiss: root.querySelector('#planet-info-dismiss') as HTMLButtonElement,
-            cardSummary: root.querySelector('#planet-info-summary') as HTMLElement,
-            cardFacts: root.querySelector('#planet-info-facts') as HTMLElement,
-            scaleSelect: root.querySelector('#orbit-scale-mode') as HTMLSelectElement,
-            scaleHelp: root.querySelector('#orbit-scale-help') as HTMLElement,
-            conjunctionChip: root.querySelector('#explorer-conjunction') as HTMLElement,
-            conjunctionText: root.querySelector('#explorer-conjunction-text') as HTMLElement,
-            conjunctionJump: root.querySelector('#explorer-conjunction-jump') as HTMLButtonElement,
-            status: root.querySelector('#explorer-status') as HTMLElement,
+            toggle: queryRequiredIn(root, '#explorer-toggle', HTMLButtonElement),
+            toggleIcon: queryRequiredIn(root, '.explorer-toggle-icon', HTMLElement),
+            bodyList: queryRequiredIn(root, '#explorer-body-list', HTMLElement),
+            card: queryRequiredIn(root, '#planet-info-card', HTMLElement),
+            cardHeader: queryRequiredIn(root, '#planet-info-header', HTMLElement),
+            cardTitle: queryRequiredIn(root, '#planet-info-title', HTMLElement),
+            cardDismiss: queryRequiredIn(root, '#planet-info-dismiss', HTMLButtonElement),
+            cardSummary: queryRequiredIn(root, '#planet-info-summary', HTMLElement),
+            cardFacts: queryRequiredIn(root, '#planet-info-facts', HTMLElement),
+            scaleSelect: queryRequiredIn(root, '#orbit-scale-mode', HTMLSelectElement),
+            scaleHelp: queryRequiredIn(root, '#orbit-scale-help', HTMLElement),
+            conjunctionChip: queryRequiredIn(root, '#explorer-conjunction', HTMLElement),
+            conjunctionText: queryRequiredIn(root, '#explorer-conjunction-text', HTMLElement),
+            conjunctionJump: queryRequiredIn(root, '#explorer-conjunction-jump', HTMLButtonElement),
+            status: queryRequiredIn(root, '#explorer-status', HTMLElement),
         };
 
         this.elements.toggle.addEventListener('click', () => {
-            this.setCollapsed(this.elements.panel.classList.contains('is-collapsed') === false);
+            this.setCollapsed(!this.elements.panel.classList.contains('is-collapsed'));
         });
 
         this.elements.cardDismiss.addEventListener('click', () => {
@@ -296,13 +297,7 @@ export class PlanetExplorer {
     }
 
     private bindConjunction(): void {
-        if (
-            !this.elements.conjunctionChip
-            || !this.elements.conjunctionText
-            || !this.elements.conjunctionJump
-            || !this.bindings.getNextConjunction
-            || !this.bindings.setSimulationEpoch
-        ) {
+        if (!this.bindings.getNextConjunction || !this.bindings.setSimulationEpoch) {
             return;
         }
         const { refresh } = bindConjunctionChip({

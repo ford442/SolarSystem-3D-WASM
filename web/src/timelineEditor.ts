@@ -5,6 +5,7 @@
  */
 import { captureVideo, downloadBlob, type CaptureSettings } from './capture.js';
 import type { DeepLinkViewState } from './deepLink.js';
+import { getClipboard, queryRequired } from './dom.js';
 import { isoDateFromJulianDate } from './ephemeris.js';
 import { keyframeFromPose, parseTimeline, type LengthUnits, type Timeline, type TimelineKeyframe } from './timeline.js';
 import {
@@ -23,14 +24,6 @@ const DRAFT_KEY = 'solarSystem.timelineDraft';
 const CUSTOM = '__custom';
 /** Gap after the last keyframe for a new one, seconds. */
 const KEY_SPACING = 4;
-
-function byId<T extends HTMLElement>(id: string): T {
-    const element = document.getElementById(id);
-    if (!element) {
-        throw new Error(`#${id} missing from index.html`);
-    }
-    return element as T;
-}
 
 function readDraft(): Timeline | null {
     try {
@@ -62,28 +55,28 @@ export function initTimelineEditor(options: {
     caption: HTMLElement;
 }): TimelinePlayer {
     const { runtime, canvas, deepLink, tourPlayer, caption } = options;
-    const panel = byId<HTMLElement>('timeline-panel');
-    const openButton = byId<HTMLButtonElement>('timeline-open');
-    const select = byId<HTMLSelectElement>('timeline-select');
-    const playButton = byId<HTMLButtonElement>('timeline-play');
-    const stopButton = byId<HTMLButtonElement>('timeline-stop');
-    const closeButton = byId<HTMLButtonElement>('timeline-close');
-    const scrub = byId<HTMLInputElement>('timeline-scrub');
-    const timeOutput = byId<HTMLOutputElement>('timeline-time');
-    const focusSelect = byId<HTMLSelectElement>('timeline-focus');
-    const unitsSelect = byId<HTMLSelectElement>('timeline-units');
-    const addKeyButton = byId<HTMLButtonElement>('timeline-add-key');
-    const keyList = byId<HTMLOListElement>('timeline-keys');
-    const newButton = byId<HTMLButtonElement>('timeline-new');
-    const exportButton = byId<HTMLButtonElement>('timeline-export');
-    const importInput = byId<HTMLInputElement>('timeline-import');
-    const copyLinkButton = byId<HTMLButtonElement>('timeline-copy-link');
-    const captureSize = byId<HTMLSelectElement>('capture-size');
-    const captureFps = byId<HTMLSelectElement>('capture-fps');
-    const captureStart = byId<HTMLButtonElement>('capture-start');
-    const captureCancel = byId<HTMLButtonElement>('capture-cancel');
-    const captureProgress = byId<HTMLProgressElement>('capture-progress');
-    const status = byId<HTMLElement>('timeline-status');
+    const panel = queryRequired('timeline-panel');
+    const openButton = queryRequired('timeline-open', HTMLButtonElement);
+    const select = queryRequired('timeline-select', HTMLSelectElement);
+    const playButton = queryRequired('timeline-play', HTMLButtonElement);
+    const stopButton = queryRequired('timeline-stop', HTMLButtonElement);
+    const closeButton = queryRequired('timeline-close', HTMLButtonElement);
+    const scrub = queryRequired('timeline-scrub', HTMLInputElement);
+    const timeOutput = queryRequired('timeline-time', HTMLOutputElement);
+    const focusSelect = queryRequired('timeline-focus', HTMLSelectElement);
+    const unitsSelect = queryRequired('timeline-units', HTMLSelectElement);
+    const addKeyButton = queryRequired('timeline-add-key', HTMLButtonElement);
+    const keyList = queryRequired('timeline-keys', HTMLOListElement);
+    const newButton = queryRequired('timeline-new', HTMLButtonElement);
+    const exportButton = queryRequired('timeline-export', HTMLButtonElement);
+    const importInput = queryRequired('timeline-import', HTMLInputElement);
+    const copyLinkButton = queryRequired('timeline-copy-link', HTMLButtonElement);
+    const captureSize = queryRequired('capture-size', HTMLSelectElement);
+    const captureFps = queryRequired('capture-fps', HTMLSelectElement);
+    const captureStart = queryRequired('capture-start', HTMLButtonElement);
+    const captureCancel = queryRequired('capture-cancel', HTMLButtonElement);
+    const captureProgress = queryRequired('capture-progress', HTMLProgressElement);
+    const status = queryRequired('timeline-status');
 
     let working: Timeline = emptyTimeline();
     /** The shipped id `working` was loaded from while unedited (its `?timeline=` link still holds). */
@@ -203,7 +196,7 @@ export function initTimelineEditor(options: {
                 working.keyframes[i].t = Math.round((working.keyframes[i - 1].t + 0.1) * 100) / 100;
             }
         }
-        const last = working.keyframes[working.keyframes.length - 1];
+        const last = working.keyframes.at(-1);
         working.durationSec = last ? last.t : 0;
         shippedId = null;
         select.value = CUSTOM;
@@ -366,7 +359,7 @@ export function initTimelineEditor(options: {
             // Editing a shipped timeline makes it the draft.
             working = { ...working, id: `${working.id}-edit`, keyframes: [...working.keyframes] };
         }
-        const last = working.keyframes[working.keyframes.length - 1];
+        const last = working.keyframes.at(-1);
         // While the timeline holds the camera, the new key goes where the scrubber is.
         const t = player.holdsCamera() && player.time() > (last?.t ?? -1) ? player.time() : last ? last.t + KEY_SPACING : 0;
         const key = keyFromCurrentPose(t, focusSelect.value, unitsSelect.value as LengthUnits);
@@ -420,7 +413,7 @@ export function initTimelineEditor(options: {
         if (player.time() > 0) {
             url.searchParams.set('tt', player.time().toFixed(1));
         }
-        void (navigator.clipboard?.writeText(url.toString()) ?? Promise.reject(new Error('no clipboard')))
+        void (getClipboard()?.writeText(url.toString()) ?? Promise.reject(new Error('no clipboard')))
             .then(() => setStatus('Link copied.'), () => setStatus(url.toString()));
     });
 

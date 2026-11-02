@@ -95,6 +95,14 @@ jobs:
         working-directory: web
         run: npm run generate:wasm-exports:check
 
+      - name: Lint (typescript-eslint strict-type-checked)
+        working-directory: web
+        run: npm run lint
+
+      - name: Check formatting (Prettier)
+        working-directory: web
+        run: npm run format:check
+
       - name: Typecheck and bundle
         working-directory: web
         run: npx tsc && npx vite build
@@ -102,6 +110,10 @@ jobs:
       - name: Run frontend unit tests
         working-directory: web
         run: npm run test:unit
+
+      - name: Run generator script tests
+        working-directory: web
+        run: npm run test:scripts
 
       - name: Install Playwright Chromium
         working-directory: web

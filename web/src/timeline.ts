@@ -448,7 +448,7 @@ function isVec3(value: unknown): value is Vec3 {
 
 function isQuat(value: unknown): value is Quat {
     return Array.isArray(value) && value.length === 4 && value.every(isFiniteNumber)
-        && Math.hypot(...(value as number[])) > 1e-9;
+        && Math.hypot(...(value)) > 1e-9;
 }
 
 const isFocus = (value: unknown): value is string =>

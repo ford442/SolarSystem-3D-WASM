@@ -21,7 +21,7 @@ const bytes = (...values: number[]) => new Uint8Array(values);
 function setup(fetchImpl: typeof fetch, caches: FakeCacheStorage | undefined = new FakeCacheStorage(), assetBase = BASE) {
     const fetchSpy = vi.fn(fetchImpl);
     const fetcher = createAssetFetcher({
-        assetBase, baseHref: BASE, caches: caches as unknown as CacheStorage | undefined, fetch: fetchSpy as typeof fetch,
+        assetBase, baseHref: BASE, caches: caches, fetch: fetchSpy,
     });
     return { fetcher, fetchSpy, caches };
 }
@@ -51,7 +51,7 @@ describe('createAssetFetcher', () => {
         expect(await fetcher(`${BASE}missing.dds`)).toBe(404);
         expect(await fetcher(`${BASE}missing.dds`)).toBe(404);
         expect(fetchSpy).toHaveBeenCalledTimes(2);
-        expect([...caches!.stores.values()].every((store) => store.size === 0)).toBe(true);
+        expect([...caches.stores.values()].every((store) => store.size === 0)).toBe(true);
     });
 
     it('reports a network error or a body that dies mid-read as status 0 and stores nothing', async () => {
@@ -63,8 +63,8 @@ describe('createAssetFetcher', () => {
             return new Response(stream, { status: 200 });
         });
         expect(await broken.fetcher(`${BASE}b.dds`)).toBe(0);
-        expect([...caches!.stores.values()].every((store) => store.size === 0)).toBe(true);
-        expect([...broken.caches!.stores.values()].every((store) => store.size === 0)).toBe(true);
+        expect([...caches.stores.values()].every((store) => store.size === 0)).toBe(true);
+        expect([...broken.caches.stores.values()].every((store) => store.size === 0)).toBe(true);
     });
 
     it('does not keep the SPA fallback page a missing file is answered with', async () => {

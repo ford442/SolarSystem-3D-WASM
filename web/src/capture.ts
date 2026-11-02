@@ -146,7 +146,8 @@ async function captureWithWebCodecs(
             fastStart: 'in-memory',
             firstTimestampBehavior: 'offset',
         });
-        let failure: unknown = null;
+        // Assigned from the encoder's error callback; the cast keeps TS from narrowing it to `null`.
+        let failure = null as Error | null;
         videoEncoder = new VideoEncoder({
             output: (chunk, metadata) => muxer.addVideoChunk(chunk, metadata),
             error: (error) => {
@@ -241,7 +242,11 @@ async function captureWithMediaRecorder(
     };
     const started = new Promise<void>((resolve, reject) => {
         recorder.onstart = () => resolve();
-        recorder.onerror = (event) => reject(new Error(`MediaRecorder failed: ${(event as ErrorEvent).message ?? event.type}`));
+        recorder.onerror = (event) => {
+            // lib.dom types this as ErrorEvent; browsers send a MediaRecorderErrorEvent with `.error`.
+            const detail = (event as Event & { error?: DOMException }).error?.message ?? event.type;
+            reject(new Error(`MediaRecorder failed: ${detail}`));
+        };
     });
     const stopped = new Promise<void>((resolve) => {
         recorder.onstop = () => resolve();

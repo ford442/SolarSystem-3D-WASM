@@ -333,7 +333,7 @@ export function initSettingsPanel(options: SettingsPanelInitOptions): void {
         if (shadowsInput.checked) {
             runtime.setShadowQuality(shadowQualityForPreset(preset, true));
         }
-        settingsStatus.textContent = `Quality set to ${qualitySelect.selectedOptions[0]?.text ?? preset}`;
+        settingsStatus.textContent = `Quality set to ${qualitySelect.selectedOptions.item(0)?.text ?? preset}`;
         persistPanelSettings();
     });
 

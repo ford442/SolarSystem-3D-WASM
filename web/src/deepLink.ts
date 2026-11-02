@@ -1,4 +1,5 @@
 import type { OrbitScaleMode, QualityPreset } from './SolarSystem.js';
+import { getClipboard } from './dom.js';
 import { MAX_PLANET_INDEX, PLANET_ID_BY_INDEX, PLANET_IDS, type PlanetIndex } from './generated/planetIds.js';
 
 export interface DeepLinkViewState {
@@ -361,8 +362,9 @@ export async function copyShareableLink(
     baseUrl = window.location.href,
 ): Promise<string> {
     const link = buildShareableUrl(readers, baseUrl);
-    if (navigator.clipboard?.writeText) {
-        await navigator.clipboard.writeText(link);
+    const clipboard = getClipboard();
+    if (clipboard) {
+        await clipboard.writeText(link);
     } else {
         const textarea = document.createElement('textarea');
         textarea.value = link;
@@ -371,6 +373,8 @@ export async function copyShareableLink(
         textarea.style.left = '-9999px';
         document.body.appendChild(textarea);
         textarea.select();
+        // Legacy path for non-secure contexts, where navigator.clipboard does not exist.
+        // eslint-disable-next-line @typescript-eslint/no-deprecated -- no replacement without a secure context
         document.execCommand('copy');
         textarea.remove();
     }

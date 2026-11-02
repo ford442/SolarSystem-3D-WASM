@@ -1,3 +1,4 @@
+import { required } from './dom';
 import { isoDateFromJulianDate, julianDateFromIsoDate, julianDateUtcNow } from './ephemeris';
 import type { SolarSystemRuntime } from './wasmBridge';
 
@@ -81,7 +82,7 @@ export const OBSERVE_RATES: readonly { value: number; label: string }[] = [
  */
 export const ECLIPSE_2017 = {
     siteId: 'casper',
-    julianDate: julianDateFromIsoDate('2017-08-21')! + (17 + 43 / 60 + 45 / 3600) / 24,
+    julianDate: required(julianDateFromIsoDate('2017-08-21'), 'the 2017-08-21 Julian date') + (17 + 43 / 60 + 45 / 3600) / 24,
     fovDeg: 10,
 } as const;
 
@@ -159,10 +160,11 @@ function finite(value: unknown, fallback: number): number {
 
 export function parseObserveStateJson(json: string): ObserveState {
     try {
-        const raw = JSON.parse(json) as Record<string, unknown>;
-        if (typeof raw !== 'object' || raw === null) {
+        const parsed: unknown = JSON.parse(json);
+        if (typeof parsed !== 'object' || parsed === null) {
             return INACTIVE_STATE;
         }
+        const raw = parsed as Record<string, unknown>;
         return {
             active: raw.active === true,
             latDeg: finite(raw.latDeg, INACTIVE_STATE.latDeg),
@@ -231,7 +233,8 @@ export function parseTimeOfDayDays(value: string): number | undefined {
     }
     const hours = Number(match[1]);
     const minutes = Number(match[2]);
-    const seconds = Number(match[3] ?? 0);
+    // Group 3 (:SS) is optional, so it is undefined when absent although the array type says string.
+    const seconds = Number((match[3] as string | undefined) ?? 0);
     if (hours > 23 || minutes > 59 || seconds > 59) {
         return undefined;
     }
@@ -380,7 +383,7 @@ export function initObservePanel(options: ObservePanelOptions): ObservePanelCont
 
     const saved = readPersisted();
     const link = options.deepLink ?? {};
-    let activeSiteId = OBSERVER_SITES.some((site) => site.id === saved.siteId) ? saved.siteId! : DEFAULT_OBSERVER_SITE.id;
+    let activeSiteId = OBSERVER_SITES.find((site) => site.id === saved.siteId)?.id ?? DEFAULT_OBSERVER_SITE.id;
     let latDeg = link.lat ?? saved.latDeg ?? DEFAULT_OBSERVER_SITE.latDeg;
     let lonDeg = link.lon ?? saved.lonDeg ?? DEFAULT_OBSERVER_SITE.lonDeg;
     if (link.lat !== undefined || link.lon !== undefined) {
@@ -388,7 +391,7 @@ export function initObservePanel(options: ObservePanelOptions): ObservePanelCont
     } else if (saved.siteId === CUSTOM_SITE_ID) {
         activeSiteId = CUSTOM_SITE_ID;
     } else {
-        const site = OBSERVER_SITES.find((s) => s.id === activeSiteId)!;
+        const site = OBSERVER_SITES.find((s) => s.id === activeSiteId) ?? DEFAULT_OBSERVER_SITE;
         latDeg = site.latDeg;
         lonDeg = site.lonDeg;
     }
@@ -589,7 +592,7 @@ export function initObservePanel(options: ObservePanelOptions): ObservePanelCont
         }
         showSiteFields();
         applySite();
-        status.textContent = `Site: ${siteSelect.selectedOptions[0]?.text ?? ''}`;
+        status.textContent = `Site: ${siteSelect.selectedOptions.item(0)?.text ?? ''}`;
     });
 
     function onLatLonEdited(): void {
@@ -608,12 +611,14 @@ export function initObservePanel(options: ObservePanelOptions): ObservePanelCont
     lonInput.addEventListener('change', onLatLonEdited);
 
     locateButton.addEventListener('click', () => {
-        if (!navigator.geolocation) {
+        // Undefined in insecure contexts and some webviews, which lib.dom does not admit.
+        const geolocation = (navigator as { geolocation?: Geolocation }).geolocation;
+        if (!geolocation) {
             status.textContent = 'Geolocation is not available in this browser';
             return;
         }
         status.textContent = 'Asking the browser for your location…';
-        navigator.geolocation.getCurrentPosition(
+        geolocation.getCurrentPosition(
             (position) => {
                 latDeg = clampLatitude(position.coords.latitude);
                 lonDeg = normalizeLongitude(position.coords.longitude);
@@ -683,7 +688,10 @@ export function initObservePanel(options: ObservePanelOptions): ObservePanelCont
     });
 
     eclipseButton.addEventListener('click', () => {
-        const site = OBSERVER_SITES.find((candidate) => candidate.id === ECLIPSE_2017.siteId)!;
+        const site = required(
+            OBSERVER_SITES.find((candidate) => candidate.id === ECLIPSE_2017.siteId),
+            `observer site '${ECLIPSE_2017.siteId}'`,
+        );
         activeSiteId = site.id;
         latDeg = site.latDeg;
         lonDeg = site.lonDeg;
