@@ -144,6 +144,24 @@ working directory):
 ./build/SolarSystem
 ```
 
+`build.sh` is a thin wrapper over the CMake presets in `CMakePresets.json` (CMake 3.25+), which
+you can also use directly:
+
+| Preset | What it builds | Output |
+|---|---|---|
+| `native-release` | the game, Release | `build/` |
+| `native-debug` | the game, Debug | `cmake-build-debug/` |
+| `native-tests` | unit tests, GL tests, atmosphere LUT baker | `build-test/` |
+| `web-release` / `web-debug` | WebAssembly (needs `$EMSDK`; `build-web.sh` finds it) | `build-web/`, `build-web-debug/` |
+
+```bash
+cmake --preset native-debug && cmake --build --preset native-debug
+cmake --workflow --preset native-tests     # configure + build + ctest (not the GL tests)
+```
+
+Every preset writes `compile_commands.json` for clangd and clang-tidy, and a `ccache` on `PATH` is
+used automatically. Warnings are errors in CI only (`-DSOLARSYSTEM_WERROR=ON`).
+
 On Linux, background music uses SDL_mixer instead of irrKlang. The web build links no audio library; see below. MP3 tracks are
 optional: place them under `resource/sounds/` if you have the assets locally.
 
@@ -163,15 +181,13 @@ To build for the web using WebAssembly:
 
 1. Install the [Emscripten SDK](https://emscripten.org/docs/getting_started/downloads.html)
 2. Activate the Emscripten environment: `source /path/to/emsdk/emsdk_env.sh`
-3. Build the project:
+3. Build the project (this is what `build-web.sh` runs, then copies the output into `web/`):
 ```bash
-emcmake cmake -B build-web .
-cd build-web
-emmake make
+cmake --preset web-release && cmake --build --preset web-release
 ```
-4. Serve the generated HTML file (due to CORS restrictions):
+4. For a quick look without Vite, serve the build directory (due to CORS restrictions):
 ```bash
-python3 -m http.server 8000
+cd build-web && python3 -m http.server 8000
 # Then open http://localhost:8000/SolarSystem.html
 ```
 

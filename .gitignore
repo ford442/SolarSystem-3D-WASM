@@ -9,7 +9,7 @@ external/
 
 # Build directories
 build/
-build-web/
+build-web*/
 build-test*/
 build-check/
 

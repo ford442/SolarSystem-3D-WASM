@@ -21,6 +21,10 @@ jobs:
     steps:
       - name: Check out repository
         uses: actions/checkout@v4
+        with:
+          # A pull_request checkout is a merge commit; HEAD^1 (the base branch tip) is what the
+          # changed-lines checks below diff against.
+          fetch-depth: 2
 
       - name: Install native dependencies
         run: |
@@ -30,7 +34,14 @@ jobs:
             libglew-dev libglfw3-dev libgl1-mesa-dev \
             libsdl2-dev libsdl2-image-dev libsdl2-mixer-dev \
             libfreetype-dev libassimp-dev libglm-dev \
-            xvfb
+            xvfb ccache clang-format clang-tidy
+
+      - name: Cache ccache objects
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/ccache
+          key: ccache-native-${{ runner.os }}-${{ github.sha }}
+          restore-keys: ccache-native-${{ runner.os }}-
 
       - name: Check GL object ownership (no raw glGen*/glDelete* outside gfx/GlHandle.h)
         run: scripts/check-gl-handles.sh
@@ -38,15 +49,37 @@ jobs:
       - name: Check source rules (no using-namespace in headers, no iostream logging)
         run: scripts/check-source-rules.sh
 
-      - name: Build native binary
-        run: ./build.sh
+      - name: Format check (lines changed by this PR)
+        if: github.event_name == 'pull_request'
+        run: |
+          # .clang-format captures the existing style; only touched lines are held to it, so
+          # a PR is never asked to reformat a legacy file it happens to edit.
+          if ! git clang-format --diff --extensions c,cpp,h,hpp HEAD^1 -- src tests tools > "$RUNNER_TEMP/clang-format.diff"; then
+            cat "$RUNNER_TEMP/clang-format.diff"
+            echo "::error::Run 'git clang-format origin/main' and commit the result."
+            exit 1
+          fi
 
-      - name: Build and run unit tests
+      # SOLARSYSTEM_WERROR=ON: -Wall -Wextra warnings fail the build here, and only here.
+      - name: Build native binary (CMake preset native-release)
+        run: ./build.sh -DSOLARSYSTEM_WERROR=ON
+
+      - name: clang-tidy (lines changed by this PR)
+        if: github.event_name == 'pull_request'
+        run: |
+          # .clang-tidy makes cppcoreguidelines-owning-memory and misc-include-cleaner errors.
+          # Older files still have ~1500 include-cleaner findings, so the check is held to the
+          # lines this PR touches (clang-tidy-diff) rather than the whole tree. build/ has
+          # compile_commands.json from the step above.
+          git diff -U0 HEAD^1 -- 'src/*.cpp' ':!src/3rdparty' \
+            | clang-tidy-diff -p1 -path build -quiet
+
+      - name: Build and run unit tests (CMake preset native-tests)
         run: |
           rm -rf build-test
-          cmake -G Ninja -DCMAKE_BUILD_TYPE=Release -DSOLARSYSTEM_BUILD_TESTS=ON -B build-test
-          cmake --build build-test --target SolarSystemTests SolarSystemGlTests atmosphere_lut_baker
-          ctest --test-dir build-test --output-on-failure --exclude-regex '^gl\.'
+          cmake --preset native-tests
+          cmake --build --preset native-tests
+          ctest --preset native-tests
 
       - name: Run GL tests under Mesa (handles, programs, framebuffers, one draw)
         working-directory: ${{ github.workspace }}

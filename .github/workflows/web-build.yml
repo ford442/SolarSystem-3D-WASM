@@ -31,14 +31,17 @@ jobs:
             libsdl2-dev libsdl2-image-dev libsdl2-mixer-dev \
             libfreetype-dev libassimp-dev
 
-      - name: Configure and build unit tests
+      # The native-tests preset builds SolarSystemGlTests too and runs everything except the
+      # `gl.` tests (they need a GL 4.6 context; native-linux-build.yml runs those under Mesa).
+      # A plain `ctest` here used to fail on SolarSystemGlTests_NOT_BUILT.
+      - name: Configure and build unit tests (CMake preset native-tests)
         run: |
           rm -rf build-test
-          cmake -G Ninja -DCMAKE_BUILD_TYPE=Release -DSOLARSYSTEM_BUILD_TESTS=ON -B build-test
-          cmake --build build-test --target SolarSystemTests atmosphere_lut_baker
+          cmake --preset native-tests
+          cmake --build --preset native-tests
 
       - name: Run unit tests
-        run: ctest --test-dir build-test --output-on-failure
+        run: ctest --preset native-tests
 
   build-web:
     runs-on: ubuntu-latest
@@ -76,7 +79,10 @@ jobs:
           # in the key exists to prevent.
           key: assimp-wasm-6.0.0-wasmeh-${{ hashFiles('setup_web_dependencies.sh') }}
 
+      # SOLARSYSTEM_WERROR=ON: -Wall -Wextra warnings fail this build (and only CI's).
       - name: Build WebAssembly
+        env:
+          SOLARSYSTEM_WERROR: "ON"
         run: ./build-web.sh --no-emsdk
 
       - name: Install frontend dependencies

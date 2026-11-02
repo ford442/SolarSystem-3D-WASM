@@ -71,21 +71,52 @@ fi
 
 # 4. Configure & Build
 echo "------------------------------------------------"
-# Create build directory in the Project Root
+# The web-release / web-debug presets in CMakePresets.json hold the configuration; this script
+# adds the environment (emsdk, ccache) and the deploy step. Debug builds get their own
+# directory so switching Debug<->Release no longer reconfigures one tree back and forth.
+PRESET=web-release
 BUILD_DIR="$PROJECT_ROOT/build-web"
-mkdir -p "$BUILD_DIR"
+if [ "$BUILD_TYPE" = "Debug" ]; then
+    PRESET=web-debug
+    BUILD_DIR="$PROJECT_ROOT/build-web-debug"
+fi
 
-# Run CMake (reconfigure when switching Debug↔Release; wipe build-web/ if flags look stale)
-echo "Running CMake configuration..."
-emcmake cmake \
-    -DCMAKE_BUILD_TYPE="$BUILD_TYPE" \
-    -B "$BUILD_DIR" \
-    "$PROJECT_ROOT"
+CMAKE_ARGS=(-DCMAKE_BUILD_TYPE="$BUILD_TYPE")
+# CI sets SOLARSYSTEM_WERROR=ON so a new warning fails the build; locally it is off.
+if [ -n "${SOLARSYSTEM_WERROR:-}" ]; then
+    CMAKE_ARGS+=(-DSOLARSYSTEM_WERROR="$SOLARSYSTEM_WERROR")
+fi
 
-# Build
-echo "Building project..."
+# emcc is a wrapper script, so ccache goes in through its own hook rather than CMake's launcher.
+if [ -z "${EM_COMPILER_WRAPPER:-}" ] && command -v ccache >/dev/null 2>&1; then
+    export EM_COMPILER_WRAPPER=ccache
+    echo "Using ccache for emcc."
+fi
+
+# The presets find the toolchain file through $EMSDK. emsdk_env.sh and setup-emsdk set it; when
+# only emcc is on PATH, derive it from emcc's location (<emsdk>/upstream/emscripten/emcc).
+if [ -z "${EMSDK:-}" ] && command -v emcc >/dev/null 2>&1; then
+    EMCC_DIR="$(dirname "$(readlink -f "$(command -v emcc)")")"
+    if [ -f "$EMCC_DIR/cmake/Modules/Platform/Emscripten.cmake" ] && [ "$(basename "$(dirname "$EMCC_DIR")")" = "upstream" ]; then
+        export EMSDK="$(cd "$EMCC_DIR/../.." && pwd)"
+    fi
+fi
+
+if [ -n "${EMSDK:-}" ] && [ -f "$EMSDK/upstream/emscripten/cmake/Modules/Platform/Emscripten.cmake" ]; then
+    echo "Running CMake preset $PRESET..."
+    (cd "$PROJECT_ROOT" && cmake --preset "$PRESET" "${CMAKE_ARGS[@]}")
+    echo "Building project..."
+    (cd "$PROJECT_ROOT" && cmake --build --preset "$PRESET" -j"$BUILD_JOBS")
+else
+    # A distro-packaged emscripten has no emsdk layout, so the preset's toolchain path does not
+    # resolve. emcmake supplies the toolchain itself.
+    echo "No emsdk layout found; configuring with emcmake instead of the $PRESET preset."
+    mkdir -p "$BUILD_DIR"
+    emcmake cmake "${CMAKE_ARGS[@]}" -DCMAKE_EXPORT_COMPILE_COMMANDS=ON -B "$BUILD_DIR" "$PROJECT_ROOT"
+    echo "Building project..."
+    cmake --build "$BUILD_DIR" -j"$BUILD_JOBS"
+fi
 cd "$BUILD_DIR"
-emmake make -j"$BUILD_JOBS"
 
 # 5. Deploy to Web Frontend
 echo "------------------------------------------------"
