@@ -234,10 +234,10 @@ export function parseDeepLinkFromUrl(search = window.location.search): DeepLinkV
     const z = parseFiniteNumber(params.get('z'));
     const yaw = parseFiniteNumber(params.get('yaw'));
     const pitch = parseFiniteNumber(params.get('pitch'));
-    const camera = x !== undefined && y !== undefined && z !== undefined
-        && yaw !== undefined && pitch !== undefined
-        ? { x, y, z, yaw, pitch }
-        : undefined;
+    const camera =
+        x !== undefined && y !== undefined && z !== undefined && yaw !== undefined && pitch !== undefined
+            ? { x, y, z, yaw, pitch }
+            : undefined;
 
     return {
         quality,
@@ -252,9 +252,7 @@ export function parseDeepLinkFromUrl(search = window.location.search): DeepLinkV
         planet,
         mission,
         tour,
-        tourStep: tourStep !== undefined && Number.isInteger(tourStep) && tourStep >= 0
-            ? tourStep
-            : undefined,
+        tourStep: tourStep !== undefined && Number.isInteger(tourStep) && tourStep >= 0 ? tourStep : undefined,
         timeline,
         timelineTime: timeline && timelineTime !== undefined && timelineTime >= 0 ? timelineTime : undefined,
         mode,
@@ -268,10 +266,7 @@ export function hasDeepLinkViewState(state: DeepLinkViewState): boolean {
 }
 
 /** Build a shareable URL for the current simulation view. */
-export function buildShareableUrl(
-    readers: DeepLinkRuntimeReaders,
-    baseUrl = window.location.href,
-): string {
+export function buildShareableUrl(readers: DeepLinkRuntimeReaders, baseUrl = window.location.href): string {
     const url = new URL(baseUrl);
     url.search = '';
 

@@ -88,8 +88,12 @@ export function webCodecsAvailable(): boolean {
     return typeof VideoEncoder !== 'undefined' && typeof VideoFrame !== 'undefined';
 }
 
-async function pickEncoder(width: number, height: number, fps: number, bitrate: number):
-Promise<{ choice: CodecChoice; config: VideoEncoderConfig } | null> {
+async function pickEncoder(
+    width: number,
+    height: number,
+    fps: number,
+    bitrate: number,
+): Promise<{ choice: CodecChoice; config: VideoEncoderConfig } | null> {
     for (const choice of CODEC_CANDIDATES) {
         const config: VideoEncoderConfig = { codec: choice.codec, width, height, bitrate, framerate: fps };
         if (choice.container === 'avc') {
@@ -224,8 +228,9 @@ async function captureWithMediaRecorder(
     if (typeof MediaRecorder === 'undefined' || typeof target.canvas.captureStream !== 'function') {
         throw new Error('This browser has neither WebCodecs nor MediaRecorder for canvas video');
     }
-    const mimeType = ['video/mp4;codecs=avc1.42E01E', 'video/mp4', 'video/webm;codecs=vp9', 'video/webm']
-        .find((type) => MediaRecorder.isTypeSupported(type));
+    const mimeType = ['video/mp4;codecs=avc1.42E01E', 'video/mp4', 'video/webm;codecs=vp9', 'video/webm'].find((type) =>
+        MediaRecorder.isTypeSupported(type),
+    );
     if (!mimeType) {
         throw new Error('MediaRecorder supports no video format here');
     }

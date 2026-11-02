@@ -82,7 +82,8 @@ export const OBSERVE_RATES: readonly { value: number; label: string }[] = [
  */
 export const ECLIPSE_2017 = {
     siteId: 'casper',
-    julianDate: required(julianDateFromIsoDate('2017-08-21'), 'the 2017-08-21 Julian date') + (17 + 43 / 60 + 45 / 3600) / 24,
+    julianDate:
+        required(julianDateFromIsoDate('2017-08-21'), 'the 2017-08-21 Julian date') + (17 + 43 / 60 + 45 / 3600) / 24,
     fovDeg: 10,
 } as const;
 
@@ -189,8 +190,10 @@ export function parseObserveStateJson(json: string): ObserveState {
             constellationSegments: finite(raw.constellationSegments, 0),
             moonLibLonDeg: finite(raw.moonLibLonDeg, 0),
             moonLibLatDeg: finite(raw.moonLibLatDeg, 0),
-            eventVisibility: raw.eventVisibility === 'above' || raw.eventVisibility === 'below'
-                || raw.eventVisibility === 'unknown' ? raw.eventVisibility : 'none',
+            eventVisibility:
+                raw.eventVisibility === 'above' || raw.eventVisibility === 'below' || raw.eventVisibility === 'unknown'
+                    ? raw.eventVisibility
+                    : 'none',
         };
     } catch {
         return INACTIVE_STATE;
@@ -485,8 +488,7 @@ export function initObservePanel(options: ObservePanelOptions): ObservePanelCont
         }
         if (telescope) {
             const field = eyepieceFieldDeg(state.fovDeg, window.innerWidth, window.innerHeight);
-            telescopeLabel.textContent =
-                `Telescope · ${formatFov(field)}° field (the Moon is ~0.5°) · no optics simulated`;
+            telescopeLabel.textContent = `Telescope · ${formatFov(field)}° field (the Moon is ~0.5°) · no optics simulated`;
         }
         if (document.activeElement === eyepieceSelect) {
             return;
@@ -530,13 +532,22 @@ export function initObservePanel(options: ObservePanelOptions): ObservePanelCont
         if (document.activeElement !== dateInput) {
             dateInput.value = isoDateFromJulianDate(state.julianDate);
         }
-        const sunState = state.sunAltDeg > 0 ? 'day' : state.sunAltDeg > -6 ? 'civil twilight' : state.sunAltDeg > -18 ? 'twilight' : 'night';
+        const sunState =
+            state.sunAltDeg > 0
+                ? 'day'
+                : state.sunAltDeg > -6
+                  ? 'civil twilight'
+                  : state.sunAltDeg > -18
+                    ? 'twilight'
+                    : 'night';
         readout.textContent =
             `Az ${Math.round(state.azDeg)}° Alt ${Math.round(state.elDeg)}° FOV ${formatFov(state.fovDeg)}° · ` +
             `Sun ${state.sunAltDeg.toFixed(1)}° (${sunState}) · ` +
             `Moon ${state.moonAltDeg.toFixed(1)}°, ${Math.round(state.moonIllum * 100)}% lit · ` +
             `${state.starCount} stars` +
-            (state.constellations && state.constellationSegments > 0 ? `, ${state.constellationSegments} figure lines` : '') +
+            (state.constellations && state.constellationSegments > 0
+                ? `, ${state.constellationSegments} figure lines`
+                : '') +
             (state.sunCoverage > 0.001 ? ` · ${eclipseLabel(state.sunCoverage)}` : '');
     }
 
@@ -666,9 +677,10 @@ export function initObservePanel(options: ObservePanelOptions): ObservePanelCont
         }
         runtime.setObserveFov(fov > 0 ? fov : nakedEyeFov);
         refresh();
-        status.textContent = fov > 0
-            ? `Telescope: ${formatFov(fov)}° field — scroll or pinch to zoom between eyepieces`
-            : `Naked eye: ${formatFov(nakedEyeFov)}° field`;
+        status.textContent =
+            fov > 0
+                ? `Telescope: ${formatFov(fov)}° field — scroll or pinch to zoom between eyepieces`
+                : `Naked eye: ${formatFov(nakedEyeFov)}° field`;
     });
 
     constellationsToggle.addEventListener('change', () => {
@@ -705,7 +717,8 @@ export function initObservePanel(options: ObservePanelOptions): ObservePanelCont
         const state = runtime.getObserveState();
         lookAt(state.sunAzDeg, state.sunAltDeg);
         refresh();
-        status.textContent = '2017-08-21 17:43:45 UTC, Casper WY — mid-totality (visualization; Moon and Sun positions to a few arcseconds)';
+        status.textContent =
+            '2017-08-21 17:43:45 UTC, Casper WY — mid-totality (visualization; Moon and Sun positions to a few arcseconds)';
     });
 
     // Keep the buttons honest when C++ flips the mode itself (the native O key), and keep the

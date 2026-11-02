@@ -8,7 +8,9 @@ class FakeCacheStorage {
         const store = this.stores.get(name)!;
         return {
             match: async (key: string) => store.get(key)?.clone(),
-            put: async (key: string, response: Response) => { store.set(key, response); },
+            put: async (key: string, response: Response) => {
+                store.set(key, response);
+            },
         } as unknown as Cache;
     });
     keys = vi.fn(async () => [...this.stores.keys()]);
@@ -18,16 +20,25 @@ class FakeCacheStorage {
 const BASE = 'https://example.test/app/';
 const bytes = (...values: number[]) => new Uint8Array(values);
 
-function setup(fetchImpl: typeof fetch, caches: FakeCacheStorage | undefined = new FakeCacheStorage(), assetBase = BASE) {
+function setup(
+    fetchImpl: typeof fetch,
+    caches: FakeCacheStorage | undefined = new FakeCacheStorage(),
+    assetBase = BASE,
+) {
     const fetchSpy = vi.fn(fetchImpl);
     const fetcher = createAssetFetcher({
-        assetBase, baseHref: BASE, caches: caches, fetch: fetchSpy,
+        assetBase,
+        baseHref: BASE,
+        caches: caches,
+        fetch: fetchSpy,
     });
     return { fetcher, fetchSpy, caches };
 }
 
-const ok = (body: Uint8Array<ArrayBuffer>, headers: Record<string, string> = {}) =>
-    async () => new Response(body, { status: 200, headers });
+const ok =
+    (body: Uint8Array<ArrayBuffer>, headers: Record<string, string> = {}) =>
+    async () =>
+        new Response(body, { status: 200, headers });
 
 describe('createAssetFetcher', () => {
     it('stores a good body on a miss and serves the second request without the network', async () => {
@@ -55,11 +66,17 @@ describe('createAssetFetcher', () => {
     });
 
     it('reports a network error or a body that dies mid-read as status 0 and stores nothing', async () => {
-        const { fetcher, caches } = setup(async () => { throw new TypeError('Failed to fetch'); });
+        const { fetcher, caches } = setup(async () => {
+            throw new TypeError('Failed to fetch');
+        });
         expect(await fetcher(`${BASE}a.dds`)).toBe(0);
 
         const broken = setup(async () => {
-            const stream = new ReadableStream({ pull(controller) { controller.error(new Error('reset')); } });
+            const stream = new ReadableStream({
+                pull(controller) {
+                    controller.error(new Error('reset'));
+                },
+            });
             return new Response(stream, { status: 200 });
         });
         expect(await broken.fetcher(`${BASE}b.dds`)).toBe(0);
@@ -88,7 +105,7 @@ describe('createAssetFetcher', () => {
         expect(fetchSpy).toHaveBeenCalledTimes(2);
     });
 
-    it('versions the cache by asset base and deletes the other bases\' caches', async () => {
+    it("versions the cache by asset base and deletes the other bases' caches", async () => {
         const caches = new FakeCacheStorage();
         caches.stores.set(assetCacheName('https://old.test/v1/', BASE), new Map());
         caches.stores.set('unrelated', new Map());

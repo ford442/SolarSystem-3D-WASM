@@ -14,11 +14,7 @@ import { initSettingsPanel } from './settingsPanel';
 import { initTimelineEditor } from './timelineEditor';
 import { initTouchControls, isMobileLikeDevice } from './touchControls';
 import { initWebXr } from './webxr';
-import {
-    createSolarSystemRuntime,
-    exposeConsoleHelpers,
-    type SolarSystemRuntime,
-} from './wasmBridge';
+import { createSolarSystemRuntime, exposeConsoleHelpers, type SolarSystemRuntime } from './wasmBridge';
 import { installWasmCallbacksOnConfig, setModuleInstance } from './wasmCallbacks';
 import { assetCacheEnabled, createAssetFetcher } from './assetCache';
 import { computeWebGlSizing } from './webglContext';
@@ -148,8 +144,10 @@ const { contextOptions, tier } = computeWebGlSizing(initConfig);
 const preinitializedWebGLContext = canvas.getContext('webgl2', contextOptions);
 if (preinitializedWebGLContext) {
     console.log(
-        `[WebGL] tier=${tier} requested`, contextOptions,
-        'actual', preinitializedWebGLContext.getContextAttributes(),
+        `[WebGL] tier=${tier} requested`,
+        contextOptions,
+        'actual',
+        preinitializedWebGLContext.getContextAttributes(),
     );
 } else {
     console.error('[WebGL] Failed to create a WebGL2 context with', contextOptions);
@@ -199,40 +197,48 @@ function pauseMainLoop(): void {
 // A mobile GPU reset or a long-backgrounded tab can drop the context. preventDefault() is
 // what tells the browser we may want it back; v1 does not rebuild GL state in place, so it
 // stops the frame loop (every GL call would fail) and offers a reload into the same view.
-canvas.addEventListener('webglcontextlost', (event) => {
-    event.preventDefault();
-    if (contextLost) return;
-    contextLost = true;
-    console.error('[WebGL] Context lost; pausing the main loop');
-    pauseMainLoop();
-    showFatalPanel({
-        title: 'Graphics context lost',
-        message: 'The browser reset the GPU context, so the scene can no longer be drawn. '
-            + 'Reload to pick up where you left off.',
-        reloadUrl: currentViewUrl,
-    });
-}, false);
+canvas.addEventListener(
+    'webglcontextlost',
+    (event) => {
+        event.preventDefault();
+        if (contextLost) return;
+        contextLost = true;
+        console.error('[WebGL] Context lost; pausing the main loop');
+        pauseMainLoop();
+        showFatalPanel({
+            title: 'Graphics context lost',
+            message:
+                'The browser reset the GPU context, so the scene can no longer be drawn. ' +
+                'Reload to pick up where you left off.',
+            reloadUrl: currentViewUrl,
+        });
+    },
+    false,
+);
 
 for (const eventName of ['pointerdown', 'pointerup', 'click', 'keydown', 'keyup']) {
     settingsPanel.addEventListener(eventName, (event) => event.stopPropagation());
     explorerPanel.addEventListener(eventName, (event) => event.stopPropagation());
 }
 
-const moduleConfig: SolarSystemModuleConfig = installWasmCallbacksOnConfig({
-    canvas,
-    ...(preinitializedWebGLContext ? { preinitializedWebGLContext } : {}),
-    locateFile: (path: string, prefix: string) => {
-        if (path.endsWith('.wasm') || path.endsWith('.data')) {
-            return new URL(path, deployedBaseUrl).toString();
-        }
-        return prefix + path;
+const moduleConfig: SolarSystemModuleConfig = installWasmCallbacksOnConfig(
+    {
+        canvas,
+        ...(preinitializedWebGLContext ? { preinitializedWebGLContext } : {}),
+        locateFile: (path: string, prefix: string) => {
+            if (path.endsWith('.wasm') || path.endsWith('.data')) {
+                return new URL(path, deployedBaseUrl).toString();
+            }
+            return prefix + path;
+        },
+        print: (text: string) => console.log(text),
+        printErr: (text: string) => console.error(text),
+        onRuntimeInitialized: () => {
+            console.log('SolarSystem WASM initialized');
+        },
     },
-    print: (text: string) => console.log(text),
-    printErr: (text: string) => console.error(text),
-    onRuntimeInitialized: () => {
-        console.log('SolarSystem WASM initialized');
-    },
-}, { ...progressCallbacks, onMusicDuck: (duck: number) => music.setDuck(duck) });
+    { ...progressCallbacks, onMusicDuck: (duck: number) => music.setDuck(duck) },
+);
 
 function startModule(): Promise<SolarSystemModule> {
     if (!preinitializedWebGLContext) {
@@ -242,179 +248,195 @@ function startModule(): Promise<SolarSystemModule> {
     return Module(moduleConfig);
 }
 
-void startModule().then((instance) => {
-    console.log('Module loaded successfully', instance);
-    moduleInstance = instance;
-    setModuleInstance(instance);
-    if (contextLost) {
-        pauseMainLoop();
-    }
+void startModule()
+    .then(
+        (instance) => {
+            console.log('Module loaded successfully', instance);
+            moduleInstance = instance;
+            setModuleInstance(instance);
+            if (contextLost) {
+                pauseMainLoop();
+            }
 
-    const runtime = createSolarSystemRuntime(instance);
-    runtimeForReload = runtime;
-    exposeConsoleHelpers(runtime);
-    if (import.meta.env.DEV) {
-        void import('./shaderReload').then(({ installShaderReload }) => installShaderReload(instance, runtime, deployedBaseUrl));
-    }
+            const runtime = createSolarSystemRuntime(instance);
+            runtimeForReload = runtime;
+            exposeConsoleHelpers(runtime);
+            if (import.meta.env.DEV) {
+                void import('./shaderReload').then(({ installShaderReload }) =>
+                    installShaderReload(instance, runtime, deployedBaseUrl),
+                );
+            }
 
-    const deepLink = parseDeepLinkFromUrl();
-    const explorer = new PlanetExplorer(explorerPanel);
-    void explorer.init({
-        focusPlanet: runtime.focusPlanet.bind(runtime),
-        getNearestPlanetIndex: runtime.getNearestPlanetIndex.bind(runtime),
-        getFocusedPlanetIndex: runtime.getFocusedPlanetIndex.bind(runtime),
-        getPlanetSceneDistance: runtime.getPlanetSceneDistance.bind(runtime),
-        getOrbitScaleMode: () => runtime.getOrbitScaleMode(),
-        setOrbitScaleMode: runtime.setOrbitScaleMode.bind(runtime),
-        getNextConjunction: () => runtime.getNextConjunction(),
-        setSimulationEpoch: runtime.setSimulationEpoch.bind(runtime),
-    }, {
-        skipPlanetRestore: deepLink.planet !== undefined || deepLink.camera !== undefined || deepLink.mission !== undefined,
-        initialOrbitScale: deepLink.orbitScale,
-    }).catch((error: unknown) => {
-        console.error('Failed to initialize planet explorer:', error);
-    });
+            const deepLink = parseDeepLinkFromUrl();
+            const explorer = new PlanetExplorer(explorerPanel);
+            void explorer
+                .init(
+                    {
+                        focusPlanet: runtime.focusPlanet.bind(runtime),
+                        getNearestPlanetIndex: runtime.getNearestPlanetIndex.bind(runtime),
+                        getFocusedPlanetIndex: runtime.getFocusedPlanetIndex.bind(runtime),
+                        getPlanetSceneDistance: runtime.getPlanetSceneDistance.bind(runtime),
+                        getOrbitScaleMode: () => runtime.getOrbitScaleMode(),
+                        setOrbitScaleMode: runtime.setOrbitScaleMode.bind(runtime),
+                        getNextConjunction: () => runtime.getNextConjunction(),
+                        setSimulationEpoch: runtime.setSimulationEpoch.bind(runtime),
+                    },
+                    {
+                        skipPlanetRestore:
+                            deepLink.planet !== undefined ||
+                            deepLink.camera !== undefined ||
+                            deepLink.mission !== undefined,
+                        initialOrbitScale: deepLink.orbitScale,
+                    },
+                )
+                .catch((error: unknown) => {
+                    console.error('Failed to initialize planet explorer:', error);
+                });
 
-    if (isMobileDevice) {
-        explorerPanel.classList.add('is-collapsed');
-    }
+            if (isMobileDevice) {
+                explorerPanel.classList.add('is-collapsed');
+            }
 
-    initTouchControls({
-        canvas,
-        settingsPanel,
-        explorerPanel,
-        loadingContainer,
-        bindings: {
-            setTouchMovement: runtime.setTouchMovement.bind(runtime),
-            addTouchLook: runtime.addTouchLook.bind(runtime),
-            addTouchZoom: runtime.addTouchZoom.bind(runtime),
-        },
-    });
-
-    void initWebXr({
-        canvas,
-        enterVrButton,
-        exitVrButton,
-        overlayRoots: [settingsPanel, explorerPanel, tourCaption],
-        hudRoot: xrHud,
-        tooltip: xrTooltip,
-        controllersRoot: xrControllers,
-        bindings: {
-            setTouchMovement: runtime.setTouchMovement.bind(runtime),
-            addTouchLook: runtime.addTouchLook.bind(runtime),
-            setQualityPreset: runtime.setQualityPreset.bind(runtime),
-            getQualityPreset: runtime.getQualityPreset.bind(runtime),
-            getCameraPosition: () => runtime.getCameraPosition(),
-            getNearestPlanetIndex: () => runtime.getNearestPlanetIndex(),
-            getFocusedPlanetIndex: () => runtime.getFocusedPlanetIndex(),
-            setXrSessionActive: runtime.setXrSessionActive.bind(runtime),
-            setXrBaseLayerFramebuffer: runtime.setXrBaseLayerFramebuffer.bind(runtime),
-            registerXrFramebuffer: runtime.registerXrFramebuffer.bind(runtime),
-            setXrEyeCount: runtime.setXrEyeCount.bind(runtime),
-            setXrEyeViewport: runtime.setXrEyeViewport.bind(runtime),
-            commitXrEyeMatrices: runtime.commitXrEyeMatrices.bind(runtime),
-            getXrMatrixScratchPtr: runtime.getXrMatrixScratchPtr.bind(runtime),
-            runXrFrame: runtime.runXrFrame.bind(runtime),
-            getHeapF32: () => runtime.heapF32,
-            setXrControllerRay: runtime.setXrControllerRay.bind(runtime),
-            observe: {
-                isActive: () => runtime.getObserveMode(),
-                scrubTime: (seconds) => runtime.setSimulationEpoch(runtime.getSimulationEpoch() + seconds / 86400),
-                turn: (degrees) => {
-                    const state = runtime.getObserveState();
-                    runtime.setObserveView(state.azDeg + degrees, state.elDeg);
+            initTouchControls({
+                canvas,
+                settingsPanel,
+                explorerPanel,
+                loadingContainer,
+                bindings: {
+                    setTouchMovement: runtime.setTouchMovement.bind(runtime),
+                    addTouchLook: runtime.addTouchLook.bind(runtime),
+                    addTouchZoom: runtime.addTouchZoom.bind(runtime),
                 },
-            },
+            });
+
+            void initWebXr({
+                canvas,
+                enterVrButton,
+                exitVrButton,
+                overlayRoots: [settingsPanel, explorerPanel, tourCaption],
+                hudRoot: xrHud,
+                tooltip: xrTooltip,
+                controllersRoot: xrControllers,
+                bindings: {
+                    setTouchMovement: runtime.setTouchMovement.bind(runtime),
+                    addTouchLook: runtime.addTouchLook.bind(runtime),
+                    setQualityPreset: runtime.setQualityPreset.bind(runtime),
+                    getQualityPreset: runtime.getQualityPreset.bind(runtime),
+                    getCameraPosition: () => runtime.getCameraPosition(),
+                    getNearestPlanetIndex: () => runtime.getNearestPlanetIndex(),
+                    getFocusedPlanetIndex: () => runtime.getFocusedPlanetIndex(),
+                    setXrSessionActive: runtime.setXrSessionActive.bind(runtime),
+                    setXrBaseLayerFramebuffer: runtime.setXrBaseLayerFramebuffer.bind(runtime),
+                    registerXrFramebuffer: runtime.registerXrFramebuffer.bind(runtime),
+                    setXrEyeCount: runtime.setXrEyeCount.bind(runtime),
+                    setXrEyeViewport: runtime.setXrEyeViewport.bind(runtime),
+                    commitXrEyeMatrices: runtime.commitXrEyeMatrices.bind(runtime),
+                    getXrMatrixScratchPtr: runtime.getXrMatrixScratchPtr.bind(runtime),
+                    runXrFrame: runtime.runXrFrame.bind(runtime),
+                    getHeapF32: () => runtime.heapF32,
+                    setXrControllerRay: runtime.setXrControllerRay.bind(runtime),
+                    observe: {
+                        isActive: () => runtime.getObserveMode(),
+                        scrubTime: (seconds) =>
+                            runtime.setSimulationEpoch(runtime.getSimulationEpoch() + seconds / 86400),
+                        turn: (degrees) => {
+                            const state = runtime.getObserveState();
+                            runtime.setObserveView(state.azDeg + degrees, state.elDeg);
+                        },
+                    },
+                },
+            })
+                .then((controller) => {
+                    if (controller) {
+                        console.log('[WebXR] Enter VR control ready');
+                    } else {
+                        console.log('[WebXR] immersive-vr unavailable — staying 2D');
+                    }
+                })
+                .catch((error: unknown) => {
+                    console.warn('[WebXR] init failed:', error);
+                    enterVrButton.hidden = true;
+                });
+
+            let observeController: ObservePanelController | null = null;
+
+            initSettingsPanel({
+                getObserveTimeOfDayDays: () => observeController?.timeOfDayDays() ?? 0,
+                elements: {
+                    settingsPanel,
+                    settingsToggle,
+                    settingsToggleIcon,
+                    settingsFieldset,
+                    qualitySelect,
+                    timeScaleInput,
+                    timeScaleValue,
+                    simulationDateInput,
+                    simulationDateSet,
+                    simulationDateNow,
+                    pausedInput,
+                    shadowsInput,
+                    orbitLinesInput,
+                    magneticFieldsInput,
+                    musicVolumeInput,
+                    musicVolumeValue,
+                    musicMutedInput,
+                    settingsReset,
+                    copyViewLinkButton,
+                    settingsStatus,
+                    skyEventChip,
+                    skyEventText,
+                    skyEventJump,
+                    skyEventLandmark,
+                },
+                runtime,
+                music,
+                deepLink,
+                isMobileDevice,
+            });
+
+            observeController = initObservePanel({
+                elements: observeElements,
+                runtime,
+                startInObserve: deepLink.mode === 'observe',
+                deepLink: { ...deepLink.observer, paused: deepLink.paused },
+                epochFromLink: deepLink.julianDate !== undefined || deepLink.simulationDate !== undefined,
+                onModeChanged: (active) => {
+                    explorerPanel.classList.toggle('is-observing', active);
+                },
+            });
+
+            const tourPlayer = initEducationalLayer({
+                runtime,
+                deepLink,
+                missionList: explorerMissionList,
+                missionsRoot: explorerMissions,
+                tourPlay,
+                tourStop,
+                tourCopyStep,
+                tourCaption,
+                settingsStatus,
+            });
+
+            initTimelineEditor({ runtime, canvas, deepLink, tourPlayer, caption: tourCaption });
+
+            if (deepLink.planet !== undefined && !deepLink.mission && !deepLink.tour && !deepLink.timeline) {
+                explorer.applyDeepLinkPlanet(deepLink.planet, { focusCamera: false });
+            }
         },
-    }).then((controller) => {
-        if (controller) {
-            console.log('[WebXR] Enter VR control ready');
-        } else {
-            console.log('[WebXR] immersive-vr unavailable — staying 2D');
-        }
-    }).catch((error: unknown) => {
-        console.warn('[WebXR] init failed:', error);
-        enterVrButton.hidden = true;
-    });
-
-    let observeController: ObservePanelController | null = null;
-
-    initSettingsPanel({
-        getObserveTimeOfDayDays: () => observeController?.timeOfDayDays() ?? 0,
-        elements: {
-            settingsPanel,
-            settingsToggle,
-            settingsToggleIcon,
-            settingsFieldset,
-            qualitySelect,
-            timeScaleInput,
-            timeScaleValue,
-            simulationDateInput,
-            simulationDateSet,
-            simulationDateNow,
-            pausedInput,
-            shadowsInput,
-            orbitLinesInput,
-            magneticFieldsInput,
-            musicVolumeInput,
-            musicVolumeValue,
-            musicMutedInput,
-            settingsReset,
-            copyViewLinkButton,
-            settingsStatus,
-            skyEventChip,
-            skyEventText,
-            skyEventJump,
-            skyEventLandmark,
+        (error: unknown) => {
+            settingsStatus.textContent = 'Controls unavailable';
+            console.error('Failed to initialize SolarSystem WASM:', error);
+            const noWebGl = !preinitializedWebGLContext;
+            showFatalPanel({
+                title: noWebGl ? 'WebGL 2 is not available' : 'The simulation failed to start',
+                message: noWebGl
+                    ? 'This browser could not create a WebGL 2 context, which the 3D scene needs.'
+                    : `Loading the simulation failed: ${error instanceof Error ? error.message : String(error)}`,
+                hints: noWebGl ? BROWSER_HINTS : ['Check your connection and reload.', ...BROWSER_HINTS],
+            });
         },
-        runtime,
-        music,
-        deepLink,
-        isMobileDevice,
+    )
+    .catch((error: unknown) => {
+        settingsStatus.textContent = 'Controls unavailable';
+        console.error('Failed to initialize the SolarSystem UI:', error);
     });
-
-    observeController = initObservePanel({
-        elements: observeElements,
-        runtime,
-        startInObserve: deepLink.mode === 'observe',
-        deepLink: { ...deepLink.observer, paused: deepLink.paused },
-        epochFromLink: deepLink.julianDate !== undefined || deepLink.simulationDate !== undefined,
-        onModeChanged: (active) => {
-            explorerPanel.classList.toggle('is-observing', active);
-        },
-    });
-
-    const tourPlayer = initEducationalLayer({
-        runtime,
-        deepLink,
-        missionList: explorerMissionList,
-        missionsRoot: explorerMissions,
-        tourPlay,
-        tourStop,
-        tourCopyStep,
-        tourCaption,
-        settingsStatus,
-    });
-
-    initTimelineEditor({ runtime, canvas, deepLink, tourPlayer, caption: tourCaption });
-
-    if (deepLink.planet !== undefined && !deepLink.mission && !deepLink.tour && !deepLink.timeline) {
-        explorer.applyDeepLinkPlanet(deepLink.planet, { focusCamera: false });
-    }
-}, (error: unknown) => {
-    settingsStatus.textContent = 'Controls unavailable';
-    console.error('Failed to initialize SolarSystem WASM:', error);
-    const noWebGl = !preinitializedWebGLContext;
-    showFatalPanel({
-        title: noWebGl ? 'WebGL 2 is not available' : 'The simulation failed to start',
-        message: noWebGl
-            ? 'This browser could not create a WebGL 2 context, which the 3D scene needs.'
-            : `Loading the simulation failed: ${error instanceof Error ? error.message : String(error)}`,
-        hints: noWebGl
-            ? BROWSER_HINTS
-            : ['Check your connection and reload.', ...BROWSER_HINTS],
-    });
-}).catch((error: unknown) => {
-    settingsStatus.textContent = 'Controls unavailable';
-    console.error('Failed to initialize the SolarSystem UI:', error);
-});

@@ -2,12 +2,7 @@ import type { MusicPlayer } from './music';
 import { copyShareableLink, type DeepLinkViewState } from './deepLink';
 import { eventVisibilitySuffix } from './observe';
 import { bindSkyEventChip } from './skyEvents';
-import {
-    isoDateFromJulianDate,
-    isoDateUtcNow,
-    julianDateFromIsoDate,
-    julianDateUtcNow,
-} from './ephemeris';
+import { isoDateFromJulianDate, isoDateUtcNow, julianDateFromIsoDate, julianDateUtcNow } from './ephemeris';
 import type { QualityPreset } from './SolarSystem.js';
 import type { SettingsChangeField, SolarSystemRuntime } from './wasmBridge';
 import { shadowQualityForPreset, subscribeSettingsChanges } from './wasmBridge';
@@ -81,24 +76,28 @@ function readPersistedSettings(): Partial<PersistedSettings> {
         const parsed = JSON.parse(raw) as Record<string, unknown>;
         return {
             quality: isQualityPreset(parsed.quality) ? parsed.quality : undefined,
-            timeScale: typeof parsed.timeScale === 'number' && Number.isFinite(parsed.timeScale)
-                ? Math.min(MAX_TIME_SCALE, Math.max(MIN_TIME_SCALE, parsed.timeScale))
-                : undefined,
+            timeScale:
+                typeof parsed.timeScale === 'number' && Number.isFinite(parsed.timeScale)
+                    ? Math.min(MAX_TIME_SCALE, Math.max(MIN_TIME_SCALE, parsed.timeScale))
+                    : undefined,
             paused: typeof parsed.paused === 'boolean' ? parsed.paused : undefined,
             shadows: typeof parsed.shadows === 'boolean' ? parsed.shadows : undefined,
             orbitLines: typeof parsed.orbitLines === 'boolean' ? parsed.orbitLines : undefined,
-            magneticFields: typeof parsed.magneticFields === 'boolean'
-                ? parsed.magneticFields
-                : typeof parsed.magneticFieldMode === 'boolean'
-                    ? parsed.magneticFieldMode
+            magneticFields:
+                typeof parsed.magneticFields === 'boolean'
+                    ? parsed.magneticFields
+                    : typeof parsed.magneticFieldMode === 'boolean'
+                      ? parsed.magneticFieldMode
+                      : undefined,
+            musicVolume:
+                typeof parsed.musicVolume === 'number' && Number.isFinite(parsed.musicVolume)
+                    ? Math.min(100, Math.max(0, Math.round(parsed.musicVolume)))
                     : undefined,
-            musicVolume: typeof parsed.musicVolume === 'number' && Number.isFinite(parsed.musicVolume)
-                ? Math.min(100, Math.max(0, Math.round(parsed.musicVolume)))
-                : undefined,
             musicMuted: typeof parsed.musicMuted === 'boolean' ? parsed.musicMuted : undefined,
-            simulationDate: typeof parsed.simulationDate === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(parsed.simulationDate)
-                ? parsed.simulationDate
-                : undefined,
+            simulationDate:
+                typeof parsed.simulationDate === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(parsed.simulationDate)
+                    ? parsed.simulationDate
+                    : undefined,
         };
     } catch (error) {
         console.warn('[Settings] Could not read saved settings:', error);
@@ -263,11 +262,10 @@ export function initSettingsPanel(options: SettingsPanelInitOptions): void {
     const magneticFields = deepLink.magneticFields ?? saved.magneticFields ?? false;
     const musicVolumePercent = saved.musicVolume ?? Math.round(music.getVolume() * 100);
     const musicMuted = saved.musicMuted ?? music.getMuted();
-    const simulationDate = deepLink.julianDate !== undefined
-        ? isoDateFromJulianDate(deepLink.julianDate)
-        : deepLink.simulationDate
-            ?? saved.simulationDate
-            ?? isoDateFromJulianDate(runtime.getSimulationEpoch());
+    const simulationDate =
+        deepLink.julianDate !== undefined
+            ? isoDateFromJulianDate(deepLink.julianDate)
+            : (deepLink.simulationDate ?? saved.simulationDate ?? isoDateFromJulianDate(runtime.getSimulationEpoch()));
     const orbitScale = deepLink.orbitScale;
 
     qualitySelect.value = String(quality);

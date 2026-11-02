@@ -33,9 +33,8 @@ export function parseTourJson(raw: unknown): GuidedTour | null {
     const record = raw as Record<string, unknown>;
     const id = typeof record.id === 'string' ? record.id : '';
     const title = typeof record.title === 'string' ? record.title : id;
-    const durationSec = typeof record.durationSec === 'number' && Number.isFinite(record.durationSec)
-        ? record.durationSec
-        : 0;
+    const durationSec =
+        typeof record.durationSec === 'number' && Number.isFinite(record.durationSec) ? record.durationSec : 0;
     if (!id || !Array.isArray(record.steps) || record.steps.length === 0) {
         return null;
     }
@@ -50,9 +49,7 @@ export function parseTourJson(raw: unknown): GuidedTour | null {
         if (!Number.isFinite(atSec) || !label) {
             continue;
         }
-        const view = (typeof step.view === 'object' && step.view !== null)
-            ? step.view as TourStepView
-            : {};
+        const view = typeof step.view === 'object' && step.view !== null ? (step.view as TourStepView) : {};
         steps.push({
             atSec,
             label,

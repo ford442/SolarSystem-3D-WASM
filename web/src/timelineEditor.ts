@@ -275,7 +275,10 @@ export function initTimelineEditor(options: {
             setStatus(`Could not load ${id}: ${result.error}`);
             return false;
         }
-        use(result.timeline, SHIPPED_TIMELINES.some((shipped) => shipped.id === result.timeline.id) ? result.timeline.id : null);
+        use(
+            result.timeline,
+            SHIPPED_TIMELINES.some((shipped) => shipped.id === result.timeline.id) ? result.timeline.id : null,
+        );
         setStatus(result.timeline.description ?? result.timeline.title);
         return true;
     };
@@ -361,7 +364,8 @@ export function initTimelineEditor(options: {
         }
         const last = working.keyframes.at(-1);
         // While the timeline holds the camera, the new key goes where the scrubber is.
-        const t = player.holdsCamera() && player.time() > (last?.t ?? -1) ? player.time() : last ? last.t + KEY_SPACING : 0;
+        const t =
+            player.holdsCamera() && player.time() > (last?.t ?? -1) ? player.time() : last ? last.t + KEY_SPACING : 0;
         const key = keyFromCurrentPose(t, focusSelect.value, unitsSelect.value as LengthUnits);
         if (!key) {
             return;
@@ -388,23 +392,28 @@ export function initTimelineEditor(options: {
         if (!file) {
             return;
         }
-        void file.text().then((text) => {
-            const result = parseTimeline(JSON.parse(text));
-            if (!result.ok) {
-                setStatus(`Not a timeline: ${result.error}`);
-                return;
-            }
-            use(result.timeline, null);
-            writeDraft(result.timeline);
-            setStatus(`Imported ${result.timeline.title}.`);
-        }).catch((error: unknown) => {
-            setStatus(`Could not read ${file.name}: ${error instanceof Error ? error.message : String(error)}`);
-        });
+        void file
+            .text()
+            .then((text) => {
+                const result = parseTimeline(JSON.parse(text));
+                if (!result.ok) {
+                    setStatus(`Not a timeline: ${result.error}`);
+                    return;
+                }
+                use(result.timeline, null);
+                writeDraft(result.timeline);
+                setStatus(`Imported ${result.timeline.title}.`);
+            })
+            .catch((error: unknown) => {
+                setStatus(`Could not read ${file.name}: ${error instanceof Error ? error.message : String(error)}`);
+            });
     });
 
     copyLinkButton.addEventListener('click', () => {
         if (!shippedId) {
-            setStatus('Only shipped timelines have a link. Export this one, host the JSON, and link ?timeline=<its URL>.');
+            setStatus(
+                'Only shipped timelines have a link. Export this one, host the JSON, and link ?timeline=<its URL>.',
+            );
             return;
         }
         const url = new URL(window.location.href);
@@ -413,15 +422,16 @@ export function initTimelineEditor(options: {
         if (player.time() > 0) {
             url.searchParams.set('tt', player.time().toFixed(1));
         }
-        void (getClipboard()?.writeText(url.toString()) ?? Promise.reject(new Error('no clipboard')))
-            .then(() => setStatus('Link copied.'), () => setStatus(url.toString()));
+        void (getClipboard()?.writeText(url.toString()) ?? Promise.reject(new Error('no clipboard'))).then(
+            () => setStatus('Link copied.'),
+            () => setStatus(url.toString()),
+        );
     });
 
     captureStart.addEventListener('click', () => {
         const fps = Number(captureFps.value);
-        const [width, height] = captureSize.value === 'canvas'
-            ? [canvas.width, canvas.height]
-            : captureSize.value.split('x').map(Number);
+        const [width, height] =
+            captureSize.value === 'canvas' ? [canvas.width, canvas.height] : captureSize.value.split('x').map(Number);
         const settings: CaptureSettings = { width, height, fps };
         tourPlayer?.stop();
         player.pause();
@@ -433,55 +443,70 @@ export function initTimelineEditor(options: {
         document.body.classList.add('capturing');
         refreshControls();
         const started = performance.now();
-        void captureVideo({
-            runtime,
-            canvas,
-            durationSec: working.durationSec,
-            renderAt: (t) => {
-                const frame = player.renderAt(t);
-                scrub.value = String(t);
-                showTime(t);
-                return frame !== null;
+        void captureVideo(
+            {
+                runtime,
+                canvas,
+                durationSec: working.durationSec,
+                renderAt: (t) => {
+                    const frame = player.renderAt(t);
+                    scrub.value = String(t);
+                    showTime(t);
+                    return frame !== null;
+                },
+                playRealtime: (abort) =>
+                    new Promise<void>((resolve) => {
+                        const done = (state: TimelinePlayerState): void => {
+                            if (state === 'ended' || state === 'idle') {
+                                stateListeners.delete(done);
+                                resolve();
+                            }
+                        };
+                        stateListeners.add(done);
+                        abort?.addEventListener('abort', () => player.stop(), { once: true });
+                        player.play(0);
+                    }),
             },
-            playRealtime: (abort) => new Promise<void>((resolve) => {
-                const done = (state: TimelinePlayerState): void => {
-                    if (state === 'ended' || state === 'idle') {
-                        stateListeners.delete(done);
-                        resolve();
-                    }
-                };
-                stateListeners.add(done);
-                abort?.addEventListener('abort', () => player.stop(), { once: true });
-                player.play(0);
-            }),
-        }, settings, {
-            signal,
-            onProgress: (done, total, phase) => {
-                captureProgress.value = total > 0 ? done / total : 0;
-                setStatus(`Recording: ${phase}, frame ${done} of ${total}`);
+            settings,
+            {
+                signal,
+                onProgress: (done, total, phase) => {
+                    captureProgress.value = total > 0 ? done / total : 0;
+                    setStatus(`Recording: ${phase}, frame ${done} of ${total}`);
+                },
             },
-        }).then((result) => {
-            const seconds = ((performance.now() - started) / 1000).toFixed(0);
-            downloadBlob(result.blob, `${working.id}.${result.extension}`);
-            const size = result.blob.size >= 1e6
-                ? `${(result.blob.size / 1e6).toFixed(1)} MB`
-                : `${Math.ceil(result.blob.size / 1e3)} kB`;
-            setStatus(result.method === 'webcodecs'
-                ? `Saved ${working.id}.mp4: ${result.frames} frames, ${result.codec}, ${size}, in ${seconds} s.`
-                : `Saved ${working.id}.${result.extension} (recorded in real time at the window's size; ${size}).`);
-        }).catch((error: unknown) => {
-            const cancelled = error instanceof DOMException && error.name === 'AbortError';
-            setStatus(cancelled ? 'Recording cancelled.' : `Recording failed: ${error instanceof Error ? error.message : String(error)}`);
-            if (!cancelled) {
-                console.error('[Capture]', error);
-            }
-        }).finally(() => {
-            capturing = null;
-            captureCancel.hidden = true;
-            captureProgress.hidden = true;
-            document.body.classList.remove('capturing');
-            refreshControls();
-        });
+        )
+            .then((result) => {
+                const seconds = ((performance.now() - started) / 1000).toFixed(0);
+                downloadBlob(result.blob, `${working.id}.${result.extension}`);
+                const size =
+                    result.blob.size >= 1e6
+                        ? `${(result.blob.size / 1e6).toFixed(1)} MB`
+                        : `${Math.ceil(result.blob.size / 1e3)} kB`;
+                setStatus(
+                    result.method === 'webcodecs'
+                        ? `Saved ${working.id}.mp4: ${result.frames} frames, ${result.codec}, ${size}, in ${seconds} s.`
+                        : `Saved ${working.id}.${result.extension} (recorded in real time at the window's size; ${size}).`,
+                );
+            })
+            .catch((error: unknown) => {
+                const cancelled = error instanceof DOMException && error.name === 'AbortError';
+                setStatus(
+                    cancelled
+                        ? 'Recording cancelled.'
+                        : `Recording failed: ${error instanceof Error ? error.message : String(error)}`,
+                );
+                if (!cancelled) {
+                    console.error('[Capture]', error);
+                }
+            })
+            .finally(() => {
+                capturing = null;
+                captureCancel.hidden = true;
+                captureProgress.hidden = true;
+                document.body.classList.remove('capturing');
+                refreshControls();
+            });
     });
 
     captureCancel.addEventListener('click', () => {

@@ -57,8 +57,9 @@ function clamp01(value: number): number {
 }
 
 function isTypingTarget(target: EventTarget | null): boolean {
-    return target instanceof HTMLElement
-        && (target.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(target.tagName));
+    return (
+        target instanceof HTMLElement && (target.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(target.tagName))
+    );
 }
 
 export function createMusicPlayer(options: MusicPlayerOptions): MusicPlayer {
@@ -121,19 +122,22 @@ export function createMusicPlayer(options: MusicPlayerOptions): MusicPlayer {
             element.addEventListener('error', () => skip(path, element.error?.message || 'load failed'));
             audio = element;
             applyVolume();
-            element.play().then(() => {
-                console.log(`[Audio] Now playing: ${path.replace(/^resource\/sounds\//, '')}`);
-            }).catch((error: unknown) => {
-                if (audio !== element) return;
-                if (error instanceof DOMException && error.name === 'NotAllowedError') {
-                    // Autoplay policy: retry on the first gesture, same track.
-                    index = (index + playlist.length - 1) % playlist.length;
-                    audio = null;
-                    awaitGesture();
-                } else if (!(error instanceof DOMException && error.name === 'AbortError')) {
-                    skip(path, String(error));
-                }
-            });
+            element
+                .play()
+                .then(() => {
+                    console.log(`[Audio] Now playing: ${path.replace(/^resource\/sounds\//, '')}`);
+                })
+                .catch((error: unknown) => {
+                    if (audio !== element) return;
+                    if (error instanceof DOMException && error.name === 'NotAllowedError') {
+                        // Autoplay policy: retry on the first gesture, same track.
+                        index = (index + playlist.length - 1) % playlist.length;
+                        audio = null;
+                        awaitGesture();
+                    } else if (!(error instanceof DOMException && error.name === 'AbortError')) {
+                        skip(path, String(error));
+                    }
+                });
             return;
         }
         console.warn('[Audio] No playable tracks; music disabled');

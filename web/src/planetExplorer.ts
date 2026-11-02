@@ -24,12 +24,15 @@ export interface PlanetFactsFile {
     version: number;
     sceneNote?: string;
     bodies: PlanetFactBody[];
-    scaleModes: Record<string, {
-        label: string;
-        labelRu?: string;
-        description: string;
-        descriptionRu?: string;
-    }>;
+    scaleModes: Record<
+        string,
+        {
+            label: string;
+            labelRu?: string;
+            description: string;
+            descriptionRu?: string;
+        }
+    >;
 }
 
 export interface PlanetExplorerBindings {
@@ -109,18 +112,17 @@ function detectLocale(): ExplorerLocale {
 }
 
 function formatDiameter(km: number, locale: ExplorerLocale): string {
-    const formatted = km >= 10000
-        ? km.toLocaleString(locale === 'ru' ? 'ru-RU' : 'en-US')
-        : km.toLocaleString(locale === 'ru' ? 'ru-RU' : 'en-US', { maximumFractionDigits: 0 });
+    const formatted =
+        km >= 10000
+            ? km.toLocaleString(locale === 'ru' ? 'ru-RU' : 'en-US')
+            : km.toLocaleString(locale === 'ru' ? 'ru-RU' : 'en-US', { maximumFractionDigits: 0 });
     return `${formatted} km`;
 }
 
 function formatOrbitalPeriod(days: number | null, locale: ExplorerLocale): string {
     if (days === null) return '—';
     if (days < 400) {
-        return locale === 'ru'
-            ? `${days.toLocaleString('ru-RU')} сут.`
-            : `${days.toLocaleString()} days`;
+        return locale === 'ru' ? `${days.toLocaleString('ru-RU')} сут.` : `${days.toLocaleString()} days`;
     }
     const years = days / 365.25;
     if (years < 10) {
@@ -140,9 +142,7 @@ function formatDayLength(days: number | undefined, locale: ExplorerLocale): stri
     if (hours < 48) {
         return `${hours.toFixed(1)} h${suffix}`;
     }
-    return locale === 'ru'
-        ? `${absDays.toFixed(2)} сут.${suffix}`
-        : `${absDays.toFixed(2)} days${suffix}`;
+    return locale === 'ru' ? `${absDays.toFixed(2)} сут.${suffix}` : `${absDays.toFixed(2)} days${suffix}`;
 }
 
 function formatSceneDistance(units: number, locale: ExplorerLocale): string {
@@ -212,12 +212,15 @@ export class PlanetExplorer {
         this.bindings = bindings;
         this.skipPlanetRestore = options?.skipPlanetRestore ?? false;
         this.initialOrbitScale = options?.initialOrbitScale;
-        const factsUrl = new URL('planet_facts.json', new URL(import.meta.env.BASE_URL, window.location.href)).toString();
+        const factsUrl = new URL(
+            'planet_facts.json',
+            new URL(import.meta.env.BASE_URL, window.location.href),
+        ).toString();
         const response = await fetch(factsUrl);
         if (!response.ok) {
             throw new Error(`Failed to load planet facts (${response.status})`);
         }
-        this.facts = await response.json() as PlanetFactsFile;
+        this.facts = (await response.json()) as PlanetFactsFile;
         this.elements.cardDismiss.setAttribute('aria-label', LABELS[this.locale].dismissCard);
         this.renderBodyList();
         if (!this.skipPlanetRestore) {
@@ -314,9 +317,8 @@ export class PlanetExplorer {
         const mode = Number(this.elements.scaleSelect.value);
         const key = mode === 1 ? 'realistic' : 'compressed';
         const entry = this.facts?.scaleModes[key];
-        const description = this.locale === 'ru'
-            ? entry?.descriptionRu ?? entry?.description ?? ''
-            : entry?.description ?? '';
+        const description =
+            this.locale === 'ru' ? (entry?.descriptionRu ?? entry?.description ?? '') : (entry?.description ?? '');
         this.elements.scaleHelp.textContent = description;
     }
 
@@ -432,11 +434,14 @@ export class PlanetExplorer {
 
     private persistState(): void {
         try {
-            window.localStorage.setItem(EXPLORER_STORAGE_KEY, JSON.stringify({
-                collapsed: this.elements.panel.classList.contains('is-collapsed'),
-                selectedIndex: this.selectedIndex,
-                scaleMode: Number(this.elements.scaleSelect.value),
-            }));
+            window.localStorage.setItem(
+                EXPLORER_STORAGE_KEY,
+                JSON.stringify({
+                    collapsed: this.elements.panel.classList.contains('is-collapsed'),
+                    selectedIndex: this.selectedIndex,
+                    scaleMode: Number(this.elements.scaleSelect.value),
+                }),
+            );
         } catch {
             // ignore storage failures
         }
