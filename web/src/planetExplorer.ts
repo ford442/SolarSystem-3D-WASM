@@ -1,4 +1,5 @@
-import type { OrbitScaleMode, PlanetIndex } from './SolarSystem.js';
+import type { OrbitScaleMode } from './SolarSystem.js';
+import type { PlanetIndex } from './generated/planetIds.js';
 import { bindConjunctionChip, type NextConjunction } from './conjunction.js';
 import { registerWasmCallbacks } from './wasmCallbacks.js';
 

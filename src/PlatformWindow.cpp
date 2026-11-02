@@ -23,7 +23,6 @@
 #include <emscripten/html5.h>
 #endif
 
-using namespace std;
 
 namespace {
 /**
@@ -118,7 +117,7 @@ void Application::InitSystems() {
     glfwSetErrorCallback(glfwErrorCallback);
 
     if (!glfwInit()) {
-        throw runtime_error("Failed to initialize GLFW");
+        throw std::runtime_error("Failed to initialize GLFW");
     }
 
 #ifdef __EMSCRIPTEN__
@@ -186,7 +185,7 @@ void Application::InitSystems() {
 
     if (_mainWindow == nullptr) {
         glfwTerminate();
-        throw runtime_error("Failed to create GLFW window");
+        throw std::runtime_error("Failed to create GLFW window");
     }
 
 #ifdef __EMSCRIPTEN__
@@ -275,7 +274,7 @@ void Application::InitSystems() {
     SDL_SetHint(SDL_HINT_NO_SIGNAL_HANDLERS, "1");
     if (SDL_Init(SDL_INIT_EVERYTHING)) {
         Dispose();
-        throw runtime_error("Failed to init SDL");
+        throw std::runtime_error("Failed to init SDL");
     }
 #endif
 
@@ -292,7 +291,7 @@ void Application::InitSystems() {
     _soundEngine = irrklang::createIrrKlangDevice(irrklang::ESOD_AUTO_DETECT,
                                                   irrklang::ESEO_MULTI_THREADED | irrklang::ESEO_LOAD_PLUGINS);
     if (!_soundEngine) {
-        throw runtime_error("Failed to init sound engine");
+        throw std::runtime_error("Failed to init sound engine");
     }
     _soundEngine->setSoundVolume(0.3);
 #endif
@@ -302,7 +301,7 @@ void Application::InitSystems() {
         Dispose();
         std::string msg = "Failed to init SDL_Image: ";
         msg += IMG_GetError();
-        throw runtime_error(msg);
+        throw std::runtime_error(msg);
     }
 #endif
 

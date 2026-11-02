@@ -13,11 +13,11 @@ import { createCachedCwrapExports } from './wasmBridge.exports.js';
 import { clearWasmCallback, emitWasmCallback, registerWasmCallbacks } from './wasmCallbacks.js';
 
 /**
- * Planet index conventions (FocusPlanet / GetFocusedPlanetIndex):
- * - 0 = Sun, 1 = Mercury … 9 = Pluto, 10 = Ceres, 11 = Vesta, 12 = Eris, 13 = Haumea,
- *   14 = Makemake, 15 = 1P/Halley (matches deepLink PLANET_IDS).
- * GetNearestPlanetIndex returns 1–15 for the nearest loaded planet, or -1 when unknown
- * (C++ adds +1 offset via GetNearestPlanetIndexForJs).
+ * Planet index conventions (FocusPlanet / GetFocusedPlanetIndex): the focus index of every
+ * body is generated into ./generated/planetIds.ts (PLANET_IDS) from planets.catalog.json and
+ * matches OrbitLayout::Body — Sun=0 … Vesta=11 are frozen, then Eris … 1P/Halley.
+ * GetNearestPlanetIndex returns 1–MAX_PLANET_INDEX for the nearest loaded planet, or -1 when
+ * unknown (C++ adds +1 offset via GetNearestPlanetIndexForJs).
  */
 export type { PlanetIndex, QualityPreset, SettingsChangeField, ShadowQuality, OrbitScaleMode };
 export type { NextConjunction };

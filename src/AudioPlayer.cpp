@@ -11,7 +11,6 @@
 #include <string>
 #include <thread>
 
-using namespace std;
 
 #ifndef __EMSCRIPTEN__
 void Application::SetMusicVolume(float volume) {
@@ -73,9 +72,9 @@ void Application::StartPlayBackgroundMusic() {
         return outMin + (outMax - outMin) * (value - inMin) / (inMax - inMin);
     };
 
-    _backgroundMusicThread = make_unique<thread>([=]() {
+    _backgroundMusicThread = std::make_unique<std::thread>([=]() {
         for (size_t i = 0; i < _backgroundSongPaths.size() && _isBackgroundMusicPlay; i++) {
-            this_thread::sleep_for(1s);
+            std::this_thread::sleep_for(std::chrono::seconds(1));
 
             auto song = _soundEngine->play2D(_backgroundSongPaths[i].c_str(), false, true, true);
             song->setVolume(0);
@@ -86,15 +85,15 @@ void Application::StartPlayBackgroundMusic() {
                 if (song->getPlayPosition() < 5000) {
                     auto x = mapRange(song->getPlayPosition(), 0.0f, 5000.0f, 0.0f, 0.7f);
                     auto volume = exp(x) - 1;
-                    song->setVolume(clamp(volume, 0.0f, 1.0f));
+                    song->setVolume(std::clamp(volume, 0.0f, 1.0f));
                 }
                 else if (song->getPlayPosition() > song->getPlayLength() - 5000) {
                     auto x = mapRange(song->getPlayPosition(), song->getPlayLength() - 5000, song->getPlayLength(), 0.0f, 6.0f);
                     auto volume = exp(-x);
-                    song->setVolume(clamp(volume, 0.0f, 1.0f));
+                    song->setVolume(std::clamp(volume, 0.0f, 1.0f));
                 }
 
-                this_thread::sleep_for(25ms);
+                std::this_thread::sleep_for(std::chrono::milliseconds(25));
             }
 
             if (i == _backgroundSongPaths.size() - 1)

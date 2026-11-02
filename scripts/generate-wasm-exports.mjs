@@ -4,15 +4,17 @@
  * fragments for SolarSystem.d.ts (SolarSystemCwrap overloads + SolarSystemModule
  * `_Export` members) and wasmBridge.exports.ts.
  *
- * Raw module / cwrap types stay unbranded (`number`). QualityPreset / PlanetIndex
- * brands live on the wasmBridge façade only.
+ * Arity, parameter names and argument/return kinds come from the C declaration, so a new
+ * export needs no parallel TypeScript edit: `bool`/`int`/`float`/`double` and other pointers
+ * are `number`, a `char*` is a `string` through cwrap. Raw module / cwrap types stay
+ * unbranded; QualityPreset / PlanetIndex brands live on the wasmBridge façade only.
  *
  * Usage: node scripts/generate-wasm-exports.mjs [--check]
  *   --check  Exit 1 if generated output would differ from committed files.
  */
 import { readFileSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
-import { fileURLToPath } from 'node:url';
+import { fileURLToPath, pathToFileURL } from 'node:url';
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '..');
 const wasmExportsCpp = join(root, 'src/WasmExports.cpp');
@@ -26,42 +28,76 @@ const CWRAP_END = '// END GENERATED CWARP OVERLOADS';
 const MODULE_BEGIN = '// BEGIN GENERATED MODULE EXPORTS';
 const MODULE_END = '// END GENERATED MODULE EXPORTS';
 
-const EXPORT_RE = /EMSCRIPTEN_KEEPALIVE\s+([\w\s*]+?)\s+(\w+)\s*\(([^)]*)\)/g;
+// `EMSCRIPTEN_KEEPALIVE <return type> <name>(<params>) {` — the body brace keeps a prototype or a
+// mention in a comment from counting as an export. Lazy return-type match, so `const char* Foo()`
+// and `float *Foo()` both split correctly.
+const EXPORT_RE = /EMSCRIPTEN_KEEPALIVE\s+([\w\s*]+?)\s*\b(\w+)\s*\(([^)]*)\)\s*\{/g;
 
-/** Map C types to cwrap arg/return types. */
-function mapCType(cType) {
-    const t = cType.replace(/\s+/g, ' ').trim();
-    if (t === 'void') return { tsReturn: 'void', cwrapReturn: 'null' };
-    if (t === 'int' || t === 'float' || t === 'double' || t === 'bool') {
-        return { tsReturn: 'number', cwrapReturn: 'number' };
-    }
-    // A returned C string is handed to JS through cwrap's 'string' marshalling, which copies
-    // it out with UTF8ToString. The raw Module._Export member is still a pointer (number) —
-    // only the cwrap façade sees a string.
-    if (t === 'const char*' || t === 'char*') {
-        return { tsReturn: 'string', cwrapReturn: 'string', moduleReturn: 'number' };
-    }
-    if (t.endsWith('*')) return { tsReturn: 'number', cwrapReturn: 'number' };
-    return { tsReturn: 'number', cwrapReturn: 'number' };
+/** C scalar types that cross the wasm boundary as a JS number (wasm32: `long` and `size_t` are 32-bit). */
+const NUMBER_TYPES = new Set([
+    'bool', 'char', 'signed char', 'unsigned char', 'short', 'unsigned short', 'int', 'unsigned',
+    'unsigned int', 'long', 'unsigned long', 'float', 'double', 'size_t',
+    'int8_t', 'uint8_t', 'int16_t', 'uint16_t', 'int32_t', 'uint32_t',
+]);
+
+const TS_RESERVED = new Set([
+    'await', 'break', 'case', 'catch', 'class', 'const', 'continue', 'debugger', 'default', 'delete', 'do',
+    'else', 'enum', 'export', 'extends', 'false', 'finally', 'for', 'function', 'if', 'implements', 'import',
+    'in', 'instanceof', 'interface', 'let', 'new', 'null', 'package', 'private', 'protected', 'public',
+    'return', 'static', 'super', 'switch', 'this', 'throw', 'true', 'try', 'typeof', 'var', 'void', 'while',
+    'with', 'yield',
+]);
+
+/** `const char *` → `char*`: drop qualifiers and glue the stars to the type. */
+function normalizeCType(cType) {
+    return cType
+        .replace(/\b(const|volatile|struct|enum)\b/g, ' ')
+        .replace(/\s*\*\s*/g, '*')
+        .replace(/\s+/g, ' ')
+        .trim();
 }
 
-function parseParams(paramStr) {
-    if (!paramStr.trim()) return [];
-    return paramStr.split(',').map((p) => {
-        const parts = p.trim().split(/\s+/);
-        const cType = parts.slice(0, -1).join(' ') || parts[0];
-        return mapCType(cType);
+/**
+ * Classify a C type for cwrap. `kind` is what cwrap marshals: 'number', or 'string' for a
+ * `char*` (cwrap copies a JS string in / a returned C string out with UTF8 helpers). Any other
+ * pointer is a heap address, so a number. 64-bit integers and by-value structs cannot cross
+ * the boundary as numbers, so they fail the generator instead of silently becoming `number`.
+ */
+function classifyCType(cType, where) {
+    const t = normalizeCType(cType);
+    if (t === 'void') return { cType: t, kind: 'void' };
+    if (t === 'char*') return { cType: t, kind: 'string' };
+    if (t.endsWith('*')) return { cType: t, kind: 'number' };
+    if (NUMBER_TYPES.has(t)) return { cType: t, kind: 'number' };
+    throw new Error(`${where}: C type '${cType.trim()}' has no cwrap mapping (add it to NUMBER_TYPES if it is a 32-bit scalar)`);
+}
+
+function parseParams(paramStr, exportName) {
+    const trimmed = paramStr.trim();
+    if (!trimmed || trimmed === 'void') return [];
+    const used = new Set();
+    return trimmed.split(',').map((raw, i) => {
+        const p = raw.replace(/=.*$/s, '').trim();
+        // The parameter name is the trailing identifier, unless the whole thing is just a type.
+        const m = /^(.*?[\s*&])([A-Za-z_]\w*)$/s.exec(p);
+        const rawName = m && !NUMBER_TYPES.has(p) ? m[2] : '';
+        const cType = m && rawName ? m[1] : p;
+        let name = rawName;
+        if (!name || TS_RESERVED.has(name) || used.has(name)) name = `arg${i}`;
+        used.add(name);
+        return { name, ...classifyCType(cType, `${exportName} parameter ${i + 1}`) };
     });
 }
 
 function parseExports(source) {
     const exports = [];
-    let match;
-    while ((match = EXPORT_RE.exec(source)) !== null) {
+    const seen = new Set();
+    for (const match of source.matchAll(EXPORT_RE)) {
         const [, returnType, name, params] = match;
-        const ret = mapCType(returnType);
-        const args = parseParams(params);
-        exports.push({ name, ret, args });
+        if (seen.has(name)) throw new Error(`${name} is exported twice`);
+        seen.add(name);
+        const ret = classifyCType(returnType, `${name} return type`);
+        exports.push({ name, ret, args: parseParams(params, name) });
     }
     return exports;
 }
@@ -70,41 +106,47 @@ function toCamelCase(exportName) {
     return exportName[0].toLowerCase() + exportName.slice(1);
 }
 
-function generateCwrapOverload({ name, ret, args }) {
-    const argTypes = args.map(() => "'number'").join(', ');
-    const argTypesTuple = argTypes ? `[${argTypes}]` : '[]';
+/** The cwrap argTypes / returnType literal for one side of the boundary. */
+function cwrapKind(kind) {
+    return kind === 'void' ? 'null' : `'${kind}'`;
+}
+
+/** TS type on the cwrap façade: a `char*` is a JS string there. */
+function tsKind(kind) {
+    return kind === 'string' ? 'string' : kind === 'void' ? 'void' : 'number';
+}
+
+/** TS type on the raw `Module._Export`: a `char*` is a heap pointer there. */
+function rawTsKind(kind) {
+    return kind === 'void' ? 'void' : 'number';
+}
+
+function tsParams({ args }, kindOf) {
+    return args.map((a) => `${a.name}: ${kindOf(a.kind)}`).join(', ');
+}
+
+function generateCwrapOverload(exp) {
+    const { name, ret, args } = exp;
+    const argTypes = `[${args.map((a) => cwrapKind(a.kind)).join(', ')}]`;
     return `  (
     ident: '${name}',
-    returnType: ${ret.cwrapReturn === 'null' ? 'null' : `'${ret.cwrapReturn}'`},
-    argTypes: ${argTypesTuple},
-  ): (...args: number[]) => ${ret.tsReturn};`;
+    returnType: ${cwrapKind(ret.kind)},
+    argTypes: ${argTypes},
+  ): (${tsParams(exp, tsKind)}) => ${tsKind(ret.kind)};`;
 }
 
 function generateCachedBinding({ name, ret, args }) {
-    const key = toCamelCase(name);
-    const argTypes = args.map(() => "'number'").join(', ');
-    const returnType = ret.cwrapReturn === 'null' ? 'null' : `'${ret.cwrapReturn}'`;
-    const tsReturn = ret.tsReturn;
-    const callSig = args.length ? '(...args: number[])' : '()';
-    return `    ${key}: cwrap('${name}', ${returnType}, [${argTypes}]) as ${callSig} => ${tsReturn},`;
+    const argTypes = args.map((a) => cwrapKind(a.kind)).join(', ');
+    return `    ${toCamelCase(name)}: cwrap('${name}', ${cwrapKind(ret.kind)}, [${argTypes}]),`;
 }
 
-function generateCachedExportType({ name, ret, args }) {
-    const key = toCamelCase(name);
-    const tsReturn = ret.tsReturn;
-    if (args.length === 0) {
-        return `    ${key}: () => ${tsReturn};`;
-    }
-    return `    ${key}: (...args: number[]) => ${tsReturn};`;
+function generateCachedExportType(exp) {
+    return `    ${toCamelCase(exp.name)}: (${tsParams(exp, tsKind)}) => ${tsKind(exp.ret.kind)};`;
 }
 
-/** Raw `_Export` members on SolarSystemModule — numbers only, no façade brands. */
-function generateModuleExport({ name, ret, args }) {
-    const tsReturn = ret.moduleReturn ?? (ret.cwrapReturn === 'null' ? 'void' : 'number');
-    if (args.length === 0) {
-        return `  _${name}: () => ${tsReturn};`;
-    }
-    return `  _${name}: (...args: number[]) => ${tsReturn};`;
+/** Raw `_Export` members on SolarSystemModule — numbers (and pointers) only, no façade brands. */
+function generateModuleExport(exp) {
+    return `  _${exp.name}: (${tsParams(exp, rawTsKind)}) => ${rawTsKind(exp.ret.kind)};`;
 }
 
 function escapeRegExp(value) {
@@ -224,4 +266,8 @@ export const EXPORT_COUNT = ${exports.length};
     console.log(`Generated ${exports.length} export bindings → ${dtsPath}, ${bridgeExportsPath}, ${exportedFunctionsPath}`);
 }
 
-main();
+export { parseExports, generateCwrapOverload, generateModuleExport };
+
+if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
+    main();
+}

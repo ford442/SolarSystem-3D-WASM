@@ -37,3 +37,7 @@ _codeql_detected_source_root
 resource/textures/
 resource/sounds/
 .aider*
+
+# Playwright output
+web/test-results/
+web/playwright-report/

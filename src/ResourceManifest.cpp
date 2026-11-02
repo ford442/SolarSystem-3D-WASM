@@ -10,7 +10,6 @@
 #include <random>
 #include <vector>
 
-using namespace std;
 
 namespace {
 constexpr std::array<const char*, 6> kLowSkyBoxFaces = {
@@ -117,12 +116,12 @@ void Application::LoadCoreResources() {
 void Application::InitSongList() {
     _backgroundSongPaths = GetBackgroundSongPaths();
 
-    default_random_engine randEngine(static_cast<uint32_t>(chrono::high_resolution_clock::now().time_since_epoch().count()));
-    shuffle(_backgroundSongPaths.begin(), _backgroundSongPaths.end(), randEngine);
+    std::default_random_engine randEngine(static_cast<uint32_t>(std::chrono::high_resolution_clock::now().time_since_epoch().count()));
+    std::shuffle(_backgroundSongPaths.begin(), _backgroundSongPaths.end(), randEngine);
 
 #if defined(SOLARSYSTEM_USE_SDL_MIXER) && !defined(__EMSCRIPTEN__)
     for (const auto& path : _backgroundSongPaths) {
-        ifstream songFile(path);
+        std::ifstream songFile(path);
         if (songFile.good()) {
             _availableSongPaths.insert(path);
         }

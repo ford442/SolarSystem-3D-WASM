@@ -1,4 +1,5 @@
-import type { OrbitScaleMode, PlanetIndex, QualityPreset } from './SolarSystem.js';
+import type { OrbitScaleMode, QualityPreset } from './SolarSystem.js';
+import { MAX_PLANET_INDEX, PLANET_ID_BY_INDEX, PLANET_IDS, type PlanetIndex } from './generated/planetIds.js';
 
 export interface DeepLinkViewState {
     quality?: QualityPreset;
@@ -75,33 +76,6 @@ export interface DeepLinkRuntimeReaders {
     isoDateFromJulianDate?: (jd: number) => string;
 }
 
-const PLANET_IDS: Record<string, PlanetIndex> = {
-    sun: 0,
-    mercury: 1,
-    venus: 2,
-    earth: 3,
-    mars: 4,
-    jupiter: 5,
-    saturn: 6,
-    uranus: 7,
-    neptune: 8,
-    pluto: 9,
-    ceres: 10,
-    vesta: 11,
-    eris: 12,
-    haumea: 13,
-    makemake: 14,
-    // 1P/Halley at its last perihelion: ?planet=halley&date=1986-02-09
-    halley: 15,
-};
-
-/** Highest focus index (OrbitLayout::kBodyCount - 1). */
-const MAX_PLANET_INDEX = 15;
-
-const PLANET_ID_BY_INDEX = Object.fromEntries(
-    Object.entries(PLANET_IDS).map(([id, index]) => [index, id]),
-) as Record<PlanetIndex, string>;
-
 function parseFiniteNumber(value: string | null): number | undefined {
     if (!value) return undefined;
     const parsed = Number(value);
@@ -134,8 +108,9 @@ function parseQuality(value: string | null): QualityPreset | undefined {
 function parsePlanetIndex(value: string | null): PlanetIndex | undefined {
     if (!value) return undefined;
     const normalized = value.toLowerCase();
-    if (normalized in PLANET_IDS) {
-        return PLANET_IDS[normalized];
+    // Own keys only: `'constructor' in PLANET_IDS` is true for a plain object.
+    if (Object.hasOwn(PLANET_IDS, normalized)) {
+        return PLANET_IDS[normalized as keyof typeof PLANET_IDS];
     }
     const asNumber = Number(value);
     if (Number.isInteger(asNumber) && asNumber >= 0 && asNumber <= MAX_PLANET_INDEX) {

@@ -166,8 +166,7 @@
 #include <iostream>
 #include <algorithm>
 
-using namespace std;
-using namespace nv_dds;
+namespace nv_dds {
 
 #define GL_BGR_EXT                                        0x80E0
 #define GL_COMPRESSED_RGB_S3TC_DXT1_EXT                   0x83F0
@@ -242,7 +241,7 @@ struct DDS_HEADER {
     uint32_t dwReserved2[3];
 };
 
-string fourcc(uint32_t enc) {
+std::string fourcc(uint32_t enc) {
     char c[5] = { '\0' };
     c[0] = enc >> 0 & 0xFF;
     c[1] = enc >> 8 & 0xFF;
@@ -491,12 +490,12 @@ void CDDSImage::create_textureCubemap(unsigned int format, unsigned int componen
 //
 // filename - fully qualified name of DDS image
 // flipImage - specifies whether image is flipped on load, default is true
-void CDDSImage::load(const string& filename, bool flipImage) {
+void CDDSImage::load(const std::string& filename, bool flipImage) {
     assert(!filename.empty());
 
-    ifstream fs(filename.c_str(), ios::binary);
+    std::ifstream fs(filename.c_str(), std::ios::binary);
     if (!fs.is_open()) {
-        throw runtime_error("Could not open file: " + filename);
+        throw std::runtime_error("Could not open file: " + filename);
     }
     load(fs, flipImage);
 }
@@ -506,7 +505,7 @@ void CDDSImage::load(const string& filename, bool flipImage) {
 //
 // is - istream to read the image from
 // flipImage - specifies whether image is flipped on load, default is true
-void CDDSImage::load(istream& is, bool flipImage) {
+void CDDSImage::load(std::istream& is, bool flipImage) {
     // clear any previously loaded images
     clear();
 
@@ -516,7 +515,7 @@ void CDDSImage::load(istream& is, bool flipImage) {
     char filecode[4];
     is.read(filecode, 4);
     if (strncmp(filecode, "DDS ", 4) != 0) {
-        throw runtime_error("not a DDS file");
+        throw std::runtime_error("not a DDS file");
     }
 
     // read in DDS header
@@ -550,7 +549,7 @@ void CDDSImage::load(istream& is, bool flipImage) {
             m_components = 4;
             break;
         default:
-            throw runtime_error("unknown texture compression '"+fourcc(ddsh.ddspf.dwFourCC)+"'");
+            throw std::runtime_error("unknown texture compression '"+fourcc(ddsh.ddspf.dwFourCC)+"'");
         }
     } else if (ddsh.ddspf.dwRGBBitCount == 32 &&
                ddsh.ddspf.dwRBitMask == 0x00FF0000 &&
@@ -597,7 +596,7 @@ void CDDSImage::load(istream& is, bool flipImage) {
         m_components = 1;
 #endif
     } else {
-        throw runtime_error("unknow texture format");
+        throw std::runtime_error("unknow texture format");
     }
 
     // store primary surface width/height/depth
@@ -700,7 +699,7 @@ void CDDSImage::load(istream& is, bool flipImage) {
     m_valid = true;
 }
 
-void CDDSImage::write_texture(const CTexture &texture, ostream& os) {
+void CDDSImage::write_texture(const CTexture &texture, std::ostream& os) {
     assert(get_num_mipmaps() == texture.get_num_mipmaps());
 
     os.write((char*)(uint8_t*)texture, texture.get_size());
@@ -781,9 +780,9 @@ void CDDSImage::save(const std::string& filename, bool flipImage) {
         ddsh.dwCaps1 |= DDSF_COMPLEX | DDSF_MIPMAP;
 
     // open file
-    ofstream of;
-    of.exceptions(ios::failbit);
-    of.open(filename.c_str(), ios::binary);
+    std::ofstream of;
+    of.exceptions(std::ios::failbit);
+    of.open(filename.c_str(), std::ios::binary);
 
     // write file header
     of.write("DDS ", 4);
@@ -1409,3 +1408,5 @@ void CSurface::clear() {
         m_pixels = NULL;
     }
 }
+
+} // namespace nv_dds

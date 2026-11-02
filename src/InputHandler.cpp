@@ -9,7 +9,6 @@
 #include <algorithm>
 #include <cmath>
 
-using namespace std;
 
 void Application::ProcessInput(GLFWwindow* window) {
     if (_isFirstMouse) {
@@ -57,7 +56,7 @@ void Application::ProcessInput(GLFWwindow* window) {
 #ifdef SOLARSYSTEM_USE_SDL_MIXER
         SetMusicVolume(GetMusicVolume() + 0.05f);
 #else
-        _soundEngine->setSoundVolume(clamp(_soundEngine->getSoundVolume() + 0.01, 0.0, 1.0));
+        _soundEngine->setSoundVolume(std::clamp(_soundEngine->getSoundVolume() + 0.01, 0.0, 1.0));
 #endif
         NotifySettingsChanged("musicVolume");
     }
@@ -65,7 +64,7 @@ void Application::ProcessInput(GLFWwindow* window) {
 #ifdef SOLARSYSTEM_USE_SDL_MIXER
         SetMusicVolume(GetMusicVolume() - 0.05f);
 #else
-        _soundEngine->setSoundVolume(clamp(_soundEngine->getSoundVolume() - 0.01, 0.0, 1.0));
+        _soundEngine->setSoundVolume(std::clamp(_soundEngine->getSoundVolume() - 0.01, 0.0, 1.0));
 #endif
         NotifySettingsChanged("musicVolume");
     }
