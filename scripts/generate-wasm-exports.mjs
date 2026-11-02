@@ -169,21 +169,28 @@ function replaceMarkedSection(source, beginComment, endComment, inner) {
  * not regenerated — nothing stops a new export from landing in exports.ts without anyone
  * wiring it into the façade real code ever calls. Fail --check if that happens.
  */
-function findUnwrappedExports(exports) {
-    let bridgeSource;
-    try {
-        bridgeSource = readFileSync(bridgePath, 'utf8');
-    } catch {
+function findUnwrappedExports(exports, bridgeSource = readBridgeSource()) {
+    if (bridgeSource === null) {
         return exports.map(({ name }) => name);
     }
     return exports
         .filter(({ name }) => {
             // Word-boundary match: a plain .includes() would count `exports.getCameraPosition`
             // as "wrapped" merely because `exports.getCameraPositionX` appears in the file.
-            const re = new RegExp(`exports\\.${escapeRegExp(toCamelCase(name))}\\b`);
+            // `\s*` around the dot: Prettier wraps `exports.getX().split(..)` chains as
+            // `exports⏎  .getX()⏎  .split(..)`, which is still a call site.
+            const re = new RegExp(`exports\\s*\\.\\s*${escapeRegExp(toCamelCase(name))}\\b`);
             return !re.test(bridgeSource);
         })
         .map(({ name }) => name);
+}
+
+function readBridgeSource() {
+    try {
+        return readFileSync(bridgePath, 'utf8');
+    } catch {
+        return null;
+    }
 }
 
 function main() {
@@ -266,7 +273,7 @@ export const EXPORT_COUNT = ${exports.length};
     console.log(`Generated ${exports.length} export bindings → ${dtsPath}, ${bridgeExportsPath}, ${exportedFunctionsPath}`);
 }
 
-export { parseExports, generateCwrapOverload, generateModuleExport };
+export { parseExports, generateCwrapOverload, generateModuleExport, findUnwrappedExports };
 
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
     main();
