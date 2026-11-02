@@ -16,3 +16,4 @@ Completed implementation notes, PR summaries, and superseded diagrams. **Do not 
 | `PROGRESS_BAR_*.md` | Implemented |
 | `VERIFICATION_CHECKLIST.md` | Historical checklist |
 | `IMPLEMENTATION_SUMMARY.md`, `PR_*.md` | Historical PR notes |
+| `LOD-behavior.md`, `lod-*.png` | Pointer stub and two LOD screenshots (moved from the root `doc/`) |

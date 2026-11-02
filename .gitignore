@@ -13,6 +13,10 @@ build-web/
 build-test*/
 build-check/
 
+# Local scratch: headless capture output, deploy virtualenvs
+headless_chrome/
+.venv*/
+
 # Emscripten output
 *.wasm
 *.js.mem
