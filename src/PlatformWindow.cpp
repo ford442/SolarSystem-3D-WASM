@@ -21,8 +21,8 @@
 #ifdef __EMSCRIPTEN__
 #include <emscripten.h>
 #include <emscripten/html5.h>
+#include <stdexcept>
 #endif
-
 
 namespace {
 /**

@@ -21,7 +21,7 @@
 #include <cstdio>
 #include <cstdlib>
 #include <sstream>
-
+#include <memory>
 
 Application::Application() : _frameTimer(240) {
     SetActiveApplication(this);
@@ -516,11 +516,10 @@ void Application::InitSceneObjects() {
     LoadMissions();
     {
         const auto asteroidQuality = GetQualitySettings(_simState.qualityPreset, _simState.isMobileWeb);
-        _asteroidField = std::make_unique<AsteroidField>(AsteroidField::kDefaultSeed,
-                                                    asteroidQuality.asteroidInstanceCount);
-        _kuiperField = std::make_unique<AsteroidField>(AsteroidField::kKuiperSeed,
-                                                  asteroidQuality.kuiperInstanceCount,
-                                                  AsteroidField::Population::Kuiper);
+        _asteroidField =
+            std::make_unique<AsteroidField>(AsteroidField::kDefaultSeed, asteroidQuality.asteroidInstanceCount);
+        _kuiperField = std::make_unique<AsteroidField>(AsteroidField::kKuiperSeed, asteroidQuality.kuiperInstanceCount,
+                                                       AsteroidField::Population::Kuiper);
     }
 
     InitSongList();
@@ -901,11 +900,11 @@ void Application::UpdateSearchNearestPlanet() {
     if (!_isSearchNearestPlanet) {
         return;
     }
-    auto nearestPlanetIt = std::min_element(_renderableSceneComponents.begin(), _renderableSceneComponents.end(),
-                       [this](const RenderableSceneComponent& left, const RenderableSceneComponent& right)
-    {
-        return CalculateSpaceObjectDistance(left.planet.get()) < CalculateSpaceObjectDistance(right.planet.get());
-    });
+    auto nearestPlanetIt = std::min_element(
+        _renderableSceneComponents.begin(), _renderableSceneComponents.end(),
+        [this](const RenderableSceneComponent& left, const RenderableSceneComponent& right) {
+            return CalculateSpaceObjectDistance(left.planet.get()) < CalculateSpaceObjectDistance(right.planet.get());
+        });
 
     const int previous = _nearestPlanetIndex;
     if (nearestPlanetIt != _renderableSceneComponents.end()) {

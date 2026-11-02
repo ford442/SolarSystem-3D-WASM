@@ -7,8 +7,15 @@
 #include "Solar_System/AtmosphereModel.h"
 #include "gfx/FloatLutTexture.h"
 #include "core/Log.h"
+#include "Solar_System/CatalogBody.h"
+#include "Solar_System/Planet.h"
+#include "Solar_System/Satellite.h"
+#include "Solar_System/Saturn_System/SaturnRing.h"
+#include "Solar_System/Uranus_System/UranusRing.h"
+#include "Solar_System/Sun/Sun.h"
 #include <unordered_set>
-
+#include <memory>
+#include <utility>
 
 namespace {
 

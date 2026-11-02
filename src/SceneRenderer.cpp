@@ -29,6 +29,10 @@
 #include "render/XrPointerRenderer.h"
 #include "render/terrain/TerrainRenderer.h"
 #include "Solar_System/SkyBox.h"
+#include "gfx/Shader.h"
+#include "gfx/GlPlatform.h"
+#include "Solar_System/ObserveSky.h"
+#include "Solar_System/Star.h"
 #include <algorithm>
 #include <array>
 #include <deque>
@@ -36,7 +40,11 @@
 #include <optional>
 #include <sstream>
 #include <string>
-
+#include <ios>
+#include <iterator>
+#include <memory>
+#include <utility>
+#include <vector>
 
 Renderer::Renderer() = default;
 Renderer::~Renderer() = default;
@@ -54,7 +62,8 @@ float ShadowBias(const RenderableSceneComponent& component, float sceneUnits) {
 }
 
 ShaderSpec Program(const char* vertex, const char* fragment, std::vector<std::string> defines = {}) {
-    return ShaderSpec(std::string("resource/shaders/") + vertex, std::string("resource/shaders/") + fragment, std::move(defines));
+    return ShaderSpec(std::string("resource/shaders/") + vertex, std::string("resource/shaders/") + fragment,
+                      std::move(defines));
 }
 
 ShaderSpec PlanetSpec(unsigned variant) {
@@ -155,18 +164,12 @@ void Renderer::Init(const SimState& sim, FT_Library ft, glm::ivec2 display) {
     // checkerboard fallback), and the native CI smoke run should still have compiled the
     // shaders by then.
     _skyBox = std::make_unique<SkyBox>(GetSkyBoxFaces());
-    _lensFlare = std::make_unique<LensFlare>(*_lensFlareShader, TextureImage2D(TexturePaths::Resolve("resource/textures_low/flares_bright_Low.dds")),
-            FlaresInfo {4,
-            {
-                FlareSprite{false, 1.0, 7.0, 0},
-                FlareSprite{false, 1.35, 0.3, 1},
-                FlareSprite{false, 1.5, 0.4, 4},
-                FlareSprite{false, 1.7, 0.6, 5},
-                FlareSprite{false, 1.9, 1.2, 6},
-                FlareSprite{false, 2.1, 0.4, 2},
-                FlareSprite{false, 2.25, 0.2, 3},
-                FlareSprite{false, 2.75, 2.0, 7}
-            }});
+    _lensFlare = std::make_unique<LensFlare>(
+        *_lensFlareShader, TextureImage2D(TexturePaths::Resolve("resource/textures_low/flares_bright_Low.dds")),
+        FlaresInfo{4,
+                   {FlareSprite{false, 1.0, 7.0, 0}, FlareSprite{false, 1.35, 0.3, 1}, FlareSprite{false, 1.5, 0.4, 4},
+                    FlareSprite{false, 1.7, 0.6, 5}, FlareSprite{false, 1.9, 1.2, 6}, FlareSprite{false, 2.1, 0.4, 2},
+                    FlareSprite{false, 2.25, 0.2, 3}, FlareSprite{false, 2.75, 2.0, 7}}});
     try {
         _observeSky = std::make_unique<ObserveSky>();
     } catch (const std::exception& error) {
@@ -184,8 +187,8 @@ void Renderer::Init(const SimState& sim, FT_Library ft, glm::ivec2 display) {
     _magneticFieldRenderer = std::make_unique<MagneticFieldLineRenderer>();
     {
         const auto fieldQuality = GetQualitySettings(sim.qualityPreset, sim.isMobileWeb);
-        _magneticFieldBloom = std::make_unique<MagneticFieldBloom>(display.x, display.y,
-                                                              fieldQuality.enableMagneticBloom);
+        _magneticFieldBloom =
+            std::make_unique<MagneticFieldBloom>(display.x, display.y, fieldQuality.enableMagneticBloom);
         ApplyEffectQuality(fieldQuality);
     }
 }
@@ -882,8 +885,10 @@ void Renderer::RenderSpaceObjectDistance(const FrameContext& ctx, const SpaceObj
         _distanceInfoCache.push_back(L' ');
     }
 
-    std::wstring distance(std::to_wstring(static_cast<uint16_t>(glm::distance(ctx.view.headPosition, spaceObject->GetPosition()))));
-    _distanceInfoCache.insert(_distanceInfoCache.end(), std::make_move_iterator(distance.begin()), std::make_move_iterator(distance.end()));
+    std::wstring distance(
+        std::to_wstring(static_cast<uint16_t>(glm::distance(ctx.view.headPosition, spaceObject->GetPosition()))));
+    _distanceInfoCache.insert(_distanceInfoCache.end(), std::make_move_iterator(distance.begin()),
+                              std::make_move_iterator(distance.end()));
 
     _mainTextShader->Use();
     _mainTextShader->SetVec3("particleCenterWorldSpace", spaceObject->GetPosition());
@@ -892,7 +897,7 @@ void Renderer::RenderSpaceObjectDistance(const FrameContext& ctx, const SpaceObj
 }
 
 void Renderer::RenderHints(const FrameContext& ctx) const {
-    static const std::string gpuHintString = std::string(reinterpret_cast<const char *>(glGetString(GL_RENDERER)));
+    static const std::string gpuHintString = std::string(reinterpret_cast<const char*>(glGetString(GL_RENDERER)));
     static constexpr glm::vec3 textColor = glm::vec3(0.98431, 0.80784, 0.69412);
 
     glDisable(GL_DEPTH_TEST);
@@ -916,7 +921,8 @@ void Renderer::RenderHints(const FrameContext& ctx) const {
     std::stringstream soundVolumeStream;
     soundVolumeStream << std::fixed << std::setprecision(0) << ctx.hud->musicVolumePercent;
     std::string soundVolume = soundVolumeStream.str();
-    _soundVolumeHintCache.emplace_back(std::wstring(L"Sound volume(PgUp/PgDown): ").append(soundVolume.begin(), soundVolume.end()).append(L" %"));
+    _soundVolumeHintCache.emplace_back(
+        std::wstring(L"Sound volume(PgUp/PgDown): ").append(soundVolume.begin(), soundVolume.end()).append(L" %"));
 
     _tmpStringCache.clear();
     _tmpStringCache.emplace_back(std::wstring(ctx.hud->musicTrack.begin(), ctx.hud->musicTrack.end()));
@@ -980,11 +986,12 @@ void Renderer::RenderHints(const FrameContext& ctx) const {
     starGammaHint.emplace_back(std::to_wstring(_starTuning.gamma));
 
     std::deque<std::wstring> starTemperatureHint;
-    std::stringstream  starTemperatureStream;
+    std::stringstream starTemperatureStream;
     starTemperatureStream << std::fixed << std::setprecision(0) << _starTuning.temperatureKelvin;
     std::string starTemperatureStr = starTemperatureStream.str();
-    starTemperatureHint.emplace_back(std::wstring(L"Star Temperature(7/8): ").append(std::make_move_iterator(starTemperatureStr.begin()),
-                                                                                std::make_move_iterator(starTemperatureStr.end())));
+    starTemperatureHint.emplace_back(std::wstring(L"Star Temperature(7/8): ")
+                                         .append(std::make_move_iterator(starTemperatureStr.begin()),
+                                                 std::make_move_iterator(starTemperatureStr.end())));
     std::deque<std::wstring> vertSyncHint;
     vertSyncHint.emplace_back(L"Vert Sync(F1): ");
     vertSyncHint.emplace_back((ctx.hud->vsync) ? L"On" : L"Off");
@@ -1031,10 +1038,10 @@ void Renderer::RenderHints(const FrameContext& ctx) const {
 
 void Renderer::RenderTextureLoadingProgress(const FrameContext& ctx) const {
     auto& loadingQueue = TextureLoadingQueue::GetInstance();
-    const int queued    = loadingQueue.GetQueuedCount();
+    const int queued = loadingQueue.GetQueuedCount();
     const int completed = loadingQueue.GetTotalProcessed();
-    const int total     = loadingQueue.GetTotalQueued();
-    const int active    = loadingQueue.GetActiveLoadCount();
+    const int total = loadingQueue.GetTotalQueued();
+    const int active = loadingQueue.GetActiveLoadCount();
     const std::string& currentPath = loadingQueue.GetCurrentLoadingPath();
     // 0=generic, 1=mid, 2=high — mirrors streaming UI labels in progressOverlay.ts
     int tierCode = 0;

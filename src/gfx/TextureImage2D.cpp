@@ -6,6 +6,7 @@
 #include "../3rdparty/ktx2_reader.h"
 #include "../3rdparty/nv_dds.h"
 #include "../core/Log.h"
+#include "GlPlatform.h"
 #include <cstdint>
 #include <algorithm>
 #include <fstream>
@@ -24,7 +25,9 @@ namespace {
                value.compare(value.size() - suffix.size(), suffix.size(), suffix) == 0;
     }
 
-    bool IsGpuTextureValid(GLuint textureId, unsigned int width, unsigned int height) {
+    // width/height are only read on the web path; native asks the driver instead.
+    bool IsGpuTextureValid(GLuint textureId, [[maybe_unused]] unsigned int width,
+                           [[maybe_unused]] unsigned int height) {
         if (textureId == 0) {
             return false;
         }

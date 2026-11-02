@@ -21,8 +21,8 @@ namespace {
         static SimState fallback;
         return activeApplication ? activeApplication->GetSimState() : fallback;
     }
-#endif
 
+    // Used by the extern "C" exports below only; native builds have no JS to call them.
     float g_touchForward = 0.0f;
     float g_touchRight = 0.0f;
     float g_touchVertical = 0.0f;
@@ -34,6 +34,7 @@ namespace {
         NotifySettingsChanged("magneticFields");
         NotifySettingsChanged("magneticFieldMode");
     }
+#endif
 }
 
 Application* GetActiveApplication() {

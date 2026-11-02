@@ -76,7 +76,7 @@ struct Shader::Pending {
 
 std::vector<Shader*>& Shader::Registry() {
     // Leaked on purpose: a Shader may outlive static destruction order.
-    static auto* registry = new std::vector<Shader*>();
+    static auto* registry = new std::vector<Shader*>(); // NOLINT(cppcoreguidelines-owning-memory)
     return *registry;
 }
 

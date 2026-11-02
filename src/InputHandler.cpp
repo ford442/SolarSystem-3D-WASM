@@ -9,7 +9,6 @@
 #include <algorithm>
 #include <cmath>
 
-
 void Application::ProcessInput(GLFWwindow* window) {
     if (_isFirstMouse) {
         _lastX = 0;

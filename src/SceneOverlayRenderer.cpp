@@ -18,7 +18,6 @@
 #include <optional>
 #include <string>
 
-
 void Renderer::SetMagneticFieldsEnabled(bool enabled, int qualityPreset) {
     _magneticFieldsEnabled = enabled;
     if (enabled) {

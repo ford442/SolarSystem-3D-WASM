@@ -8,8 +8,11 @@
 #include <fstream>
 #include "core/Log.h"
 #include <random>
+#include <string>
+#include <utility>
 #include <vector>
-
+#include <algorithm>
+#include <cstdint>
 
 namespace {
 constexpr std::array<const char*, 6> kLowSkyBoxFaces = {
@@ -57,6 +60,9 @@ void Application::LoadCoreResources() {
         std::string virtualPath;
         // Tried (into the same virtualPath) when url fails; empty for none.
         std::string fallbackUrl;
+
+        CoreResource(std::string urlIn, std::string virtualPathIn, std::string fallbackUrlIn = std::string())
+            : url(std::move(urlIn)), virtualPath(std::move(virtualPathIn)), fallbackUrl(std::move(fallbackUrlIn)) {}
     };
 
     std::vector<CoreResource> coreResources = {
@@ -116,7 +122,8 @@ void Application::LoadCoreResources() {
 void Application::InitSongList() {
     _backgroundSongPaths = GetBackgroundSongPaths();
 
-    std::default_random_engine randEngine(static_cast<uint32_t>(std::chrono::high_resolution_clock::now().time_since_epoch().count()));
+    std::default_random_engine randEngine(
+        static_cast<uint32_t>(std::chrono::high_resolution_clock::now().time_since_epoch().count()));
     std::shuffle(_backgroundSongPaths.begin(), _backgroundSongPaths.end(), randEngine);
 
 #if defined(SOLARSYSTEM_USE_SDL_MIXER) && !defined(__EMSCRIPTEN__)

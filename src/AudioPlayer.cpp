@@ -11,7 +11,6 @@
 #include <string>
 #include <thread>
 
-
 #ifndef __EMSCRIPTEN__
 void Application::SetMusicVolume(float volume) {
 #ifdef SOLARSYSTEM_USE_SDL_MIXER

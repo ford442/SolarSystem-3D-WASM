@@ -199,14 +199,14 @@ const uint32_t DDSF_COMPLEX = 0x00000008;
 const uint32_t DDSF_TEXTURE = 0x00001000;
 const uint32_t DDSF_MIPMAP = 0x00400000;
 
-// dwCaps2 flags
+// dwCaps2 flags (the per-face bits document the format; the loader only tests DDSF_CUBEMAP)
 const uint32_t DDSF_CUBEMAP = 0x00000200;
-const uint32_t DDSF_CUBEMAP_POSITIVEX = 0x00000400;
-const uint32_t DDSF_CUBEMAP_NEGATIVEX = 0x00000800;
-const uint32_t DDSF_CUBEMAP_POSITIVEY = 0x00001000;
-const uint32_t DDSF_CUBEMAP_NEGATIVEY = 0x00002000;
-const uint32_t DDSF_CUBEMAP_POSITIVEZ = 0x00004000;
-const uint32_t DDSF_CUBEMAP_NEGATIVEZ = 0x00008000;
+[[maybe_unused]] const uint32_t DDSF_CUBEMAP_POSITIVEX = 0x00000400;
+[[maybe_unused]] const uint32_t DDSF_CUBEMAP_NEGATIVEX = 0x00000800;
+[[maybe_unused]] const uint32_t DDSF_CUBEMAP_POSITIVEY = 0x00001000;
+[[maybe_unused]] const uint32_t DDSF_CUBEMAP_NEGATIVEY = 0x00002000;
+[[maybe_unused]] const uint32_t DDSF_CUBEMAP_POSITIVEZ = 0x00004000;
+[[maybe_unused]] const uint32_t DDSF_CUBEMAP_NEGATIVEZ = 0x00008000;
 const uint32_t DDSF_CUBEMAP_ALL_FACES = 0x0000FC00;
 const uint32_t DDSF_VOLUME = 0x00200000;
 
@@ -509,7 +509,9 @@ void CDDSImage::load(std::istream& is, bool flipImage) {
     // clear any previously loaded images
     clear();
 
-    bool needsSwizzle = false;
+#ifdef __EMSCRIPTEN__
+    bool needsSwizzle = false; // only the WebGL path swaps channels (see below)
+#endif
 
     // read in file marker, make sure its a DDS file
     char filecode[4];
