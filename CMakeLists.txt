@@ -209,7 +209,11 @@ if(EMSCRIPTEN)
     # Sounds are LFS-excluded — do not preload (CI/sandbox).
     set(SOLAR_EM_LINK_FLAGS
         "SHELL:-sUSE_GLFW=3"
-        "SHELL:-sFULL_ES3=1"
+        # No -sFULL_ES3: it only adds JS emulation for what WebGL 2 lacks (glMapBuffer*,
+        # glGetBufferSubData, client-side vertex arrays) and taxes every buffer call. Nothing in
+        # src/ uses those: attribute pointers are VBO offsets and glDrawElements takes nullptr, as
+        # the desktop 4.6 core profile (same source) requires. A regression is a link error, not
+        # a silent slowdown. WebGL 2 itself comes from MIN/MAX_WEBGL_VERSION.
         "SHELL:-sMAX_WEBGL_VERSION=2"
         "SHELL:-sMIN_WEBGL_VERSION=2"
         "SHELL:-sGL_ENABLE_GET_PROC_ADDRESS=1"

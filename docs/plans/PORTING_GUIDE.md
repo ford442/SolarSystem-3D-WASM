@@ -50,7 +50,7 @@ The build system now properly handles Emscripten-specific configuration:
 - `GROWABLE_ARRAYBUFFERS` stays 0 and there are no pthread flags
 - No audio port: music is an `HTMLAudioElement` in `web/src/music.ts` (SDL_mixer's Emscripten backend used a deprecated ScriptProcessorNode)
 - Uses `-s USE_FREETYPE=1` for text rendering
-- Uses `-s FULL_ES3=1` for WebGL 2.0 support
+- WebGL 2.0 via `-sMIN_WEBGL_VERSION=2 -sMAX_WEBGL_VERSION=2` (`-sFULL_ES3` was dropped: nothing here needs its client-array / `glMapBuffer` emulation)
 - Preloads assets with `--preload-file resource@/resource`
 - Conditionally excludes GLEW and irrKlang for web builds
 
