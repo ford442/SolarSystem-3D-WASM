@@ -37,6 +37,12 @@ for arg in "$@"; do
             BUILD_TYPE=Debug
             shift
             ;;
+        --no-threads)
+            # Skip the pthread variant (SolarSystem-mt); the page then always runs the
+            # single-threaded build, with every job inline.
+            export SOLARSYSTEM_WEB_THREADS=0
+            shift
+            ;;
     esac
 done
 echo "CMake build type: $BUILD_TYPE"
@@ -116,6 +122,24 @@ else
     echo "Building project..."
     cmake --build "$BUILD_DIR" -j"$BUILD_JOBS"
 fi
+
+# The pthread variant (Release only): same sources with -pthread, output SolarSystem-mt.*.
+# bootstrap.ts loads it on a cross-origin isolated page (docs/CROSS_ORIGIN_HEADERS.md).
+BUILD_THREADS=false
+MT_BUILD_DIR="$PROJECT_ROOT/build-web-mt"
+if [ "${SOLARSYSTEM_WEB_THREADS:-1}" != "0" ] && [ "$BUILD_TYPE" = "Release" ]; then
+    BUILD_THREADS=true
+    if [ -n "${EMSDK:-}" ] && [ -f "$EMSDK/upstream/emscripten/cmake/Modules/Platform/Emscripten.cmake" ]; then
+        echo "Running CMake preset web-release-mt..."
+        (cd "$PROJECT_ROOT" && cmake --preset web-release-mt "${CMAKE_ARGS[@]}")
+        (cd "$PROJECT_ROOT" && cmake --build --preset web-release-mt -j"$BUILD_JOBS")
+    else
+        mkdir -p "$MT_BUILD_DIR"
+        emcmake cmake "${CMAKE_ARGS[@]}" -DSOLARSYSTEM_WEB_THREADS=ON -DCMAKE_EXPORT_COMPILE_COMMANDS=ON \
+            -B "$MT_BUILD_DIR" "$PROJECT_ROOT"
+        cmake --build "$MT_BUILD_DIR" -j"$BUILD_JOBS"
+    fi
+fi
 cd "$BUILD_DIR"
 
 # 5. Deploy to Web Frontend
@@ -168,11 +192,26 @@ if [ -f "SolarSystem.data" ]; then
     echo "Copied SolarSystem.data to web/public/"
 fi
 
+# The threaded glue goes to public/, not src/: Vite must not bundle it, because its workers
+# import the same file again by URL. Both variants preload the same files, so they share
+# SolarSystem.data (bootstrap.ts's locateFile maps SolarSystem-mt.data to it); refuse to
+# deploy if the two packages ever differ.
+rm -f "$PROJECT_ROOT/web/public/SolarSystem-mt.js" "$PROJECT_ROOT/web/public/SolarSystem-mt.wasm"
+if [ "$BUILD_THREADS" = true ]; then
+    if ! cmp -s "$MT_BUILD_DIR/SolarSystem-mt.data" "SolarSystem.data"; then
+        echo "Error: SolarSystem-mt.data differs from SolarSystem.data; the variants must share one package."
+        exit 1
+    fi
+    cp "$MT_BUILD_DIR/SolarSystem-mt.js" "$MT_BUILD_DIR/SolarSystem-mt.wasm" "$PROJECT_ROOT/web/public/"
+    echo "Copied SolarSystem-mt.js and SolarSystem-mt.wasm to web/public/"
+fi
+
 echo ""
 echo "Artifact sizes ($BUILD_TYPE):"
 if [ -f "$PROJECT_ROOT/web/public/SolarSystem.wasm" ]; then
     wc -c "$PROJECT_ROOT/web/public/SolarSystem.wasm" "$PROJECT_ROOT/web/public/SolarSystem.data" \
-        "$PROJECT_ROOT/web/src/SolarSystem.js" 2>/dev/null || true
+        "$PROJECT_ROOT/web/src/SolarSystem.js" "$PROJECT_ROOT/web/public/SolarSystem-mt.wasm" \
+        "$PROJECT_ROOT/web/public/SolarSystem-mt.js" 2>/dev/null || true
 fi
 # Release only: minified name -> original name, for reading Closure-renamed stacks.
 if [ -f "SolarSystem.js.symbols" ]; then

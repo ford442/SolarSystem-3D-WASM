@@ -29,14 +29,19 @@ function devShaderRoute(): Plugin {
   };
 }
 
-// Dev/preview rehearse Option B (COEP+COOP) for a future pthread / SharedArrayBuffer
-// build. Production stays Option A (no COEP) until pthreads ship — see
-// docs/CROSS_ORIGIN_HEADERS.md. Asset CDNs should emit CORS + CORP, not COEP/COOP.
-const appIsolationHeaders = {
-  'Cross-Origin-Embedder-Policy': 'require-corp',
-  'Cross-Origin-Opener-Policy': 'same-origin',
-  'Cross-Origin-Resource-Policy': 'same-origin',
-};
+// Dev/preview serve Option B (COEP+COOP), which production uses too now that the pthread
+// build ships: on an isolated page bootstrap.ts loads SolarSystem-mt.js and the job pool runs
+// on workers (docs/CROSS_ORIGIN_HEADERS.md). Asset CDNs emit CORS + CORP, not COEP/COOP.
+// SOLARSYSTEM_NO_ISOLATION=1 serves Option A instead (no isolation: the single-threaded
+// build), which the second Playwright smoke run uses.
+const isolationOff = process.env.SOLARSYSTEM_NO_ISOLATION === '1';
+const appIsolationHeaders: Record<string, string> = isolationOff
+  ? {}
+  : {
+      'Cross-Origin-Embedder-Policy': 'require-corp',
+      'Cross-Origin-Opener-Policy': 'same-origin',
+      'Cross-Origin-Resource-Policy': 'same-origin',
+    };
 
 export default defineConfig({
   base: '/solar-system/',

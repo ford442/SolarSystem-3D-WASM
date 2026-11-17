@@ -9,6 +9,7 @@
 #include "assets/TextureFormatSupport.h"
 #include "Solar_System/OrbitLayout.h"
 #include "assets/ModelCache.h"
+#include "gfx/GpuTimer.h" // IWYU pragma: keep (ReleaseGpuResources destroys the unique_ptr)
 #include "assets/UploadQueue.h"
 #include "core/JobSystem.h"
 #include "core/Log.h"
@@ -352,6 +353,7 @@ void Application::Dispose() {
 }
 
 void Application::ReleaseGpuResources() {
+    _gpuTimer.reset();
     _renderableSceneComponents.clear();
     _planetSystemManifests.clear();
     _sun.reset();

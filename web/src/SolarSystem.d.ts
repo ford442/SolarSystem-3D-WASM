@@ -119,6 +119,16 @@ export interface SolarSystemCwrap {
     argTypes: [],
   ): () => string;
   (
+    ident: 'GetFrameStatsJson',
+    returnType: 'string',
+    argTypes: [],
+  ): () => string;
+  (
+    ident: 'SetGpuTimersEnabled',
+    returnType: null,
+    argTypes: ['number'],
+  ): (enabled: number) => void;
+  (
     ident: 'GetFocusedMissionJson',
     returnType: 'string',
     argTypes: [],
@@ -503,6 +513,8 @@ export interface SolarSystemModule {
   _GetFocusedMissionIndex: () => number;
   _GetMissionCount: () => number;
   _GetMissionCatalogJson: () => number;
+  _GetFrameStatsJson: () => number;
+  _SetGpuTimersEnabled: (enabled: number) => void;
   _GetFocusedMissionJson: () => number;
   _SetOrbitScaleMode: (mode: number) => void;
   _GetOrbitScaleMode: () => number;

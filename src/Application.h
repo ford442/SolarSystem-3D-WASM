@@ -16,6 +16,7 @@
 #include "XrState.h"
 #include "core/Camera.h"
 #include "core/CameraNavigation.h"
+#include "core/FrameProfile.h"
 #include "core/FrameTimer.h"
 #include "core/JobSystem.h"
 #include "gfx/MeshHolder.h"
@@ -24,6 +25,7 @@
 #include <atomic>
 #include <cstddef>
 #include <functional>
+#include <memory>
 #include <optional>
 #include <string>
 #include <unordered_set>
@@ -44,6 +46,8 @@ class TerrainSystem;
 #elif !defined(__EMSCRIPTEN__)
 #include <irrKlang.h>
 #endif
+
+class GpuTimer;
 
 class Application {
 public:
@@ -80,6 +84,10 @@ public:
     int GetFocusedMissionIndex() const;
     int GetMissionCount() const;
     std::string GetMissionCatalogJson() const;
+    /** The last frame's FrameProfile as JSON (perf HUD); resets the worst-frame window. */
+    std::string GetFrameStatsJson();
+    /** GPU stage timers (gfx/GpuTimer.h): on for the perf HUD and debug-level FrameStats. */
+    void SetGpuTimersEnabled(bool enabled);
     std::string GetFocusedMissionJson() const;
     void SetXrControllerRay(int hand, float ox, float oy, float oz, float dx, float dy, float dz, int visible);
     /**
@@ -236,6 +244,13 @@ private:
     int _nearestPlanetIndex = -1;      // Into _renderableSceneComponents; -1 when no planets are loaded yet
     int _focusedPlanetIndex = -1;      // FocusPlanet index (0=sun … 9=pluto); -1 = none
     FrameTimer _frameTimer;
+    // Frame profile (core/FrameProfile.h): CPU per stage this frame, the GPU timer, and the
+    // finished sample of the last frame that ReportFrameStats and GetFrameStatsJson read.
+    FrameProfile::CpuStages _cpuStages;
+    FrameProfile::Sample _frameProfile;
+    FrameProfile::Totals _frameProfileTotals;
+    std::unique_ptr<GpuTimer> _gpuTimer;
+    double _profileFrameStart = -1.0;
     FT_Library _ft = nullptr;
     bool _isBackgroundMusicPlay = false, _isSearchNearestPlanet = false;
 
@@ -393,6 +408,11 @@ private:
     void RenderFrame(int viewCount);
     /** Debug: the previous frame's FramePasses::Stats and glUniform* count (SOLARSYSTEM_FRAME_STATS=N). */
     void ReportFrameStats();
+    /** Run `work` as `stage`: CPU time into _cpuStages, GPU time into _gpuTimer. */
+    template <class F>
+    void TimeStage(FrameProfile::Stage stage, F&& work);
+    void BeginFrameProfile();
+    void EndFrameProfile();
     /**
      * Frustum culling after the views are known: marks every scene object and component
      * visible or not in any of the `viewCount` views, and fills _drawOrder with the visible

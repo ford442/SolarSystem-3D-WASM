@@ -32,6 +32,7 @@ set(SOLARSYSTEM_TEST_SOURCES
     ${CMAKE_SOURCE_DIR}/src/assets/TextureDecode.cpp
     ${CMAKE_SOURCE_DIR}/src/assets/UploadQueue.cpp
     ${CMAKE_SOURCE_DIR}/src/assets/ModelCache.cpp
+    ${CMAKE_SOURCE_DIR}/src/core/FrameProfile.cpp
     ${CMAKE_SOURCE_DIR}/src/3rdparty/ktx2_reader.cpp
     ${CMAKE_SOURCE_DIR}/src/3rdparty/nv_dds.cpp
     ${CMAKE_SOURCE_DIR}/src/gfx/ShaderSource.cpp
@@ -86,6 +87,7 @@ add_executable(SolarSystemTests
     test_texture_decode.cpp
     test_upload_queue.cpp
     test_model_cache.cpp
+    test_frame_profile.cpp
     test_model_cache.cpp
     stub_texture_image2d.cpp
     ${SOLARSYSTEM_TEST_SOURCES}
@@ -117,6 +119,8 @@ gtest_discover_tests(SolarSystemTests)
 find_package(glfw3 REQUIRED)
 add_executable(SolarSystemGlTests
     gl/test_gl.cpp
+    gl/test_gpu_timer.cpp
+    ${CMAKE_SOURCE_DIR}/src/gfx/GpuTimer.cpp
     ${CMAKE_SOURCE_DIR}/src/core/Log.cpp
     ${CMAKE_SOURCE_DIR}/src/core/JobSystem.cpp
     ${CMAKE_SOURCE_DIR}/src/gfx/Shader.cpp

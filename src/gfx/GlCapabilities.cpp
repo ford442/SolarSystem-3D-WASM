@@ -42,7 +42,15 @@ GlCapabilities ProbeGlCapabilities() {
             return 0;
         }
     }) != 0;
+    caps.gpuTimerQuery = EM_ASM_INT({
+                             try {
+                                 return GLctx.getExtension('EXT_disjoint_timer_query_webgl2') ? 1 : 0;
+                             } catch (e) {
+                                 return 0;
+                             }
+                         }) != 0;
 #else
+    caps.gpuTimerQuery = true; // ARB_timer_query is core since GL 3.3
     // Desktop GL 4.6 core always has these via GLEW; anisotropy is applied unconditionally
     // in TextureImage2D.cpp for native builds, so this cap is web-only for now.
     caps.anisotropicFiltering = true;
@@ -81,11 +89,11 @@ const GlCapabilities& GetGlCapabilities() {
         const auto yesNo = [](bool value) { return value ? "yes" : "no"; };
         LOG_INFO("GlCapabilities",
                  "anisotropy=%s (max %gx) | S3TC=%s | BPTC=%s | ETC2=%s | ASTC=%s | preferredPack=%s"
-                 " | colorBufferFloat=%s | parallelShaderCompile=%s | maxTextureSize=%d",
+                 " | colorBufferFloat=%s | parallelShaderCompile=%s | maxTextureSize=%d | gpuTimer=%s",
                  yesNo(c.anisotropicFiltering), c.maxAnisotropy, yesNo(c.s3tcCompressedTextures),
                  yesNo(c.bptcCompressedTextures), yesNo(c.etc2CompressedTextures), yesNo(c.astcCompressedTextures),
-                 c.PreferredTexturePack(), yesNo(c.colorBufferFloat), yesNo(c.parallelShaderCompile),
-                 c.maxTextureSize);
+                 c.PreferredTexturePack(), yesNo(c.colorBufferFloat), yesNo(c.parallelShaderCompile), c.maxTextureSize,
+                 yesNo(c.gpuTimerQuery));
         return c;
     }();
     return caps;

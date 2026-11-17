@@ -27,3 +27,5 @@ dist-ssr
 src/SolarSystem.js
 public/SolarSystem.wasm
 public/SolarSystem.data
+public/SolarSystem-mt.js
+public/SolarSystem-mt.wasm

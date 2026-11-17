@@ -45,7 +45,8 @@ jobs:
 
   build-web:
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    # Two Wasm links (single-threaded and SolarSystem-mt) and, on a cache miss, two Assimp builds.
+    timeout-minutes: 50
     env:
       BUILD_JOBS: 4
 
@@ -70,14 +71,18 @@ jobs:
         uses: actions/cache@v4
         id: assimp-cache
         with:
-          path: external/assimp/build-wasm/
+          # Both builds: build-wasm for SolarSystem.wasm, build-wasm-mt (-pthread) for
+          # the threaded SolarSystem-mt.wasm.
+          path: |
+            external/assimp/build-wasm/
+            external/assimp/build-wasm-mt/
           # 'wasmeh' marks the exception ABI the library is built with. Bump it
           # whenever that changes: a cached -fexceptions/JS-EH libassimp.a cannot be
           # linked into a -fwasm-exceptions build. No restore-keys on purpose: a prefix
           # restore would hand back an older libassimp.a after any change to
           # setup_web_dependencies.sh (flags included), which is exactly what the hash
           # in the key exists to prevent.
-          key: assimp-wasm-6.0.0-wasmeh-${{ hashFiles('setup_web_dependencies.sh') }}
+          key: assimp-wasm-6.0.0-wasmeh-mt-${{ hashFiles('setup_web_dependencies.sh') }}
 
       # SOLARSYSTEM_WERROR=ON: -Wall -Wextra warnings fail this build (and only CI's).
       - name: Build WebAssembly
@@ -125,32 +130,12 @@ jobs:
         working-directory: web
         run: npx playwright install --with-deps chromium
 
-      - name: Start preview server
-        run: |
-          cd web
-          npm run preview -- --host 127.0.0.1 > "$RUNNER_TEMP/solar-preview.log" 2>&1 &
-          echo $! > "$RUNNER_TEMP/solar-preview.pid"
-          for attempt in {1..30}; do
-            if curl --fail --silent --show-error http://127.0.0.1:4173/solar-system/ > /dev/null; then
-              exit 0
-            fi
-            sleep 1
-          done
-          cat "$RUNNER_TEMP/solar-preview.log"
-          exit 1
-
-      - name: Run smoke test
+      # playwright.config.ts starts two previews of the same dist: the cross-origin isolated
+      # one (threaded build, workers) on 4173 and one without isolation headers
+      # (single-threaded build, jobs inline) on 4174, and runs every spec against both.
+      - name: Run smoke test (threaded and single-threaded)
         working-directory: web
-        env:
-          SMOKE_TEST_URL: http://127.0.0.1:4173/solar-system/
         run: npm run test:smoke
-
-      - name: Stop preview server
-        if: always()
-        run: |
-          if [ -f "$RUNNER_TEMP/solar-preview.pid" ]; then
-            kill "$(cat "$RUNNER_TEMP/solar-preview.pid")" || true
-          fi
 
       - name: Upload production bundle
         uses: actions/upload-artifact@v4

@@ -53,47 +53,61 @@ else
     echo "Assimp already exists in $ASSIMP_DIR"
 fi
 
-ASSIMP_BUILD_DIR="$ASSIMP_DIR/build-wasm"
+# Two builds of the same sources: build-wasm for the single-threaded SolarSystem.wasm, and
+# build-wasm-mt (-pthread: atomics + bulk memory) for SolarSystem-mt.wasm, since a
+# shared-memory link rejects any object built without atomics. SOLARSYSTEM_WEB_THREADS=0
+# skips the second one (build-web.sh --no-threads).
+build_assimp() {
+    local build_dir="$1"
+    local thread_flags="$2"
 
-# Clean previous failed builds to ensure new flags take effect
-if [ -d "$ASSIMP_BUILD_DIR" ] && [ ! -f "$ASSIMP_BUILD_DIR/lib/libassimp.a" ]; then
-    echo "Cleaning incomplete build..."
-    rm -rf "$ASSIMP_BUILD_DIR"
-fi
+    # Clean previous failed builds to ensure new flags take effect
+    if [ -d "$build_dir" ] && [ ! -f "$build_dir/lib/libassimp.a" ]; then
+        echo "Cleaning incomplete build in $build_dir..."
+        rm -rf "$build_dir"
+    fi
 
-if [ ! -f "$ASSIMP_BUILD_DIR/lib/libassimp.a" ]; then
-    echo "Building Assimp for WebAssembly..."
-    mkdir -p "$ASSIMP_BUILD_DIR"
-    cd "$ASSIMP_BUILD_DIR"
+    if [ -f "$build_dir/lib/libassimp.a" ]; then
+        echo "Assimp library already built at $build_dir/lib/libassimp.a"
+        return
+    fi
 
-    # Configure Assimp
-    # - Disable tests, tools, and exporters to save space/time
-    # - Build static library
-    # - Disable warnings as errors to pass strict compiler checks
-    # - Explicitly disable Werror in compiler flags
-    emcmake cmake .. \
-        -DCMAKE_BUILD_TYPE=Release \
-        -DBUILD_SHARED_LIBS=OFF \
-        -DASSIMP_BUILD_TESTS=OFF \
-        -DASSIMP_BUILD_ASSIMP_TOOLS=OFF \
-        -DASSIMP_NO_EXPORT=ON \
-        -DASSIMP_BUILD_ZLIB=ON \
-        -DASSIMP_BUILD_ALL_IMPORTERS_BY_DEFAULT=OFF \
-        -DASSIMP_BUILD_OBJ_IMPORTER=ON \
-        -DASSIMP_BUILD_FBX_IMPORTER=ON \
-        -DASSIMP_BUILD_GLTF_IMPORTER=ON \
-        -DASSIMP_BUILD_COLLADA_IMPORTER=ON \
-        -DASSIMP_WARNINGS_AS_ERRORS=OFF \
-        -DCMAKE_CXX_FLAGS="-Wno-error -w -fwasm-exceptions" \
-        -DCMAKE_EXE_LINKER_FLAGS="-fwasm-exceptions" \
-        -DCMAKE_INSTALL_PREFIX="$PWD/install"
+    echo "Building Assimp for WebAssembly in $build_dir ${thread_flags:+($thread_flags)}..."
+    mkdir -p "$build_dir"
+    (
+        cd "$build_dir"
+        # Configure Assimp
+        # - Disable tests, tools, and exporters to save space/time
+        # - Build static library
+        # - Disable warnings as errors to pass strict compiler checks
+        # - Explicitly disable Werror in compiler flags
+        emcmake cmake "$ASSIMP_DIR_ABS" \
+            -DCMAKE_BUILD_TYPE=Release \
+            -DBUILD_SHARED_LIBS=OFF \
+            -DASSIMP_BUILD_TESTS=OFF \
+            -DASSIMP_BUILD_ASSIMP_TOOLS=OFF \
+            -DASSIMP_NO_EXPORT=ON \
+            -DASSIMP_BUILD_ZLIB=ON \
+            -DASSIMP_BUILD_ALL_IMPORTERS_BY_DEFAULT=OFF \
+            -DASSIMP_BUILD_OBJ_IMPORTER=ON \
+            -DASSIMP_BUILD_FBX_IMPORTER=ON \
+            -DASSIMP_BUILD_GLTF_IMPORTER=ON \
+            -DASSIMP_BUILD_COLLADA_IMPORTER=ON \
+            -DASSIMP_WARNINGS_AS_ERRORS=OFF \
+            -DCMAKE_C_FLAGS="$thread_flags" \
+            -DCMAKE_CXX_FLAGS="-Wno-error -w -fwasm-exceptions $thread_flags" \
+            -DCMAKE_EXE_LINKER_FLAGS="-fwasm-exceptions $thread_flags" \
+            -DCMAKE_INSTALL_PREFIX="$PWD/install"
 
-    # Build
-    emmake make -j"$BUILD_JOBS"
+        # Build
+        emmake make -j"$BUILD_JOBS"
+    )
+}
 
-    cd ../../..
-else
-    echo "Assimp library already built at $ASSIMP_BUILD_DIR/lib/libassimp.a"
+ASSIMP_DIR_ABS="$(cd "$ASSIMP_DIR" && pwd)"
+build_assimp "$ASSIMP_DIR_ABS/build-wasm" ""
+if [ "${SOLARSYSTEM_WEB_THREADS:-1}" != "0" ]; then
+    build_assimp "$ASSIMP_DIR_ABS/build-wasm-mt" "-pthread"
 fi
 
 echo "Dependencies setup complete."

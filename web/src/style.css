@@ -1168,3 +1168,30 @@ body.observe-mode #magnetic-fields-enabled {
     outline: 2px solid #ffffff;
     outline-offset: 2px;
 }
+
+/* ?perf=1 (perfHud.ts): last frame's CPU/GPU time per stage, jobs and uploads. */
+#perf-hud {
+    position: fixed;
+    top: 8px;
+    left: 8px;
+    z-index: 950;
+    margin: 0;
+    padding: 6px 8px;
+    max-width: calc(100vw - 32px);
+    font:
+        11px/1.35 ui-monospace,
+        SFMono-Regular,
+        Menlo,
+        Consolas,
+        monospace;
+    color: #d8f5d0;
+    background: rgba(0, 0, 0, 0.72);
+    border: 1px solid rgba(255, 255, 255, 0.15);
+    border-radius: 4px;
+    pointer-events: none;
+    white-space: pre;
+}
+
+#perf-hud.is-slow {
+    border-color: #e0a040;
+}
