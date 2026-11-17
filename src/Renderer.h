@@ -23,6 +23,7 @@ class HDR;
 class LensFlare;
 class MagneticFieldBloom;
 class MagneticFieldLineRenderer;
+struct MagneticFieldTraceJobs;
 class MissionPathRenderer;
 class OrbitPathRenderer;
 class ShadowMapFBO;
@@ -156,6 +157,8 @@ private:
     /** Compass points and body/star names projected onto `_observeFrame`; `textScale` grows them for a headset. */
     void RenderObserveLabels(const FrameContext& ctx, float width, float height, float textScale);
     void EnsureMagneticFieldsBuilt(int qualityPreset);
+    /** Upload the ribbons once every trace job of the build in flight has finished. */
+    void CollectMagneticFieldTraces();
 
     void RenderAtmospheres(const FrameContext& ctx, const RenderableSceneComponent& component);
     void RenderOneilAtmosphere(const FrameContext& ctx, const RenderableAtmosphere& renderableAtmosphere,
@@ -256,6 +259,7 @@ private:
     std::unique_ptr<XrPointerRenderer> _xrPointerRenderer;
     std::unique_ptr<MagneticFieldLineRenderer> _magneticFieldRenderer;
     std::unique_ptr<MagneticFieldBloom> _magneticFieldBloom;
+    std::unique_ptr<MagneticFieldTraceJobs> _magneticFieldTraces; // build in flight, if any
     std::vector<std::unique_ptr<MissionPathRenderer>> _missionPathMeshes;
     glm::dvec3 _missionPathOrigin{0.0}; // world point the path vertices are relative to
 

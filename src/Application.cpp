@@ -13,6 +13,8 @@
 #include "assets/UploadQueue.h"
 #include "Solar_System/OrbitLayout.h"
 #include "Solar_System/SceneScale.h"
+#include "astro/MissionCatalog.h"
+#include "core/JobSystem.h"
 #include "core/Log.h"
 #include "render/XrPointerRenderer.h"
 #include "render/terrain/TerrainSystem.h"
@@ -21,12 +23,20 @@
 #include <cmath>
 #include <cstdio>
 #include <cstdlib>
+#include <fstream>
+#include <ratio>
 #include <sstream>
 #include <memory>
+#include <utility>
+
+namespace {
+constexpr const char* kMissionCatalogPath = "resource/missions/catalog.json";
+} // namespace
 
 Application::Application() : _frameTimer(240) {
     SetActiveApplication(this);
     InitSystems();
+    StartCatalogJobs();
     ApplyQualityPreset(_simState.qualityPreset);
     InitScene();
 }
@@ -553,6 +563,7 @@ void Application::UpdateLoadingProgress() {
 
 
 void Application::InitSceneObjects() {
+    const auto started = std::chrono::steady_clock::now();
     _camera.SetAspect(static_cast<float>(_displayWidth) / static_cast<float>(_displayHeight));
 #ifdef __EMSCRIPTEN__
     TextureImage2D::SetWebAnisotropyCap(_simState.isMobileWeb ? 4.0f : 8.0f);
@@ -581,6 +592,9 @@ void Application::InitSceneObjects() {
     ApplyScaleEnvOverride();
     ApplyCameraPoseEnvOverride();
     ApplyObserveEnvOverride();
+    LOG_INFO("Loading", "Scene initialised in %.0f ms (%d job worker(s))",
+             std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - started).count(),
+             Jobs::WorkerCount());
 }
 
 void Application::ApplyScaleEnvOverride() {
@@ -876,9 +890,34 @@ bool Application::GetOrbitLinesEnabled() const { return _renderer.GetOrbitLinesE
 void Application::SetMagneticFieldsEnabled(bool enabled) { _renderer.SetMagneticFieldsEnabled(enabled, _simState.qualityPreset); }
 bool Application::GetMagneticFieldsEnabled() const { return _renderer.GetMagneticFieldsEnabled(); }
 
+void Application::StartCatalogJobs() {
+    // The JSON is preloaded (web .data, native disk), so it can be read now and parsed while
+    // the core resources download; LoadMissionCatalog takes the result.
+    std::ifstream in(kMissionCatalogPath);
+    if (!in) {
+        return; // LoadMissionCatalog reports it
+    }
+    std::ostringstream text;
+    text << in.rdbuf();
+    _missionCatalogJob = Jobs::Submit([json = text.str()] {
+        ParsedMissionCatalog parsed;
+        parsed.ok = MissionCatalog::LoadFromString(json, parsed.catalog, parsed.error);
+        return parsed;
+    });
+}
+
 void Application::LoadMissionCatalog() {
     std::string error;
-    if (!MissionCatalog::LoadFromFile("resource/missions/catalog.json", _missionCatalog, error)) {
+    bool ok = false;
+    if (_missionCatalogJob.Valid()) {
+        ParsedMissionCatalog parsed = _missionCatalogJob.Get();
+        ok = parsed.ok;
+        _missionCatalog = std::move(parsed.catalog);
+        error = std::move(parsed.error);
+    } else {
+        ok = MissionCatalog::LoadFromFile(kMissionCatalogPath, _missionCatalog, error);
+    }
+    if (!ok) {
         LOG_WARN("Missions", "%s", error.c_str());
         _missionCatalog = {};
         return;

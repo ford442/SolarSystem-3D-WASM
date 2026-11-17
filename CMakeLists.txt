@@ -115,6 +115,7 @@ set(SOLARSYSTEM_SOURCES_AUX
     src/assets/BlockCompression.cpp
     src/assets/TextureDecode.cpp
     src/assets/UploadQueue.cpp
+    src/assets/ModelCache.cpp
     # astro/: ephemerides, sky events, catalogs, field models (GL-free)
     src/astro/Ephemeris.cpp
     src/astro/SkyEvents.cpp

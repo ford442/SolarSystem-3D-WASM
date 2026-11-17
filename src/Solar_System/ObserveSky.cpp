@@ -3,7 +3,15 @@
 
 #include <algorithm>
 #include <cmath>
+#include <fstream>
+#include <ios>
+#include <optional>
+#include <sstream>
+#include <string>
+#include <utility>
 #include "../core/Log.h"
+#include "/root/SolarSystem-3D-WASM/src/core/JobSystem.h"
+#include "/root/SolarSystem-3D-WASM/src/astro/StarCatalog.h"
 
 namespace {
 
@@ -58,7 +66,51 @@ void tangentBasis(const glm::vec3& d, glm::vec3& right, glm::vec3& up) {
 
 } // namespace
 
+namespace {
+
+/** The file's text, or nullopt; read on the main thread (MEMFS), parsed in a job. */
+std::optional<std::string> ReadText(const char* path) {
+    std::ifstream in(path, std::ios::binary);
+    if (!in) {
+        return std::nullopt;
+    }
+    std::ostringstream text;
+    text << in.rdbuf();
+    return text.str();
+}
+
+} // namespace
+
 ObserveSky::ObserveSky() {
+    // Parse the star catalogue and constellation figures off the main thread now; the first
+    // Observe frame takes the result (long finished by then).
+    _parsedSky = Jobs::Submit([stars = ReadText(kStarCatalogPath), figures = ReadText(kConstellationPath)] {
+        ParsedSky parsed;
+        if (!stars) {
+            parsed.starError = std::string("Could not open ") + kStarCatalogPath;
+            return parsed;
+        }
+        if (!StarCatalog::Parse(*stars, parsed.stars, parsed.starError)) {
+            if (parsed.starError.empty()) {
+                parsed.starError = "malformed catalog";
+            }
+            return parsed;
+        }
+        parsed.starError.clear();
+        if (!figures) {
+            parsed.constellationError = std::string("Could not open ") + kConstellationPath;
+        } else if (!StarCatalog::ParseConstellations(*figures, static_cast<int>(parsed.stars.stars.size()),
+                                                     parsed.constellations, parsed.constellationError)) {
+            parsed.constellations.clear();
+            if (parsed.constellationError.empty()) {
+                parsed.constellationError = "malformed constellation lines";
+            }
+        } else {
+            parsed.constellationError.clear();
+        }
+        return parsed;
+    });
+
     _skyShader = std::make_unique<Shader>("resource/shaders/observeSky.vs", "resource/shaders/observeSky.fs");
     _spriteShader = std::make_unique<Shader>("resource/shaders/observeSprite.vs", "resource/shaders/observeSprite.fs");
     _lineShader = std::make_unique<Shader>("resource/shaders/observeLines.vs", "resource/shaders/observeLines.fs");
@@ -127,12 +179,15 @@ void ObserveSky::EnsureStarsLoaded() {
     }
     _starsTried = true;
 
-    std::string error;
-    if (!StarCatalog::LoadFromFile(kStarCatalogPath, _stars, error)) {
+    ParsedSky parsed = _parsedSky.Get();
+    _constellations = std::move(parsed.constellations);
+    _constellationError = std::move(parsed.constellationError);
+    if (!parsed.starError.empty()) {
         // Observe still works without stars (planets, Sun and Moon), so this is not fatal.
-        LOG_WARN("Observe", "star catalog unavailable (%s); drawing no stars", error.c_str());
+        LOG_WARN("Observe", "star catalog unavailable (%s); drawing no stars", parsed.starError.c_str());
         return;
     }
+    _stars = std::move(parsed.stars);
 
     std::vector<SpriteInstance> instances;
     instances.reserve(_stars.stars.size());
@@ -159,10 +214,8 @@ void ObserveSky::EnsureConstellationLines() {
     }
     if (!_constellationsTried) {
         _constellationsTried = true;
-        std::string error;
-        if (!StarCatalog::LoadConstellationsFromFile(kConstellationPath, static_cast<int>(_stars.stars.size()),
-                                                     _constellations, error)) {
-            LOG_WARN("Observe", "constellation lines unavailable (%s)", error.c_str());
+        if (!_constellationError.empty()) {
+            LOG_WARN("Observe", "constellation lines unavailable (%s)", _constellationError.c_str());
             _constellations.clear();
         }
     }

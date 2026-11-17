@@ -7,16 +7,20 @@
 #include "Solar_System/AsteroidField.h"
 #include "Solar_System/OrbitLayout.h"
 #include "astro/MagneticFieldTracer.h"
+#include "core/JobSystem.h"
 #include "render/MagneticFieldBloom.h"
 #include "render/MagneticFieldLineMesh.h"
 #include "render/MagneticFieldLineRenderer.h"
+#include "render/MagneticFieldTraceJobs.h"
 #include "render/MissionPathRenderer.h"
 #include "render/OrbitPathRenderer.h"
 #include "render/XrPointerRenderer.h"
 #include "core/Log.h"
 #include <algorithm>
+#include <memory>
 #include <optional>
 #include <string>
+#include <utility>
 
 void Renderer::SetMagneticFieldsEnabled(bool enabled, int qualityPreset) {
     _magneticFieldsEnabled = enabled;
@@ -39,8 +43,12 @@ void Renderer::EnsureMagneticFieldsBuilt(int qualityPreset) {
     if (_magneticFieldsBuilt && _magneticFieldsQuality == qualityPreset) {
         return;
     }
+    if (_magneticFieldTraces && _magneticFieldTraces->qualityPreset == qualityPreset) {
+        CollectMagneticFieldTraces();
+        return; // already tracing this preset
+    }
 
-    _magneticFieldRenderer->Clear();
+    // Trace every body in a job; the ribbons drawn now stay until the new set is in.
     static constexpr OrbitLayout::Body kFieldBodies[] = {
         OrbitLayout::Body::Sun,
         OrbitLayout::Body::Mercury,
@@ -50,18 +58,34 @@ void Renderer::EnsureMagneticFieldsBuilt(int qualityPreset) {
         OrbitLayout::Body::Uranus,
         OrbitLayout::Body::Neptune,
     };
+    auto traces = std::make_unique<MagneticFieldTraceJobs>();
+    traces->qualityPreset = qualityPreset;
     for (const auto body : kFieldBodies) {
         const MagneticFieldParams params = MagneticFieldCatalog::ParamsForBody(body, qualityPreset);
+        traces->bodies.push_back({body, params, Jobs::Submit([params] { return MagneticFieldTracer::Trace(params); })});
+    }
+    _magneticFieldTraces = std::move(traces);
+    CollectMagneticFieldTraces(); // inline jobs (SOLARSYSTEM_JOBS=0, single-threaded web) are done already
+}
+
+void Renderer::CollectMagneticFieldTraces() {
+    if (!_magneticFieldTraces || !_magneticFieldRenderer || !_magneticFieldTraces->Ready()) {
+        return;
+    }
+    _magneticFieldRenderer->Clear();
+    for (MagneticFieldTraceJobs::Body& traced : _magneticFieldTraces->bodies) {
         MagneticFieldLineMesh mesh;
-        mesh.Upload(MagneticFieldTracer::Trace(params));
-        _magneticFieldRenderer->AddBody(body, std::move(mesh), params);
+        mesh.Upload(traced.lines.Get());
+        _magneticFieldRenderer->AddBody(traced.body, std::move(mesh), traced.params);
     }
     _magneticFieldsBuilt = true;
-    _magneticFieldsQuality = qualityPreset;
-    LOG_INFO("MagneticField", "Built field-line ribbons for quality preset %d", qualityPreset);
+    _magneticFieldsQuality = _magneticFieldTraces->qualityPreset;
+    _magneticFieldTraces.reset();
+    LOG_INFO("MagneticField", "Built field-line ribbons for quality preset %d", _magneticFieldsQuality);
 }
 
 void Renderer::RenderMagneticFields(const FrameContext& ctx) {
+    CollectMagneticFieldTraces();
     if (!_magneticFieldsEnabled || !_magneticFieldRenderer || _magneticFieldRenderer->Empty()) {
         return;
     }

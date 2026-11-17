@@ -31,6 +31,7 @@ set(SOLARSYSTEM_TEST_SOURCES
     ${CMAKE_SOURCE_DIR}/src/assets/BlockCompression.cpp
     ${CMAKE_SOURCE_DIR}/src/assets/TextureDecode.cpp
     ${CMAKE_SOURCE_DIR}/src/assets/UploadQueue.cpp
+    ${CMAKE_SOURCE_DIR}/src/assets/ModelCache.cpp
     ${CMAKE_SOURCE_DIR}/src/3rdparty/ktx2_reader.cpp
     ${CMAKE_SOURCE_DIR}/src/3rdparty/nv_dds.cpp
     ${CMAKE_SOURCE_DIR}/src/gfx/ShaderSource.cpp
@@ -84,6 +85,8 @@ add_executable(SolarSystemTests
     test_job_system.cpp
     test_texture_decode.cpp
     test_upload_queue.cpp
+    test_model_cache.cpp
+    test_model_cache.cpp
     stub_texture_image2d.cpp
     ${SOLARSYSTEM_TEST_SOURCES}
 )
@@ -102,7 +105,8 @@ endif()
 find_package(OpenGL REQUIRED)
 find_package(GLEW REQUIRED)
 find_package(Threads REQUIRED)
-target_link_libraries(SolarSystemTests PRIVATE GTest::gtest_main OpenGL::GL GLEW::GLEW Threads::Threads)
+find_package(assimp REQUIRED)
+target_link_libraries(SolarSystemTests PRIVATE GTest::gtest_main OpenGL::GL GLEW::GLEW Threads::Threads assimp::assimp)
 
 include(GoogleTest)
 gtest_discover_tests(SolarSystemTests)

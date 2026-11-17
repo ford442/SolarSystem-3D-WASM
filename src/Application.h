@@ -17,6 +17,7 @@
 #include "core/Camera.h"
 #include "core/CameraNavigation.h"
 #include "core/FrameTimer.h"
+#include "core/JobSystem.h"
 #include "gfx/MeshHolder.h"
 #include "gfx/ShadowFit.h"
 #include <array>
@@ -255,6 +256,13 @@ private:
 
     std::string _currentMusicTrack;
     MissionCatalog::Catalog _missionCatalog;
+    /** The catalog's parse, started in the constructor so it runs while core resources download. */
+    struct ParsedMissionCatalog {
+        bool ok = false;
+        MissionCatalog::Catalog catalog;
+        std::string error;
+    };
+    Jobs::Future<ParsedMissionCatalog> _missionCatalogJob;
     int _focusedMissionIndex = -1;
     bool _missionFollowActive = false;
     std::unique_ptr<AsteroidField> _asteroidField;
@@ -332,6 +340,7 @@ private:
     void RefreshPlanetProxyPositions(); // Keep WASM proxy markers aligned with orbit scale
     void UpdateLOD();             // Central LOD manager: upgrade textures for nearest planets (WASM)
     glm::ivec2 DisplaySize() const { return {_displayWidth, _displayHeight}; }
+    void StartCatalogJobs();
     void LoadMissionCatalog();
     void LoadMissions();
     void UpdateMissionFollow();

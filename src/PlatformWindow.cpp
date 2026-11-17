@@ -8,6 +8,7 @@
 #include "gfx/GlCapabilities.h"
 #include "assets/TextureFormatSupport.h"
 #include "Solar_System/OrbitLayout.h"
+#include "assets/ModelCache.h"
 #include "assets/UploadQueue.h"
 #include "core/JobSystem.h"
 #include "core/Log.h"
@@ -332,6 +333,7 @@ void Application::Dispose() {
     // nobody uploads, and the uploads queued for the scene's textures are dropped with it.
     Jobs::Stop();
     UploadQueue::Get().Clear();
+    ModelCache::Clear();
     ReleaseGpuResources();
     StopPlayBackgroundMusic();
 
