@@ -6,7 +6,7 @@ import type { PlanetIndex } from './generated/planetIds.js';
  * the “branded” wasmBridge façade narrows those raw numbers to.
  */
 
-/** Focus index of a body (Sun … 1P/Halley); generated from planets.catalog.json. */
+/** Focus index of a Sol body (Sun … 1P/Halley); generated from resource/systems/sol.catalog.json. */
 export type { PlanetIndex };
 
 export type QualityPreset = 0 | 1 | 2;
@@ -133,6 +133,21 @@ export interface SolarSystemCwrap {
     returnType: 'string',
     argTypes: [],
   ): () => string;
+  (
+    ident: 'LoadStarSystem',
+    returnType: 'number',
+    argTypes: ['string', 'number'],
+  ): (id: string, focusIndex: number) => number;
+  (
+    ident: 'GetActiveSystemId',
+    returnType: 'string',
+    argTypes: [],
+  ): () => string;
+  (
+    ident: 'IsSystemJumpActive',
+    returnType: 'number',
+    argTypes: [],
+  ): () => number;
   (
     ident: 'SetOrbitScaleMode',
     returnType: null,
@@ -516,6 +531,9 @@ export interface SolarSystemModule {
   _GetFrameStatsJson: () => number;
   _SetGpuTimersEnabled: (enabled: number) => void;
   _GetFocusedMissionJson: () => number;
+  _LoadStarSystem: (id: number, focusIndex: number) => number;
+  _GetActiveSystemId: () => number;
+  _IsSystemJumpActive: () => number;
   _SetOrbitScaleMode: (mode: number) => void;
   _GetOrbitScaleMode: () => number;
   _GetNearestPlanetIndex: () => number;

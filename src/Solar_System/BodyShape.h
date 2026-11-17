@@ -1,7 +1,7 @@
 #ifndef SOLARSYSTEM_BODY_SHAPE_H
 #define SOLARSYSTEM_BODY_SHAPE_H
 
-#include "BodyCatalog.generated.h"
+#include "BodyCatalog.h"
 
 #include <glm/glm.hpp>
 #include <glm/gtc/matrix_transform.hpp>

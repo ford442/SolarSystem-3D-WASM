@@ -18,6 +18,9 @@ unsigned Variant(const Material& material, const Textures& textures) {
     if (material.useSphereIntersect) {
         variant |= kSphereIntersect;
     }
+    if (material.procedural.enabled) {
+        variant |= kProcedural;
+    }
     return variant;
 }
 
@@ -51,6 +54,9 @@ std::vector<std::string> Defines(unsigned variant) {
     }
     if (variant & kNearSurface) {
         defines.emplace_back("NEAR_SURFACE");
+    }
+    if (variant & kProcedural) {
+        defines.emplace_back("PROCEDURAL_SURFACE");
     }
     return defines;
 }

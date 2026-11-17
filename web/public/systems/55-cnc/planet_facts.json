@@ -1,0 +1,160 @@
+{
+  "version": 2,
+  "generatedFrom": "resource/systems/55-cnc.catalog.json",
+  "indexConvention": "Star=0, planets 1… by semi-major axis; matches the active system's OrbitLayout table",
+  "sceneNote": "Measured orbits and sizes; surfaces are procedural (no exoplanet has been imaged). Values marked fit are estimates.",
+  "bodies": [
+    {
+      "index": 0,
+      "id": "55_cnc",
+      "name": "55 Cancri",
+      "nameRu": "55 Рака",
+      "type": "star",
+      "diameterKm": 1312090,
+      "massEarths": 301316,
+      "siderealRotationDays": null,
+      "orbitalPeriodDays": null,
+      "distanceAu": 0,
+      "moons": 0,
+      "summary": "G8 V star 41 light-years away; 5 known planets in the archive's composite table.",
+      "summaryRu": "Звезда класса G8 V на расстоянии 41 св. лет; известных планет: 5.",
+      "spectralType": "G8 V",
+      "effectiveTemperatureK": 5172,
+      "luminositySolar": 0.6354041,
+      "distancePc": 12.586
+    },
+    {
+      "index": 1,
+      "id": "55_cnc_e",
+      "name": "55 Cancri e",
+      "nameRu": "55 Рака e",
+      "type": "super-earth",
+      "diameterKm": 23891,
+      "massEarths": 7.99,
+      "siderealRotationDays": 0.736547,
+      "orbitalPeriodDays": 0.7365474,
+      "distanceAu": 0.01544,
+      "moons": 0,
+      "summary": "Super-earth discovered in 2004 (radial velocity); 2665.36× Earth's insolation, equilibrium temperature ≈ 1958 K.",
+      "summaryRu": "Суперземля, открыта в 2004 г. методом лучевых скоростей; освещённость 2665.36 от земной, равновесная температура ≈ 1958 K.",
+      "equilibriumTemperatureK": 1958,
+      "irradianceEarth": 2665.3571,
+      "discoveryYear": 2004,
+      "discoveryMethod": "Radial Velocity",
+      "fit": {
+        "rotation": "tidally-locked"
+      },
+      "surface": "lava"
+    },
+    {
+      "index": 2,
+      "id": "55_cnc_b",
+      "name": "55 Cancri b",
+      "nameRu": "55 Рака b",
+      "type": "gas giant",
+      "diameterKm": 177114,
+      "massEarths": 263.979,
+      "siderealRotationDays": 14.651552,
+      "orbitalPeriodDays": 14.651552,
+      "distanceAu": 0.118,
+      "moons": 0,
+      "summary": "Gas giant discovered in 1996 (radial velocity); 45.63× Earth's insolation, equilibrium temperature ≈ 700 K.",
+      "summaryRu": "Газовый гигант, открыта в 1996 г. методом лучевых скоростей; освещённость 45.63 от земной, равновесная температура ≈ 700 K.",
+      "equilibriumTemperatureK": 700,
+      "irradianceEarth": 45.6337,
+      "discoveryYear": 1996,
+      "discoveryMethod": "Radial Velocity",
+      "fit": {
+        "rotation": "tidally-locked"
+      },
+      "surface": "gas-giant"
+    },
+    {
+      "index": 3,
+      "id": "55_cnc_c",
+      "name": "55 Cancri c",
+      "nameRu": "55 Рака c",
+      "type": "gas giant",
+      "diameterKm": 108434,
+      "massEarths": 54.474,
+      "siderealRotationDays": 1,
+      "orbitalPeriodDays": 44.3936,
+      "distanceAu": 0.247,
+      "moons": 0,
+      "summary": "Gas giant discovered in 2004 (radial velocity); 10.41× Earth's insolation, equilibrium temperature ≈ 499 K.",
+      "summaryRu": "Газовый гигант, открыта в 2004 г. методом лучевых скоростей; освещённость 10.41 от земной, равновесная температура ≈ 499 K.",
+      "equilibriumTemperatureK": 499.3,
+      "irradianceEarth": 10.4149,
+      "discoveryYear": 2004,
+      "discoveryMethod": "Radial Velocity",
+      "fit": {
+        "rotation": "unknown"
+      },
+      "surface": "gas-giant"
+    },
+    {
+      "index": 4,
+      "id": "55_cnc_f",
+      "name": "55 Cancri f",
+      "nameRu": "55 Рака f",
+      "type": "gas giant",
+      "diameterKm": 96712,
+      "massEarths": 44.812,
+      "siderealRotationDays": 1,
+      "orbitalPeriodDays": 260.58,
+      "distanceAu": 0.802,
+      "moons": 0,
+      "summary": "Gas giant discovered in 2007 (radial velocity); 0.99× Earth's insolation, equilibrium temperature ≈ 277 K.",
+      "summaryRu": "Газовый гигант, открыта в 2007 г. методом лучевых скоростей; освещённость 0.99 от земной, равновесная температура ≈ 277 K.",
+      "equilibriumTemperatureK": 277.1,
+      "irradianceEarth": 0.9879,
+      "discoveryYear": 2007,
+      "discoveryMethod": "Radial Velocity",
+      "fit": {
+        "rotation": "unknown"
+      },
+      "surface": "cold-giant"
+    },
+    {
+      "index": 5,
+      "id": "55_cnc_d",
+      "name": "55 Cancri d",
+      "nameRu": "55 Рака d",
+      "type": "gas giant",
+      "diameterKm": 165646,
+      "massEarths": 1232.493,
+      "siderealRotationDays": 1,
+      "orbitalPeriodDays": 4799,
+      "distanceAu": 5.6,
+      "moons": 0,
+      "summary": "Gas giant discovered in 2002 (radial velocity); 0.02× Earth's insolation, equilibrium temperature ≈ 105 K.",
+      "summaryRu": "Газовый гигант, открыта в 2002 г. методом лучевых скоростей; освещённость 0.02 от земной, равновесная температура ≈ 105 K.",
+      "equilibriumTemperatureK": 104.9,
+      "irradianceEarth": 0.0203,
+      "discoveryYear": 2002,
+      "discoveryMethod": "Radial Velocity",
+      "fit": {
+        "rotation": "unknown"
+      },
+      "surface": "cold-giant"
+    }
+  ],
+  "scaleModes": {},
+  "system": {
+    "id": "55-cnc",
+    "name": "55 Cancri",
+    "nameRu": "55 Рака",
+    "distancePc": 12.586,
+    "habitableZoneAu": {
+      "innerAu": 0.76003,
+      "outerAu": 1.09493
+    },
+    "source": {
+      "table": "NASA Exoplanet Archive, Planetary Systems Composite Parameters (pscomppars)",
+      "url": "https://exoplanetarchive.ipac.caltech.edu/",
+      "archiveHostname": "55 Cnc",
+      "referencePlaneInclinationDeg": 89.73
+    },
+    "sceneNoteRu": "Орбиты и размеры измерены; поверхности процедурные (ни одна экзопланета не сфотографирована). Значения с пометкой fit — оценки."
+  }
+}

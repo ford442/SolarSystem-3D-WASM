@@ -1,8 +1,7 @@
 import './style.css';
 import Module, { type SolarSystemModule, type SolarSystemModuleConfig } from './SolarSystem.js';
-import { buildShareableUrl, parseDeepLinkFromUrl } from './deepLink';
+import { buildShareableUrl, parseDeepLinkFromUrl, runtimeLinkReaders } from './deepLink';
 import { queryRequired, queryRequiredIn } from './dom';
-import { isoDateFromJulianDate } from './ephemeris';
 import { showFatalPanel } from './fatalOverlay';
 import { initEducationalLayer } from './educationalLayer';
 import { initObservePanel, type ObservePanelController } from './observe';
@@ -11,12 +10,13 @@ import { PlanetExplorer } from './planetExplorer';
 import { createProgressCallbacks } from './progressOverlay';
 import { createMusicPlayer } from './music';
 import { initSettingsPanel } from './settingsPanel';
+import { initSystemPicker, loadSystemIndex, SOL_SYSTEM_ID, systemFactsUrl } from './systemPicker';
 import { initTimelineEditor } from './timelineEditor';
 import { initTouchControls, isMobileLikeDevice } from './touchControls';
 import { initWebXr } from './webxr';
 import { installPerfHud, perfHudRequested } from './perfHud';
 import { createSolarSystemRuntime, exposeConsoleHelpers, type SolarSystemRuntime } from './wasmBridge';
-import { installWasmCallbacksOnConfig, setModuleInstance } from './wasmCallbacks';
+import { installWasmCallbacksOnConfig, registerWasmCallbacks, setModuleInstance } from './wasmCallbacks';
 import { assetCacheEnabled, createAssetFetcher } from './assetCache';
 import { computeWebGlSizing } from './webglContext';
 import { chooseWasmVariant, locateWasmFile, THREADED_GLUE } from './wasmVariant';
@@ -80,6 +80,7 @@ const exitVrButton = queryRequired('exit-vr', HTMLButtonElement);
 const explorerPanel = queryRequired('explorer-panel');
 const explorerMissions = queryRequired('explorer-missions');
 const explorerMissionList = queryRequired('explorer-mission-list');
+const systemPickerRoot = queryRequired('system-picker');
 const tourPlay = queryRequired('tour-play', HTMLButtonElement);
 const tourStop = queryRequired('tour-stop', HTMLButtonElement);
 const tourCopyStep = queryRequired('tour-copy-step', HTMLButtonElement);
@@ -172,21 +173,7 @@ function currentViewUrl(): string {
     if (!runtime) {
         return window.location.href;
     }
-    return buildShareableUrl({
-        getQualityPreset: () => runtime.getQualityPreset(),
-        getTimeScale: () => runtime.getTimeScale(),
-        getPaused: () => runtime.getPaused(),
-        getSimulationEpoch: () => runtime.getSimulationEpoch(),
-        getOrbitScaleMode: () => runtime.getOrbitScaleMode(),
-        getShadowQuality: () => runtime.getShadowQuality(),
-        getOrbitLines: () => runtime.getOrbitLines(),
-        getMagneticFields: () => runtime.getMagneticFields(),
-        getFocusedPlanetIndex: () => runtime.getFocusedPlanetIndex(),
-        getFocusedMission: () => runtime.getFocusedMission(),
-        getCameraPose: () => runtime.getCameraPose(),
-        getObserveState: () => runtime.getObserveState(),
-        isoDateFromJulianDate,
-    });
+    return buildShareableUrl(runtimeLinkReaders(runtime));
 }
 
 function pauseMainLoop(): void {
@@ -294,8 +281,12 @@ void startModule()
             }
 
             const deepLink = parseDeepLinkFromUrl();
+            const systemIndexPromise = loadSystemIndex(deployedBaseUrl.toString()).catch((error: unknown) => {
+                console.warn('[Systems] index unavailable; the picker is hidden:', error);
+                return null;
+            });
             const explorer = new PlanetExplorer(explorerPanel);
-            void explorer
+            const explorerReady = explorer
                 .init(
                     {
                         focusPlanet: runtime.focusPlanet.bind(runtime),
@@ -423,12 +414,53 @@ void startModule()
             observeController = initObservePanel({
                 elements: observeElements,
                 runtime,
-                startInObserve: deepLink.mode === 'observe',
+                startInObserve: deepLink.mode === 'observe' && deepLink.system === undefined,
                 deepLink: { ...deepLink.observer, paused: deepLink.paused },
                 epochFromLink: deepLink.julianDate !== undefined || deepLink.simulationDate !== undefined,
                 onModeChanged: (active) => {
                     explorerPanel.classList.toggle('is-observing', active);
                 },
+            });
+
+            // Star systems (ARCHITECTURE §12). C++ swaps the scene and reports it as phase 1 of
+            // onSystemChanged — after a jump, and once at start-up for a `?system=` link, which C++
+            // reads itself while building the scene (after this code has run with Sol's UI).
+            const observe = observeController;
+            const applySystem = (id: string): void => {
+                const inSol = id === SOL_SYSTEM_ID;
+                document.body.classList.toggle('in-other-system', !inSol);
+                observe.setAvailable(inSol, 'Observe stands on Earth, so it is only in the Solar System');
+                void explorerReady
+                    .then(() => explorer.showSystem(id, systemFactsUrl(id, deployedBaseUrl.toString())))
+                    .catch((error: unknown) => {
+                        console.error('[Systems] facts failed to load:', error);
+                    });
+            };
+            let linkSystemArrived = false;
+            registerWasmCallbacks({
+                onSystemChanged: (id: string, phase: number) => {
+                    if (phase !== 1) return;
+                    applySystem(id);
+                    if (!linkSystemArrived && id === deepLink.system) {
+                        // The landing replaced what the settings panel applied from the link.
+                        linkSystemArrived = true;
+                        if (deepLink.timeScale !== undefined) runtime.setTimeScale(deepLink.timeScale);
+                        if (deepLink.camera) {
+                            const { x, y, z, yaw, pitch } = deepLink.camera;
+                            runtime.setCameraPose(x, y, z, yaw, pitch);
+                        }
+                    }
+                },
+            });
+            if (runtime.getActiveSystemId() !== SOL_SYSTEM_ID) {
+                applySystem(runtime.getActiveSystemId());
+            }
+            void systemIndexPromise.then((index) => {
+                if (!index || index.systems.length < 2) {
+                    systemPickerRoot.hidden = true;
+                    return;
+                }
+                initSystemPicker({ root: systemPickerRoot, runtime, index, status: settingsStatus });
             });
 
             const tourPlayer = initEducationalLayer({

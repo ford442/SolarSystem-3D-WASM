@@ -1,0 +1,165 @@
+{
+  "version": 2,
+  "generatedFrom": "resource/systems/kepler-186.catalog.json",
+  "indexConvention": "Star=0, planets 1… by semi-major axis; matches the active system's OrbitLayout table",
+  "sceneNote": "Measured orbits and sizes; surfaces are procedural (no exoplanet has been imaged). Values marked fit are estimates.",
+  "bodies": [
+    {
+      "index": 0,
+      "id": "kepler_186",
+      "name": "Kepler-186",
+      "nameRu": "Kepler-186",
+      "type": "star",
+      "diameterKm": 656741,
+      "massEarths": 159148,
+      "siderealRotationDays": null,
+      "orbitalPeriodDays": null,
+      "distanceAu": 0,
+      "moons": 0,
+      "summary": "M1 star 579.2 light-years away; 5 known planets in the archive's composite table.",
+      "summaryRu": "Звезда класса M1 на расстоянии 579.2 св. лет; известных планет: 5.",
+      "spectralType": "M1",
+      "effectiveTemperatureK": 3788,
+      "luminositySolar": 0.0412098,
+      "distancePc": 177.594
+    },
+    {
+      "index": 1,
+      "id": "kepler_186_b",
+      "name": "Kepler-186 b",
+      "nameRu": "Kepler-186 b",
+      "type": "terrestrial",
+      "diameterKm": 13634,
+      "massEarths": 1.24,
+      "siderealRotationDays": 3.886791,
+      "orbitalPeriodDays": 3.8867907,
+      "distanceAu": 0.0343,
+      "moons": 0,
+      "summary": "Terrestrial discovered in 2014 (transit); 35.03× Earth's insolation, equilibrium temperature ≈ 571 K.",
+      "summaryRu": "Планета земного типа, открыта в 2014 г. транзитным методом; освещённость 35.03 от земной, равновесная температура ≈ 571 K.",
+      "equilibriumTemperatureK": 571,
+      "irradianceEarth": 35.0277,
+      "discoveryYear": 2014,
+      "discoveryMethod": "Transit",
+      "fit": {
+        "argumentOfPeriastron": true,
+        "rotation": "tidally-locked"
+      },
+      "surface": "scorched"
+    },
+    {
+      "index": 2,
+      "id": "kepler_186_c",
+      "name": "Kepler-186 c",
+      "nameRu": "Kepler-186 c",
+      "type": "super-earth",
+      "diameterKm": 15928,
+      "massEarths": 2.1,
+      "siderealRotationDays": 7.267302,
+      "orbitalPeriodDays": 7.267302,
+      "distanceAu": 0.0451,
+      "moons": 0,
+      "summary": "Super-earth discovered in 2014 (transit); 20.26× Earth's insolation, equilibrium temperature ≈ 464 K.",
+      "summaryRu": "Суперземля, открыта в 2014 г. транзитным методом; освещённость 20.26 от земной, равновесная температура ≈ 464 K.",
+      "equilibriumTemperatureK": 464,
+      "irradianceEarth": 20.2603,
+      "discoveryYear": 2014,
+      "discoveryMethod": "Transit",
+      "fit": {
+        "argumentOfPeriastron": true,
+        "rotation": "tidally-locked"
+      },
+      "surface": "scorched"
+    },
+    {
+      "index": 3,
+      "id": "kepler_186_d",
+      "name": "Kepler-186 d",
+      "nameRu": "Kepler-186 d",
+      "type": "super-earth",
+      "diameterKm": 17839,
+      "massEarths": 2.54,
+      "siderealRotationDays": 13.342996,
+      "orbitalPeriodDays": 13.342996,
+      "distanceAu": 0.0781,
+      "moons": 0,
+      "summary": "Super-earth discovered in 2014 (transit); 6.76× Earth's insolation, equilibrium temperature ≈ 379 K.",
+      "summaryRu": "Суперземля, открыта в 2014 г. транзитным методом; освещённость 6.76 от земной, равновесная температура ≈ 379 K.",
+      "equilibriumTemperatureK": 379,
+      "irradianceEarth": 6.7561,
+      "discoveryYear": 2014,
+      "discoveryMethod": "Transit",
+      "fit": {
+        "argumentOfPeriastron": true,
+        "rotation": "tidally-locked"
+      },
+      "surface": "scorched"
+    },
+    {
+      "index": 4,
+      "id": "kepler_186_e",
+      "name": "Kepler-186 e",
+      "nameRu": "Kepler-186 e",
+      "type": "super-earth",
+      "diameterKm": 16182,
+      "massEarths": 2.15,
+      "siderealRotationDays": 22.407704,
+      "orbitalPeriodDays": 22.407704,
+      "distanceAu": 0.11,
+      "moons": 0,
+      "summary": "Super-earth discovered in 2014 (transit); 3.41× Earth's insolation, equilibrium temperature ≈ 319 K.",
+      "summaryRu": "Суперземля, открыта в 2014 г. транзитным методом; освещённость 3.41 от земной, равновесная температура ≈ 319 K.",
+      "equilibriumTemperatureK": 319,
+      "irradianceEarth": 3.4058,
+      "discoveryYear": 2014,
+      "discoveryMethod": "Transit",
+      "fit": {
+        "argumentOfPeriastron": true,
+        "rotation": "tidally-locked"
+      },
+      "surface": "ocean"
+    },
+    {
+      "index": 5,
+      "id": "kepler_186_f",
+      "name": "Kepler-186 f",
+      "nameRu": "Kepler-186 f",
+      "type": "terrestrial",
+      "diameterKm": 14908,
+      "massEarths": 1.71,
+      "siderealRotationDays": 1,
+      "orbitalPeriodDays": 129.9441,
+      "distanceAu": 0.432,
+      "moons": 0,
+      "summary": "Terrestrial discovered in 2014 (transit); 0.22× Earth's insolation, equilibrium temperature ≈ 177 K.",
+      "summaryRu": "Планета земного типа, открыта в 2014 г. транзитным методом; освещённость 0.22 от земной, равновесная температура ≈ 177 K.",
+      "equilibriumTemperatureK": 177,
+      "irradianceEarth": 0.2208,
+      "discoveryYear": 2014,
+      "discoveryMethod": "Transit",
+      "fit": {
+        "argumentOfPeriastron": true,
+        "rotation": "unknown"
+      },
+      "surface": "ice"
+    }
+  ],
+  "scaleModes": {},
+  "system": {
+    "id": "kepler-186",
+    "name": "Kepler-186",
+    "nameRu": "Kepler-186",
+    "distancePc": 177.594,
+    "habitableZoneAu": {
+      "innerAu": 0.19355,
+      "outerAu": 0.27884
+    },
+    "source": {
+      "table": "NASA Exoplanet Archive, Planetary Systems Composite Parameters (pscomppars)",
+      "url": "https://exoplanetarchive.ipac.caltech.edu/",
+      "archiveHostname": "Kepler-186",
+      "referencePlaneInclinationDeg": 89.84
+    },
+    "sceneNoteRu": "Орбиты и размеры измерены; поверхности процедурные (ни одна экзопланета не сфотографирована). Значения с пометкой fit — оценки."
+  }
+}

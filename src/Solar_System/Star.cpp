@@ -1,10 +1,14 @@
 #include "Star.h"
+#include "SpaceObject.h"
 #include "../gfx/TextureUnits.h"
 
-Star::Star(StarInfo&& starInfo) : SpaceObject(starInfo.starModel, starInfo.engName, starInfo.otherLangName),
-    _starTemperature(starInfo.starTemperature), _starRadius(starInfo.starRadius), _glowTintMult(starInfo.glowTintMult),
-    _starSpectrumTexture(std::move(starInfo.starSpectrum))
-{
+#include <utility>
+
+Star::Star(StarInfo&& starInfo)
+    : SpaceObject(starInfo.starModel, starInfo.engName, starInfo.otherLangName),
+      _starTemperature(starInfo.starTemperature), _starRadius(starInfo.starRadius),
+      _glowTintMult(starInfo.glowTintMult * starInfo.lightTint), _lightTint(starInfo.lightTint),
+      _activity(starInfo.activity), _starSpectrumTexture(std::move(starInfo.starSpectrum)) {
     InitBuffers();
 #ifndef __EMSCRIPTEN__
     for (GlQuery& query : _starOcclusion) {
@@ -94,9 +98,11 @@ GLuint Star::GetStarOcclusionValue(size_t index) const {
 }
 
 void Star::CalculateShiftColor() {
+    // The tuned photosphere/corona ramp, tinted by the star's light (x 1 for the Sun).
     _starShiftColor = glm::vec3(_starTemperature * (0.0534 / 255.0) - (43.0 / 255.0),
                                 _starTemperature * (0.0628 / 255.0) - (77.0 / 255.0),
-                                _starTemperature * (0.0735 / 255.0) - (115.0 / 255.0));
+                                _starTemperature * (0.0735 / 255.0) - (115.0 / 255.0)) *
+                      _lightTint;
 }
 
 void Star::CalculateGlowSize(float distance) {

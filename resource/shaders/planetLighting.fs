@@ -3,7 +3,8 @@
 // render.shaderFlags and which maps are resident (ShaderLibrary caches each combination).
 // NEAR_SURFACE (planetLighting.vs) writes depth per fragment. The material itself is
 // common/planet_surface.glsl, which terrain.fs shares.
-// permutations: HAS_NIGHT_TEXTURE HAS_SPECULAR_MAP HAS_CLOUDS USE_SPHERE_INTERSECT NEAR_SURFACE
+// PROCEDURAL_SURFACE replaces the maps with noise (render.procedural, exoplanets).
+// permutations: HAS_NIGHT_TEXTURE HAS_SPECULAR_MAP HAS_CLOUDS USE_SPHERE_INTERSECT NEAR_SURFACE PROCEDURAL_SURFACE
 #ifdef NEAR_SURFACE
 in float vLogDepth;
 #endif

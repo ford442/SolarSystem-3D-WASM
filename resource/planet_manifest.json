@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "generatedFrom": "resource/planets.catalog.json",
+  "generatedFrom": "resource/systems/sol.catalog.json",
   "systems": [
     {
       "name": "Mercury",

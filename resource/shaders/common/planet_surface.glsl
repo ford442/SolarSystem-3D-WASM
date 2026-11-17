@@ -9,7 +9,11 @@
 //                                                   // gradients that do not jump at the seam
 // and, for relief to bend the normal map, SURFACE_RELIEF.
 // Switches it reads: HAS_NIGHT_TEXTURE HAS_SPECULAR_MAP HAS_CLOUDS USE_SPHERE_INTERSECT
+// PROCEDURAL_SURFACE (no maps: albedo from common/procedural_surface.glsl)
 #include "common/frame.glsl"
+#ifdef PROCEDURAL_SURFACE
+#include "common/procedural_surface.glsl"
+#endif
 #include "common/raytrace.glsl"
 #include "common/ring.glsl"
 #include "common/eclipse.glsl"
@@ -107,10 +111,16 @@ float CalculateShadow(vec4 fragPosLightSpace, vec3 fragPos) {
 // SURFACE_RELIEF folds into the normal map (on the bare sphere it is (0, 0, 1) and changes
 // nothing). `fragPos` is the render-frame position the shadow and eclipse tests use.
 vec3 ShadePlanetSurface(vec2 uv, vec3 relief, vec3 lightDir, vec3 viewDir, vec3 fragPos, vec4 fragPosLightSpace) {
+#ifdef PROCEDURAL_SURFACE
+    vec4 procedural = ProceduralAlbedo(uv);
+    vec3 diffuseColor = procedural.rgb;
+    vec3 normal = vec3(0.0, 0.0, 1.0);
+#else
     vec3 diffuseColor = SurfaceTexture(mainDiffuseTexture, uv).rgb;
 
     vec3 normal = SurfaceTexture(normalMap, uv).rgb;
     normal = normalize(normal * 2.0 - 1.0);
+#endif
 #ifdef SURFACE_RELIEF
     // Whiteout blend: the map's detail rides on the relief's slope.
     normal = normalize(vec3(normal.xy + relief.xy, normal.z * relief.z));
@@ -140,7 +150,12 @@ vec3 ShadePlanetSurface(vec2 uv, vec3 relief, vec3 lightDir, vec3 viewDir, vec3 
     if (shadow < 0.05)
         ambient *= 0.1;
 
-    vec3 lighting = ambient + shadow * diffuseColor;
+    // Lit by the system's star: frame.starColor is (1, 1, 1) for the Sun, red for an M dwarf.
+    vec3 lighting = (ambient + shadow * diffuseColor) * frame.starColor.rgb;
+#ifdef PROCEDURAL_SURFACE
+    // Lava and hot giants glow on their own, night side included.
+    lighting += procedural.rgb * procedural.a;
+#endif
 
 #ifdef HAS_SPECULAR_MAP
     // Blinn-Phong highlight, masked by the map (oceans on Earth) and faded at the terminator.

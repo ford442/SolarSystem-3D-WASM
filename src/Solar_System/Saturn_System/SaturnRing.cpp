@@ -1,7 +1,7 @@
 #include "SaturnRing.h"
 #include "../../gfx/TextureUnits.h"
 #include "../TexturePaths.h"
-#include "../BodyCatalog.generated.h"
+#include "../BodyCatalog.h"
 #include "../OrbitLayout.h"
 
 SaturnRing::SaturnRing(PlanetaryRingInfo&& planetaryRingInfo, std::shared_ptr<Planet> parent) : PlanetaryRing(std::move(planetaryRingInfo), std::move(parent)) {

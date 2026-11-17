@@ -1,5 +1,14 @@
 {
   "schemaVersion": 1,
+  "system": {
+    "id": "sol",
+    "name": {
+      "en": "Solar System",
+      "ru": "Солнечная система"
+    },
+    "distancePc": 0,
+    "spectralType": "G2V"
+  },
   "generatedOutputs": [
     "web/public/planet_facts.json",
     "web/threejs/src/data/orbital-parameters.json",
@@ -88,6 +97,17 @@
         "rotationRate": 0.005,
         "primeMeridianDegJ2000": 84.176,
         "primeMeridianRateDegPerDay": 14.1844
+      },
+      "render": {
+        "star": {
+          "effectiveTemperatureK": 5772,
+          "radiusSolar": 1,
+          "luminositySolar": 1,
+          "massSolar": 1,
+          "spectralType": "G2V",
+          "glowTemperatureK": 5778,
+          "activity": 0
+        }
       },
       "includeInCompanion": false
     },
@@ -1772,7 +1792,8 @@
           "OmegaDotDegPerDay": -2.2e-06,
           "omegaDotDegPerDay": 0.1606539
         
-        }
+        },
+        "placeFromElements": true
       },
       "includeInCompanion": false,
       "render": {
@@ -1843,7 +1864,8 @@
           "OmegaDotDegPerDay": -0.0010529,
           "omegaDotDegPerDay": 0.1615026
         
-        }
+        },
+        "placeFromElements": true
       },
       "includeInCompanion": false,
       "render": {
@@ -1914,7 +1936,8 @@
           "OmegaDotDegPerDay": -0.0004511,
           "omegaDotDegPerDay": 0.0048602
         
-        }
+        },
+        "placeFromElements": true
       },
       "includeInCompanion": false,
       "render": {
@@ -1985,7 +2008,8 @@
           "OmegaDotDegPerDay": -8.49e-05,
           "omegaDotDegPerDay": 0.0018625
         
-        }
+        },
+        "placeFromElements": true
       },
       "includeInCompanion": false,
       "render": {
@@ -2406,7 +2430,8 @@
           "OmegaDotDegPerDay": -1.5e-05,
           "omegaDotDegPerDay": 0.0014296
         
-        }
+        },
+        "placeFromElements": true
       },
       "includeInCompanion": false,
       "render": {
@@ -2923,7 +2948,8 @@
           "OmegaDotDegPerDay": 0.000718,
           "omegaDotDegPerDay": 0.0012525
         
-        }
+        },
+        "placeFromElements": true
       },
       "includeInCompanion": false,
       "render": {

@@ -68,7 +68,9 @@ bool TextureLoadingQueue::QueueTextureLoad(const std::string& path, const std::s
         return false;
     }
     _pendingPaths.insert(path);
-    _queue.push({path, id, texture, callback, category, 0, std::chrono::steady_clock::time_point{}});
+    TextureLoadJob job{path, id, texture, std::move(callback), category, 0, std::chrono::steady_clock::time_point{}};
+    job.epoch = _epoch;
+    _queue.push(std::move(job));
     _totalQueued++;
     _categoryQueued.at(static_cast<size_t>(category))++;
     ProcessQueue();
@@ -96,6 +98,9 @@ void TextureLoadingQueue::SetMaxConcurrentLoads(int maxConcurrentLoads) {
 }
 
 void TextureLoadingQueue::HandleDownloadResult(TextureLoadJob job, bool success) {
+    if (job.epoch != _epoch) {
+        return; // CancelAll: the texture and the callback's owner are gone
+    }
     if (_cancelledPaths.erase(job.path)) {
         _pendingPaths.erase(job.path);
         _totalCancelled++;
@@ -117,7 +122,7 @@ void TextureLoadingQueue::HandleDownloadResult(TextureLoadJob job, bool success)
                 HandleTextureApplied(std::move(job), result);
                 ProcessQueue();
             },
-            [this, path] { return _cancelledPaths.count(path) == 0; });
+            [this, path, epoch = job.epoch] { return epoch == _epoch && _cancelledPaths.count(path) == 0; });
         return;
     }
 
@@ -125,6 +130,9 @@ void TextureLoadingQueue::HandleDownloadResult(TextureLoadJob job, bool success)
 }
 
 void TextureLoadingQueue::HandleTextureApplied(TextureLoadJob job, TextureImage2D::AsyncResult result) {
+    if (job.epoch != _epoch) {
+        return; // CancelAll
+    }
     switch (result) {
         case TextureImage2D::AsyncResult::Uploaded:
             LOG_DEBUG("TextureLoadingQueue", "Successfully loaded: %s", job.textureId.c_str());
@@ -215,6 +223,18 @@ int TextureLoadingQueue::GetCategoryQueued(TextureLoadCategory category) const {
 
 int TextureLoadingQueue::GetCategoryCompleted(TextureLoadCategory category) const {
     return _categoryCompleted.at(static_cast<size_t>(category));
+}
+
+void TextureLoadingQueue::CancelAll() {
+    ++_epoch;
+    _totalCancelled += static_cast<int>(_queue.size());
+    while (!_queue.empty()) {
+        _queue.pop();
+    }
+    _pendingPaths.clear();
+    _cancelledPaths.clear();
+    _currentPath.clear();
+    LOG_INFO("TextureLoadingQueue", "Cancelled every pending texture load (scene teardown)");
 }
 
 void TextureLoadingQueue::CancelLoad(const std::string& path) {

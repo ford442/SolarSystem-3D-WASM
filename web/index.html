@@ -1,308 +1,443 @@
 <!doctype html>
 <html lang="en">
-  <head>
-    <meta charset="UTF-8" />
-    <link rel="icon" type="image/svg+xml" href="/vite.svg" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
-    <title>SolarSystem WASM</title>
-    <style>
-      /* FOUC-critical: canvas fills the viewport before style.css loads. */
-      body { margin: 0; overflow: hidden; background-color: black; touch-action: none; overscroll-behavior: none; }
-      html { touch-action: none; overscroll-behavior: none; }
-      canvas.emscripten { border: 0px none; background-color: black; width: 100vw; height: 100vh; display: block; touch-action: none; }
-    </style>
-  </head>
-  <body>
-    <div id="loading-container">
-      <div id="loading-text">Loading SolarSystem...</div>
-      <div id="progress-bar-container">
-        <div id="progress-bar"></div>
-      </div>
-      <div id="progress-text">0%</div>
-    </div>
-    <div id="streaming-progress">
-      <div id="streaming-text"></div>
-      <div id="streaming-progress-bar-container">
-        <div id="streaming-progress-bar"></div>
-      </div>
-    </div>
-    <aside id="explorer-panel" class="explorer-panel" aria-label="Solar system explorer">
-      <button
-        id="explorer-toggle"
-        class="explorer-toggle"
-        type="button"
-        aria-expanded="true"
-        aria-controls="explorer-controls"
-      >
-        <span>Explorer</span>
-        <span class="explorer-toggle-icon" aria-hidden="true">−</span>
-      </button>
-      <div id="explorer-controls" class="explorer-controls">
-        <label class="explorer-row" for="orbit-scale-mode">
-          <span>Orbit scale</span>
-          <select id="orbit-scale-mode">
-            <option value="0">Compressed</option>
-            <option value="1">Realistic</option>
-          </select>
-        </label>
-        <small id="orbit-scale-help" class="explorer-help">
-          Artistic spacing for navigation — all worlds stay within a few thousand scene units.
-        </small>
-        <div id="explorer-conjunction" class="conjunction-chip" hidden>
-          <p id="explorer-conjunction-text" class="conjunction-chip-text"></p>
-          <button id="explorer-conjunction-jump" class="conjunction-chip-jump" type="button">Jump to conjunction</button>
-        </div>
-
-        <div id="explorer-missions" class="explorer-missions" hidden>
-          <p class="explorer-missions-label">Missions</p>
-          <div id="explorer-mission-list" class="explorer-body-list" role="listbox" aria-label="Mission trajectories"></div>
-        </div>
-
-        <div id="explorer-body-list" class="explorer-body-list" role="listbox" aria-label="Celestial bodies"></div>
-
-        <article id="planet-info-card" class="planet-info-card" hidden>
-          <div id="planet-info-header" class="planet-info-header">
-            <h2 id="planet-info-title" class="planet-info-title">Earth</h2>
-            <button id="planet-info-dismiss" class="planet-info-dismiss" type="button" aria-label="Dismiss info card">×</button>
-          </div>
-          <p id="planet-info-summary" class="planet-info-summary"></p>
-          <dl id="planet-info-facts" class="planet-info-facts"></dl>
-        </article>
-
-        <p id="explorer-status" class="explorer-status" aria-live="polite">Loading facts…</p>
-      </div>
-    </aside>
-    <aside id="settings-panel" class="settings-panel" aria-label="Simulation settings">
-      <button
-        id="settings-toggle"
-        class="settings-toggle"
-        type="button"
-        aria-expanded="true"
-        aria-controls="settings-controls"
-      >
-        <span>Simulation</span>
-        <span class="settings-toggle-icon" aria-hidden="true">−</span>
-      </button>
-      <div id="settings-controls" class="settings-controls">
-        <fieldset id="settings-fieldset" disabled>
-          <label class="settings-row" for="quality-preset">
-            <span>Quality</span>
-            <select id="quality-preset">
-              <option value="0">Low</option>
-              <option value="1">Medium</option>
-              <option value="2">Full</option>
-            </select>
-          </label>
-
-          <section id="observe-section" class="observe-section" aria-label="View mode">
-            <div class="observe-mode" role="group" aria-label="View mode">
-              <button id="mode-explore" class="observe-mode-btn" type="button" aria-pressed="true">Explore</button>
-              <button id="mode-observe" class="observe-mode-btn" type="button" aria-pressed="false" title="Stand on Earth at a place and time and look up (O)">Observe</button>
+    <head>
+        <meta charset="UTF-8" />
+        <link rel="icon" type="image/svg+xml" href="/vite.svg" />
+        <meta
+            name="viewport"
+            content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover"
+        />
+        <title>SolarSystem WASM</title>
+        <style>
+            /* FOUC-critical: canvas fills the viewport before style.css loads. */
+            body {
+                margin: 0;
+                overflow: hidden;
+                background-color: black;
+                touch-action: none;
+                overscroll-behavior: none;
+            }
+            html {
+                touch-action: none;
+                overscroll-behavior: none;
+            }
+            canvas.emscripten {
+                border: 0px none;
+                background-color: black;
+                width: 100vw;
+                height: 100vh;
+                display: block;
+                touch-action: none;
+            }
+        </style>
+    </head>
+    <body>
+        <div id="loading-container">
+            <div id="loading-text">Loading SolarSystem...</div>
+            <div id="progress-bar-container">
+                <div id="progress-bar"></div>
             </div>
-            <div id="observe-controls" class="observe-controls" hidden>
-              <label class="settings-row" for="observe-site">
-                <span>Site</span>
-                <select id="observe-site"></select>
-              </label>
-              <div class="observe-latlon">
-                <label for="observe-lat"><span>Lat</span>
-                  <input id="observe-lat" type="number" min="-90" max="90" step="0.01" inputmode="decimal" />
+            <div id="progress-text">0%</div>
+        </div>
+        <div id="streaming-progress">
+            <div id="streaming-text"></div>
+            <div id="streaming-progress-bar-container">
+                <div id="streaming-progress-bar"></div>
+            </div>
+        </div>
+        <aside id="explorer-panel" class="explorer-panel" aria-label="Solar system explorer">
+            <button
+                id="explorer-toggle"
+                class="explorer-toggle"
+                type="button"
+                aria-expanded="true"
+                aria-controls="explorer-controls"
+            >
+                <span>Explorer</span>
+                <span class="explorer-toggle-icon" aria-hidden="true">−</span>
+            </button>
+            <div id="explorer-controls" class="explorer-controls">
+                <section id="system-picker" class="system-picker" aria-label="Star systems">
+                    <div class="system-picker-head">
+                        <span class="system-picker-label">Star system</span>
+                        <strong id="system-current" class="system-current">Solar System</strong>
+                        <button
+                            id="system-home"
+                            class="system-home"
+                            type="button"
+                            title="Back to the Solar System"
+                            hidden
+                        >
+                            ⌂ Sol
+                        </button>
+                    </div>
+                    <div
+                        id="system-list"
+                        class="explorer-body-list system-list"
+                        role="listbox"
+                        aria-label="Star systems by distance"
+                    ></div>
+                    <small id="system-note" class="explorer-help"></small>
+                </section>
+
+                <label class="explorer-row" for="orbit-scale-mode">
+                    <span>Orbit scale</span>
+                    <select id="orbit-scale-mode">
+                        <option value="0">Compressed</option>
+                        <option value="1">Realistic</option>
+                    </select>
                 </label>
-                <label for="observe-lon"><span>Lon</span>
-                  <input id="observe-lon" type="number" min="-180" max="180" step="0.01" inputmode="decimal" />
+                <small id="orbit-scale-help" class="explorer-help">
+                    Artistic spacing for navigation — all worlds stay within a few thousand scene units.
+                </small>
+                <div id="explorer-conjunction" class="conjunction-chip" hidden>
+                    <p id="explorer-conjunction-text" class="conjunction-chip-text"></p>
+                    <button id="explorer-conjunction-jump" class="conjunction-chip-jump" type="button">
+                        Jump to conjunction
+                    </button>
+                </div>
+
+                <div id="explorer-missions" class="explorer-missions" hidden>
+                    <p class="explorer-missions-label">Missions</p>
+                    <div
+                        id="explorer-mission-list"
+                        class="explorer-body-list"
+                        role="listbox"
+                        aria-label="Mission trajectories"
+                    ></div>
+                </div>
+
+                <div
+                    id="explorer-body-list"
+                    class="explorer-body-list"
+                    role="listbox"
+                    aria-label="Celestial bodies"
+                ></div>
+
+                <article id="planet-info-card" class="planet-info-card" hidden>
+                    <div id="planet-info-header" class="planet-info-header">
+                        <h2 id="planet-info-title" class="planet-info-title">Earth</h2>
+                        <button
+                            id="planet-info-dismiss"
+                            class="planet-info-dismiss"
+                            type="button"
+                            aria-label="Dismiss info card"
+                        >
+                            ×
+                        </button>
+                    </div>
+                    <p id="planet-info-summary" class="planet-info-summary"></p>
+                    <dl id="planet-info-facts" class="planet-info-facts"></dl>
+                </article>
+
+                <p id="explorer-status" class="explorer-status" aria-live="polite">Loading facts…</p>
+            </div>
+        </aside>
+        <aside id="settings-panel" class="settings-panel" aria-label="Simulation settings">
+            <button
+                id="settings-toggle"
+                class="settings-toggle"
+                type="button"
+                aria-expanded="true"
+                aria-controls="settings-controls"
+            >
+                <span>Simulation</span>
+                <span class="settings-toggle-icon" aria-hidden="true">−</span>
+            </button>
+            <div id="settings-controls" class="settings-controls">
+                <fieldset id="settings-fieldset" disabled>
+                    <label class="settings-row" for="quality-preset">
+                        <span>Quality</span>
+                        <select id="quality-preset">
+                            <option value="0">Low</option>
+                            <option value="1">Medium</option>
+                            <option value="2">Full</option>
+                        </select>
+                    </label>
+
+                    <section id="observe-section" class="observe-section" aria-label="View mode">
+                        <div class="observe-mode" role="group" aria-label="View mode">
+                            <button id="mode-explore" class="observe-mode-btn" type="button" aria-pressed="true">
+                                Explore
+                            </button>
+                            <button
+                                id="mode-observe"
+                                class="observe-mode-btn"
+                                type="button"
+                                aria-pressed="false"
+                                title="Stand on Earth at a place and time and look up (O)"
+                            >
+                                Observe
+                            </button>
+                        </div>
+                        <div id="observe-controls" class="observe-controls" hidden>
+                            <label class="settings-row" for="observe-site">
+                                <span>Site</span>
+                                <select id="observe-site"></select>
+                            </label>
+                            <div class="observe-latlon">
+                                <label for="observe-lat"
+                                    ><span>Lat</span>
+                                    <input
+                                        id="observe-lat"
+                                        type="number"
+                                        min="-90"
+                                        max="90"
+                                        step="0.01"
+                                        inputmode="decimal"
+                                    />
+                                </label>
+                                <label for="observe-lon"
+                                    ><span>Lon</span>
+                                    <input
+                                        id="observe-lon"
+                                        type="number"
+                                        min="-180"
+                                        max="180"
+                                        step="0.01"
+                                        inputmode="decimal"
+                                    />
+                                </label>
+                            </div>
+                            <button id="observe-locate" class="settings-date-btn" type="button">Use my location</button>
+                            <label class="settings-row" for="observe-time">
+                                <span>Time (UTC)</span>
+                                <input id="observe-time" type="time" step="1" />
+                            </label>
+                            <div class="settings-date-actions">
+                                <button class="settings-date-btn" type="button" data-step-days="-1">−1 d</button>
+                                <button class="settings-date-btn" type="button" data-step-days="-0.0416667">
+                                    −1 h
+                                </button>
+                                <button class="settings-date-btn" type="button" data-step-days="0.0416667">+1 h</button>
+                                <button class="settings-date-btn" type="button" data-step-days="1">+1 d</button>
+                                <button id="observe-now" class="settings-date-btn" type="button">Now</button>
+                            </div>
+                            <label class="settings-row" for="observe-rate">
+                                <span>Rate</span>
+                                <select id="observe-rate"></select>
+                            </label>
+                            <div class="settings-date-actions">
+                                <button id="observe-look-sun" class="settings-date-btn" type="button">
+                                    Look at Sun
+                                </button>
+                                <button id="observe-look-moon" class="settings-date-btn" type="button">
+                                    Look at Moon
+                                </button>
+                            </div>
+                            <label class="settings-row" for="observe-eyepiece">
+                                <span>Telescope</span>
+                                <select id="observe-eyepiece"></select>
+                            </label>
+                            <label class="settings-switch" for="observe-constellations">
+                                <span>Constellation lines</span>
+                                <input id="observe-constellations" type="checkbox" checked />
+                            </label>
+                            <button id="observe-eclipse" class="settings-share" type="button">
+                                2017 total eclipse (Casper, WY)
+                            </button>
+                            <p id="observe-readout" class="observe-readout" aria-live="off"></p>
+                            <small class="observe-disclaimer"
+                                >Visualization, not an almanac: planets ~arcminute, Sun and Moon a few arcseconds,
+                                standard-atmosphere refraction, times in UTC. Drag to look, scroll to zoom.</small
+                            >
+                        </div>
+                    </section>
+
+                    <label class="settings-row" for="simulation-date">
+                        <span>Simulation date</span>
+                        <input id="simulation-date" type="date" min="1800-01-01" max="2050-12-31" />
+                    </label>
+                    <div class="settings-date-actions">
+                        <button id="simulation-date-set" class="settings-date-btn" type="button">Set date</button>
+                        <button id="simulation-date-now" class="settings-date-btn" type="button">Now</button>
+                    </div>
+                    <small id="simulation-date-help">Heliocentric positions from Julian date (Standish approx.)</small>
+                    <div id="next-sky-event" class="conjunction-chip" hidden>
+                        <p id="next-sky-event-text" class="conjunction-chip-text"></p>
+                        <div class="conjunction-chip-actions">
+                            <button id="next-sky-event-jump" class="conjunction-chip-jump" type="button">
+                                Jump to event
+                            </button>
+                            <button id="next-sky-event-landmark" class="conjunction-chip-jump" type="button">
+                                Play
+                            </button>
+                        </div>
+                    </div>
+
+                    <label class="settings-slider" for="time-scale">
+                        <span>Time scale</span>
+                        <output id="time-scale-value" for="time-scale">1×</output>
+                    </label>
+                    <input
+                        id="time-scale"
+                        type="range"
+                        min="-2"
+                        max="4"
+                        step="0.05"
+                        value="0"
+                        aria-describedby="time-scale-help"
+                    />
+                    <small id="time-scale-help">Log scale: 0.01× to 10,000×</small>
+
+                    <label class="settings-switch" for="simulation-paused">
+                        <span>Pause animation</span>
+                        <input id="simulation-paused" type="checkbox" />
+                    </label>
+
+                    <label class="settings-switch" for="shadows-enabled">
+                        <span>Shadows</span>
+                        <input id="shadows-enabled" type="checkbox" checked />
+                    </label>
+
+                    <label class="settings-switch" for="orbit-lines-enabled">
+                        <span>Orbit lines</span>
+                        <input id="orbit-lines-enabled" type="checkbox" checked />
+                    </label>
+
+                    <label
+                        class="settings-switch"
+                        for="magnetic-fields-enabled"
+                        title="Dipole and toroidal ribbons (M). Planets dim and orbit lines fade while on. Bloom on Medium and Full; Low shows the Sun only."
+                    >
+                        <span>Magnetic fields</span>
+                        <input id="magnetic-fields-enabled" type="checkbox" />
+                    </label>
+
+                    <label class="settings-slider" for="music-volume">
+                        <span>Music volume</span>
+                        <output id="music-volume-value" for="music-volume">30%</output>
+                    </label>
+                    <input
+                        id="music-volume"
+                        type="range"
+                        min="0"
+                        max="100"
+                        step="1"
+                        value="30"
+                        aria-describedby="music-volume-help"
+                    />
+                    <small id="music-volume-help">Background music from hosted MP3 assets</small>
+
+                    <label class="settings-switch" for="music-muted">
+                        <span>Mute music</span>
+                        <input id="music-muted" type="checkbox" />
+                    </label>
+
+                    <button id="settings-reset" class="settings-reset" type="button">Reset settings</button>
+                    <button id="copy-view-link" class="settings-share" type="button">Copy link to this view</button>
+                    <div class="tour-controls">
+                        <button id="tour-play" class="settings-share" type="button">Play inner-system tour</button>
+                        <button id="tour-stop" class="settings-reset" type="button" hidden>Stop tour</button>
+                        <button id="tour-copy-step" class="settings-share" type="button" hidden>
+                            Copy link to this tour step
+                        </button>
+                        <button id="timeline-open" class="settings-share" type="button">Cinematics and video…</button>
+                    </div>
+                    <button id="enter-vr" class="settings-vr" type="button" hidden>Enter VR</button>
+                    <button id="exit-vr" class="settings-vr settings-vr-exit" type="button" hidden>Exit VR</button>
+                </fieldset>
+                <p id="settings-status" class="settings-status" aria-live="polite">Initializing controls…</p>
+            </div>
+        </aside>
+        <div id="tour-caption" class="tour-caption" hidden></div>
+        <section id="timeline-panel" class="timeline-panel" aria-label="Cinematic timeline" hidden>
+            <div class="timeline-row">
+                <select id="timeline-select" class="timeline-select" aria-label="Timeline"></select>
+                <button id="timeline-play" class="timeline-btn timeline-btn-primary" type="button">Play</button>
+                <button id="timeline-stop" class="timeline-btn" type="button" title="Stop and give the camera back">
+                    Stop
+                </button>
+                <button
+                    id="timeline-close"
+                    class="timeline-btn timeline-close"
+                    type="button"
+                    aria-label="Close the timeline panel"
+                >
+                    ×
+                </button>
+            </div>
+            <div class="timeline-row">
+                <input
+                    id="timeline-scrub"
+                    class="timeline-scrub"
+                    type="range"
+                    min="0"
+                    max="1"
+                    step="0.01"
+                    value="0"
+                    aria-label="Timeline position"
+                />
+                <output id="timeline-time" class="timeline-time" for="timeline-scrub">0.0 / 0.0 s</output>
+            </div>
+            <details class="timeline-editor">
+                <summary>Keyframes</summary>
+                <div class="timeline-row timeline-wrap">
+                    <label class="timeline-field"
+                        >Focus
+                        <select id="timeline-focus"></select
+                    ></label>
+                    <label class="timeline-field"
+                        >Units
+                        <select id="timeline-units">
+                            <option value="radii">radii</option>
+                            <option value="km">km</option>
+                            <option value="scene">scene</option>
+                        </select>
+                    </label>
+                    <button id="timeline-add-key" class="timeline-btn timeline-btn-primary" type="button">
+                        Add keyframe at current pose
+                    </button>
+                </div>
+                <ol id="timeline-keys" class="timeline-keys"></ol>
+                <div class="timeline-row timeline-wrap">
+                    <button id="timeline-new" class="timeline-btn" type="button">New timeline</button>
+                    <button id="timeline-export" class="timeline-btn" type="button">Export JSON</button>
+                    <label class="timeline-btn timeline-file"
+                        >Import JSON<input id="timeline-import" type="file" accept=".json,application/json"
+                    /></label>
+                    <button id="timeline-copy-link" class="timeline-btn" type="button">Copy link</button>
+                </div>
+            </details>
+            <div class="timeline-row timeline-wrap">
+                <label class="timeline-field"
+                    >Video
+                    <select id="capture-size">
+                        <option value="canvas">Window size</option>
+                        <option value="1280x720">1280 × 720</option>
+                        <option value="1920x1080" selected>1920 × 1080</option>
+                        <option value="3840x2160">3840 × 2160</option>
+                    </select>
                 </label>
-              </div>
-              <button id="observe-locate" class="settings-date-btn" type="button">Use my location</button>
-              <label class="settings-row" for="observe-time">
-                <span>Time (UTC)</span>
-                <input id="observe-time" type="time" step="1" />
-              </label>
-              <div class="settings-date-actions">
-                <button class="settings-date-btn" type="button" data-step-days="-1">−1 d</button>
-                <button class="settings-date-btn" type="button" data-step-days="-0.0416667">−1 h</button>
-                <button class="settings-date-btn" type="button" data-step-days="0.0416667">+1 h</button>
-                <button class="settings-date-btn" type="button" data-step-days="1">+1 d</button>
-                <button id="observe-now" class="settings-date-btn" type="button">Now</button>
-              </div>
-              <label class="settings-row" for="observe-rate">
-                <span>Rate</span>
-                <select id="observe-rate"></select>
-              </label>
-              <div class="settings-date-actions">
-                <button id="observe-look-sun" class="settings-date-btn" type="button">Look at Sun</button>
-                <button id="observe-look-moon" class="settings-date-btn" type="button">Look at Moon</button>
-              </div>
-              <label class="settings-row" for="observe-eyepiece">
-                <span>Telescope</span>
-                <select id="observe-eyepiece"></select>
-              </label>
-              <label class="settings-switch" for="observe-constellations">
-                <span>Constellation lines</span>
-                <input id="observe-constellations" type="checkbox" checked />
-              </label>
-              <button id="observe-eclipse" class="settings-share" type="button">2017 total eclipse (Casper, WY)</button>
-              <p id="observe-readout" class="observe-readout" aria-live="off"></p>
-              <small class="observe-disclaimer">Visualization, not an almanac: planets ~arcminute, Sun and Moon a few arcseconds, standard-atmosphere refraction, times in UTC. Drag to look, scroll to zoom.</small>
+                <label class="timeline-field">
+                    <select id="capture-fps">
+                        <option value="30">30 fps</option>
+                        <option value="60" selected>60 fps</option>
+                    </select>
+                </label>
+                <button id="capture-start" class="timeline-btn timeline-btn-primary" type="button">Record video</button>
+                <button id="capture-cancel" class="timeline-btn" type="button" hidden>Cancel</button>
+                <progress id="capture-progress" class="timeline-progress" max="1" value="0" hidden></progress>
             </div>
-          </section>
-
-          <label class="settings-row" for="simulation-date">
-            <span>Simulation date</span>
-            <input id="simulation-date" type="date" min="1800-01-01" max="2050-12-31" />
-          </label>
-          <div class="settings-date-actions">
-            <button id="simulation-date-set" class="settings-date-btn" type="button">Set date</button>
-            <button id="simulation-date-now" class="settings-date-btn" type="button">Now</button>
-          </div>
-          <small id="simulation-date-help">Heliocentric positions from Julian date (Standish approx.)</small>
-          <div id="next-sky-event" class="conjunction-chip" hidden>
-            <p id="next-sky-event-text" class="conjunction-chip-text"></p>
-            <div class="conjunction-chip-actions">
-              <button id="next-sky-event-jump" class="conjunction-chip-jump" type="button">Jump to event</button>
-              <button id="next-sky-event-landmark" class="conjunction-chip-jump" type="button">Play</button>
+            <p id="timeline-status" class="timeline-status" aria-live="polite"></p>
+        </section>
+        <div id="telescope-overlay" class="telescope-overlay" hidden>
+            <div class="telescope-field" aria-hidden="true"></div>
+            <p id="telescope-label" class="telescope-label"></p>
+        </div>
+        <div id="xr-hud" class="xr-hud" hidden>
+            <p id="xr-tooltip" class="xr-tooltip"></p>
+            <div id="xr-controllers" class="xr-controllers" hidden>
+                <span id="xr-controller-left" class="xr-controller-ray" data-hand="left">L</span>
+                <span id="xr-controller-right" class="xr-controller-ray" data-hand="right">R</span>
             </div>
-          </div>
-
-          <label class="settings-slider" for="time-scale">
-            <span>Time scale</span>
-            <output id="time-scale-value" for="time-scale">1×</output>
-          </label>
-          <input
-            id="time-scale"
-            type="range"
-            min="-2"
-            max="4"
-            step="0.05"
-            value="0"
-            aria-describedby="time-scale-help"
-          />
-          <small id="time-scale-help">Log scale: 0.01× to 10,000×</small>
-
-          <label class="settings-switch" for="simulation-paused">
-            <span>Pause animation</span>
-            <input id="simulation-paused" type="checkbox" />
-          </label>
-
-          <label class="settings-switch" for="shadows-enabled">
-            <span>Shadows</span>
-            <input id="shadows-enabled" type="checkbox" checked />
-          </label>
-
-          <label class="settings-switch" for="orbit-lines-enabled">
-            <span>Orbit lines</span>
-            <input id="orbit-lines-enabled" type="checkbox" checked />
-          </label>
-
-          <label class="settings-switch" for="magnetic-fields-enabled" title="Dipole and toroidal ribbons (M). Planets dim and orbit lines fade while on. Bloom on Medium and Full; Low shows the Sun only.">
-            <span>Magnetic fields</span>
-            <input id="magnetic-fields-enabled" type="checkbox" />
-          </label>
-
-          <label class="settings-slider" for="music-volume">
-            <span>Music volume</span>
-            <output id="music-volume-value" for="music-volume">30%</output>
-          </label>
-          <input
-            id="music-volume"
-            type="range"
-            min="0"
-            max="100"
-            step="1"
-            value="30"
-            aria-describedby="music-volume-help"
-          />
-          <small id="music-volume-help">Background music from hosted MP3 assets</small>
-
-          <label class="settings-switch" for="music-muted">
-            <span>Mute music</span>
-            <input id="music-muted" type="checkbox" />
-          </label>
-
-          <button id="settings-reset" class="settings-reset" type="button">Reset settings</button>
-          <button id="copy-view-link" class="settings-share" type="button">Copy link to this view</button>
-          <div class="tour-controls">
-            <button id="tour-play" class="settings-share" type="button">Play inner-system tour</button>
-            <button id="tour-stop" class="settings-reset" type="button" hidden>Stop tour</button>
-            <button id="tour-copy-step" class="settings-share" type="button" hidden>Copy link to this tour step</button>
-            <button id="timeline-open" class="settings-share" type="button">Cinematics and video…</button>
-          </div>
-          <button id="enter-vr" class="settings-vr" type="button" hidden>Enter VR</button>
-          <button id="exit-vr" class="settings-vr settings-vr-exit" type="button" hidden>Exit VR</button>
-        </fieldset>
-        <p id="settings-status" class="settings-status" aria-live="polite">Initializing controls…</p>
-      </div>
-    </aside>
-    <div id="tour-caption" class="tour-caption" hidden></div>
-    <section id="timeline-panel" class="timeline-panel" aria-label="Cinematic timeline" hidden>
-      <div class="timeline-row">
-        <select id="timeline-select" class="timeline-select" aria-label="Timeline"></select>
-        <button id="timeline-play" class="timeline-btn timeline-btn-primary" type="button">Play</button>
-        <button id="timeline-stop" class="timeline-btn" type="button" title="Stop and give the camera back">Stop</button>
-        <button id="timeline-close" class="timeline-btn timeline-close" type="button" aria-label="Close the timeline panel">×</button>
-      </div>
-      <div class="timeline-row">
-        <input id="timeline-scrub" class="timeline-scrub" type="range" min="0" max="1" step="0.01" value="0" aria-label="Timeline position" />
-        <output id="timeline-time" class="timeline-time" for="timeline-scrub">0.0 / 0.0 s</output>
-      </div>
-      <details class="timeline-editor">
-        <summary>Keyframes</summary>
-        <div class="timeline-row timeline-wrap">
-          <label class="timeline-field">Focus <select id="timeline-focus"></select></label>
-          <label class="timeline-field">Units
-            <select id="timeline-units">
-              <option value="radii">radii</option>
-              <option value="km">km</option>
-              <option value="scene">scene</option>
-            </select>
-          </label>
-          <button id="timeline-add-key" class="timeline-btn timeline-btn-primary" type="button">Add keyframe at current pose</button>
         </div>
-        <ol id="timeline-keys" class="timeline-keys"></ol>
-        <div class="timeline-row timeline-wrap">
-          <button id="timeline-new" class="timeline-btn" type="button">New timeline</button>
-          <button id="timeline-export" class="timeline-btn" type="button">Export JSON</button>
-          <label class="timeline-btn timeline-file">Import JSON<input id="timeline-import" type="file" accept=".json,application/json" /></label>
-          <button id="timeline-copy-link" class="timeline-btn" type="button">Copy link</button>
+        <div id="touch-controls" class="touch-controls" hidden>
+            <div id="touch-joystick-zone" class="touch-joystick-zone" aria-hidden="true"></div>
+            <div id="touch-joystick-base" class="touch-joystick-base" aria-hidden="true"></div>
+            <div id="touch-joystick-knob" class="touch-joystick-knob" aria-hidden="true"></div>
         </div>
-      </details>
-      <div class="timeline-row timeline-wrap">
-        <label class="timeline-field">Video
-          <select id="capture-size">
-            <option value="canvas">Window size</option>
-            <option value="1280x720">1280 × 720</option>
-            <option value="1920x1080" selected>1920 × 1080</option>
-            <option value="3840x2160">3840 × 2160</option>
-          </select>
-        </label>
-        <label class="timeline-field">
-          <select id="capture-fps">
-            <option value="30">30 fps</option>
-            <option value="60" selected>60 fps</option>
-          </select>
-        </label>
-        <button id="capture-start" class="timeline-btn timeline-btn-primary" type="button">Record video</button>
-        <button id="capture-cancel" class="timeline-btn" type="button" hidden>Cancel</button>
-        <progress id="capture-progress" class="timeline-progress" max="1" value="0" hidden></progress>
-      </div>
-      <p id="timeline-status" class="timeline-status" aria-live="polite"></p>
-    </section>
-    <div id="telescope-overlay" class="telescope-overlay" hidden>
-      <div class="telescope-field" aria-hidden="true"></div>
-      <p id="telescope-label" class="telescope-label"></p>
-    </div>
-    <div id="xr-hud" class="xr-hud" hidden>
-      <p id="xr-tooltip" class="xr-tooltip"></p>
-      <div id="xr-controllers" class="xr-controllers" hidden>
-        <span id="xr-controller-left" class="xr-controller-ray" data-hand="left">L</span>
-        <span id="xr-controller-right" class="xr-controller-ray" data-hand="right">R</span>
-      </div>
-    </div>
-    <div id="touch-controls" class="touch-controls" hidden>
-      <div id="touch-joystick-zone" class="touch-joystick-zone" aria-hidden="true"></div>
-      <div id="touch-joystick-base" class="touch-joystick-base" aria-hidden="true"></div>
-      <div id="touch-joystick-knob" class="touch-joystick-knob" aria-hidden="true"></div>
-    </div>
-    <canvas class="emscripten" id="canvas" oncontextmenu="event.preventDefault()" tabindex="-1"></canvas>
-    <script type="module" src="/src/main.ts"></script>
-  </body>
+        <canvas class="emscripten" id="canvas" oncontextmenu="event.preventDefault()" tabindex="-1"></canvas>
+        <script type="module" src="/src/main.ts"></script>
+    </body>
 </html>

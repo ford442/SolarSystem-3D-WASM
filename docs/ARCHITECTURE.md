@@ -33,8 +33,11 @@ SolarSystem-3D-WASM/
 │   ├── astro/                  # GL-free ephemerides, sky events, observer maths, catalogs, field models
 │   └── Solar_System/           # Scene objects: catalog bodies, Sun/, ring meshes, shells, OrbitLayout
 ├── resource/                   # Runtime assets
-│   ├── planets.catalog.json    # **Canonical** body metadata (edit this)
-│   ├── planets.catalog.schema.json
+│   ├── systems/                # Star-system catalogs (§12)
+│   │   ├── sol.catalog.json    # **Canonical** Sol body metadata (edit this)
+│   │   ├── <id>.catalog.json   # GENERATED from the NASA archive (generate-exoplanet-systems.mjs)
+│   │   ├── catalog.schema.json
+│   │   └── generated/          # GENERATED <id>.runtime.json, read by StarSystemCatalog
 │   ├── planet_manifest.json    # GENERATED staged-loading systems
 │   ├── shaders/                # GLSL (preloaded into WASM VFS)
 │   ├── textures/               # High-res DDS (hosted at deploy time, not all in git)
@@ -57,10 +60,11 @@ SolarSystem-3D-WASM/
 
 Planet-related data used to live in several hand-edited files. The **single source of truth** is now:
 
-`resource/planets.catalog.json` (schema: `resource/planets.catalog.schema.json`)
+`resource/systems/sol.catalog.json` (schema: `resource/systems/catalog.schema.json`); the
+other star systems' catalogs sit beside it (§12).
 
 ```
-resource/planets.catalog.json
+resource/systems/sol.catalog.json
             │
             ▼
   scripts/generate-planet-metadata.mjs
@@ -111,7 +115,7 @@ vs catalog `−97.8°`, `+28.3°` vs `−28.3°` for Neptune, and no tilt at all
 Atmospheres are catalog data too: `render.atmosphere` carries the O'Neil shell numbers
 (`oneil`) and, for Earth/Venus/Mars/Titan and the four giants, the physical coefficients (`physical`) that
 `tools/atmosphere_lut_baker` turns into `resource/atmosphere/*.ktx2` (§9.2). The flow is
-catalog → `generate-planet-metadata.mjs` → `BodyCatalog::kAtmospheres` → baker → LUTs
+catalog → `generate-planet-metadata.mjs` → `BodyCatalog::kSolAtmospheres` → baker → LUTs
 preloaded into `.data`. The Sun and Saturn/Uranus *ring geometry* remain hand-maintained
 (`Sun`, `SaturnRing`/`UranusRing`, `SystemVisuals.h`). Moon motion is
 described under § Ephemeris accuracy: Keplerian where the row has measured elements, the
@@ -1005,8 +1009,8 @@ with a `render` block, textures, and an `initTag` on `initTagAllowlist`. Codegen
 `BodyFromName` mapping, and Keplerian elements in `Ephemeris.cpp` if it is not in the Standish
 table. A **moon** gets its Keplerian elements from its own catalog row
 (`orbit.keplerian`, including the `OmegaDotDegPerDay` / `omegaDotDegPerDay` secular rates)
-rather than from `Ephemeris.cpp`; it is only placed from those elements once its id is added
-to `kKeplerianSatellites` in `Ephemeris.cpp`, which is the gate that keeps rows still carrying
+rather than from `Ephemeris.cpp`; it is only placed from those elements once its row sets
+`orbit.placeFromElements: true`, which is the gate that keeps rows still carrying
 placeholder angles on the old circular `SatelliteOrbit::Offset` path. See § Ephemeris accuracy. Keep focus indices **0–11 frozen** (Sun=0 … Vesta=11). The outer system appends after them:
 **12=Eris, 13=Haumea, 14=Makemake, 15=1P/Halley** (kind `comet`). Satellites are numbered
 *after* the last focus index (Moon=16 … Charon=36) — the generator rejects a satellite index at
@@ -1051,8 +1055,8 @@ corrections make that so, and both are easy to lose: the Sun's apparent longitud
 one minus 20.4898″/R (`SkyEvents::geocentricKm`, Meeus ch. 25 — without it every solar eclipse is
 ~36 s late), and ΔT is applied to the Moon only (the planets move too slowly for it to show).
 
-**Other moons.** A satellite is placed from its catalog `orbit.keplerian` row only when its index
-is listed in `kKeplerianSatellites` (`Ephemeris.cpp`): today Io, Europa, Ganymede, Callisto,
+**Other moons.** A satellite is placed from its catalog `orbit.keplerian` row only when the row
+sets `orbit.placeFromElements` (it was the `kKeplerianSatellites` list in `Ephemeris.cpp`): today Io, Europa, Ganymede, Callisto,
 Titan, and Triton. Everything else still uses the circular `SatelliteOrbit::Offset` /
 `OffsetXY` helpers, because its row's node and periapsis angles are placeholder zeros and a
 confidently wrong orbital plane is worse than an obviously simplified one. `SatelliteOrbit::
@@ -1414,7 +1418,143 @@ the drawn tile under the eye with its morph, else the deepest resident tile (the
 are). The floor only lifts: a camera placed before finer tiles arrive stays above the coarse
 surface it was lifted to. Co-rotation (§11) keeps a hover over one tile while time runs.
 
-## 12. Common pitfalls
+## 12. Star systems
+
+The app is a catalogue of planetary systems. Sol is the default and is unchanged: its tables
+are compiled in, and its frames render pixel-identical to the single-system build. Every
+other system is generated data, so adding one needs no C++ change and no factory edit.
+
+### 12.1 Catalogs, generated files and the active system
+
+| File | Written by | Read by |
+|------|------------|---------|
+| `resource/systems/sol.catalog.json` | hand-edited | `generate-planet-metadata.mjs` |
+| `resource/systems/<id>.catalog.json`, `index.json` | `generate-exoplanet-systems.mjs` (§12.3), committed | `generate-planet-metadata.mjs` |
+| `resource/systems/catalog.schema.json` | hand-edited | both generators (validation) |
+| `src/Solar_System/BodyCatalog.generated.h` (`kSolEntries`, `kSolAtmospheres`, `kSolStar`), `OrbitLayoutBodies.generated.inc` | metadata generator, Sol only | compiled in |
+| `resource/systems/generated/<id>.runtime.json` | metadata generator, every system but Sol | `StarSystemCatalog::LoadRuntimeJson` (preloaded into MEMFS on web) |
+| `web/public/systems/index.json`, `systems/<id>/planet_facts.json`, `thumbnail.svg` | metadata generator | `systemPicker.ts`, `planetExplorer.ts` |
+
+`StarSystemCatalog` (GL-free) owns which system is active. `ParseRuntimeJson` turns a runtime
+file into the same `Entry`, `AtmosphereRow`, `StarRow` and `OrbitLayout::BodyRow` structs the
+compiled tables use, and interns their strings. `Activate` makes them what
+`BodyCatalog::Entries()`, `Atmospheres()`, `Star()` and the `OrbitLayout` body table serve.
+`ActivateSol()` switches back to the compiled tables. Code reads rows only through
+`BodyCatalog.h`, never through `kSol*`, so the same draw, physics and UI paths serve every
+system. Focus indices are per system: the star is 0 and planets follow by semi-major axis.
+Sol's 0–15 are frozen as before.
+
+A moon or planet is placed from its Keplerian elements only when its row carries
+`orbit.placeFromElements` (this was `kKeplerianSatellites` in `Ephemeris.cpp`). Every
+exoplanet sets it, and `Ephemeris::KeplerianPosition` evaluates the elements against the date.
+
+### 12.2 The star
+
+`render.star` holds `effectiveTemperatureK`, `radiusSolar`, `luminositySolar`, `massSolar`,
+`spectralType`, `glowTemperatureK` and `activity`. `astro/StarPhysics.h` derives the rest:
+
+- **Colour.** `RelativeTint(T)` is the Krystek/Planckian blackbody colour divided by that of
+  5772 K, peak-normalised. It tints the corona and glow, the lens flare, the skybox sprite,
+  and `FrameUBO.starColor`, which every lit shader (`planet_surface.glsl`,
+  `cloudsLighting.fs`) multiplies into its light. Sol's tint is exactly (1, 1, 1), which is
+  why Sol is unchanged. The glow ramp stays calibrated at `glowTemperatureK` (5778 for every
+  star), so the ramp does not redden a red dwarf a second time.
+- **Size.** The art radius is `SceneScale::SunArtRadius()`, √radiusSolar clamped to 0.35–3.
+  `StarRadiusKm()` feeds the eclipse caster and angular size (`AngularRadiusRad`).
+- **Irradiance.** `IrradianceEarthUnits`, `EquilibriumTemperatureK`, `HabitableZoneAu` and
+  `HabitabilityDistance` choose the landing planet (`StarSystemCatalog::EarthLikeFocusIndex`)
+  and the procedural style (§12.4).
+- **Activity.** 0–1 modulates the corona volume's noise frequency, drift and brightness
+  (`starCoronaVolume.fs`). It is a visual and the UI says so; at 0 the shader output is
+  unchanged.
+
+`tests/test_star_physics.cpp` holds 5772 K to the current Sun colour within 1%.
+
+### 12.3 Exoplanet data
+
+`scripts/generate-exoplanet-systems.mjs` pulls NASA's Planetary Systems Composite Parameters
+table (`pscomppars`) over TAP and writes the curated systems. There are eight: TRAPPIST-1,
+Proxima Centauri, τ Ceti, TOI-700, Kepler-186, Kepler-90, 55 Cancri and 51 Pegasi.
+
+- **Snapshot.** The archive rows are kept in `resource/systems/archive/`, so `--offline`
+  rebuilds without the network and `--check` (CI) fails on drift.
+- **Gaps.** Gaps are filled the way the composite table does it: Chen & Kipping
+  mass ↔ radius, Kepler's third law, e = 0, i = 90°, ω = 90°, L from R²T⁴. Every filled value
+  is listed in the body's `fit` block, and the facts card says which numbers are fits.
+- **Index.** `index.json` lists the systems with the star's colour and how many archive
+  systems would qualify (`archive.systemsAvailable`).
+- **Spins.** Planets inside the tidal-locking distance rotate once per orbit, with
+  W0 = ω + M0 − 180°. The rate is stored in the IAU sense, so the validator's sign rule holds
+  (§12.5).
+
+### 12.4 Procedural surfaces
+
+No exoplanet has been imaged, so a body with `render.procedural` has no textures. The
+`PROCEDURAL_SURFACE` permutation of `planetLighting` (`CatalogMaterial::kProcedural`) draws
+it from noise on the sphere direction (`common/procedural_surface.glsl`). The generator picks
+the mode and three colours from the planet's equilibrium temperature and radius:
+
+| Mode | Look | Extra parameters |
+|------|------|------------------|
+| 0 rocky | ocean, land, caps | `seaLevel`, `polarCap` |
+| 1 banded gas | zonal bands | `bands` |
+| 2 lava | glowing cracks | `emissive` |
+| 3 ice | ridged lineae | |
+
+`CatalogBody` skips the texture loads for these bodies, and terrain masks the bit
+(`TerrainProgram`). `Renderer::PrefetchCatalogVariants` compiles the new system's variants
+before its first frame.
+
+### 12.5 Orbits, spins and the mirror
+
+The scene maps ecliptic y to +Z, so a prograde orbit turns the negative way about +Y. Sol's
+spins were calibrated in that frame and are kept as they are. For other systems,
+`OrbitLayout::AxialSpinDegreesAt` returns −W, so a catalog's IAU-sense rate turns with its
+orbit. A tidally locked planet keeps its sub-stellar point at map longitude 0 (u = 0.5);
+`TidallyLockedPlanetsKeepOneFaceToTheirStar` checks it to 2°. The poses are functions of the
+date (§11), so a system's resonances, such as TRAPPIST-1 b:c:d, come out of the elements
+directly.
+
+### 12.6 Travel
+
+```
+RequestSystemJump(id)       Out 0.9 s: fade to the departing star's colour, then black   onSystemChanged(id, 0)
+  └─ first Black frame ──▶  LoadSystem(id): tear down, Activate, InitStarSystem,
+                            PlaceBodies, arrival clock, land the camera                    onSystemChanged(id, 1)
+                            Black 0.25 s, then In 1.2 s fade up                           onSystemChanged(id, 2)
+```
+
+- **Teardown.** `TearDownStarSystem` cancels in-flight texture jobs
+  (`TextureLoadingQueue::CancelAll` bumps an epoch, and stale results are dropped without
+  their callbacks) and bumps `_manifestGeneration`, so a late manifest download finds nothing
+  to touch. It then releases the scene. The render origin moves with the camera as usual.
+- **Landing.** The camera lands on the requested body, or else on the Earth-like planet. It
+  approaches from the star side, about 40° off the sub-stellar direction, so the planet's day
+  side fills the view.
+- **Arrival clock.** Sol keeps `SimState{}.timeScale`. Other systems start with the landing
+  planet moving about 1°/s along its orbit: 100–10 000× real time, and never below the
+  slider's 0.01 floor.
+- **Sol-only features.** Observe mode, missions, belts, the magnetic field and sky events stand
+  on Earth or Sol data. Outside Sol they are refused or empty, and the page greys out
+  Observe.
+- **Web.** `systemPicker.ts` lists `index.json` with Sol first, then by distance, plus a
+  "⌂ Sol" home button. It calls `LoadStarSystem` and follows `Module['onSystemChanged']`.
+  On phase 1 the explorer loads the system's `planet_facts.json`.
+- **Deep links.** `?system=trappist-1&planet=e` is read by C++ before the scene is built
+  (`ApplySystemEnvOverride`; native `SOLARSYSTEM_SYSTEM=trappist-1:e`), so the page opens
+  directly in that system. `StarSystemCatalog::FocusIndexForName` resolves the planet name.
+  "Copy view link" writes `system=` and the planet letter.
+
+### 12.7 Adding a system
+
+1. Add its host to `CURATED` in `scripts/generate-exoplanet-systems.mjs` and run it
+   (online once, then `--offline`). Alternatively, write `resource/systems/<id>.catalog.json`
+   by hand against the schema.
+2. Run `node scripts/generate-planet-metadata.mjs`.
+3. Rebuild. The runtime JSON is preloaded, and `StarSystemTest.EverySystemInTheIndexLoads`
+   parses it.
+
+## 13. Common pitfalls
 
 1. Do not use a blocking main loop on WASM.
 2. Do not spawn `std::thread` in the web build.
@@ -1431,7 +1571,7 @@ surface it was lifted to. Co-rotation (§11) keeps a hover over one tile while t
 
 ---
 
-## 13. Local verification (summary)
+## 14. Local verification (summary)
 
 ```bash
 ./build-web.sh
@@ -1463,7 +1603,7 @@ Full scenarios: [docs/plans/TESTING_GUIDE.md](plans/TESTING_GUIDE.md).
 
 ---
 
-## 14. Related documentation
+## 15. Related documentation
 
 | Document | Purpose |
 |----------|---------|

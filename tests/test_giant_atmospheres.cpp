@@ -37,7 +37,7 @@ TEST(BodyShape, GiantsAreFlattenedAndEverythingElseIsASphere) {
     EXPECT_NEAR(BodyCatalog::FindById("saturn")->oblateness, 0.0980f, 1e-3f);
     EXPECT_GT(BodyCatalog::FindById("uranus")->oblateness, 0.0f);
     EXPECT_GT(BodyCatalog::FindById("neptune")->oblateness, 0.0f);
-    for (const BodyCatalog::Entry& entry : BodyCatalog::kEntries) {
+    for (const BodyCatalog::Entry& entry : BodyCatalog::Entries()) {
         if (entry.kind == BodyCatalog::Kind::Satellite) {
             EXPECT_EQ(entry.oblateness, 0.0f) << entry.id << ": satellites are spheres";
         }

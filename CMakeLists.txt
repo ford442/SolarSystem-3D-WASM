@@ -80,11 +80,13 @@ set(SOLARSYSTEM_SOURCES_CORE
     src/AudioPlayer.cpp
     src/RenderSettings.cpp
     src/XrSession.cpp
+    src/SystemJump.cpp
 )
 
 set(SOLARSYSTEM_SOURCES_AUX
     # core/: logging, camera, frame timing
     src/core/Log.cpp
+    src/core/Json.cpp
     src/core/Camera.cpp
     src/core/CameraNavigation.cpp
     src/core/FrameTimer.cpp
@@ -159,6 +161,7 @@ set(SOLARSYSTEM_SOURCES_SOLAR
     src/Solar_System/OuterShell.cpp
     src/Solar_System/Clouds.cpp
     src/Solar_System/OrbitLayout.cpp
+    src/Solar_System/StarSystemCatalog.cpp
     src/Solar_System/AsteroidOrbit.cpp
     src/Solar_System/AsteroidField.cpp
     src/Solar_System/ObserveSky.cpp
@@ -255,6 +258,8 @@ if(EMSCRIPTEN)
         "SHELL:--preload-file ${CMAKE_SOURCE_DIR}/resource/textures_low@/resource/textures_low"
         # Baked atmosphere LUTs (~1.1 MB, 8 bodies): tools/atmosphere_lut_baker, ARCHITECTURE §9.2.
         "SHELL:--preload-file ${CMAKE_SOURCE_DIR}/resource/atmosphere@/resource/atmosphere"
+        # Star-system catalogs (~150 KB): StarSystemCatalog loads one on LoadSystem (ARCHITECTURE §12).
+        "SHELL:--preload-file ${CMAKE_SOURCE_DIR}/resource/systems/generated@/resource/systems/generated"
         "SHELL:-sMODULARIZE=1"
         "SHELL:-sEXPORT_ES6=1"
         # 'GL' is needed so web/src/wasmBridge.ts can register the XRWebGLLayer's opaque
@@ -334,7 +339,7 @@ if(EMSCRIPTEN)
     # mission JSON or scripts/wasm-exports.json then relinks and rebuilds SolarSystem.data.
     # CONFIGURE_DEPENDS re-globs at build time, so a file added to a preloaded directory
     # is picked up too.
-    set(SOLAR_EM_PRELOAD_DIRS shaders missions sky fonts textures_low atmosphere)
+    set(SOLAR_EM_PRELOAD_DIRS shaders missions sky fonts textures_low atmosphere systems/generated)
     set(SOLAR_EM_LINK_INPUTS
         ${CMAKE_SOURCE_DIR}/scripts/wasm-exports.json
         ${CMAKE_SOURCE_DIR}/resource/planet_manifest.json)

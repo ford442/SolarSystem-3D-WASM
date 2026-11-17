@@ -15,6 +15,13 @@ CatalogBody::CatalogBody(PlanetInfo&& planetInfo, std::shared_ptr<Star> parentSt
       _specular(std::move(planetInfo.specularTexture)) {
     Place(OrbitLayout::GetHeliocentricScenePosition(_body));
 
+    if (_material.procedural.enabled) {
+        // render.procedural: no maps to stream (the lod ids are empty); always "resident".
+        _isHighResLoaded = true;
+        _isHighResLoading = false;
+        return;
+    }
+
     const TexturePaths::Paths diffuse = TexturePaths::ForTextureId(entry.lod.diffuse);
     _diffuseLOD.Configure(_diffuses.at(0), diffuse.low, diffuse.mid, diffuse.high, entry.lod.diffuse,
                           TextureLoadCategory::Planet);
@@ -86,6 +93,10 @@ void CatalogBody::BindMaterial(const Shader& shader) const {
 
 void CatalogBody::LoadHighResIfClose(const glm::vec3& cameraPos, const TextureLodPolicy& policy) {
     const float distance = glm::length(cameraPos - GetPosition());
+    if (_material.procedural.enabled) {
+        _lastCameraDistance = distance;
+        return;
+    }
     const float lodThreshold = GetEffectiveLODThreshold(policy);
     _lastCameraDistance = distance;
 

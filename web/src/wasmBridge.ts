@@ -14,7 +14,7 @@ import { clearWasmCallback, emitWasmCallback, registerWasmCallbacks } from './wa
 
 /**
  * Planet index conventions (FocusPlanet / GetFocusedPlanetIndex): the focus index of every
- * body is generated into ./generated/planetIds.ts (PLANET_IDS) from planets.catalog.json and
+ * body is generated into ./generated/planetIds.ts (PLANET_IDS) from resource/systems/sol.catalog.json and
  * matches OrbitLayout::Body — Sun=0 … Vesta=11 are frozen, then Eris … 1P/Halley.
  * GetNearestPlanetIndex returns 1–MAX_PLANET_INDEX for the nearest loaded planet, or -1 when
  * unknown (C++ adds +1 offset via GetNearestPlanetIndexForJs).
@@ -199,6 +199,16 @@ export interface SolarSystemRuntime {
     addTouchZoom(delta: number): void;
     isMobileWeb(): boolean;
     focusPlanet(index: PlanetIndex): void;
+    /**
+     * Jump to a star system from systems/index.json (fade out, swap, fade in; see
+     * Module['onSystemChanged']). `focusIndex` picks the landing body, -1 the Earth-like
+     * planet. False for an id with no catalog.
+     */
+    loadStarSystem(id: string, focusIndex?: number): boolean;
+    /** The active system's id ("sol" unless a jump has happened). */
+    getActiveSystemId(): string;
+    /** True between a jump's start and the end of its fade-in. */
+    isSystemJumpActive(): boolean;
     setOrbitScaleMode(mode: OrbitScaleMode): void;
     getOrbitScaleMode(): OrbitScaleMode;
     /** 1–15 nearest loaded planet, or -1. See planet index note above. */
@@ -325,6 +335,9 @@ export function createSolarSystemRuntime(instance: SolarSystemModule): SolarSyst
         addTouchZoom: exports.addTouchZoom,
         isMobileWeb: () => exports.isMobileWeb() !== 0,
         focusPlanet: (index) => exports.focusPlanet(index),
+        loadStarSystem: (id, focusIndex = -1) => exports.loadStarSystem(id, focusIndex) !== 0,
+        getActiveSystemId: () => exports.getActiveSystemId(),
+        isSystemJumpActive: () => exports.isSystemJumpActive() !== 0,
         setOrbitScaleMode: (mode) => {
             exports.setOrbitScaleMode(mode);
             // Only JS ever changes the scale mode, so the event is raised here rather than in C++.

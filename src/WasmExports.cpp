@@ -11,6 +11,10 @@
 #include <glm/glm.hpp>
 #include <string>
 
+#ifdef __EMSCRIPTEN__
+#include "Solar_System/StarSystemCatalog.h"
+#endif
+
 namespace {
     Application* activeApplication = nullptr;
 
@@ -166,6 +170,24 @@ extern "C" {
         json = activeApplication ? activeApplication->GetFocusedMissionJson() : R"({"valid":false})";
         return json.c_str();
     }
+    // Star systems (docs/ARCHITECTURE.md §12). `id` is a resource/systems/index.json id;
+    // focusIndex picks the landing body (-1: the system's Earth-like planet). 1 if the jump
+    // started (Module['onSystemChanged'] reports its phases), 0 for an unknown id.
+    EMSCRIPTEN_KEEPALIVE int LoadStarSystem(const char* id, int focusIndex) {
+        if (!id) return 0;
+        if (!activeApplication) {
+            return 0;
+        }
+        return activeApplication->RequestSystemJump(id, focusIndex) ? 1 : 0;
+    }
+    EMSCRIPTEN_KEEPALIVE const char* GetActiveSystemId() {
+        static std::string id;
+        id = StarSystemCatalog::ActiveId();
+        return id.c_str();
+    }
+    EMSCRIPTEN_KEEPALIVE int IsSystemJumpActive() {
+        return activeApplication && activeApplication->IsSystemJumpActive() ? 1 : 0;
+    }
     EMSCRIPTEN_KEEPALIVE void SetOrbitScaleMode(int mode) {
         if (activeApplication) {
             activeApplication->ApplyOrbitScaleMode(mode);
@@ -183,7 +205,7 @@ extern "C" {
         return activeApplication ? activeApplication->GetFocusedPlanetIndex() : -1;
     }
     EMSCRIPTEN_KEEPALIVE float GetPlanetSceneDistance(int idx) {
-        idx = std::clamp(idx, 0, OrbitLayout::kBodyCount - 1);
+        idx = std::clamp(idx, 0, OrbitLayout::BodyCount() - 1);
         return OrbitLayout::GetSceneDistance(static_cast<OrbitLayout::Body>(idx));
     }
     // Next inner-planet conjunction at the current epoch, as four scalars.

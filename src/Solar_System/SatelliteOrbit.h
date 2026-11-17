@@ -2,7 +2,7 @@
 #define SOLARSYSTEM_SATELLITEORBIT_H
 
 #include "../astro/Ephemeris.h"
-#include "BodyCatalog.generated.h"
+#include "BodyCatalog.h"
 #include "OrbitLayout.h"
 #include "SceneScale.h"
 #include <cmath>

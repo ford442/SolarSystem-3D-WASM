@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 160 72" width="160" height="72" role="img" aria-label="Proxima Centauri">
+  <defs>
+    <radialGradient id="glow"><stop offset="0" stop-color="#ffb466" stop-opacity="0.9"/><stop offset="1" stop-color="#ffb466" stop-opacity="0"/></radialGradient>
+  </defs>
+  <rect width="160" height="72" fill="#05070d"/>
+  <line x1="28.44765733796614" y1="36" x2="154" y2="36" stroke="#ffffff" stroke-opacity="0.12" stroke-width="0.6"/>
+  <circle cx="16" cy="36" r="14.2" fill="url(#glow)"/>
+  <circle cx="16" cy="36" r="6.4" fill="#ffb466"/>
+  <circle cx="32.4" cy="36" r="1.40" fill="#adb390"/>
+  <circle cx="150.0" cy="36" r="1.62" fill="#dadfe5"/>
+</svg>

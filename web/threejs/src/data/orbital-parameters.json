@@ -1,6 +1,6 @@
 {
-  "source": "Generated from resource/planets.catalog.json — companion scale 1 unit = 1 C++ world unit",
-  "generatedFrom": "resource/planets.catalog.json",
+  "source": "Generated from resource/systems/sol.catalog.json — companion scale 1 unit = 1 C++ world unit",
+  "generatedFrom": "resource/systems/sol.catalog.json",
   "indexConvention": "Body order follows catalog focus index (Sun excluded from this list)",
   "bodies": [
     {

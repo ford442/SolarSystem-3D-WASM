@@ -1,0 +1,499 @@
+{
+  "format": "solarsystem-runtime-catalog",
+  "version": 1,
+  "generatedFrom": "resource/systems/toi-700.catalog.json",
+  "id": "toi-700",
+  "name": {
+    "en": "TOI-700",
+    "ru": "TOI-700"
+  },
+  "distancePc": 31.127,
+  "spectralType": "M2.5 V",
+  "habitableZoneAu": {
+    "innerAu": 0.14554,
+    "outerAu": 0.20967
+  },
+  "star": {
+    "id": "toi_700",
+    "displayNameEn": "TOI-700",
+    "displayNameRu": "TOI-700",
+    "spectralType": "M2.5 V",
+    "effectiveTemperatureK": 3459,
+    "glowTemperatureK": 5778,
+    "radiusKm": 285515.27999999997,
+    "radiusSolar": 0.4104,
+    "luminositySolar": 0.0233002,
+    "massSolar": 0.417,
+    "activity": 0.34
+  },
+  "layout": [
+    {
+      "index": 0,
+      "id": "toi_700",
+      "compressedOffset": [
+        0,
+        0,
+        0
+      ],
+      "auDistance": 0,
+      "orbitalPeriodDays": 0,
+      "inclinationDeg": 0,
+      "siderealRotationDays": 0,
+      "primeMeridianDegJ2000": 0,
+      "primeMeridianRateDegPerDay": 0,
+      "trueRadius": false,
+      "kepler": null
+    },
+    {
+      "index": 1,
+      "id": "toi_700_b",
+      "compressedOffset": [
+        1500,
+        0,
+        0
+      ],
+      "auDistance": 0.0678,
+      "orbitalPeriodDays": 9.97722,
+      "inclinationDeg": -0.1,
+      "siderealRotationDays": 9.97722,
+      "primeMeridianDegJ2000": 202.5398,
+      "primeMeridianRateDegPerDay": 36.082195241,
+      "trueRadius": false,
+      "kepler": {
+        "aAu": 0.06779999977633372,
+        "e": 0.032,
+        "iDeg": -0.1,
+        "OmegaDeg": 0,
+        "omegaDeg": 285,
+        "M0Deg": 97.5398,
+        "nDegPerDay": 36.082195241
+      }
+    },
+    {
+      "index": 2,
+      "id": "toi_700_c",
+      "compressedOffset": [
+        -1290.4,
+        0,
+        1182.11
+      ],
+      "auDistance": 0.0931,
+      "orbitalPeriodDays": 16.0511039,
+      "inclinationDeg": -0.788,
+      "siderealRotationDays": 16.051104,
+      "primeMeridianDegJ2000": 146.6983,
+      "primeMeridianRateDegPerDay": 22.428363946,
+      "trueRadius": false,
+      "kepler": {
+        "aAu": 0.09310000025287794,
+        "e": 0.033,
+        "iDeg": -0.788,
+        "OmegaDeg": 0,
+        "omegaDeg": 81,
+        "M0Deg": 245.6983,
+        "nDegPerDay": 22.428363946
+      }
+    },
+    {
+      "index": 3,
+      "id": "toi_700_e",
+      "compressedOffset": [
+        174.85,
+        0,
+        -1992.34
+      ],
+      "auDistance": 0.1336,
+      "orbitalPeriodDays": 27.810124,
+      "inclinationDeg": 0.16,
+      "siderealRotationDays": 27.810124,
+      "primeMeridianDegJ2000": 338.9484,
+      "primeMeridianRateDegPerDay": 12.9449261,
+      "trueRadius": false,
+      "kepler": {
+        "aAu": 0.13359999982940934,
+        "e": 0.059,
+        "iDeg": 0.16,
+        "OmegaDeg": 0,
+        "omegaDeg": 70,
+        "M0Deg": 88.9484,
+        "nDegPerDay": 12.9449261
+      }
+    },
+    {
+      "index": 4,
+      "id": "toi_700_d",
+      "compressedOffset": [
+        1368.99,
+        0,
+        1785.6
+      ],
+      "auDistance": 0.1642,
+      "orbitalPeriodDays": 37.423457,
+      "inclinationDeg": 0.1,
+      "siderealRotationDays": 37.423457,
+      "primeMeridianDegJ2000": 151.3361,
+      "primeMeridianRateDegPerDay": 9.619635086,
+      "trueRadius": false,
+      "kepler": {
+        "aAu": 0.1642000002076233,
+        "e": 0.042,
+        "iDeg": 0.1,
+        "OmegaDeg": 0,
+        "omegaDeg": 10,
+        "M0Deg": 321.3361,
+        "nDegPerDay": 9.619635086
+      }
+    }
+  ],
+  "entries": [
+    {
+      "index": 1,
+      "id": "toi_700_b",
+      "parentId": "toi_700",
+      "initTag": "toi_700_b",
+      "kind": "planet",
+      "displayNameEn": "TOI-700 b",
+      "displayNameRu": "TOI-700 b",
+      "auDistance": 0.0678,
+      "orbitalPeriodDays": 9.97722,
+      "earthRadiusScale": 0.963,
+      "radiusKm": 6135.5,
+      "axialTiltDegrees": 0,
+      "artTiltXDegrees": 0,
+      "oblateness": 0,
+      "yawOffsetDegrees": 0,
+      "artRollDegrees": 0,
+      "shaderFlags": {
+        "hasNightTexture": false,
+        "hasSpecularMap": false,
+        "hasClouds": false
+      },
+      "useSphereIntersect": false,
+      "ambientFactor": 0,
+      "lod": {
+        "diffuse": "",
+        "normal": "",
+        "specular": null,
+        "night": null,
+        "clouds": null
+      },
+      "meshPath": null,
+      "sceneOrbitRadius": 0,
+      "orbitPlane": "xz",
+      "initialAnomalyRad": 0,
+      "spinDegPerSimSecond": 0,
+      "keplerian": {
+        "aKm": 10142735.6,
+        "e": 0.032,
+        "iDeg": -0.1,
+        "OmegaDeg": 0,
+        "omegaDeg": 285,
+        "M0Deg": 97.5398,
+        "nDegPerDay": 36.082195241,
+        "OmegaDotDegPerDay": 0,
+        "omegaDotDegPerDay": 0
+      },
+      "cloudLayer": {
+        "diffuse": null,
+        "normal": null,
+        "scaleFactor": 0,
+        "spinDegPerSimSecond": 0,
+        "ambientFactor": 0
+      },
+      "hasCloudLayer": false,
+      "hasRings": false,
+      "hasTerrain": false,
+      "terrainAttribution": null,
+      "procedural": {
+        "enabled": true,
+        "mode": 0,
+        "seed": 1,
+        "colors": [
+          [
+            0.32,
+            0.22,
+            0.15
+          ],
+          [
+            0.55,
+            0.42,
+            0.3
+          ],
+          [
+            0.72,
+            0.62,
+            0.5
+          ]
+        ],
+        "bands": 0,
+        "seaLevel": 0,
+        "polarCap": 0,
+        "emissive": 0,
+        "equilibriumTemperatureK": 417
+      },
+      "placeFromElements": true
+    },
+    {
+      "index": 2,
+      "id": "toi_700_c",
+      "parentId": "toi_700",
+      "initTag": "toi_700_c",
+      "kind": "planet",
+      "displayNameEn": "TOI-700 c",
+      "displayNameRu": "TOI-700 c",
+      "auDistance": 0.0931,
+      "orbitalPeriodDays": 16.0511039,
+      "earthRadiusScale": 2.535,
+      "radiusKm": 16150.5,
+      "axialTiltDegrees": 0,
+      "artTiltXDegrees": 0,
+      "oblateness": 0,
+      "yawOffsetDegrees": 0,
+      "artRollDegrees": 0,
+      "shaderFlags": {
+        "hasNightTexture": false,
+        "hasSpecularMap": false,
+        "hasClouds": false
+      },
+      "useSphereIntersect": false,
+      "ambientFactor": 0,
+      "lod": {
+        "diffuse": "",
+        "normal": "",
+        "specular": null,
+        "night": null,
+        "clouds": null
+      },
+      "meshPath": null,
+      "sceneOrbitRadius": 0,
+      "orbitPlane": "xz",
+      "initialAnomalyRad": 0,
+      "spinDegPerSimSecond": 0,
+      "keplerian": {
+        "aKm": 13927561.8,
+        "e": 0.033,
+        "iDeg": -0.788,
+        "OmegaDeg": 0,
+        "omegaDeg": 81,
+        "M0Deg": 245.6983,
+        "nDegPerDay": 22.428363946,
+        "OmegaDotDegPerDay": 0,
+        "omegaDotDegPerDay": 0
+      },
+      "cloudLayer": {
+        "diffuse": null,
+        "normal": null,
+        "scaleFactor": 0,
+        "spinDegPerSimSecond": 0,
+        "ambientFactor": 0
+      },
+      "hasCloudLayer": false,
+      "hasRings": false,
+      "hasTerrain": false,
+      "terrainAttribution": null,
+      "procedural": {
+        "enabled": true,
+        "mode": 1,
+        "seed": 2,
+        "colors": [
+          [
+            0.13,
+            0.32,
+            0.55
+          ],
+          [
+            0.3,
+            0.55,
+            0.72
+          ],
+          [
+            0.62,
+            0.82,
+            0.9
+          ]
+        ],
+        "bands": 5,
+        "seaLevel": 0,
+        "polarCap": 0,
+        "emissive": 0,
+        "equilibriumTemperatureK": 356
+      },
+      "placeFromElements": true
+    },
+    {
+      "index": 3,
+      "id": "toi_700_e",
+      "parentId": "toi_700",
+      "initTag": "toi_700_e",
+      "kind": "planet",
+      "displayNameEn": "TOI-700 e",
+      "displayNameRu": "TOI-700 e",
+      "auDistance": 0.1336,
+      "orbitalPeriodDays": 27.810124,
+      "earthRadiusScale": 0.919,
+      "radiusKm": 5855,
+      "axialTiltDegrees": 0,
+      "artTiltXDegrees": 0,
+      "oblateness": 0,
+      "yawOffsetDegrees": 0,
+      "artRollDegrees": 0,
+      "shaderFlags": {
+        "hasNightTexture": false,
+        "hasSpecularMap": false,
+        "hasClouds": false
+      },
+      "useSphereIntersect": false,
+      "ambientFactor": 0,
+      "lod": {
+        "diffuse": "",
+        "normal": "",
+        "specular": null,
+        "night": null,
+        "clouds": null
+      },
+      "meshPath": null,
+      "sceneOrbitRadius": 0,
+      "orbitPlane": "xz",
+      "initialAnomalyRad": 0,
+      "spinDegPerSimSecond": 0,
+      "keplerian": {
+        "aKm": 19986275.5,
+        "e": 0.059,
+        "iDeg": 0.16,
+        "OmegaDeg": 0,
+        "omegaDeg": 70,
+        "M0Deg": 88.9484,
+        "nDegPerDay": 12.9449261,
+        "OmegaDotDegPerDay": 0,
+        "omegaDotDegPerDay": 0
+      },
+      "cloudLayer": {
+        "diffuse": null,
+        "normal": null,
+        "scaleFactor": 0,
+        "spinDegPerSimSecond": 0,
+        "ambientFactor": 0
+      },
+      "hasCloudLayer": false,
+      "hasRings": false,
+      "hasTerrain": false,
+      "terrainAttribution": null,
+      "procedural": {
+        "enabled": true,
+        "mode": 0,
+        "seed": 3,
+        "colors": [
+          [
+            0.07,
+            0.22,
+            0.45
+          ],
+          [
+            0.42,
+            0.45,
+            0.28
+          ],
+          [
+            0.92,
+            0.94,
+            0.97
+          ]
+        ],
+        "bands": 0,
+        "seaLevel": 0.55,
+        "polarCap": 0.75,
+        "emissive": 0,
+        "equilibriumTemperatureK": 272.9
+      },
+      "placeFromElements": true
+    },
+    {
+      "index": 4,
+      "id": "toi_700_d",
+      "parentId": "toi_700",
+      "initTag": "toi_700_d",
+      "kind": "planet",
+      "displayNameEn": "TOI-700 d",
+      "displayNameRu": "TOI-700 d",
+      "auDistance": 0.1642,
+      "orbitalPeriodDays": 37.423457,
+      "earthRadiusScale": 1.145,
+      "radiusKm": 7295,
+      "axialTiltDegrees": 0,
+      "artTiltXDegrees": 0,
+      "oblateness": 0,
+      "yawOffsetDegrees": 0,
+      "artRollDegrees": 0,
+      "shaderFlags": {
+        "hasNightTexture": false,
+        "hasSpecularMap": false,
+        "hasClouds": false
+      },
+      "useSphereIntersect": false,
+      "ambientFactor": 0,
+      "lod": {
+        "diffuse": "",
+        "normal": "",
+        "specular": null,
+        "night": null,
+        "clouds": null
+      },
+      "meshPath": null,
+      "sceneOrbitRadius": 0,
+      "orbitPlane": "xz",
+      "initialAnomalyRad": 0,
+      "spinDegPerSimSecond": 0,
+      "keplerian": {
+        "aKm": 24563970.4,
+        "e": 0.042,
+        "iDeg": 0.1,
+        "OmegaDeg": 0,
+        "omegaDeg": 10,
+        "M0Deg": 321.3361,
+        "nDegPerDay": 9.619635086,
+        "OmegaDotDegPerDay": 0,
+        "omegaDotDegPerDay": 0
+      },
+      "cloudLayer": {
+        "diffuse": null,
+        "normal": null,
+        "scaleFactor": 0,
+        "spinDegPerSimSecond": 0,
+        "ambientFactor": 0
+      },
+      "hasCloudLayer": false,
+      "hasRings": false,
+      "hasTerrain": false,
+      "terrainAttribution": null,
+      "procedural": {
+        "enabled": true,
+        "mode": 0,
+        "seed": 4,
+        "colors": [
+          [
+            0.07,
+            0.22,
+            0.45
+          ],
+          [
+            0.42,
+            0.45,
+            0.28
+          ],
+          [
+            0.92,
+            0.94,
+            0.97
+          ]
+        ],
+        "bands": 0,
+        "seaLevel": 0.55,
+        "polarCap": 0.75,
+        "emissive": 0,
+        "equilibriumTemperatureK": 268.8
+      },
+      "placeFromElements": true
+    }
+  ],
+  "atmospheres": []
+}

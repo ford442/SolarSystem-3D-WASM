@@ -356,12 +356,12 @@ def bake(args):
 
 
 def catalog_row(body):
-    catalog = json.loads((REPO / "resource" / "planets.catalog.json").read_text())
+    catalog = json.loads((REPO / "resource" / "systems" / "sol.catalog.json").read_text())
     rows = catalog["bodies"] if isinstance(catalog, dict) else catalog
     for row in rows:
         if row.get("id") == body:
             return row
-    raise SystemExit(f"{body}: not in resource/planets.catalog.json")
+    raise SystemExit(f"{body}: not in resource/systems/sol.catalog.json")
 
 
 def main():

@@ -3,28 +3,18 @@
 #include "../astro/Ephemeris.h"
 #include "../astro/Observer.h"
 #include "../astro/SkyEvents.h"
-#include "BodyCatalog.generated.h"
+#include "BodyCatalog.h"
 
 #include <algorithm>
 #include <cmath>
 #include <cstddef>
 #include <glm/glm.hpp>
 #include <glm/gtc/constants.hpp>
+#include <string>
+#include <vector>
 
 namespace OrbitLayout {
 namespace {
-
-struct BodyData {
-    glm::vec3 compressedOffset;
-    float auDistance;
-    float orbitalPeriodDays;
-    float inclinationDeg;
-    float siderealRotationDays; // negative => retrograde
-    // IAU prime-meridian angle at J2000 and its rate: W = W0 + Wdot * days. Double, since
-    // Wdot times a century of days is millions of degrees. Negative rate => retrograde.
-    double primeMeridianDegJ2000;
-    double primeMeridianRateDegPerDay;
-};
 
 /**
  * Geographic longitude at the centre (u = 0.5) of the Earth diffuse map: the Greenwich-
@@ -38,36 +28,82 @@ constexpr double kEarthTextureCentreLonDeg = 0.0;
 
 // NASA fact-sheet averages for periods/inclination/sidereal day.
 // Sidereal rotation days: Venus and Uranus are retrograde (negative).
-// Generated from resource/planets.catalog.json — see OrbitLayoutBodies.generated.inc header
+// Generated from resource/systems/sol.catalog.json — see OrbitLayoutBodies.generated.inc header
 // comment. Run `node scripts/generate-planet-metadata.mjs` after editing the catalog.
-constexpr BodyData kBodies[] = {
+constexpr BodyRow kSolBodies[] = {
 #include "OrbitLayoutBodies.generated.inc"
 };
 
-static_assert(sizeof(kBodies) / sizeof(kBodies[0]) == static_cast<std::size_t>(kBodyCount),
+static_assert(sizeof(kSolBodies) / sizeof(kSolBodies[0]) == static_cast<std::size_t>(kBodyCount),
               "Generated body rows must cover every OrbitLayout::Body value — "
               "rerun scripts/generate-planet-metadata.mjs after editing the catalog.");
+
+// The active system's table: Sol's compiled rows unless SetSystemRows chose another system's.
+const BodyRow* g_bodies = kSolBodies;
+int g_bodyCount = kBodyCount;
+bool g_isSol = true;
 
 ScaleMode g_scaleMode = ScaleMode::Compressed;
 double g_julianDate = Ephemeris::kJ2000;
 // Kept in double: rounding these to float is what put a ~0.004-unit grid under Neptune.
-double g_lonRad[kBodyCount] = {};
-double g_latRad[kBodyCount] = {};
-double g_rAu[kBodyCount] = {};
+std::vector<double> g_lonRad(kBodyCount, 0.0);
+std::vector<double> g_latRad(kBodyCount, 0.0);
+std::vector<double> g_rAu(kBodyCount, 0.0);
 glm::dvec3 g_renderOrigin(0.0);
+
+/** The compressed-scale remap's keys (AuToSceneDistanceDouble), fixed per system. */
+struct Key {
+    double au;
+    double scene;
+};
+std::vector<Key> g_compressedKeys;
 
 int bodyIndex(Body body) {
     const int idx = static_cast<int>(body);
-    return std::clamp(idx, 0, kBodyCount - 1);
+    return std::clamp(idx, 0, g_bodyCount - 1);
+}
+
+const BodyRow& row(Body body) {
+    return g_bodies[bodyIndex(body)];
 }
 
 void refreshEphemerisCache() {
-    for (int i = 0; i < kBodyCount; ++i) {
-        const Ephemeris::HelioLB pos = Ephemeris::Position(i, g_julianDate);
+    for (int i = 0; i < g_bodyCount; ++i) {
+        Ephemeris::HelioLB pos;
+        if (g_isSol) {
+            pos = Ephemeris::Position(i, g_julianDate);
+        } else if (g_bodies[i].kepler.aAu > 0.0) {
+            const KeplerElements& k = g_bodies[i].kepler;
+            pos = Ephemeris::KeplerianPosition(k.aAu, k.e, k.iDeg, k.OmegaDeg, k.omegaDeg, k.M0Deg, k.nDegPerDay,
+                                               g_julianDate);
+        }
         g_lonRad[i] = pos.lonRad;
         g_latRad[i] = pos.latRad;
         g_rAu[i] = pos.rAu;
     }
+}
+
+/**
+ * The compressed scale's piecewise-linear AU → scene map runs through the planets' art orbit
+ * radii. Sol's keys are Mercury … Pluto, in that order, exactly as before; another system's are
+ * its own focus bodies (not the star, not the eccentric true-radius ones), sorted by distance.
+ */
+void rebuildCompressedKeys() {
+    g_compressedKeys.clear();
+    const auto key = [](Body body) { return Key{GetAuDistance(body), glm::length(GetCompressedOffset(body))}; };
+    if (g_isSol) {
+        for (const Body body : {Body::Mercury, Body::Venus, Body::Earth, Body::Mars, Body::Jupiter, Body::Saturn,
+                                Body::Uranus, Body::Neptune, Body::Pluto}) {
+            g_compressedKeys.push_back(key(body));
+        }
+        return;
+    }
+    for (int i = 1; i < g_bodyCount; ++i) {
+        if (g_bodies[i].auDistance > 0.0f && !g_bodies[i].trueRadius) {
+            g_compressedKeys.push_back(key(static_cast<Body>(i)));
+        }
+    }
+    std::sort(g_compressedKeys.begin(), g_compressedKeys.end(), [](const Key& a, const Key& b) { return a.au < b.au; });
 }
 
 double wrapDegrees(double deg) {
@@ -137,6 +173,31 @@ double orbitRadius(Body body) {
 
 } // namespace
 
+void SetSystemRows(const BodyRow* rows, int count) {
+    if (rows && count > 0) {
+        g_bodies = rows;
+        g_bodyCount = count;
+        g_isSol = false;
+    } else {
+        g_bodies = kSolBodies;
+        g_bodyCount = kBodyCount;
+        g_isSol = true;
+    }
+    g_lonRad.assign(static_cast<std::size_t>(g_bodyCount), 0.0);
+    g_latRad.assign(static_cast<std::size_t>(g_bodyCount), 0.0);
+    g_rAu.assign(static_cast<std::size_t>(g_bodyCount), 0.0);
+    rebuildCompressedKeys();
+    refreshEphemerisCache();
+}
+
+int BodyCount() {
+    return g_bodyCount;
+}
+
+bool IsSolLayout() {
+    return g_isSol;
+}
+
 void SetScaleMode(ScaleMode mode) {
     g_scaleMode = mode;
 }
@@ -157,7 +218,8 @@ double GetJulianDate() {
 void ResetForTests() {
     g_scaleMode = ScaleMode::Compressed;
     g_renderOrigin = glm::dvec3(0.0);
-    SetJulianDate(Ephemeris::kJ2000);
+    g_julianDate = Ephemeris::kJ2000;
+    SetSystemRows(nullptr, 0);
 }
 
 float GetOrbitPeriodSecondsAt1x(Body body) {
@@ -180,11 +242,11 @@ void Advance(float scaledDtSeconds) {
 }
 
 glm::vec3 GetCompressedOffset(Body body) {
-    return kBodies[bodyIndex(body)].compressedOffset;
+    return row(body).compressedOffset;
 }
 
 float GetAuDistance(Body body) {
-    return kBodies[bodyIndex(body)].auDistance;
+    return row(body).auDistance;
 }
 
 double AuToSceneDistanceDouble(double au) {
@@ -197,19 +259,14 @@ double AuToSceneDistanceDouble(double au) {
 
     // Piecewise-linear remap through planet compressed orbit radii so the
     // main belt (and comets) sit between Mars and Jupiter in art scale.
-    struct Key {
-        double au;
-        double scene;
-    };
-    const auto key = [](Body body) {
-        return Key{GetAuDistance(body), glm::length(GetCompressedOffset(body))};
-    };
-    const Key keys[] = {
-        key(Body::Mercury), key(Body::Venus), key(Body::Earth),
-        key(Body::Mars), key(Body::Jupiter), key(Body::Saturn),
-        key(Body::Uranus), key(Body::Neptune), key(Body::Pluto),
-    };
-    constexpr int keyCount = static_cast<int>(sizeof(keys) / sizeof(keys[0]));
+    if (g_compressedKeys.empty()) {
+        rebuildCompressedKeys();
+    }
+    if (g_compressedKeys.empty()) {
+        return au * static_cast<double>(kAuToSceneUnits); // a system with no planet yet
+    }
+    const Key* keys = g_compressedKeys.data();
+    const int keyCount = static_cast<int>(g_compressedKeys.size());
 
     if (au <= keys[0].au) {
         return keys[0].scene * (au / keys[0].au);
@@ -245,11 +302,11 @@ glm::dvec3 HelioAuToSceneDouble(const glm::dvec3& auSceneAxes) {
 }
 
 float GetOrbitalPeriodDays(Body body) {
-    return kBodies[bodyIndex(body)].orbitalPeriodDays;
+    return row(body).orbitalPeriodDays;
 }
 
 float GetSiderealRotationDays(Body body) {
-    return kBodies[bodyIndex(body)].siderealRotationDays;
+    return row(body).siderealRotationDays;
 }
 
 float GetOrbitRadius(Body body) {
@@ -257,6 +314,9 @@ float GetOrbitRadius(Body body) {
 }
 
 bool UsesTrueRadius(Body body) {
+    if (!g_isSol) {
+        return row(body).trueRadius;
+    }
     return static_cast<int>(body) >= static_cast<int>(Body::Eris);
 }
 
@@ -278,12 +338,16 @@ double AxialSpinDegreesAt(Body body, double julianDate) {
     // negative for the retrograde rotators (Venus, Uranus) and needs no special case. Their
     // poles and textures are art, not IAU frames, so W0 fixes a reproducible epoch; it does
     // not by itself put a named feature at a real longitude.
-    if (body == Body::Earth) {
+    if (g_isSol && body == Body::Earth) {
         return earthSpinDegrees(julianDate);
     }
-    const BodyData& row = kBodies[bodyIndex(body)];
-    return wrapDegrees(row.primeMeridianDegJ2000 +
-                       row.primeMeridianRateDegPerDay * (julianDate - Ephemeris::kJ2000));
+    const BodyRow& r = row(body);
+    const double w = r.primeMeridianDegJ2000 + r.primeMeridianRateDegPerDay * (julianDate - Ephemeris::kJ2000);
+    // The scene maps ecliptic y to +Z (GetHeliocentricScenePosition), a mirror: a prograde
+    // orbit runs the negative way about +Y. Sol's spins were tuned in that frame and are kept
+    // as they are; another system's are mirrored back, so a tidally locked planet (W at the
+    // mean motion, W0 = λ0 − 180°) keeps its sub-stellar point at map longitude 0.
+    return wrapDegrees(g_isSol ? w : -w);
 }
 
 float GetAxialSpinDegrees(Body body) {
@@ -291,7 +355,7 @@ float GetAxialSpinDegrees(Body body) {
 }
 
 float GetInclinationDegrees(Body body) {
-    return kBodies[bodyIndex(body)].inclinationDeg;
+    return row(body).inclinationDeg;
 }
 
 glm::dvec3 GetHeliocentricScenePosition(Body body) {
@@ -340,6 +404,19 @@ glm::vec3 GetRenderPosition(Body body) {
 }
 
 Body BodyFromName(const std::string& name) {
+    if (!g_isSol) {
+        // Another system: its catalog ids and display names (names are ASCII designations).
+        for (const BodyCatalog::Entry& entry : BodyCatalog::Entries()) {
+            if (entry.kind == BodyCatalog::Kind::Satellite) {
+                continue;
+            }
+            const std::wstring wide(entry.displayNameEn);
+            if (name == entry.id || name == std::string(wide.begin(), wide.end())) {
+                return static_cast<Body>(entry.index);
+            }
+        }
+        return Body::Sun;
+    }
     if (name == "Mercury") return Body::Mercury;
     if (name == "Venus") return Body::Venus;
     if (name == "Earth") return Body::Earth;

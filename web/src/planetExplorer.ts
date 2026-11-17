@@ -77,6 +77,7 @@ const LABELS: Record<ExplorerLocale, Record<string, string>> = {
         dayLength: 'Day length',
         orbitalPeriod: 'Orbital period',
         distanceFromSun: 'Distance from Sun',
+        distanceFromStar: 'Distance from star',
         sceneDistance: 'Scene distance',
         scaleMode: 'Scale mode',
         knownMoons: 'Known moons',
@@ -94,6 +95,7 @@ const LABELS: Record<ExplorerLocale, Record<string, string>> = {
         dayLength: 'Длина суток',
         orbitalPeriod: 'Орбитальный период',
         distanceFromSun: 'Расстояние от Солнца',
+        distanceFromStar: 'Расстояние от звезды',
         sceneDistance: 'Расстояние в сцене',
         scaleMode: 'Режим масштаба',
         knownMoons: 'Известные спутники',
@@ -160,6 +162,8 @@ export class PlanetExplorer {
     private skipPlanetRestore = false;
     private initialOrbitScale: OrbitScaleMode | undefined;
     private conjunctionRefresh: (() => void) | null = null;
+    /** "sol" or the star system whose facts are shown (systemPicker.ts). */
+    private systemId = 'sol';
 
     constructor(root: HTMLElement) {
         this.locale = detectLocale();
@@ -207,23 +211,28 @@ export class PlanetExplorer {
 
     async init(
         bindings: PlanetExplorerBindings,
-        options?: { skipPlanetRestore?: boolean; initialOrbitScale?: OrbitScaleMode },
+        options?: {
+            skipPlanetRestore?: boolean;
+            initialOrbitScale?: OrbitScaleMode;
+            /** Another star system's facts (systems/<id>/planet_facts.json); Sol's by default. */
+            system?: { id: string; factsUrl: string };
+        },
     ): Promise<void> {
         this.bindings = bindings;
         this.skipPlanetRestore = options?.skipPlanetRestore ?? false;
         this.initialOrbitScale = options?.initialOrbitScale;
-        const factsUrl = new URL(
-            'planet_facts.json',
-            new URL(import.meta.env.BASE_URL, window.location.href),
-        ).toString();
-        const response = await fetch(factsUrl);
-        if (!response.ok) {
-            throw new Error(`Failed to load planet facts (${response.status})`);
-        }
-        this.facts = (await response.json()) as PlanetFactsFile;
+        this.systemId = options?.system?.id ?? 'sol';
+        const factsUrl =
+            options?.system?.factsUrl ??
+            new URL('planet_facts.json', new URL(import.meta.env.BASE_URL, window.location.href)).toString();
+        this.facts = await PlanetExplorer.fetchFacts(factsUrl);
         this.elements.cardDismiss.setAttribute('aria-label', LABELS[this.locale].dismissCard);
         this.renderBodyList();
-        if (!this.skipPlanetRestore) {
+        if (this.systemId !== 'sol') {
+            // A system other than Sol: C++ chose the landing planet; show its card.
+            this.restoreState({ skipPlanet: true, skipScale: this.initialOrbitScale !== undefined });
+            this.selectFocusedFromRuntime();
+        } else if (!this.skipPlanetRestore) {
             this.restoreState();
         } else {
             this.restoreState({ skipPlanet: true, skipScale: this.initialOrbitScale !== undefined });
@@ -236,6 +245,40 @@ export class PlanetExplorer {
         this.bindConjunction();
         this.elements.status.textContent = 'Explorer ready';
         this.subscribeRuntimeEvents();
+    }
+
+    private static async fetchFacts(url: string): Promise<PlanetFactsFile> {
+        const response = await fetch(url);
+        if (!response.ok) {
+            throw new Error(`Failed to load planet facts (${response.status})`);
+        }
+        return (await response.json()) as PlanetFactsFile;
+    }
+
+    /**
+     * The scene is now another star system (systemPicker.ts, after C++ swapped it): list its
+     * bodies and show the landing planet's card. Focus indices restart at 0 for each system.
+     */
+    async showSystem(id: string, factsUrl: string): Promise<void> {
+        const next = await PlanetExplorer.fetchFacts(factsUrl);
+        // Only Sol's facts describe the scale modes; other systems keep that help text.
+        const scaleModes = Object.keys(next.scaleModes).length > 0 ? next.scaleModes : (this.facts?.scaleModes ?? {});
+        this.facts = { ...next, scaleModes };
+        this.systemId = id;
+        this.selectedIndex = null;
+        this.cardDismissed = false;
+        this.elements.card.hidden = true;
+        this.renderBodyList();
+        this.updateScaleHelp();
+        this.conjunctionRefresh?.();
+        this.selectFocusedFromRuntime();
+    }
+
+    private selectFocusedFromRuntime(): void {
+        const focused = this.bindings.getFocusedPlanetIndex?.() ?? -1;
+        if (focused >= 0 && this.facts?.bodies.some((body) => body.index === focused)) {
+            this.selectPlanet(focused as PlanetIndex, { focusCamera: false });
+        }
     }
 
     applyDeepLinkPlanet(index: PlanetIndex, options: { focusCamera: boolean }): void {
@@ -395,7 +438,10 @@ export class PlanetExplorer {
             [labels.type, body.type.replace(/_/g, ' ')],
             [labels.diameter, formatDiameter(body.diameterKm, this.locale)],
             [labels.dayLength, formatDayLength(body.siderealRotationDays, this.locale)],
-            [labels.distanceFromSun, body.distanceAu > 0 ? `${body.distanceAu} AU` : labels.centerOfSystem],
+            [
+                this.systemId === 'sol' ? labels.distanceFromSun : labels.distanceFromStar,
+                body.distanceAu > 0 ? `${body.distanceAu} AU` : labels.centerOfSystem,
+            ],
         ];
 
         if (body.moons !== undefined) {
@@ -438,7 +484,8 @@ export class PlanetExplorer {
                 EXPLORER_STORAGE_KEY,
                 JSON.stringify({
                     collapsed: this.elements.panel.classList.contains('is-collapsed'),
-                    selectedIndex: this.selectedIndex,
+                    // Focus indices are per system; only Sol's selection is restored on load.
+                    selectedIndex: this.systemId === 'sol' ? this.selectedIndex : null,
                     scaleMode: Number(this.elements.scaleSelect.value),
                 }),
             );
@@ -453,7 +500,7 @@ export class PlanetExplorer {
             if (!raw) return;
             const parsed = JSON.parse(raw) as {
                 collapsed?: boolean;
-                selectedIndex?: PlanetIndex;
+                selectedIndex?: PlanetIndex | null;
                 scaleMode?: OrbitScaleMode;
             };
             if (typeof parsed.collapsed === 'boolean') {
@@ -464,7 +511,7 @@ export class PlanetExplorer {
                 this.bindings.setOrbitScaleMode?.(parsed.scaleMode);
                 this.updateScaleHelp();
             }
-            if (!options?.skipPlanet && parsed.selectedIndex !== undefined) {
+            if (!options?.skipPlanet && typeof parsed.selectedIndex === 'number') {
                 this.selectPlanet(parsed.selectedIndex, { focusCamera: false });
             }
         } catch {

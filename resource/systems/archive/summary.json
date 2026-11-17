@@ -1,0 +1,38 @@
+{
+  "table": "pscomppars",
+  "fetched": "2026-11-17",
+  "columns": [
+    "hostname",
+    "pl_name",
+    "pl_letter",
+    "sy_dist",
+    "st_spectype",
+    "st_teff",
+    "st_rad",
+    "st_mass",
+    "st_lum",
+    "pl_orbper",
+    "pl_orbsmax",
+    "pl_rade",
+    "pl_bmasse",
+    "pl_orbeccen",
+    "pl_orbincl",
+    "pl_orblper",
+    "pl_eqt",
+    "pl_tranmid",
+    "disc_year",
+    "discoverymethod"
+  ],
+  "curatedHosts": [
+    "TRAPPIST-1",
+    "Proxima Cen",
+    "KOI-351",
+    "51 Peg",
+    "55 Cnc",
+    "tau Cet",
+    "TOI-700",
+    "Kepler-186"
+  ],
+  "archiveSystemsAvailable": 4853,
+  "criterion": "at least one planet with (pl_orbper or pl_orbsmax) and (pl_rade or pl_bmasse)"
+}

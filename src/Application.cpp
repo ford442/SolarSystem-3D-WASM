@@ -4,6 +4,7 @@
 // SceneRenderer.cpp / SceneOverlayRenderer.cpp (drawing), StarSystemFactory.cpp and
 // PlanetSystemLoader.cpp (scene construction), XrSession.cpp (WebXR).
 #include "Application.h"
+#include "Solar_System/StarSystemCatalog.h"
 #include "FrameContext.h"
 #include "JsBridge.h"
 #include "QualitySettings.h"
@@ -108,6 +109,7 @@ void Application::RunOneFrame() {
     _deltaTime = _capture.active ? _capture.stepSeconds : currentFrame - _lastFrame;
     _lastFrame = currentFrame;
     _simState.animationSeconds += _deltaTime;
+    UpdateSystemJump(_deltaTime); // may swap the whole scene, so before anything places a body
 #ifndef __EMSCRIPTEN__
     PollShaderHotReload(currentFrame);
 #endif
@@ -158,7 +160,10 @@ void Application::RunOneFrame() {
     glBindFramebuffer(GL_FRAMEBUFFER, DefaultFramebuffer());
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
     RenderFrame(1);
-    TimeStage(FrameProfile::Stage::Hud, [this] { _renderer.RenderHud(FrameContextFor(0)); });
+    TimeStage(FrameProfile::Stage::Hud, [this] {
+        _renderer.RenderHud(FrameContextFor(0));
+        _renderer.RenderScreenFade(DefaultFramebuffer(), _screenFadeColor, _screenFadeAmount);
+    });
 
     TimeStage(FrameProfile::Stage::Uploads, [this] {
         TextureLoadingQueue::GetInstance().ProcessQueue();
@@ -268,13 +273,15 @@ void Application::UpdateScene(double julianDate) {
         component.lightSpaceMatrix = lightProjection * lightView;
     }
 
-    if (_asteroidField) {
+    // The belts and the probes are Sol's: another star system has neither.
+    const bool sol = StarSystemCatalog::IsSol();
+    if (_asteroidField && sol) {
         _asteroidField->Update(julianDate);
     }
-    if (_kuiperField) {
+    if (_kuiperField && sol) {
         _kuiperField->Update(julianDate);
     }
-    _missionProbes.resize(_missionCatalog.missions.size());
+    _missionProbes.resize(sol ? _missionCatalog.missions.size() : 0);
     for (size_t i = 0; i < _missionProbes.size(); ++i) {
         glm::vec3 probe(0.0f);
         _missionProbes[i] = SampleMissionScenePosition(static_cast<int>(i), probe) ? std::optional(probe) : std::nullopt;
@@ -282,7 +289,9 @@ void Application::UpdateScene(double julianDate) {
     UpdateLOD();
     UpdateSearchNearestPlanet();
     // Warm the lazily searched caches here so no pass is the one that pays for a search.
-    GetNextSkyEvent();
+    if (sol) {
+        GetNextSkyEvent();
+    }
     if (_observe.active) {
         CurrentObserveSky();
     }
@@ -581,9 +590,11 @@ void Application::BuildFrameSnapshot(int viewCount) {
     scene.sun = _sun.get();
     scene.components = &_renderableSceneComponents;
     scene.nearestComponent = _nearestPlanetIndex;
-    scene.asteroidField = _asteroidField.get();
-    scene.kuiperField = _kuiperField.get();
-    scene.missions = &_missionCatalog;
+    const bool sol = StarSystemCatalog::IsSol();
+    static const MissionCatalog::Catalog kNoMissions;
+    scene.asteroidField = sol ? _asteroidField.get() : nullptr;
+    scene.kuiperField = sol ? _kuiperField.get() : nullptr;
+    scene.missions = sol ? &_missionCatalog : &kNoMissions;
     scene.focusedMission = _focusedMissionIndex;
     scene.missionProbes = &_missionProbes;
     scene.stagedSystems = &_planetSystemManifests;
@@ -691,6 +702,9 @@ void Application::InitSceneObjects() {
     }
 
     InitSongList();
+    // ?system= on web, SOLARSYSTEM_SYSTEM natively: select the catalog before the build reads it.
+    ApplySystemEnvOverride();
+    _renderer.PrefetchCatalogVariants();
     InitStarSystem();
 
     glfwShowWindow(_mainWindow);
@@ -701,6 +715,19 @@ void Application::InitSceneObjects() {
     StartSearchNearestPlanet();
     StartPlayBackgroundMusic();
     ApplyScaleEnvOverride();
+    if (_pendingSystemLanding) {
+        _pendingSystemLanding = false;
+        PlaceBodies();
+        LandCameraInSystem(_pendingSystemFocus);
+        if (!StarSystemCatalog::IsSol()) {
+            // On web the module resolves before the scene is built, so the page set up its UI
+            // for Sol (and may have applied a link's pose and speed, which the landing just
+            // replaced): announce the system as a jump's swap and arrival would.
+            NotifySettingsChanged("timeScale");
+            NotifySystemChanged(StarSystemCatalog::ActiveId().c_str(), 1);
+            NotifySystemChanged(StarSystemCatalog::ActiveId().c_str(), 2);
+        }
+    }
     ApplyCameraPoseEnvOverride();
     ApplyObserveEnvOverride();
     LOG_INFO("Loading", "Scene initialised in %.0f ms (%d job worker(s))",
@@ -752,9 +779,13 @@ void Application::ApplyCameraPoseEnvOverride() {
 }
 
 void Application::FocusPlanetByIndex(int idx) {
+    FocusPlanetByIndex(idx, glm::normalize(glm::vec3(0.7f, 0.3f, 0.7f)));
+}
+
+void Application::FocusPlanetByIndex(int idx, const glm::vec3& fromDirection) {
     if (_observe.active) return; // the viewer stays on the ground in Observe
     StopMissionFollow();
-    idx = std::clamp(idx, 0, OrbitLayout::kBodyCount - 1);
+    idx = std::clamp(idx, 0, OrbitLayout::BodyCount() - 1);
     _focusedPlanetIndex = idx;
 
     glm::dvec3 target(0.0);
@@ -805,7 +836,7 @@ void Application::FocusPlanetByIndex(int idx) {
         }
     }
 
-    const glm::vec3 direction = glm::normalize(glm::vec3(0.7f, 0.3f, 0.7f));
+    const glm::vec3 direction = fromDirection;
     const glm::dvec3 cameraPos = target + glm::dvec3(direction) * static_cast<double>((focusRadius + 30.0f) * sizeFactor);
     const glm::vec3 lookDir = -direction;
     const float yaw = glm::degrees(std::atan2(lookDir.z, lookDir.x));
@@ -911,6 +942,7 @@ void Application::FocusMissionByIndex(int idx) {
         return;
     }
     if (_observe.active) return; // the viewer stays on the ground in Observe
+    if (!StarSystemCatalog::IsSol()) return; // the probes fly in Sol
     if (idx >= static_cast<int>(_missionCatalog.missions.size())) {
         return;
     }
@@ -1053,6 +1085,10 @@ const SkyEvents::Conjunction& Application::GetNextConjunction() const {
     const bool rewound = jd < _nextConjunctionComputedJd - 0.5;
     const bool retryEmpty = !_nextConjunction.valid && jd > _nextConjunctionComputedJd + kEmptyRetryDays;
 
+    if (!StarSystemCatalog::IsSol()) {
+        static const SkyEvents::Conjunction kNone{};
+        return kNone; // the sky-event searches are Sol's ephemeris
+    }
     if (!_nextConjunctionCached || passed || rewound || retryEmpty) {
         _nextConjunction = SkyEvents::NextInnerPlanetConjunction(jd);
         _nextConjunctionComputedJd = jd;
@@ -1071,6 +1107,10 @@ const SkyEvents::SkyEvent& Application::GetNextSkyEvent() const {
     const bool rewound = jd < _nextSkyEventComputedJd - 0.5;
     const bool retryEmpty = !_nextSkyEvent.valid && jd > _nextSkyEventComputedJd + kEmptyRetryDays;
 
+    if (!StarSystemCatalog::IsSol()) {
+        static const SkyEvents::SkyEvent kNone{};
+        return kNone;
+    }
     if (!_nextSkyEventCached || passed || rewound || retryEmpty) {
         _nextSkyEvent = SkyEvents::NextEvent(jd);
         _nextSkyEventComputedJd = jd;

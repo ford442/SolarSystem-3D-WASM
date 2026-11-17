@@ -1,0 +1,23 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 160 72" width="160" height="72" role="img" aria-label="Solar System">
+  <defs>
+    <radialGradient id="glow"><stop offset="0" stop-color="#fff0ea" stop-opacity="0.9"/><stop offset="1" stop-color="#fff0ea" stop-opacity="0"/></radialGradient>
+  </defs>
+  <rect width="160" height="72" fill="#05070d"/>
+  <line x1="31" y1="36" x2="154" y2="36" stroke="#ffffff" stroke-opacity="0.12" stroke-width="0.6"/>
+  <circle cx="16" cy="36" r="19.8" fill="url(#glow)"/>
+  <circle cx="16" cy="36" r="9.0" fill="#fff0ea"/>
+  <circle cx="35.0" cy="36" r="1.40" fill="#9b8b75"/>
+  <circle cx="48.9" cy="36" r="1.56" fill="#d5a55f"/>
+  <circle cx="56.1" cy="36" r="1.60" fill="#2f6fc0"/>
+  <circle cx="65.5" cy="36" r="1.40" fill="#b65332"/>
+  <circle cx="75.3" cy="36" r="1.40" fill="#9a9086"/>
+  <circle cx="78.8" cy="36" r="1.40" fill="#8c8177"/>
+  <circle cx="92.8" cy="36" r="5.35" fill="#c9a36a"/>
+  <circle cx="106.3" cy="36" r="4.92" fill="#e6d3a3"/>
+  <circle cx="121.9" cy="36" r="3.20" fill="#7ec8e3"/>
+  <circle cx="131.9" cy="36" r="3.15" fill="#3f6fdb"/>
+  <circle cx="137.9" cy="36" r="1.40" fill="#b59a7a"/>
+  <circle cx="139.9" cy="36" r="1.40" fill="#cfcac2"/>
+  <circle cx="141.1" cy="36" r="1.40" fill="#c99b7a"/>
+  <circle cx="150.0" cy="36" r="1.40" fill="#d9d6d0"/>
+</svg>

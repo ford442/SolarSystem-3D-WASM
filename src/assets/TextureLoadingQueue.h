@@ -8,6 +8,7 @@
 #include <unordered_set>
 #include <chrono>
 #include <array>
+#include <cstdint>
 
 #include "../gfx/TextureImage2D.h"
 
@@ -28,6 +29,8 @@ struct TextureLoadJob {
     int retries = 0;
     std::chrono::steady_clock::time_point nextAttemptTime{};
     const int maxRetries = 3;
+    /** TextureLoadingQueue::CancelAll bumps the queue's epoch; a job from an older one is dropped unseen. */
+    std::uint64_t epoch = 0;
 };
 
 class TextureLoadingQueue {
@@ -49,6 +52,13 @@ public:
     // Cancel a pending or in-flight load (deprioritize when camera moves away).
     // For in-flight async downloads, suppresses the texture reload on completion.
     void CancelLoad(const std::string& path);
+
+    /**
+     * Forget every queued and in-flight load *without* running its callback or touching its
+     * texture: their owners are about to be destroyed (Application::LoadSystem tears the scene
+     * down). Downloads already on the wire finish and are dropped.
+     */
+    void CancelAll();
 
     // Cumulative stats for JS progress reporting
     int GetTotalQueued()    const { return _totalQueued; }
@@ -83,6 +93,8 @@ private:
     // Dedup + cancel support for resilience against repeated LOD checks and camera movement.
     std::unordered_set<std::string> _pendingPaths;
     std::unordered_set<std::string> _cancelledPaths;
+
+    std::uint64_t _epoch = 0;
 
     int _totalQueued    = 0;
     int _totalCompleted = 0;

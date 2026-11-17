@@ -1,0 +1,294 @@
+{
+  "schemaVersion": 1,
+  "system": {
+    "id": "proxima-cen",
+    "name": {
+      "en": "Proxima Centauri",
+      "ru": "Проксима Центавра"
+    },
+    "distancePc": 1.301,
+    "spectralType": "M5.5 V",
+    "starColor": "#ffb466",
+    "habitableZoneAu": {
+      "innerAu": 0.03705,
+      "outerAu": 0.05338
+    },
+    "source": {
+      "table": "NASA Exoplanet Archive, Planetary Systems Composite Parameters (pscomppars)",
+      "url": "https://exoplanetarchive.ipac.caltech.edu/",
+      "archiveHostname": "Proxima Cen",
+      "referencePlaneInclinationDeg": 90
+    }
+  },
+  "sceneNote": {
+    "en": "Measured orbits and sizes; surfaces are procedural (no exoplanet has been imaged). Values marked fit are estimates.",
+    "ru": "Орбиты и размеры измерены; поверхности процедурные (ни одна экзопланета не сфотографирована). Значения с пометкой fit — оценки."
+  },
+  "initTagAllowlist": [
+    "proxima_cen_d",
+    "proxima_cen_b"
+  ],
+  "bodies": [
+    {
+      "id": "proxima_cen",
+      "index": 0,
+      "kind": "star",
+      "parent": null,
+      "displayName": {
+        "en": "Proxima Centauri",
+        "ru": "Проксима Центавра"
+      },
+      "type": "star",
+      "facts": {
+        "diameterKm": 196187,
+        "massEarths": 40653,
+        "siderealRotationDays": null,
+        "orbitalPeriodDays": null,
+        "distanceAu": 0,
+        "moons": 0,
+        "distancePc": 1.301,
+        "spectralType": "M5.5 V",
+        "effectiveTemperatureK": 2900,
+        "luminositySolar": 0.00151,
+        "summary": {
+          "en": "M5.5 V star 4.2 light-years away; 2 known planets in the archive's composite table.",
+          "ru": "Звезда класса M5.5 V на расстоянии 4.2 св. лет; известных планет: 2."
+        }
+      },
+      "orbit": {
+        "compressedOffset": [
+          0,
+          0,
+          0
+        ],
+        "inclinationDeg": 0,
+        "siderealRotationDays": null,
+        "orbitalPeriodDays": null,
+        "distanceAu": 0,
+        "axialTiltDegrees": 0,
+        "earthRadiusScale": 1,
+        "rotationRate": 0
+      },
+      "render": {
+        "star": {
+          "effectiveTemperatureK": 2900,
+          "radiusSolar": 0.141,
+          "luminositySolar": 0.00151,
+          "massSolar": 0.1221,
+          "spectralType": "M5.5 V",
+          "activity": 0.77
+        }
+      },
+      "includeInCompanion": false
+    },
+    {
+      "id": "proxima_cen_d",
+      "index": 1,
+      "kind": "planet",
+      "parent": "proxima_cen",
+      "displayName": {
+        "en": "Proxima Centauri d",
+        "ru": "Проксима Центавра d"
+      },
+      "type": "terrestrial",
+      "facts": {
+        "diameterKm": 8817,
+        "massEarths": 0.26,
+        "siderealRotationDays": 5.12338,
+        "orbitalPeriodDays": 5.12338,
+        "distanceAu": 0.02881,
+        "moons": 0,
+        "equilibriumTemperatureK": 282,
+        "irradianceEarth": 1.8193,
+        "discoveryYear": 2025,
+        "discoveryMethod": "Radial Velocity",
+        "summary": {
+          "en": "Terrestrial discovered in 2025 (radial velocity); 1.82× Earth's insolation, equilibrium temperature ≈ 282 K.",
+          "ru": "Планета земного типа, открыта в 2025 г. методом лучевых скоростей; освещённость 1.82 от земной, равновесная температура ≈ 282 K."
+        }
+      },
+      "orbit": {
+        "compressedOffset": [
+          1500,
+          0,
+          0
+        ],
+        "inclinationDeg": 0,
+        "siderealRotationDays": 5.12338,
+        "orbitalPeriodDays": 5.12338,
+        "distanceAu": 0.02881,
+        "axialTiltDegrees": 0,
+        "earthRadiusScale": 0.692,
+        "rotationRate": 0,
+        "primeMeridianDegJ2000": 184,
+        "primeMeridianRateDegPerDay": 70.266113386,
+        "keplerian": {
+          "aKm": 4309914.7,
+          "e": 0,
+          "iDeg": 0,
+          "OmegaDeg": 0,
+          "omegaDeg": 4,
+          "M0Deg": 0,
+          "nDegPerDay": 70.266113386,
+          "OmegaDotDegPerDay": 0,
+          "omegaDotDegPerDay": 0
+        },
+        "placeFromElements": true
+      },
+      "system": {
+        "name": "Proxima Centauri d",
+        "initTag": "proxima_cen_d",
+        "activationRadius": 800,
+        "lodThreshold": 20
+      },
+      "render": {
+        "shaderFlags": {
+          "hasNightTexture": false,
+          "hasSpecularMap": false,
+          "hasClouds": false
+        },
+        "ambientFactor": 0,
+        "procedural": {
+          "seed": 1,
+          "equilibriumTemperatureK": 282,
+          "style": "ocean",
+          "mode": 0,
+          "colors": [
+            [
+              0.07,
+              0.22,
+              0.45
+            ],
+            [
+              0.42,
+              0.45,
+              0.28
+            ],
+            [
+              0.92,
+              0.94,
+              0.97
+            ]
+          ],
+          "seaLevel": 0.55,
+          "polarCap": 0.75,
+          "emissive": 0
+        }
+      },
+      "fit": {
+        "inclination": true,
+        "meanAnomaly": true,
+        "rotation": "tidally-locked"
+      },
+      "archive": {
+        "plName": "Proxima Cen d",
+        "observedInclinationDeg": null
+      },
+      "includeInCompanion": false
+    },
+    {
+      "id": "proxima_cen_b",
+      "index": 2,
+      "kind": "planet",
+      "parent": "proxima_cen",
+      "displayName": {
+        "en": "Proxima Centauri b",
+        "ru": "Проксима Центавра b"
+      },
+      "type": "terrestrial",
+      "facts": {
+        "diameterKm": 12997,
+        "massEarths": 1.055,
+        "siderealRotationDays": 11.18465,
+        "orbitalPeriodDays": 11.18465,
+        "distanceAu": 0.04848,
+        "moons": 0,
+        "equilibriumTemperatureK": 218,
+        "irradianceEarth": 0.6425,
+        "discoveryYear": 2016,
+        "discoveryMethod": "Radial Velocity",
+        "summary": {
+          "en": "Terrestrial discovered in 2016 (radial velocity); 0.64× Earth's insolation, equilibrium temperature ≈ 218 K.",
+          "ru": "Планета земного типа, открыта в 2016 г. методом лучевых скоростей; освещённость 0.64 от земной, равновесная температура ≈ 218 K."
+        }
+      },
+      "orbit": {
+        "compressedOffset": [
+          -1290.4,
+          0,
+          1182.11
+        ],
+        "inclinationDeg": 0,
+        "siderealRotationDays": 11.18465,
+        "orbitalPeriodDays": 11.18465,
+        "distanceAu": 0.04848,
+        "axialTiltDegrees": 0,
+        "earthRadiusScale": 1.02,
+        "rotationRate": 0,
+        "primeMeridianDegJ2000": 269.3949,
+        "primeMeridianRateDegPerDay": 32.186970536,
+        "keplerian": {
+          "aKm": 7252504.8,
+          "e": 0,
+          "iDeg": 0,
+          "OmegaDeg": 0,
+          "omegaDeg": 3.3,
+          "M0Deg": 86.0949,
+          "nDegPerDay": 32.186970536,
+          "OmegaDotDegPerDay": 0,
+          "omegaDotDegPerDay": 0
+        },
+        "placeFromElements": true
+      },
+      "system": {
+        "name": "Proxima Centauri b",
+        "initTag": "proxima_cen_b",
+        "activationRadius": 800,
+        "lodThreshold": 20
+      },
+      "render": {
+        "shaderFlags": {
+          "hasNightTexture": false,
+          "hasSpecularMap": false,
+          "hasClouds": false
+        },
+        "ambientFactor": 0,
+        "procedural": {
+          "seed": 2,
+          "equilibriumTemperatureK": 218,
+          "style": "tundra",
+          "mode": 3,
+          "colors": [
+            [
+              0.45,
+              0.47,
+              0.5
+            ],
+            [
+              0.7,
+              0.74,
+              0.78
+            ],
+            [
+              0.95,
+              0.96,
+              0.98
+            ]
+          ],
+          "seaLevel": 0.35,
+          "polarCap": 0.45,
+          "emissive": 0
+        }
+      },
+      "fit": {
+        "inclination": true,
+        "rotation": "tidally-locked"
+      },
+      "archive": {
+        "plName": "Proxima Cen b",
+        "observedInclinationDeg": null
+      },
+      "includeInCompanion": false
+    }
+  ]
+}

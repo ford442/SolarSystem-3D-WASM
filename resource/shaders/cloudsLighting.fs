@@ -72,6 +72,6 @@ void main() {
     if (shadow < 0.05)
         ambient *= 0.1;
 
-    vec3 lighting = ambient + shadow * diffuse;
+    vec3 lighting = (ambient + shadow * diffuse) * frame.starColor.rgb;
     fragColor = vec4(lighting * uSurfaceDim, 1.0f);
 }

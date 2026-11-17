@@ -74,4 +74,18 @@ void NotifyMissionFocused(int index) {
     }, index);
 }
 
+// A star-system jump (Application::RequestSystemJump): phase 0 = started (fading out),
+// 1 = swapped (the new system is the scene: catalog, facts and focus indices changed),
+// 2 = finished (faded in), -1 = refused (unknown id).
+// EM_ASM bodies are JavaScript, and clang-format would split `===`.
+// clang-format off
+void NotifySystemChanged(const char* id, int phase) {
+    EM_ASM({
+        if (typeof Module['onSystemChanged'] === 'function') {
+            Module['onSystemChanged'](UTF8ToString($0), $1);
+        }
+    }, id, phase);
+}
+// clang-format on
+
 #endif

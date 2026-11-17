@@ -1,0 +1,3913 @@
+{
+  "format": "solarsystem-runtime-catalog",
+  "version": 1,
+  "generatedFrom": "resource/systems/sol.catalog.json",
+  "id": "sol",
+  "name": {
+    "en": "Solar System",
+    "ru": "Солнечная система"
+  },
+  "distancePc": 0,
+  "spectralType": "G2V",
+  "habitableZoneAu": null,
+  "star": {
+    "id": "sun",
+    "displayNameEn": "Sun",
+    "displayNameRu": "Солнце",
+    "spectralType": "G2V",
+    "effectiveTemperatureK": 5772,
+    "glowTemperatureK": 5778,
+    "radiusKm": 695700,
+    "radiusSolar": 1,
+    "luminositySolar": 1,
+    "massSolar": 1,
+    "activity": 0
+  },
+  "layout": [
+    {
+      "index": 0,
+      "id": "sun",
+      "compressedOffset": [
+        0,
+        0,
+        0
+      ],
+      "auDistance": 0,
+      "orbitalPeriodDays": 0,
+      "inclinationDeg": 0,
+      "siderealRotationDays": 25.38,
+      "primeMeridianDegJ2000": 84.176,
+      "primeMeridianRateDegPerDay": 14.1844,
+      "trueRadius": false,
+      "kepler": null
+    },
+    {
+      "index": 1,
+      "id": "mercury",
+      "compressedOffset": [
+        1500,
+        0,
+        350
+      ],
+      "auDistance": 0.387,
+      "orbitalPeriodDays": 88,
+      "inclinationDeg": 7,
+      "siderealRotationDays": 58.646,
+      "primeMeridianDegJ2000": 329.5988,
+      "primeMeridianRateDegPerDay": 6.1385108,
+      "trueRadius": false,
+      "kepler": null
+    },
+    {
+      "index": 2,
+      "id": "venus",
+      "compressedOffset": [
+        1125,
+        0,
+        -1340
+      ],
+      "auDistance": 0.723,
+      "orbitalPeriodDays": 224.7,
+      "inclinationDeg": 3.4,
+      "siderealRotationDays": -243.025,
+      "primeMeridianDegJ2000": 160.2,
+      "primeMeridianRateDegPerDay": -1.4813688,
+      "trueRadius": false,
+      "kepler": null
+    },
+    {
+      "index": 3,
+      "id": "earth",
+      "compressedOffset": [
+        1900,
+        0,
+        0
+      ],
+      "auDistance": 1,
+      "orbitalPeriodDays": 365.25,
+      "inclinationDeg": 0,
+      "siderealRotationDays": 0.99726968,
+      "primeMeridianDegJ2000": 190.147,
+      "primeMeridianRateDegPerDay": 360.9856235,
+      "trueRadius": false,
+      "kepler": null
+    },
+    {
+      "index": 4,
+      "id": "mars",
+      "compressedOffset": [
+        -1732,
+        0,
+        1000
+      ],
+      "auDistance": 1.524,
+      "orbitalPeriodDays": 687,
+      "inclinationDeg": 1.9,
+      "siderealRotationDays": 1.025957,
+      "primeMeridianDegJ2000": 176.049863,
+      "primeMeridianRateDegPerDay": 350.891982443297,
+      "trueRadius": false,
+      "kepler": null
+    },
+    {
+      "index": 5,
+      "id": "jupiter",
+      "compressedOffset": [
+        1350,
+        0,
+        1737
+      ],
+      "auDistance": 5.203,
+      "orbitalPeriodDays": 4333,
+      "inclinationDeg": 1.3,
+      "siderealRotationDays": 0.41354,
+      "primeMeridianDegJ2000": 284.95,
+      "primeMeridianRateDegPerDay": 870.536,
+      "trueRadius": false,
+      "kepler": null
+    },
+    {
+      "index": 6,
+      "id": "saturn",
+      "compressedOffset": [
+        0,
+        -100,
+        2450
+      ],
+      "auDistance": 9.537,
+      "orbitalPeriodDays": 10759,
+      "inclinationDeg": 2.5,
+      "siderealRotationDays": 0.44401,
+      "primeMeridianDegJ2000": 38.9,
+      "primeMeridianRateDegPerDay": 810.7939024,
+      "trueRadius": false,
+      "kepler": null
+    },
+    {
+      "index": 7,
+      "id": "uranus",
+      "compressedOffset": [
+        0,
+        0,
+        -2650
+      ],
+      "auDistance": 19.191,
+      "orbitalPeriodDays": 30687,
+      "inclinationDeg": 0.8,
+      "siderealRotationDays": -0.71833,
+      "primeMeridianDegJ2000": 203.81,
+      "primeMeridianRateDegPerDay": -501.1600928,
+      "trueRadius": false,
+      "kepler": null
+    },
+    {
+      "index": 8,
+      "id": "neptune",
+      "compressedOffset": [
+        -2900,
+        0,
+        0
+      ],
+      "auDistance": 30.069,
+      "orbitalPeriodDays": 60190,
+      "inclinationDeg": 1.8,
+      "siderealRotationDays": 0.67125,
+      "primeMeridianDegJ2000": 249.978,
+      "primeMeridianRateDegPerDay": 541.1397757,
+      "trueRadius": false,
+      "kepler": null
+    },
+    {
+      "index": 9,
+      "id": "pluto",
+      "compressedOffset": [
+        2800,
+        0,
+        1757.73
+      ],
+      "auDistance": 39.482,
+      "orbitalPeriodDays": 90560,
+      "inclinationDeg": 17.2,
+      "siderealRotationDays": 6.3872,
+      "primeMeridianDegJ2000": 302.695,
+      "primeMeridianRateDegPerDay": 56.3625225,
+      "trueRadius": false,
+      "kepler": null
+    },
+    {
+      "index": 10,
+      "id": "ceres",
+      "compressedOffset": [
+        400.51,
+        0,
+        2028.28
+      ],
+      "auDistance": 2.7656,
+      "orbitalPeriodDays": 1679.85,
+      "inclinationDeg": 10.59,
+      "siderealRotationDays": 0.3781,
+      "primeMeridianDegJ2000": 170.309,
+      "primeMeridianRateDegPerDay": 952.1532,
+      "trueRadius": false,
+      "kepler": null
+    },
+    {
+      "index": 11,
+      "id": "vesta",
+      "compressedOffset": [
+        2010.24,
+        0,
+        378.02
+      ],
+      "auDistance": 2.3614,
+      "orbitalPeriodDays": 1325.39,
+      "inclinationDeg": 7.14,
+      "siderealRotationDays": 0.2226,
+      "primeMeridianDegJ2000": 285.39,
+      "primeMeridianRateDegPerDay": 1617.3329,
+      "trueRadius": false,
+      "kepler": null
+    },
+    {
+      "index": 12,
+      "id": "eris",
+      "compressedOffset": [
+        0,
+        0,
+        5680
+      ],
+      "auDistance": 67.86,
+      "orbitalPeriodDays": 203830,
+      "inclinationDeg": 44.04,
+      "siderealRotationDays": 15.786,
+      "primeMeridianDegJ2000": 0,
+      "primeMeridianRateDegPerDay": 22.80501710376283,
+      "trueRadius": false,
+      "kepler": null
+    },
+    {
+      "index": 13,
+      "id": "haumea",
+      "compressedOffset": [
+        -2550,
+        0,
+        -2550
+      ],
+      "auDistance": 43.12,
+      "orbitalPeriodDays": 103774,
+      "inclinationDeg": 28.21,
+      "siderealRotationDays": 0.1631,
+      "primeMeridianDegJ2000": 0,
+      "primeMeridianRateDegPerDay": 2207.2348252605766,
+      "trueRadius": false,
+      "kepler": null
+    },
+    {
+      "index": 14,
+      "id": "makemake",
+      "compressedOffset": [
+        2700,
+        0,
+        -2700
+      ],
+      "auDistance": 45.51,
+      "orbitalPeriodDays": 111845,
+      "inclinationDeg": 29.03,
+      "siderealRotationDays": 0.9511,
+      "primeMeridianDegJ2000": 0,
+      "primeMeridianRateDegPerDay": 378.5090947324151,
+      "trueRadius": false,
+      "kepler": null
+    },
+    {
+      "index": 15,
+      "id": "halley",
+      "compressedOffset": [
+        -2100,
+        0,
+        1200
+      ],
+      "auDistance": 17.83,
+      "orbitalPeriodDays": 27510,
+      "inclinationDeg": 162.26,
+      "siderealRotationDays": 2.2,
+      "primeMeridianDegJ2000": 0,
+      "primeMeridianRateDegPerDay": 163.63636363636363,
+      "trueRadius": false,
+      "kepler": null
+    }
+  ],
+  "entries": [
+    {
+      "index": 1,
+      "id": "mercury",
+      "parentId": "sun",
+      "initTag": "Mercury",
+      "kind": "planet",
+      "displayNameEn": "Mercury",
+      "displayNameRu": "Меркурий",
+      "auDistance": 0.387,
+      "orbitalPeriodDays": 88,
+      "earthRadiusScale": 0.38,
+      "radiusKm": 2439.5,
+      "axialTiltDegrees": 0,
+      "artTiltXDegrees": 0,
+      "oblateness": 0,
+      "yawOffsetDegrees": 0,
+      "artRollDegrees": 0,
+      "shaderFlags": {
+        "hasNightTexture": false,
+        "hasSpecularMap": true,
+        "hasClouds": false
+      },
+      "useSphereIntersect": false,
+      "ambientFactor": 0,
+      "lod": {
+        "diffuse": "Mercury_Diffuse",
+        "normal": "Mercury_Normal",
+        "specular": "Mercury_Specular",
+        "night": null,
+        "clouds": null
+      },
+      "meshPath": null,
+      "sceneOrbitRadius": 0,
+      "orbitPlane": "xz",
+      "initialAnomalyRad": 0,
+      "spinDegPerSimSecond": 0,
+      "keplerian": {
+        "aKm": 0,
+        "e": 0,
+        "iDeg": 0,
+        "OmegaDeg": 0,
+        "omegaDeg": 0,
+        "M0Deg": 0,
+        "nDegPerDay": 0,
+        "OmegaDotDegPerDay": 0,
+        "omegaDotDegPerDay": 0
+      },
+      "cloudLayer": {
+        "diffuse": null,
+        "normal": null,
+        "scaleFactor": 0,
+        "spinDegPerSimSecond": 0,
+        "ambientFactor": 0
+      },
+      "hasCloudLayer": false,
+      "hasRings": false,
+      "hasTerrain": true,
+      "terrainAttribution": "Heights: MESSENGER MLA/MDIS global DEM (NASA/JHUAPL/Carnegie Institution of Washington/USGS), public domain. Faces the DEM does not cover stay the sphere.",
+      "procedural": {
+        "enabled": false,
+        "mode": 0,
+        "seed": 0,
+        "colors": [
+          [
+            0,
+            0,
+            0
+          ],
+          [
+            0,
+            0,
+            0
+          ],
+          [
+            0,
+            0,
+            0
+          ]
+        ],
+        "bands": 0,
+        "seaLevel": 0,
+        "polarCap": 0,
+        "emissive": 0,
+        "equilibriumTemperatureK": 0
+      },
+      "placeFromElements": false
+    },
+    {
+      "index": 2,
+      "id": "venus",
+      "parentId": "sun",
+      "initTag": "Venus",
+      "kind": "planet",
+      "displayNameEn": "Venus",
+      "displayNameRu": "Венера",
+      "auDistance": 0.723,
+      "orbitalPeriodDays": 224.7,
+      "earthRadiusScale": 0.95,
+      "radiusKm": 6052,
+      "axialTiltDegrees": 177.3,
+      "artTiltXDegrees": 0,
+      "oblateness": 0,
+      "yawOffsetDegrees": 0,
+      "artRollDegrees": 0,
+      "shaderFlags": {
+        "hasNightTexture": false,
+        "hasSpecularMap": false,
+        "hasClouds": false
+      },
+      "useSphereIntersect": false,
+      "ambientFactor": 0,
+      "lod": {
+        "diffuse": "Venus_Diffuse",
+        "normal": "Venus_Normal",
+        "specular": null,
+        "night": null,
+        "clouds": null
+      },
+      "meshPath": null,
+      "sceneOrbitRadius": 0,
+      "orbitPlane": "xz",
+      "initialAnomalyRad": 0,
+      "spinDegPerSimSecond": 0,
+      "keplerian": {
+        "aKm": 0,
+        "e": 0,
+        "iDeg": 0,
+        "OmegaDeg": 0,
+        "omegaDeg": 0,
+        "M0Deg": 0,
+        "nDegPerDay": 0,
+        "OmegaDotDegPerDay": 0,
+        "omegaDotDegPerDay": 0
+      },
+      "cloudLayer": {
+        "diffuse": null,
+        "normal": null,
+        "scaleFactor": 0,
+        "spinDegPerSimSecond": 0,
+        "ambientFactor": 0
+      },
+      "hasCloudLayer": false,
+      "hasRings": false,
+      "hasTerrain": false,
+      "terrainAttribution": null,
+      "procedural": {
+        "enabled": false,
+        "mode": 0,
+        "seed": 0,
+        "colors": [
+          [
+            0,
+            0,
+            0
+          ],
+          [
+            0,
+            0,
+            0
+          ],
+          [
+            0,
+            0,
+            0
+          ]
+        ],
+        "bands": 0,
+        "seaLevel": 0,
+        "polarCap": 0,
+        "emissive": 0,
+        "equilibriumTemperatureK": 0
+      },
+      "placeFromElements": false
+    },
+    {
+      "index": 3,
+      "id": "earth",
+      "parentId": "sun",
+      "initTag": "EarthSystem",
+      "kind": "planet",
+      "displayNameEn": "Earth",
+      "displayNameRu": "Земля",
+      "auDistance": 1,
+      "orbitalPeriodDays": 365.25,
+      "earthRadiusScale": 1,
+      "radiusKm": 6371,
+      "axialTiltDegrees": -23.4,
+      "artTiltXDegrees": 0,
+      "oblateness": 0,
+      "yawOffsetDegrees": 0,
+      "artRollDegrees": 0,
+      "shaderFlags": {
+        "hasNightTexture": true,
+        "hasSpecularMap": true,
+        "hasClouds": true
+      },
+      "useSphereIntersect": false,
+      "ambientFactor": 0.75,
+      "lod": {
+        "diffuse": "Earth_Day_Diffuse",
+        "normal": "Earth_Normal",
+        "specular": "Earth_Specular",
+        "night": "Earth_Night_Diffuse",
+        "clouds": "Earth_Clouds_Diffuse"
+      },
+      "meshPath": null,
+      "sceneOrbitRadius": 0,
+      "orbitPlane": "xz",
+      "initialAnomalyRad": 0,
+      "spinDegPerSimSecond": 0,
+      "keplerian": {
+        "aKm": 0,
+        "e": 0,
+        "iDeg": 0,
+        "OmegaDeg": 0,
+        "omegaDeg": 0,
+        "M0Deg": 0,
+        "nDegPerDay": 0,
+        "OmegaDotDegPerDay": 0,
+        "omegaDotDegPerDay": 0
+      },
+      "cloudLayer": {
+        "diffuse": "Earth_Clouds_Diffuse",
+        "normal": "Earth_Clouds_Normal",
+        "scaleFactor": 1.0055,
+        "spinDegPerSimSecond": 1.125,
+        "ambientFactor": 1
+      },
+      "hasCloudLayer": true,
+      "hasRings": false,
+      "hasTerrain": true,
+      "terrainAttribution": "Heights: SRTM v3 (NASA/USGS) on land and ETOPO 2022 bathymetry (NOAA NCEI) at sea, both public domain.",
+      "procedural": {
+        "enabled": false,
+        "mode": 0,
+        "seed": 0,
+        "colors": [
+          [
+            0,
+            0,
+            0
+          ],
+          [
+            0,
+            0,
+            0
+          ],
+          [
+            0,
+            0,
+            0
+          ]
+        ],
+        "bands": 0,
+        "seaLevel": 0,
+        "polarCap": 0,
+        "emissive": 0,
+        "equilibriumTemperatureK": 0
+      },
+      "placeFromElements": false
+    },
+    {
+      "index": 4,
+      "id": "mars",
+      "parentId": "sun",
+      "initTag": "MarsSystem",
+      "kind": "planet",
+      "displayNameEn": "Mars",
+      "displayNameRu": "Марс",
+      "auDistance": 1.524,
+      "orbitalPeriodDays": 687,
+      "earthRadiusScale": 0.53,
+      "radiusKm": 3389.5,
+      "axialTiltDegrees": -25.2,
+      "artTiltXDegrees": 0,
+      "oblateness": 0,
+      "yawOffsetDegrees": 0,
+      "artRollDegrees": 0,
+      "shaderFlags": {
+        "hasNightTexture": false,
+        "hasSpecularMap": false,
+        "hasClouds": false
+      },
+      "useSphereIntersect": false,
+      "ambientFactor": 0,
+      "lod": {
+        "diffuse": "Mars_Diffuse",
+        "normal": "Mars_Normal",
+        "specular": null,
+        "night": null,
+        "clouds": null
+      },
+      "meshPath": null,
+      "sceneOrbitRadius": 0,
+      "orbitPlane": "xz",
+      "initialAnomalyRad": 0,
+      "spinDegPerSimSecond": 0,
+      "keplerian": {
+        "aKm": 0,
+        "e": 0,
+        "iDeg": 0,
+        "OmegaDeg": 0,
+        "omegaDeg": 0,
+        "M0Deg": 0,
+        "nDegPerDay": 0,
+        "OmegaDotDegPerDay": 0,
+        "omegaDotDegPerDay": 0
+      },
+      "cloudLayer": {
+        "diffuse": null,
+        "normal": null,
+        "scaleFactor": 0,
+        "spinDegPerSimSecond": 0,
+        "ambientFactor": 0
+      },
+      "hasCloudLayer": false,
+      "hasRings": false,
+      "hasTerrain": true,
+      "terrainAttribution": "Heights: MGS MOLA MEGDR (NASA/JPL/GSFC), public domain.",
+      "procedural": {
+        "enabled": false,
+        "mode": 0,
+        "seed": 0,
+        "colors": [
+          [
+            0,
+            0,
+            0
+          ],
+          [
+            0,
+            0,
+            0
+          ],
+          [
+            0,
+            0,
+            0
+          ]
+        ],
+        "bands": 0,
+        "seaLevel": 0,
+        "polarCap": 0,
+        "emissive": 0,
+        "equilibriumTemperatureK": 0
+      },
+      "placeFromElements": false
+    },
+    {
+      "index": 5,
+      "id": "jupiter",
+      "parentId": "sun",
+      "initTag": "JupiterSystem",
+      "kind": "planet",
+      "displayNameEn": "Jupiter",
+      "displayNameRu": "Юпитер",
+      "auDistance": 5.203,
+      "orbitalPeriodDays": 4333,
+      "earthRadiusScale": 11.2,
+      "radiusKm": 69910,
+      "axialTiltDegrees": -3.1,
+      "artTiltXDegrees": 0,
+      "oblateness": 0.06487,
+      "yawOffsetDegrees": 0,
+      "artRollDegrees": 0,
+      "shaderFlags": {
+        "hasNightTexture": false,
+        "hasSpecularMap": false,
+        "hasClouds": false
+      },
+      "useSphereIntersect": false,
+      "ambientFactor": 0,
+      "lod": {
+        "diffuse": "Jupiter_Diffuse",
+        "normal": "Jupiter_Normal",
+        "specular": null,
+        "night": null,
+        "clouds": null
+      },
+      "meshPath": null,
+      "sceneOrbitRadius": 0,
+      "orbitPlane": "xz",
+      "initialAnomalyRad": 0,
+      "spinDegPerSimSecond": 0,
+      "keplerian": {
+        "aKm": 0,
+        "e": 0,
+        "iDeg": 0,
+        "OmegaDeg": 0,
+        "omegaDeg": 0,
+        "M0Deg": 0,
+        "nDegPerDay": 0,
+        "OmegaDotDegPerDay": 0,
+        "omegaDotDegPerDay": 0
+      },
+      "cloudLayer": {
+        "diffuse": null,
+        "normal": null,
+        "scaleFactor": 0,
+        "spinDegPerSimSecond": 0,
+        "ambientFactor": 0
+      },
+      "hasCloudLayer": false,
+      "hasRings": false,
+      "hasTerrain": false,
+      "terrainAttribution": null,
+      "procedural": {
+        "enabled": false,
+        "mode": 0,
+        "seed": 0,
+        "colors": [
+          [
+            0,
+            0,
+            0
+          ],
+          [
+            0,
+            0,
+            0
+          ],
+          [
+            0,
+            0,
+            0
+          ]
+        ],
+        "bands": 0,
+        "seaLevel": 0,
+        "polarCap": 0,
+        "emissive": 0,
+        "equilibriumTemperatureK": 0
+      },
+      "placeFromElements": false
+    },
+    {
+      "index": 6,
+      "id": "saturn",
+      "parentId": "sun",
+      "initTag": "SaturnSystem",
+      "kind": "planet",
+      "displayNameEn": "Saturn",
+      "displayNameRu": "Сатурн",
+      "auDistance": 9.537,
+      "orbitalPeriodDays": 10759,
+      "earthRadiusScale": 9.45,
+      "radiusKm": 58230,
+      "axialTiltDegrees": -26.7,
+      "artTiltXDegrees": -15,
+      "oblateness": 0.09796,
+      "yawOffsetDegrees": 0,
+      "artRollDegrees": 0,
+      "shaderFlags": {
+        "hasNightTexture": false,
+        "hasSpecularMap": false,
+        "hasClouds": false
+      },
+      "useSphereIntersect": false,
+      "ambientFactor": 0,
+      "lod": {
+        "diffuse": "Saturn_Diffuse",
+        "normal": "Saturn_Normal",
+        "specular": null,
+        "night": null,
+        "clouds": null
+      },
+      "meshPath": null,
+      "sceneOrbitRadius": 0,
+      "orbitPlane": "xz",
+      "initialAnomalyRad": 0,
+      "spinDegPerSimSecond": 0,
+      "keplerian": {
+        "aKm": 0,
+        "e": 0,
+        "iDeg": 0,
+        "OmegaDeg": 0,
+        "omegaDeg": 0,
+        "M0Deg": 0,
+        "nDegPerDay": 0,
+        "OmegaDotDegPerDay": 0,
+        "omegaDotDegPerDay": 0
+      },
+      "cloudLayer": {
+        "diffuse": null,
+        "normal": null,
+        "scaleFactor": 0,
+        "spinDegPerSimSecond": 0,
+        "ambientFactor": 0
+      },
+      "hasCloudLayer": false,
+      "hasRings": true,
+      "hasTerrain": false,
+      "terrainAttribution": null,
+      "procedural": {
+        "enabled": false,
+        "mode": 0,
+        "seed": 0,
+        "colors": [
+          [
+            0,
+            0,
+            0
+          ],
+          [
+            0,
+            0,
+            0
+          ],
+          [
+            0,
+            0,
+            0
+          ]
+        ],
+        "bands": 0,
+        "seaLevel": 0,
+        "polarCap": 0,
+        "emissive": 0,
+        "equilibriumTemperatureK": 0
+      },
+      "placeFromElements": false
+    },
+    {
+      "index": 7,
+      "id": "uranus",
+      "parentId": "sun",
+      "initTag": "UranusSystem",
+      "kind": "planet",
+      "displayNameEn": "Uranus",
+      "displayNameRu": "Уран",
+      "auDistance": 19.191,
+      "orbitalPeriodDays": 30687,
+      "earthRadiusScale": 4,
+      "radiusKm": 25362,
+      "axialTiltDegrees": -97.8,
+      "artTiltXDegrees": 0,
+      "oblateness": 0.02293,
+      "yawOffsetDegrees": 0,
+      "artRollDegrees": 0,
+      "shaderFlags": {
+        "hasNightTexture": false,
+        "hasSpecularMap": false,
+        "hasClouds": true
+      },
+      "useSphereIntersect": false,
+      "ambientFactor": 0,
+      "lod": {
+        "diffuse": "Uranus_Diffuse",
+        "normal": "Uranus_Normal",
+        "specular": null,
+        "night": null,
+        "clouds": "Uranus_Clouds_Diffuse"
+      },
+      "meshPath": null,
+      "sceneOrbitRadius": 0,
+      "orbitPlane": "xz",
+      "initialAnomalyRad": 0,
+      "spinDegPerSimSecond": 0,
+      "keplerian": {
+        "aKm": 0,
+        "e": 0,
+        "iDeg": 0,
+        "OmegaDeg": 0,
+        "omegaDeg": 0,
+        "M0Deg": 0,
+        "nDegPerDay": 0,
+        "OmegaDotDegPerDay": 0,
+        "omegaDotDegPerDay": 0
+      },
+      "cloudLayer": {
+        "diffuse": "Uranus_Clouds_Diffuse",
+        "normal": "Uranus_Clouds_Normal",
+        "scaleFactor": 3.98635,
+        "spinDegPerSimSecond": 3.447,
+        "ambientFactor": 0
+      },
+      "hasCloudLayer": true,
+      "hasRings": true,
+      "hasTerrain": false,
+      "terrainAttribution": null,
+      "procedural": {
+        "enabled": false,
+        "mode": 0,
+        "seed": 0,
+        "colors": [
+          [
+            0,
+            0,
+            0
+          ],
+          [
+            0,
+            0,
+            0
+          ],
+          [
+            0,
+            0,
+            0
+          ]
+        ],
+        "bands": 0,
+        "seaLevel": 0,
+        "polarCap": 0,
+        "emissive": 0,
+        "equilibriumTemperatureK": 0
+      },
+      "placeFromElements": false
+    },
+    {
+      "index": 8,
+      "id": "neptune",
+      "parentId": "sun",
+      "initTag": "NeptuneSystem",
+      "kind": "planet",
+      "displayNameEn": "Neptune",
+      "displayNameRu": "Нептун",
+      "auDistance": 30.069,
+      "orbitalPeriodDays": 60190,
+      "earthRadiusScale": 3.88,
+      "radiusKm": 24622,
+      "axialTiltDegrees": -28.3,
+      "artTiltXDegrees": 0,
+      "oblateness": 0.01708,
+      "yawOffsetDegrees": 0,
+      "artRollDegrees": 0,
+      "shaderFlags": {
+        "hasNightTexture": false,
+        "hasSpecularMap": false,
+        "hasClouds": true
+      },
+      "useSphereIntersect": false,
+      "ambientFactor": 0,
+      "lod": {
+        "diffuse": "Neptune_Diffuse",
+        "normal": "Neptune_Normal",
+        "specular": null,
+        "night": null,
+        "clouds": "Neptune_Clouds_Diffuse"
+      },
+      "meshPath": null,
+      "sceneOrbitRadius": 0,
+      "orbitPlane": "xz",
+      "initialAnomalyRad": 0,
+      "spinDegPerSimSecond": 0,
+      "keplerian": {
+        "aKm": 0,
+        "e": 0,
+        "iDeg": 0,
+        "OmegaDeg": 0,
+        "omegaDeg": 0,
+        "M0Deg": 0,
+        "nDegPerDay": 0,
+        "OmegaDotDegPerDay": 0,
+        "omegaDotDegPerDay": 0
+      },
+      "cloudLayer": {
+        "diffuse": "Neptune_Clouds_Diffuse",
+        "normal": "Neptune_Clouds_Normal",
+        "scaleFactor": 3.87,
+        "spinDegPerSimSecond": 4.8,
+        "ambientFactor": 0
+      },
+      "hasCloudLayer": true,
+      "hasRings": false,
+      "hasTerrain": false,
+      "terrainAttribution": null,
+      "procedural": {
+        "enabled": false,
+        "mode": 0,
+        "seed": 0,
+        "colors": [
+          [
+            0,
+            0,
+            0
+          ],
+          [
+            0,
+            0,
+            0
+          ],
+          [
+            0,
+            0,
+            0
+          ]
+        ],
+        "bands": 0,
+        "seaLevel": 0,
+        "polarCap": 0,
+        "emissive": 0,
+        "equilibriumTemperatureK": 0
+      },
+      "placeFromElements": false
+    },
+    {
+      "index": 9,
+      "id": "pluto",
+      "parentId": "sun",
+      "initTag": "PlutoSystem",
+      "kind": "dwarf_planet",
+      "displayNameEn": "Pluto",
+      "displayNameRu": "Плутон",
+      "auDistance": 39.482,
+      "orbitalPeriodDays": 90560,
+      "earthRadiusScale": 0.18,
+      "radiusKm": 1188.5,
+      "axialTiltDegrees": -122.5,
+      "artTiltXDegrees": 0,
+      "oblateness": 0,
+      "yawOffsetDegrees": 0,
+      "artRollDegrees": 0,
+      "shaderFlags": {
+        "hasNightTexture": false,
+        "hasSpecularMap": true,
+        "hasClouds": false
+      },
+      "useSphereIntersect": false,
+      "ambientFactor": 0,
+      "lod": {
+        "diffuse": "Pluto_Diffuse",
+        "normal": "Pluto_Normal",
+        "specular": "Pluto_Specular",
+        "night": null,
+        "clouds": null
+      },
+      "meshPath": null,
+      "sceneOrbitRadius": 0,
+      "orbitPlane": "xz",
+      "initialAnomalyRad": 0,
+      "spinDegPerSimSecond": 0,
+      "keplerian": {
+        "aKm": 0,
+        "e": 0,
+        "iDeg": 0,
+        "OmegaDeg": 0,
+        "omegaDeg": 0,
+        "M0Deg": 0,
+        "nDegPerDay": 0,
+        "OmegaDotDegPerDay": 0,
+        "omegaDotDegPerDay": 0
+      },
+      "cloudLayer": {
+        "diffuse": null,
+        "normal": null,
+        "scaleFactor": 0,
+        "spinDegPerSimSecond": 0,
+        "ambientFactor": 0
+      },
+      "hasCloudLayer": false,
+      "hasRings": false,
+      "hasTerrain": false,
+      "terrainAttribution": null,
+      "procedural": {
+        "enabled": false,
+        "mode": 0,
+        "seed": 0,
+        "colors": [
+          [
+            0,
+            0,
+            0
+          ],
+          [
+            0,
+            0,
+            0
+          ],
+          [
+            0,
+            0,
+            0
+          ]
+        ],
+        "bands": 0,
+        "seaLevel": 0,
+        "polarCap": 0,
+        "emissive": 0,
+        "equilibriumTemperatureK": 0
+      },
+      "placeFromElements": false
+    },
+    {
+      "index": 10,
+      "id": "ceres",
+      "parentId": "sun",
+      "initTag": "Ceres",
+      "kind": "dwarf_planet",
+      "displayNameEn": "Ceres",
+      "displayNameRu": "Церера",
+      "auDistance": 2.7656,
+      "orbitalPeriodDays": 1679.85,
+      "earthRadiusScale": 0.0736,
+      "radiusKm": 469.5,
+      "axialTiltDegrees": 4,
+      "artTiltXDegrees": 0,
+      "oblateness": 0,
+      "yawOffsetDegrees": 0,
+      "artRollDegrees": 0,
+      "shaderFlags": {
+        "hasNightTexture": false,
+        "hasSpecularMap": false,
+        "hasClouds": false
+      },
+      "useSphereIntersect": false,
+      "ambientFactor": 0,
+      "lod": {
+        "diffuse": "Ceres_Diffuse",
+        "normal": "Ceres_Normal",
+        "specular": null,
+        "night": null,
+        "clouds": null
+      },
+      "meshPath": null,
+      "sceneOrbitRadius": 0,
+      "orbitPlane": "xz",
+      "initialAnomalyRad": 0,
+      "spinDegPerSimSecond": 0,
+      "keplerian": {
+        "aKm": 0,
+        "e": 0,
+        "iDeg": 0,
+        "OmegaDeg": 0,
+        "omegaDeg": 0,
+        "M0Deg": 0,
+        "nDegPerDay": 0,
+        "OmegaDotDegPerDay": 0,
+        "omegaDotDegPerDay": 0
+      },
+      "cloudLayer": {
+        "diffuse": null,
+        "normal": null,
+        "scaleFactor": 0,
+        "spinDegPerSimSecond": 0,
+        "ambientFactor": 0
+      },
+      "hasCloudLayer": false,
+      "hasRings": false,
+      "hasTerrain": false,
+      "terrainAttribution": null,
+      "procedural": {
+        "enabled": false,
+        "mode": 0,
+        "seed": 0,
+        "colors": [
+          [
+            0,
+            0,
+            0
+          ],
+          [
+            0,
+            0,
+            0
+          ],
+          [
+            0,
+            0,
+            0
+          ]
+        ],
+        "bands": 0,
+        "seaLevel": 0,
+        "polarCap": 0,
+        "emissive": 0,
+        "equilibriumTemperatureK": 0
+      },
+      "placeFromElements": false
+    },
+    {
+      "index": 11,
+      "id": "vesta",
+      "parentId": "sun",
+      "initTag": "Vesta",
+      "kind": "dwarf_planet",
+      "displayNameEn": "Vesta",
+      "displayNameRu": "Веста",
+      "auDistance": 2.3614,
+      "orbitalPeriodDays": 1325.39,
+      "earthRadiusScale": 0.0412,
+      "radiusKm": 262.5,
+      "axialTiltDegrees": 27,
+      "artTiltXDegrees": 0,
+      "oblateness": 0,
+      "yawOffsetDegrees": 0,
+      "artRollDegrees": 0,
+      "shaderFlags": {
+        "hasNightTexture": false,
+        "hasSpecularMap": false,
+        "hasClouds": false
+      },
+      "useSphereIntersect": false,
+      "ambientFactor": 0,
+      "lod": {
+        "diffuse": "Vesta_Diffuse",
+        "normal": "Vesta_Normal",
+        "specular": null,
+        "night": null,
+        "clouds": null
+      },
+      "meshPath": null,
+      "sceneOrbitRadius": 0,
+      "orbitPlane": "xz",
+      "initialAnomalyRad": 0,
+      "spinDegPerSimSecond": 0,
+      "keplerian": {
+        "aKm": 0,
+        "e": 0,
+        "iDeg": 0,
+        "OmegaDeg": 0,
+        "omegaDeg": 0,
+        "M0Deg": 0,
+        "nDegPerDay": 0,
+        "OmegaDotDegPerDay": 0,
+        "omegaDotDegPerDay": 0
+      },
+      "cloudLayer": {
+        "diffuse": null,
+        "normal": null,
+        "scaleFactor": 0,
+        "spinDegPerSimSecond": 0,
+        "ambientFactor": 0
+      },
+      "hasCloudLayer": false,
+      "hasRings": false,
+      "hasTerrain": false,
+      "terrainAttribution": null,
+      "procedural": {
+        "enabled": false,
+        "mode": 0,
+        "seed": 0,
+        "colors": [
+          [
+            0,
+            0,
+            0
+          ],
+          [
+            0,
+            0,
+            0
+          ],
+          [
+            0,
+            0,
+            0
+          ]
+        ],
+        "bands": 0,
+        "seaLevel": 0,
+        "polarCap": 0,
+        "emissive": 0,
+        "equilibriumTemperatureK": 0
+      },
+      "placeFromElements": false
+    },
+    {
+      "index": 12,
+      "id": "eris",
+      "parentId": "sun",
+      "initTag": "Eris",
+      "kind": "dwarf_planet",
+      "displayNameEn": "Eris",
+      "displayNameRu": "Эрида",
+      "auDistance": 67.86,
+      "orbitalPeriodDays": 203830,
+      "earthRadiusScale": 0.1825,
+      "radiusKm": 1163,
+      "axialTiltDegrees": 78,
+      "artTiltXDegrees": 0,
+      "oblateness": 0,
+      "yawOffsetDegrees": 0,
+      "artRollDegrees": 0,
+      "shaderFlags": {
+        "hasNightTexture": false,
+        "hasSpecularMap": false,
+        "hasClouds": false
+      },
+      "useSphereIntersect": false,
+      "ambientFactor": 0,
+      "lod": {
+        "diffuse": "Eris_Diffuse",
+        "normal": "Eris_Normal",
+        "specular": null,
+        "night": null,
+        "clouds": null
+      },
+      "meshPath": null,
+      "sceneOrbitRadius": 0,
+      "orbitPlane": "xz",
+      "initialAnomalyRad": 0,
+      "spinDegPerSimSecond": 0,
+      "keplerian": {
+        "aKm": 0,
+        "e": 0,
+        "iDeg": 0,
+        "OmegaDeg": 0,
+        "omegaDeg": 0,
+        "M0Deg": 0,
+        "nDegPerDay": 0,
+        "OmegaDotDegPerDay": 0,
+        "omegaDotDegPerDay": 0
+      },
+      "cloudLayer": {
+        "diffuse": null,
+        "normal": null,
+        "scaleFactor": 0,
+        "spinDegPerSimSecond": 0,
+        "ambientFactor": 0
+      },
+      "hasCloudLayer": false,
+      "hasRings": false,
+      "hasTerrain": false,
+      "terrainAttribution": null,
+      "procedural": {
+        "enabled": false,
+        "mode": 0,
+        "seed": 0,
+        "colors": [
+          [
+            0,
+            0,
+            0
+          ],
+          [
+            0,
+            0,
+            0
+          ],
+          [
+            0,
+            0,
+            0
+          ]
+        ],
+        "bands": 0,
+        "seaLevel": 0,
+        "polarCap": 0,
+        "emissive": 0,
+        "equilibriumTemperatureK": 0
+      },
+      "placeFromElements": false
+    },
+    {
+      "index": 13,
+      "id": "haumea",
+      "parentId": "sun",
+      "initTag": "Haumea",
+      "kind": "dwarf_planet",
+      "displayNameEn": "Haumea",
+      "displayNameRu": "Хаумеа",
+      "auDistance": 43.12,
+      "orbitalPeriodDays": 103774,
+      "earthRadiusScale": 0.128,
+      "radiusKm": 816,
+      "axialTiltDegrees": 126,
+      "artTiltXDegrees": 0,
+      "oblateness": 0,
+      "yawOffsetDegrees": 0,
+      "artRollDegrees": 0,
+      "shaderFlags": {
+        "hasNightTexture": false,
+        "hasSpecularMap": false,
+        "hasClouds": false
+      },
+      "useSphereIntersect": false,
+      "ambientFactor": 0,
+      "lod": {
+        "diffuse": "Haumea_Diffuse",
+        "normal": "Haumea_Normal",
+        "specular": null,
+        "night": null,
+        "clouds": null
+      },
+      "meshPath": null,
+      "sceneOrbitRadius": 0,
+      "orbitPlane": "xz",
+      "initialAnomalyRad": 0,
+      "spinDegPerSimSecond": 0,
+      "keplerian": {
+        "aKm": 0,
+        "e": 0,
+        "iDeg": 0,
+        "OmegaDeg": 0,
+        "omegaDeg": 0,
+        "M0Deg": 0,
+        "nDegPerDay": 0,
+        "OmegaDotDegPerDay": 0,
+        "omegaDotDegPerDay": 0
+      },
+      "cloudLayer": {
+        "diffuse": null,
+        "normal": null,
+        "scaleFactor": 0,
+        "spinDegPerSimSecond": 0,
+        "ambientFactor": 0
+      },
+      "hasCloudLayer": false,
+      "hasRings": false,
+      "hasTerrain": false,
+      "terrainAttribution": null,
+      "procedural": {
+        "enabled": false,
+        "mode": 0,
+        "seed": 0,
+        "colors": [
+          [
+            0,
+            0,
+            0
+          ],
+          [
+            0,
+            0,
+            0
+          ],
+          [
+            0,
+            0,
+            0
+          ]
+        ],
+        "bands": 0,
+        "seaLevel": 0,
+        "polarCap": 0,
+        "emissive": 0,
+        "equilibriumTemperatureK": 0
+      },
+      "placeFromElements": false
+    },
+    {
+      "index": 14,
+      "id": "makemake",
+      "parentId": "sun",
+      "initTag": "Makemake",
+      "kind": "dwarf_planet",
+      "displayNameEn": "Makemake",
+      "displayNameRu": "Макемаке",
+      "auDistance": 45.51,
+      "orbitalPeriodDays": 111845,
+      "earthRadiusScale": 0.112,
+      "radiusKm": 715,
+      "axialTiltDegrees": 0,
+      "artTiltXDegrees": 0,
+      "oblateness": 0,
+      "yawOffsetDegrees": 0,
+      "artRollDegrees": 0,
+      "shaderFlags": {
+        "hasNightTexture": false,
+        "hasSpecularMap": false,
+        "hasClouds": false
+      },
+      "useSphereIntersect": false,
+      "ambientFactor": 0,
+      "lod": {
+        "diffuse": "Makemake_Diffuse",
+        "normal": "Makemake_Normal",
+        "specular": null,
+        "night": null,
+        "clouds": null
+      },
+      "meshPath": null,
+      "sceneOrbitRadius": 0,
+      "orbitPlane": "xz",
+      "initialAnomalyRad": 0,
+      "spinDegPerSimSecond": 0,
+      "keplerian": {
+        "aKm": 0,
+        "e": 0,
+        "iDeg": 0,
+        "OmegaDeg": 0,
+        "omegaDeg": 0,
+        "M0Deg": 0,
+        "nDegPerDay": 0,
+        "OmegaDotDegPerDay": 0,
+        "omegaDotDegPerDay": 0
+      },
+      "cloudLayer": {
+        "diffuse": null,
+        "normal": null,
+        "scaleFactor": 0,
+        "spinDegPerSimSecond": 0,
+        "ambientFactor": 0
+      },
+      "hasCloudLayer": false,
+      "hasRings": false,
+      "hasTerrain": false,
+      "terrainAttribution": null,
+      "procedural": {
+        "enabled": false,
+        "mode": 0,
+        "seed": 0,
+        "colors": [
+          [
+            0,
+            0,
+            0
+          ],
+          [
+            0,
+            0,
+            0
+          ],
+          [
+            0,
+            0,
+            0
+          ]
+        ],
+        "bands": 0,
+        "seaLevel": 0,
+        "polarCap": 0,
+        "emissive": 0,
+        "equilibriumTemperatureK": 0
+      },
+      "placeFromElements": false
+    },
+    {
+      "index": 15,
+      "id": "halley",
+      "parentId": "sun",
+      "initTag": "Halley",
+      "kind": "comet",
+      "displayNameEn": "1P/Halley",
+      "displayNameRu": "Комета Галлея",
+      "auDistance": 17.83,
+      "orbitalPeriodDays": 27510,
+      "earthRadiusScale": 0.01,
+      "radiusKm": 5.5,
+      "axialTiltDegrees": 0,
+      "artTiltXDegrees": 0,
+      "oblateness": 0,
+      "yawOffsetDegrees": 0,
+      "artRollDegrees": 0,
+      "shaderFlags": {
+        "hasNightTexture": false,
+        "hasSpecularMap": false,
+        "hasClouds": false
+      },
+      "useSphereIntersect": false,
+      "ambientFactor": 0,
+      "lod": {
+        "diffuse": "Halley_Diffuse",
+        "normal": "Halley_Normal",
+        "specular": null,
+        "night": null,
+        "clouds": null
+      },
+      "meshPath": null,
+      "sceneOrbitRadius": 0,
+      "orbitPlane": "xz",
+      "initialAnomalyRad": 0,
+      "spinDegPerSimSecond": 0,
+      "keplerian": {
+        "aKm": 0,
+        "e": 0,
+        "iDeg": 0,
+        "OmegaDeg": 0,
+        "omegaDeg": 0,
+        "M0Deg": 0,
+        "nDegPerDay": 0,
+        "OmegaDotDegPerDay": 0,
+        "omegaDotDegPerDay": 0
+      },
+      "cloudLayer": {
+        "diffuse": null,
+        "normal": null,
+        "scaleFactor": 0,
+        "spinDegPerSimSecond": 0,
+        "ambientFactor": 0
+      },
+      "hasCloudLayer": false,
+      "hasRings": false,
+      "hasTerrain": false,
+      "terrainAttribution": null,
+      "procedural": {
+        "enabled": false,
+        "mode": 0,
+        "seed": 0,
+        "colors": [
+          [
+            0,
+            0,
+            0
+          ],
+          [
+            0,
+            0,
+            0
+          ],
+          [
+            0,
+            0,
+            0
+          ]
+        ],
+        "bands": 0,
+        "seaLevel": 0,
+        "polarCap": 0,
+        "emissive": 0,
+        "equilibriumTemperatureK": 0
+      },
+      "placeFromElements": false
+    },
+    {
+      "index": 16,
+      "id": "moon",
+      "parentId": "earth",
+      "initTag": "EarthSystem",
+      "kind": "satellite",
+      "displayNameEn": "Moon",
+      "displayNameRu": "Луна",
+      "auDistance": 0.0025695552897999907,
+      "orbitalPeriodDays": 27.3,
+      "earthRadiusScale": 0.2724,
+      "radiusKm": 1737,
+      "axialTiltDegrees": 0,
+      "artTiltXDegrees": 0,
+      "oblateness": 0,
+      "yawOffsetDegrees": -75,
+      "artRollDegrees": 0,
+      "shaderFlags": {
+        "hasNightTexture": false,
+        "hasSpecularMap": false,
+        "hasClouds": false
+      },
+      "useSphereIntersect": true,
+      "ambientFactor": 0,
+      "lod": {
+        "diffuse": "Moon_Diffuse",
+        "normal": "Moon_Normal",
+        "specular": null,
+        "night": null,
+        "clouds": null
+      },
+      "meshPath": null,
+      "sceneOrbitRadius": 25,
+      "orbitPlane": "xz",
+      "initialAnomalyRad": -1.57079633,
+      "spinDegPerSimSecond": -0.69,
+      "keplerian": {
+        "aKm": 384400,
+        "e": 0.0549,
+        "iDeg": 5.1454,
+        "OmegaDeg": 125.0445,
+        "omegaDeg": 318.3087,
+        "M0Deg": 134.9634,
+        "nDegPerDay": 13.0649931,
+        "OmegaDotDegPerDay": -0.0529539,
+        "omegaDotDegPerDay": 0.1643574
+      },
+      "cloudLayer": {
+        "diffuse": null,
+        "normal": null,
+        "scaleFactor": 0,
+        "spinDegPerSimSecond": 0,
+        "ambientFactor": 0
+      },
+      "hasCloudLayer": false,
+      "hasRings": false,
+      "hasTerrain": true,
+      "terrainAttribution": "Heights: LRO LOLA LDEM (NASA/GSFC/LOLA Science Team), public domain.",
+      "procedural": {
+        "enabled": false,
+        "mode": 0,
+        "seed": 0,
+        "colors": [
+          [
+            0,
+            0,
+            0
+          ],
+          [
+            0,
+            0,
+            0
+          ],
+          [
+            0,
+            0,
+            0
+          ]
+        ],
+        "bands": 0,
+        "seaLevel": 0,
+        "polarCap": 0,
+        "emissive": 0,
+        "equilibriumTemperatureK": 0
+      },
+      "placeFromElements": false
+    },
+    {
+      "index": 17,
+      "id": "phobos",
+      "parentId": "mars",
+      "initTag": "MarsSystem",
+      "kind": "satellite",
+      "displayNameEn": "Phobos",
+      "displayNameRu": "Фобос",
+      "auDistance": 0.00006267468885838895,
+      "orbitalPeriodDays": 0.3189,
+      "earthRadiusScale": 0.001768,
+      "radiusKm": 11.1,
+      "axialTiltDegrees": 0,
+      "artTiltXDegrees": 0,
+      "oblateness": 0,
+      "yawOffsetDegrees": 0,
+      "artRollDegrees": 0,
+      "shaderFlags": {
+        "hasNightTexture": false,
+        "hasSpecularMap": false,
+        "hasClouds": false
+      },
+      "useSphereIntersect": true,
+      "ambientFactor": 0,
+      "lod": {
+        "diffuse": "Phobos_Diffuse",
+        "normal": "Phobos_Normal",
+        "specular": null,
+        "night": null,
+        "clouds": null
+      },
+      "meshPath": "resource/models/phobos.obj",
+      "sceneOrbitRadius": 2.5,
+      "orbitPlane": "xz",
+      "initialAnomalyRad": -1.57079633,
+      "spinDegPerSimSecond": -7.56,
+      "keplerian": {
+        "aKm": 9376,
+        "e": 0.0151,
+        "iDeg": 1.093,
+        "OmegaDeg": 199.42,
+        "omegaDeg": 150.21,
+        "M0Deg": 0,
+        "nDegPerDay": 1128.8805268109124,
+        "OmegaDotDegPerDay": 0,
+        "omegaDotDegPerDay": 0
+      },
+      "cloudLayer": {
+        "diffuse": null,
+        "normal": null,
+        "scaleFactor": 0,
+        "spinDegPerSimSecond": 0,
+        "ambientFactor": 0
+      },
+      "hasCloudLayer": false,
+      "hasRings": false,
+      "hasTerrain": false,
+      "terrainAttribution": null,
+      "procedural": {
+        "enabled": false,
+        "mode": 0,
+        "seed": 0,
+        "colors": [
+          [
+            0,
+            0,
+            0
+          ],
+          [
+            0,
+            0,
+            0
+          ],
+          [
+            0,
+            0,
+            0
+          ]
+        ],
+        "bands": 0,
+        "seaLevel": 0,
+        "polarCap": 0,
+        "emissive": 0,
+        "equilibriumTemperatureK": 0
+      },
+      "placeFromElements": false
+    },
+    {
+      "index": 18,
+      "id": "deimos",
+      "parentId": "mars",
+      "initTag": "MarsSystem",
+      "kind": "satellite",
+      "displayNameEn": "Deimos",
+      "displayNameRu": "Деймос",
+      "auDistance": 0.00015684046764978456,
+      "orbitalPeriodDays": 1.263,
+      "earthRadiusScale": 0.00097316,
+      "radiusKm": 6.3,
+      "axialTiltDegrees": 0,
+      "artTiltXDegrees": 0,
+      "oblateness": 0,
+      "yawOffsetDegrees": 0,
+      "artRollDegrees": 0,
+      "shaderFlags": {
+        "hasNightTexture": false,
+        "hasSpecularMap": false,
+        "hasClouds": false
+      },
+      "useSphereIntersect": true,
+      "ambientFactor": 0,
+      "lod": {
+        "diffuse": "Deimos_Diffuse",
+        "normal": "Deimos_Normal",
+        "specular": null,
+        "night": null,
+        "clouds": null
+      },
+      "meshPath": "resource/models/deimos.obj",
+      "sceneOrbitRadius": 2.95,
+      "orbitPlane": "xz",
+      "initialAnomalyRad": -1.57079633,
+      "spinDegPerSimSecond": -2.76,
+      "keplerian": {
+        "aKm": 23463,
+        "e": 0.00033,
+        "iDeg": 0.93,
+        "OmegaDeg": 54.5,
+        "omegaDeg": 0,
+        "M0Deg": 0,
+        "nDegPerDay": 285.03562945368174,
+        "OmegaDotDegPerDay": 0,
+        "omegaDotDegPerDay": 0
+      },
+      "cloudLayer": {
+        "diffuse": null,
+        "normal": null,
+        "scaleFactor": 0,
+        "spinDegPerSimSecond": 0,
+        "ambientFactor": 0
+      },
+      "hasCloudLayer": false,
+      "hasRings": false,
+      "hasTerrain": false,
+      "terrainAttribution": null,
+      "procedural": {
+        "enabled": false,
+        "mode": 0,
+        "seed": 0,
+        "colors": [
+          [
+            0,
+            0,
+            0
+          ],
+          [
+            0,
+            0,
+            0
+          ],
+          [
+            0,
+            0,
+            0
+          ]
+        ],
+        "bands": 0,
+        "seaLevel": 0,
+        "polarCap": 0,
+        "emissive": 0,
+        "equilibriumTemperatureK": 0
+      },
+      "placeFromElements": false
+    },
+    {
+      "index": 19,
+      "id": "io",
+      "parentId": "jupiter",
+      "initTag": "JupiterSystem",
+      "kind": "satellite",
+      "displayNameEn": "Io",
+      "displayNameRu": "Ио",
+      "auDistance": 0.0028195588481728304,
+      "orbitalPeriodDays": 1.769,
+      "earthRadiusScale": 0.28592,
+      "radiusKm": 1821.5,
+      "axialTiltDegrees": 0,
+      "artTiltXDegrees": 0,
+      "oblateness": 0,
+      "yawOffsetDegrees": 0,
+      "artRollDegrees": 0,
+      "shaderFlags": {
+        "hasNightTexture": false,
+        "hasSpecularMap": false,
+        "hasClouds": false
+      },
+      "useSphereIntersect": true,
+      "ambientFactor": 0,
+      "lod": {
+        "diffuse": "Io_Diffuse",
+        "normal": "Io_Normal",
+        "specular": null,
+        "night": null,
+        "clouds": null
+      },
+      "meshPath": null,
+      "sceneOrbitRadius": 65,
+      "orbitPlane": "xz",
+      "initialAnomalyRad": -1.57079633,
+      "spinDegPerSimSecond": -2.76,
+      "keplerian": {
+        "aKm": 422029.1,
+        "e": 0.004128,
+        "iDeg": 2.2129,
+        "OmegaDeg": 337.8716,
+        "omegaDeg": 69.529,
+        "M0Deg": 330.777,
+        "nDegPerDay": 203.3283065,
+        "OmegaDotDegPerDay": -0.0000022,
+        "omegaDotDegPerDay": 0.1606539
+      },
+      "cloudLayer": {
+        "diffuse": null,
+        "normal": null,
+        "scaleFactor": 0,
+        "spinDegPerSimSecond": 0,
+        "ambientFactor": 0
+      },
+      "hasCloudLayer": false,
+      "hasRings": false,
+      "hasTerrain": false,
+      "terrainAttribution": null,
+      "procedural": {
+        "enabled": false,
+        "mode": 0,
+        "seed": 0,
+        "colors": [
+          [
+            0,
+            0,
+            0
+          ],
+          [
+            0,
+            0,
+            0
+          ],
+          [
+            0,
+            0,
+            0
+          ]
+        ],
+        "bands": 0,
+        "seaLevel": 0,
+        "polarCap": 0,
+        "emissive": 0,
+        "equilibriumTemperatureK": 0
+      },
+      "placeFromElements": true
+    },
+    {
+      "index": 20,
+      "id": "europa",
+      "parentId": "jupiter",
+      "initTag": "JupiterSystem",
+      "kind": "satellite",
+      "displayNameEn": "Europa",
+      "displayNameRu": "Европа",
+      "auDistance": 0.004486026417754354,
+      "orbitalPeriodDays": 3.551,
+      "earthRadiusScale": 0.244985,
+      "radiusKm": 1561,
+      "axialTiltDegrees": 0,
+      "artTiltXDegrees": 0,
+      "oblateness": 0,
+      "yawOffsetDegrees": 0,
+      "artRollDegrees": 0,
+      "shaderFlags": {
+        "hasNightTexture": false,
+        "hasSpecularMap": false,
+        "hasClouds": false
+      },
+      "useSphereIntersect": true,
+      "ambientFactor": 0,
+      "lod": {
+        "diffuse": "Europa_Diffuse",
+        "normal": "Europa_Normal",
+        "specular": null,
+        "night": null,
+        "clouds": null
+      },
+      "meshPath": null,
+      "sceneOrbitRadius": 74,
+      "orbitPlane": "xz",
+      "initialAnomalyRad": -1.57079633,
+      "spinDegPerSimSecond": -2.76,
+      "keplerian": {
+        "aKm": 671262.2,
+        "e": 0.009368,
+        "iDeg": 2.172,
+        "OmegaDeg": 345.1275,
+        "omegaDeg": 242.6817,
+        "M0Deg": 344.9269,
+        "nDegPerDay": 101.2142751,
+        "OmegaDotDegPerDay": -0.0010529,
+        "omegaDotDegPerDay": 0.1615026
+      },
+      "cloudLayer": {
+        "diffuse": null,
+        "normal": null,
+        "scaleFactor": 0,
+        "spinDegPerSimSecond": 0,
+        "ambientFactor": 0
+      },
+      "hasCloudLayer": false,
+      "hasRings": false,
+      "hasTerrain": false,
+      "terrainAttribution": null,
+      "procedural": {
+        "enabled": false,
+        "mode": 0,
+        "seed": 0,
+        "colors": [
+          [
+            0,
+            0,
+            0
+          ],
+          [
+            0,
+            0,
+            0
+          ],
+          [
+            0,
+            0,
+            0
+          ]
+        ],
+        "bands": 0,
+        "seaLevel": 0,
+        "polarCap": 0,
+        "emissive": 0,
+        "equilibriumTemperatureK": 0
+      },
+      "placeFromElements": true
+    },
+    {
+      "index": 21,
+      "id": "ganymede",
+      "parentId": "jupiter",
+      "initTag": "JupiterSystem",
+      "kind": "satellite",
+      "displayNameEn": "Ganymede",
+      "displayNameRu": "Ганимед",
+      "auDistance": 0.007155182055676145,
+      "orbitalPeriodDays": 7.155,
+      "earthRadiusScale": 0.41345,
+      "radiusKm": 2634,
+      "axialTiltDegrees": 0,
+      "artTiltXDegrees": 0,
+      "oblateness": 0,
+      "yawOffsetDegrees": 0,
+      "artRollDegrees": 0,
+      "shaderFlags": {
+        "hasNightTexture": false,
+        "hasSpecularMap": false,
+        "hasClouds": false
+      },
+      "useSphereIntersect": true,
+      "ambientFactor": 0,
+      "lod": {
+        "diffuse": "Ganymede_Diffuse",
+        "normal": "Ganymede_Normal",
+        "specular": null,
+        "night": null,
+        "clouds": null
+      },
+      "meshPath": null,
+      "sceneOrbitRadius": 83,
+      "orbitPlane": "xz",
+      "initialAnomalyRad": -1.57079633,
+      "spinDegPerSimSecond": -2.76,
+      "keplerian": {
+        "aKm": 1070619.7,
+        "e": 0.001835,
+        "iDeg": 2.2971,
+        "OmegaDeg": 343.2765,
+        "omegaDeg": 310.0789,
+        "M0Deg": 286.6576,
+        "nDegPerDay": 50.3131988,
+        "OmegaDotDegPerDay": -0.0004511,
+        "omegaDotDegPerDay": 0.0048602
+      },
+      "cloudLayer": {
+        "diffuse": null,
+        "normal": null,
+        "scaleFactor": 0,
+        "spinDegPerSimSecond": 0,
+        "ambientFactor": 0
+      },
+      "hasCloudLayer": false,
+      "hasRings": false,
+      "hasTerrain": false,
+      "terrainAttribution": null,
+      "procedural": {
+        "enabled": false,
+        "mode": 0,
+        "seed": 0,
+        "colors": [
+          [
+            0,
+            0,
+            0
+          ],
+          [
+            0,
+            0,
+            0
+          ],
+          [
+            0,
+            0,
+            0
+          ]
+        ],
+        "bands": 0,
+        "seaLevel": 0,
+        "polarCap": 0,
+        "emissive": 0,
+        "equilibriumTemperatureK": 0
+      },
+      "placeFromElements": true
+    },
+    {
+      "index": 22,
+      "id": "callisto",
+      "parentId": "jupiter",
+      "initTag": "JupiterSystem",
+      "kind": "satellite",
+      "displayNameEn": "Callisto",
+      "displayNameRu": "Каллисто",
+      "auDistance": 0.012585072175094802,
+      "orbitalPeriodDays": 16.69,
+      "earthRadiusScale": 0.3783236,
+      "radiusKm": 2410.5,
+      "axialTiltDegrees": 0,
+      "artTiltXDegrees": 0,
+      "oblateness": 0,
+      "yawOffsetDegrees": 0,
+      "artRollDegrees": 0,
+      "shaderFlags": {
+        "hasNightTexture": false,
+        "hasSpecularMap": false,
+        "hasClouds": false
+      },
+      "useSphereIntersect": true,
+      "ambientFactor": 0,
+      "lod": {
+        "diffuse": "Callisto_Diffuse",
+        "normal": "Callisto_Normal",
+        "specular": null,
+        "night": null,
+        "clouds": null
+      },
+      "meshPath": null,
+      "sceneOrbitRadius": 92,
+      "orbitPlane": "xz",
+      "initialAnomalyRad": -1.57079633,
+      "spinDegPerSimSecond": -2.76,
+      "keplerian": {
+        "aKm": 1883132.1,
+        "e": 0.007304,
+        "iDeg": 1.9733,
+        "OmegaDeg": 337.6738,
+        "omegaDeg": 15.6011,
+        "M0Deg": 85.9223,
+        "nDegPerDay": 21.5692957,
+        "OmegaDotDegPerDay": -0.0000849,
+        "omegaDotDegPerDay": 0.0018625
+      },
+      "cloudLayer": {
+        "diffuse": null,
+        "normal": null,
+        "scaleFactor": 0,
+        "spinDegPerSimSecond": 0,
+        "ambientFactor": 0
+      },
+      "hasCloudLayer": false,
+      "hasRings": false,
+      "hasTerrain": false,
+      "terrainAttribution": null,
+      "procedural": {
+        "enabled": false,
+        "mode": 0,
+        "seed": 0,
+        "colors": [
+          [
+            0,
+            0,
+            0
+          ],
+          [
+            0,
+            0,
+            0
+          ],
+          [
+            0,
+            0,
+            0
+          ]
+        ],
+        "bands": 0,
+        "seaLevel": 0,
+        "polarCap": 0,
+        "emissive": 0,
+        "equilibriumTemperatureK": 0
+      },
+      "placeFromElements": true
+    },
+    {
+      "index": 23,
+      "id": "mimas",
+      "parentId": "saturn",
+      "initTag": "SaturnSystem",
+      "kind": "satellite",
+      "displayNameEn": "Mimas",
+      "displayNameRu": "Мимас",
+      "auDistance": 0.0012402516100785653,
+      "orbitalPeriodDays": 0.942,
+      "earthRadiusScale": 0.03111,
+      "radiusKm": 198,
+      "axialTiltDegrees": 0,
+      "artTiltXDegrees": 0,
+      "oblateness": 0,
+      "yawOffsetDegrees": 0,
+      "artRollDegrees": 0,
+      "shaderFlags": {
+        "hasNightTexture": false,
+        "hasSpecularMap": false,
+        "hasClouds": false
+      },
+      "useSphereIntersect": true,
+      "ambientFactor": 0,
+      "lod": {
+        "diffuse": "Mimas_Diffuse",
+        "normal": "Mimas_Normal",
+        "specular": null,
+        "night": null,
+        "clouds": null
+      },
+      "meshPath": null,
+      "sceneOrbitRadius": 60.5,
+      "orbitPlane": "xz",
+      "initialAnomalyRad": -1.57079633,
+      "spinDegPerSimSecond": -2.76,
+      "keplerian": {
+        "aKm": 185539,
+        "e": 0.0196,
+        "iDeg": 1.574,
+        "OmegaDeg": 0,
+        "omegaDeg": 0,
+        "M0Deg": 0,
+        "nDegPerDay": 382.1656050955414,
+        "OmegaDotDegPerDay": 0,
+        "omegaDotDegPerDay": 0
+      },
+      "cloudLayer": {
+        "diffuse": null,
+        "normal": null,
+        "scaleFactor": 0,
+        "spinDegPerSimSecond": 0,
+        "ambientFactor": 0
+      },
+      "hasCloudLayer": false,
+      "hasRings": false,
+      "hasTerrain": false,
+      "terrainAttribution": null,
+      "procedural": {
+        "enabled": false,
+        "mode": 0,
+        "seed": 0,
+        "colors": [
+          [
+            0,
+            0,
+            0
+          ],
+          [
+            0,
+            0,
+            0
+          ],
+          [
+            0,
+            0,
+            0
+          ]
+        ],
+        "bands": 0,
+        "seaLevel": 0,
+        "polarCap": 0,
+        "emissive": 0,
+        "equilibriumTemperatureK": 0
+      },
+      "placeFromElements": false
+    },
+    {
+      "index": 24,
+      "id": "enceladus",
+      "parentId": "saturn",
+      "initTag": "SaturnSystem",
+      "kind": "satellite",
+      "displayNameEn": "Enceladus",
+      "displayNameRu": "Энцелад",
+      "auDistance": 0.0015905841365695323,
+      "orbitalPeriodDays": 1.37,
+      "earthRadiusScale": 0.03957,
+      "radiusKm": 252,
+      "axialTiltDegrees": 0,
+      "artTiltXDegrees": 0,
+      "oblateness": 0,
+      "yawOffsetDegrees": 0,
+      "artRollDegrees": 0,
+      "shaderFlags": {
+        "hasNightTexture": false,
+        "hasSpecularMap": false,
+        "hasClouds": false
+      },
+      "useSphereIntersect": true,
+      "ambientFactor": 0,
+      "lod": {
+        "diffuse": "Enceladus_Diffuse",
+        "normal": "Enceladus_Normal",
+        "specular": null,
+        "night": null,
+        "clouds": null
+      },
+      "meshPath": null,
+      "sceneOrbitRadius": 65,
+      "orbitPlane": "xz",
+      "initialAnomalyRad": -1.57079633,
+      "spinDegPerSimSecond": -2.76,
+      "keplerian": {
+        "aKm": 237948,
+        "e": 0.0047,
+        "iDeg": 0.009,
+        "OmegaDeg": 0,
+        "omegaDeg": 0,
+        "M0Deg": 0,
+        "nDegPerDay": 262.7737226277372,
+        "OmegaDotDegPerDay": 0,
+        "omegaDotDegPerDay": 0
+      },
+      "cloudLayer": {
+        "diffuse": null,
+        "normal": null,
+        "scaleFactor": 0,
+        "spinDegPerSimSecond": 0,
+        "ambientFactor": 0
+      },
+      "hasCloudLayer": false,
+      "hasRings": false,
+      "hasTerrain": false,
+      "terrainAttribution": null,
+      "procedural": {
+        "enabled": false,
+        "mode": 0,
+        "seed": 0,
+        "colors": [
+          [
+            0,
+            0,
+            0
+          ],
+          [
+            0,
+            0,
+            0
+          ],
+          [
+            0,
+            0,
+            0
+          ]
+        ],
+        "bands": 0,
+        "seaLevel": 0,
+        "polarCap": 0,
+        "emissive": 0,
+        "equilibriumTemperatureK": 0
+      },
+      "placeFromElements": false
+    },
+    {
+      "index": 25,
+      "id": "tethys",
+      "parentId": "saturn",
+      "initTag": "SaturnSystem",
+      "kind": "satellite",
+      "displayNameEn": "Tethys",
+      "displayNameRu": "Тефия",
+      "auDistance": 0.0019694063733756073,
+      "orbitalPeriodDays": 1.888,
+      "earthRadiusScale": 0.083346,
+      "radiusKm": 531,
+      "axialTiltDegrees": 0,
+      "artTiltXDegrees": 0,
+      "oblateness": 0,
+      "yawOffsetDegrees": 0,
+      "artRollDegrees": 0,
+      "shaderFlags": {
+        "hasNightTexture": false,
+        "hasSpecularMap": false,
+        "hasClouds": false
+      },
+      "useSphereIntersect": true,
+      "ambientFactor": 0,
+      "lod": {
+        "diffuse": "Tethys_Diffuse",
+        "normal": "Tethys_Normal",
+        "specular": null,
+        "night": null,
+        "clouds": null
+      },
+      "meshPath": null,
+      "sceneOrbitRadius": 69.5,
+      "orbitPlane": "xz",
+      "initialAnomalyRad": -1.57079633,
+      "spinDegPerSimSecond": -2.76,
+      "keplerian": {
+        "aKm": 294619,
+        "e": 0.0001,
+        "iDeg": 1.12,
+        "OmegaDeg": 0,
+        "omegaDeg": 0,
+        "M0Deg": 0,
+        "nDegPerDay": 190.67796610169492,
+        "OmegaDotDegPerDay": 0,
+        "omegaDotDegPerDay": 0
+      },
+      "cloudLayer": {
+        "diffuse": null,
+        "normal": null,
+        "scaleFactor": 0,
+        "spinDegPerSimSecond": 0,
+        "ambientFactor": 0
+      },
+      "hasCloudLayer": false,
+      "hasRings": false,
+      "hasTerrain": false,
+      "terrainAttribution": null,
+      "procedural": {
+        "enabled": false,
+        "mode": 0,
+        "seed": 0,
+        "colors": [
+          [
+            0,
+            0,
+            0
+          ],
+          [
+            0,
+            0,
+            0
+          ],
+          [
+            0,
+            0,
+            0
+          ]
+        ],
+        "bands": 0,
+        "seaLevel": 0,
+        "polarCap": 0,
+        "emissive": 0,
+        "equilibriumTemperatureK": 0
+      },
+      "placeFromElements": false
+    },
+    {
+      "index": 26,
+      "id": "dione",
+      "parentId": "saturn",
+      "initTag": "SaturnSystem",
+      "kind": "satellite",
+      "displayNameEn": "Dione",
+      "displayNameRu": "Диона",
+      "auDistance": 0.0025227364415956223,
+      "orbitalPeriodDays": 2.737,
+      "earthRadiusScale": 0.08812,
+      "radiusKm": 561.5,
+      "axialTiltDegrees": 0,
+      "artTiltXDegrees": 0,
+      "oblateness": 0,
+      "yawOffsetDegrees": 0,
+      "artRollDegrees": 0,
+      "shaderFlags": {
+        "hasNightTexture": false,
+        "hasSpecularMap": false,
+        "hasClouds": false
+      },
+      "useSphereIntersect": true,
+      "ambientFactor": 0,
+      "lod": {
+        "diffuse": "Dione_Diffuse",
+        "normal": "Dione_Normal",
+        "specular": null,
+        "night": null,
+        "clouds": null
+      },
+      "meshPath": null,
+      "sceneOrbitRadius": 74,
+      "orbitPlane": "xz",
+      "initialAnomalyRad": -1.57079633,
+      "spinDegPerSimSecond": -2.76,
+      "keplerian": {
+        "aKm": 377396,
+        "e": 0.0022,
+        "iDeg": 0.019,
+        "OmegaDeg": 0,
+        "omegaDeg": 0,
+        "M0Deg": 0,
+        "nDegPerDay": 131.53087321885275,
+        "OmegaDotDegPerDay": 0,
+        "omegaDotDegPerDay": 0
+      },
+      "cloudLayer": {
+        "diffuse": null,
+        "normal": null,
+        "scaleFactor": 0,
+        "spinDegPerSimSecond": 0,
+        "ambientFactor": 0
+      },
+      "hasCloudLayer": false,
+      "hasRings": false,
+      "hasTerrain": false,
+      "terrainAttribution": null,
+      "procedural": {
+        "enabled": false,
+        "mode": 0,
+        "seed": 0,
+        "colors": [
+          [
+            0,
+            0,
+            0
+          ],
+          [
+            0,
+            0,
+            0
+          ],
+          [
+            0,
+            0,
+            0
+          ]
+        ],
+        "bands": 0,
+        "seaLevel": 0,
+        "polarCap": 0,
+        "emissive": 0,
+        "equilibriumTemperatureK": 0
+      },
+      "placeFromElements": false
+    },
+    {
+      "index": 27,
+      "id": "rhea",
+      "parentId": "saturn",
+      "initTag": "SaturnSystem",
+      "kind": "satellite",
+      "displayNameEn": "Rhea",
+      "displayNameRu": "Рея",
+      "auDistance": 0.003523499348844676,
+      "orbitalPeriodDays": 4.518,
+      "earthRadiusScale": 0.119886,
+      "radiusKm": 764,
+      "axialTiltDegrees": 0,
+      "artTiltXDegrees": 0,
+      "oblateness": 0,
+      "yawOffsetDegrees": 0,
+      "artRollDegrees": 0,
+      "shaderFlags": {
+        "hasNightTexture": false,
+        "hasSpecularMap": false,
+        "hasClouds": false
+      },
+      "useSphereIntersect": true,
+      "ambientFactor": 0,
+      "lod": {
+        "diffuse": "Rhea_Diffuse",
+        "normal": "Rhea_Normal",
+        "specular": null,
+        "night": null,
+        "clouds": null
+      },
+      "meshPath": null,
+      "sceneOrbitRadius": 78.5,
+      "orbitPlane": "xz",
+      "initialAnomalyRad": -1.57079633,
+      "spinDegPerSimSecond": -2.76,
+      "keplerian": {
+        "aKm": 527108,
+        "e": 0.0013,
+        "iDeg": 0.345,
+        "OmegaDeg": 0,
+        "omegaDeg": 0,
+        "M0Deg": 0,
+        "nDegPerDay": 79.6812749003984,
+        "OmegaDotDegPerDay": 0,
+        "omegaDotDegPerDay": 0
+      },
+      "cloudLayer": {
+        "diffuse": null,
+        "normal": null,
+        "scaleFactor": 0,
+        "spinDegPerSimSecond": 0,
+        "ambientFactor": 0
+      },
+      "hasCloudLayer": false,
+      "hasRings": false,
+      "hasTerrain": false,
+      "terrainAttribution": null,
+      "procedural": {
+        "enabled": false,
+        "mode": 0,
+        "seed": 0,
+        "colors": [
+          [
+            0,
+            0,
+            0
+          ],
+          [
+            0,
+            0,
+            0
+          ],
+          [
+            0,
+            0,
+            0
+          ]
+        ],
+        "bands": 0,
+        "seaLevel": 0,
+        "polarCap": 0,
+        "emissive": 0,
+        "equilibriumTemperatureK": 0
+      },
+      "placeFromElements": false
+    },
+    {
+      "index": 28,
+      "id": "titan",
+      "parentId": "saturn",
+      "initTag": "SaturnSystem",
+      "kind": "satellite",
+      "displayNameEn": "Titan",
+      "displayNameRu": "Титан",
+      "auDistance": 0.008167696467086146,
+      "orbitalPeriodDays": 15.95,
+      "earthRadiusScale": 0.404136,
+      "radiusKm": 2575,
+      "axialTiltDegrees": 0,
+      "artTiltXDegrees": 0,
+      "oblateness": 0,
+      "yawOffsetDegrees": 0,
+      "artRollDegrees": 0,
+      "shaderFlags": {
+        "hasNightTexture": false,
+        "hasSpecularMap": false,
+        "hasClouds": false
+      },
+      "useSphereIntersect": true,
+      "ambientFactor": 0,
+      "lod": {
+        "diffuse": "Titan_Diffuse",
+        "normal": "Titan_Normal",
+        "specular": null,
+        "night": null,
+        "clouds": null
+      },
+      "meshPath": null,
+      "sceneOrbitRadius": 87.5,
+      "orbitPlane": "xz",
+      "initialAnomalyRad": -1.57079633,
+      "spinDegPerSimSecond": -2.76,
+      "keplerian": {
+        "aKm": 1221946.9,
+        "e": 0.028688,
+        "iDeg": 27.7041,
+        "OmegaDeg": 169.2016,
+        "omegaDeg": 164.3077,
+        "M0Deg": 163.5719,
+        "nDegPerDay": 22.5755606,
+        "OmegaDotDegPerDay": -0.000015,
+        "omegaDotDegPerDay": 0.0014296
+      },
+      "cloudLayer": {
+        "diffuse": null,
+        "normal": null,
+        "scaleFactor": 0,
+        "spinDegPerSimSecond": 0,
+        "ambientFactor": 0
+      },
+      "hasCloudLayer": false,
+      "hasRings": false,
+      "hasTerrain": false,
+      "terrainAttribution": null,
+      "procedural": {
+        "enabled": false,
+        "mode": 0,
+        "seed": 0,
+        "colors": [
+          [
+            0,
+            0,
+            0
+          ],
+          [
+            0,
+            0,
+            0
+          ],
+          [
+            0,
+            0,
+            0
+          ]
+        ],
+        "bands": 0,
+        "seaLevel": 0,
+        "polarCap": 0,
+        "emissive": 0,
+        "equilibriumTemperatureK": 0
+      },
+      "placeFromElements": true
+    },
+    {
+      "index": 29,
+      "id": "iapetus",
+      "parentId": "saturn",
+      "initTag": "SaturnSystem",
+      "kind": "satellite",
+      "displayNameEn": "Iapetus",
+      "displayNameRu": "Япет",
+      "auDistance": 0.02380261151671593,
+      "orbitalPeriodDays": 79.32,
+      "earthRadiusScale": 0.115288,
+      "radiusKm": 735,
+      "axialTiltDegrees": 0,
+      "artTiltXDegrees": 0,
+      "oblateness": 0,
+      "yawOffsetDegrees": 0,
+      "artRollDegrees": 0,
+      "shaderFlags": {
+        "hasNightTexture": false,
+        "hasSpecularMap": false,
+        "hasClouds": false
+      },
+      "useSphereIntersect": true,
+      "ambientFactor": 0,
+      "lod": {
+        "diffuse": "Iapetus_Diffuse",
+        "normal": "Iapetus_Normal",
+        "specular": null,
+        "night": null,
+        "clouds": null
+      },
+      "meshPath": null,
+      "sceneOrbitRadius": 96.5,
+      "orbitPlane": "xz",
+      "initialAnomalyRad": -1.57079633,
+      "spinDegPerSimSecond": -2.76,
+      "keplerian": {
+        "aKm": 3560820,
+        "e": 0.0286,
+        "iDeg": 15.47,
+        "OmegaDeg": 0,
+        "omegaDeg": 0,
+        "M0Deg": 0,
+        "nDegPerDay": 4.538577912254161,
+        "OmegaDotDegPerDay": 0,
+        "omegaDotDegPerDay": 0
+      },
+      "cloudLayer": {
+        "diffuse": null,
+        "normal": null,
+        "scaleFactor": 0,
+        "spinDegPerSimSecond": 0,
+        "ambientFactor": 0
+      },
+      "hasCloudLayer": false,
+      "hasRings": false,
+      "hasTerrain": false,
+      "terrainAttribution": null,
+      "procedural": {
+        "enabled": false,
+        "mode": 0,
+        "seed": 0,
+        "colors": [
+          [
+            0,
+            0,
+            0
+          ],
+          [
+            0,
+            0,
+            0
+          ],
+          [
+            0,
+            0,
+            0
+          ]
+        ],
+        "bands": 0,
+        "seaLevel": 0,
+        "polarCap": 0,
+        "emissive": 0,
+        "equilibriumTemperatureK": 0
+      },
+      "placeFromElements": false
+    },
+    {
+      "index": 30,
+      "id": "miranda",
+      "parentId": "uranus",
+      "initTag": "UranusSystem",
+      "kind": "satellite",
+      "displayNameEn": "Miranda",
+      "displayNameRu": "Миранда",
+      "auDistance": 0.0008649187277503142,
+      "orbitalPeriodDays": 1.413,
+      "earthRadiusScale": 0.0368858,
+      "radiusKm": 236,
+      "axialTiltDegrees": 0,
+      "artTiltXDegrees": 0,
+      "oblateness": 0,
+      "yawOffsetDegrees": 0,
+      "artRollDegrees": 90,
+      "shaderFlags": {
+        "hasNightTexture": false,
+        "hasSpecularMap": false,
+        "hasClouds": false
+      },
+      "useSphereIntersect": true,
+      "ambientFactor": 0,
+      "lod": {
+        "diffuse": "Miranda_Diffuse",
+        "normal": "Miranda_Normal",
+        "specular": null,
+        "night": null,
+        "clouds": null
+      },
+      "meshPath": null,
+      "sceneOrbitRadius": 34.8,
+      "orbitPlane": "xy",
+      "initialAnomalyRad": 3.14159265,
+      "spinDegPerSimSecond": -2.76,
+      "keplerian": {
+        "aKm": 129390,
+        "e": 0.0013,
+        "iDeg": 4.338,
+        "OmegaDeg": 0,
+        "omegaDeg": 0,
+        "M0Deg": 0,
+        "nDegPerDay": 254.77707006369425,
+        "OmegaDotDegPerDay": 0,
+        "omegaDotDegPerDay": 0
+      },
+      "cloudLayer": {
+        "diffuse": null,
+        "normal": null,
+        "scaleFactor": 0,
+        "spinDegPerSimSecond": 0,
+        "ambientFactor": 0
+      },
+      "hasCloudLayer": false,
+      "hasRings": false,
+      "hasTerrain": false,
+      "terrainAttribution": null,
+      "procedural": {
+        "enabled": false,
+        "mode": 0,
+        "seed": 0,
+        "colors": [
+          [
+            0,
+            0,
+            0
+          ],
+          [
+            0,
+            0,
+            0
+          ],
+          [
+            0,
+            0,
+            0
+          ]
+        ],
+        "bands": 0,
+        "seaLevel": 0,
+        "polarCap": 0,
+        "emissive": 0,
+        "equilibriumTemperatureK": 0
+      },
+      "placeFromElements": false
+    },
+    {
+      "index": 31,
+      "id": "ariel",
+      "parentId": "uranus",
+      "initTag": "UranusSystem",
+      "kind": "satellite",
+      "displayNameEn": "Ariel",
+      "displayNameRu": "Ариэль",
+      "auDistance": 0.0012768898320957185,
+      "orbitalPeriodDays": 2.52,
+      "earthRadiusScale": 0.090865,
+      "radiusKm": 579,
+      "axialTiltDegrees": 0,
+      "artTiltXDegrees": 0,
+      "oblateness": 0,
+      "yawOffsetDegrees": 0,
+      "artRollDegrees": 90,
+      "shaderFlags": {
+        "hasNightTexture": false,
+        "hasSpecularMap": false,
+        "hasClouds": false
+      },
+      "useSphereIntersect": true,
+      "ambientFactor": 0,
+      "lod": {
+        "diffuse": "Ariel_Diffuse",
+        "normal": "Ariel_Normal",
+        "specular": null,
+        "night": null,
+        "clouds": null
+      },
+      "meshPath": null,
+      "sceneOrbitRadius": 44,
+      "orbitPlane": "xy",
+      "initialAnomalyRad": 3.14159265,
+      "spinDegPerSimSecond": -2.76,
+      "keplerian": {
+        "aKm": 191020,
+        "e": 0.0012,
+        "iDeg": 0.041,
+        "OmegaDeg": 0,
+        "omegaDeg": 0,
+        "M0Deg": 0,
+        "nDegPerDay": 142.85714285714286,
+        "OmegaDotDegPerDay": 0,
+        "omegaDotDegPerDay": 0
+      },
+      "cloudLayer": {
+        "diffuse": null,
+        "normal": null,
+        "scaleFactor": 0,
+        "spinDegPerSimSecond": 0,
+        "ambientFactor": 0
+      },
+      "hasCloudLayer": false,
+      "hasRings": false,
+      "hasTerrain": false,
+      "terrainAttribution": null,
+      "procedural": {
+        "enabled": false,
+        "mode": 0,
+        "seed": 0,
+        "colors": [
+          [
+            0,
+            0,
+            0
+          ],
+          [
+            0,
+            0,
+            0
+          ],
+          [
+            0,
+            0,
+            0
+          ]
+        ],
+        "bands": 0,
+        "seaLevel": 0,
+        "polarCap": 0,
+        "emissive": 0,
+        "equilibriumTemperatureK": 0
+      },
+      "placeFromElements": false
+    },
+    {
+      "index": 32,
+      "id": "umbriel",
+      "parentId": "uranus",
+      "initTag": "UranusSystem",
+      "kind": "satellite",
+      "displayNameEn": "Umbriel",
+      "displayNameRu": "Умбриэль",
+      "auDistance": 0.0017781001745234067,
+      "orbitalPeriodDays": 4.144,
+      "earthRadiusScale": 0.091775,
+      "radiusKm": 584.5,
+      "axialTiltDegrees": 0,
+      "artTiltXDegrees": 0,
+      "oblateness": 0,
+      "yawOffsetDegrees": 0,
+      "artRollDegrees": 90,
+      "shaderFlags": {
+        "hasNightTexture": false,
+        "hasSpecularMap": false,
+        "hasClouds": false
+      },
+      "useSphereIntersect": true,
+      "ambientFactor": 0,
+      "lod": {
+        "diffuse": "Umbriel_Diffuse",
+        "normal": "Umbriel_Normal",
+        "specular": null,
+        "night": null,
+        "clouds": null
+      },
+      "meshPath": null,
+      "sceneOrbitRadius": 49,
+      "orbitPlane": "xy",
+      "initialAnomalyRad": 3.14159265,
+      "spinDegPerSimSecond": -2.76,
+      "keplerian": {
+        "aKm": 266000,
+        "e": 0.0039,
+        "iDeg": 0.128,
+        "OmegaDeg": 0,
+        "omegaDeg": 0,
+        "M0Deg": 0,
+        "nDegPerDay": 86.87258687258687,
+        "OmegaDotDegPerDay": 0,
+        "omegaDotDegPerDay": 0
+      },
+      "cloudLayer": {
+        "diffuse": null,
+        "normal": null,
+        "scaleFactor": 0,
+        "spinDegPerSimSecond": 0,
+        "ambientFactor": 0
+      },
+      "hasCloudLayer": false,
+      "hasRings": false,
+      "hasTerrain": false,
+      "terrainAttribution": null,
+      "procedural": {
+        "enabled": false,
+        "mode": 0,
+        "seed": 0,
+        "colors": [
+          [
+            0,
+            0,
+            0
+          ],
+          [
+            0,
+            0,
+            0
+          ],
+          [
+            0,
+            0,
+            0
+          ]
+        ],
+        "bands": 0,
+        "seaLevel": 0,
+        "polarCap": 0,
+        "emissive": 0,
+        "equilibriumTemperatureK": 0
+      },
+      "placeFromElements": false
+    },
+    {
+      "index": 33,
+      "id": "titania",
+      "parentId": "uranus",
+      "initTag": "UranusSystem",
+      "kind": "satellite",
+      "displayNameEn": "Titania",
+      "displayNameRu": "Титания",
+      "auDistance": 0.002913878372468038,
+      "orbitalPeriodDays": 8.706,
+      "earthRadiusScale": 0.123748,
+      "radiusKm": 789,
+      "axialTiltDegrees": 0,
+      "artTiltXDegrees": 0,
+      "oblateness": 0,
+      "yawOffsetDegrees": 0,
+      "artRollDegrees": 90,
+      "shaderFlags": {
+        "hasNightTexture": false,
+        "hasSpecularMap": false,
+        "hasClouds": false
+      },
+      "useSphereIntersect": true,
+      "ambientFactor": 0,
+      "lod": {
+        "diffuse": "Titania_Diffuse",
+        "normal": "Titania_Normal",
+        "specular": null,
+        "night": null,
+        "clouds": null
+      },
+      "meshPath": null,
+      "sceneOrbitRadius": 55,
+      "orbitPlane": "xy",
+      "initialAnomalyRad": 3.14159265,
+      "spinDegPerSimSecond": -2.76,
+      "keplerian": {
+        "aKm": 435910,
+        "e": 0.0011,
+        "iDeg": 0.079,
+        "OmegaDeg": 0,
+        "omegaDeg": 0,
+        "M0Deg": 0,
+        "nDegPerDay": 41.35079255685734,
+        "OmegaDotDegPerDay": 0,
+        "omegaDotDegPerDay": 0
+      },
+      "cloudLayer": {
+        "diffuse": null,
+        "normal": null,
+        "scaleFactor": 0,
+        "spinDegPerSimSecond": 0,
+        "ambientFactor": 0
+      },
+      "hasCloudLayer": false,
+      "hasRings": false,
+      "hasTerrain": false,
+      "terrainAttribution": null,
+      "procedural": {
+        "enabled": false,
+        "mode": 0,
+        "seed": 0,
+        "colors": [
+          [
+            0,
+            0,
+            0
+          ],
+          [
+            0,
+            0,
+            0
+          ],
+          [
+            0,
+            0,
+            0
+          ]
+        ],
+        "bands": 0,
+        "seaLevel": 0,
+        "polarCap": 0,
+        "emissive": 0,
+        "equilibriumTemperatureK": 0
+      },
+      "placeFromElements": false
+    },
+    {
+      "index": 34,
+      "id": "oberon",
+      "parentId": "uranus",
+      "initTag": "UranusSystem",
+      "kind": "satellite",
+      "displayNameEn": "Oberon",
+      "displayNameRu": "Оберон",
+      "auDistance": 0.0039005902775860837,
+      "orbitalPeriodDays": 13.46,
+      "earthRadiusScale": 0.11951,
+      "radiusKm": 761.5,
+      "axialTiltDegrees": 0,
+      "artTiltXDegrees": 0,
+      "oblateness": 0,
+      "yawOffsetDegrees": 0,
+      "artRollDegrees": 90,
+      "shaderFlags": {
+        "hasNightTexture": false,
+        "hasSpecularMap": false,
+        "hasClouds": false
+      },
+      "useSphereIntersect": true,
+      "ambientFactor": 0,
+      "lod": {
+        "diffuse": "Oberon_Diffuse",
+        "normal": "Oberon_Normal",
+        "specular": null,
+        "night": null,
+        "clouds": null
+      },
+      "meshPath": null,
+      "sceneOrbitRadius": 61,
+      "orbitPlane": "xy",
+      "initialAnomalyRad": 3.14159265,
+      "spinDegPerSimSecond": -2.76,
+      "keplerian": {
+        "aKm": 583520,
+        "e": 0.0014,
+        "iDeg": 0.068,
+        "OmegaDeg": 0,
+        "omegaDeg": 0,
+        "M0Deg": 0,
+        "nDegPerDay": 26.745913818722137,
+        "OmegaDotDegPerDay": 0,
+        "omegaDotDegPerDay": 0
+      },
+      "cloudLayer": {
+        "diffuse": null,
+        "normal": null,
+        "scaleFactor": 0,
+        "spinDegPerSimSecond": 0,
+        "ambientFactor": 0
+      },
+      "hasCloudLayer": false,
+      "hasRings": false,
+      "hasTerrain": false,
+      "terrainAttribution": null,
+      "procedural": {
+        "enabled": false,
+        "mode": 0,
+        "seed": 0,
+        "colors": [
+          [
+            0,
+            0,
+            0
+          ],
+          [
+            0,
+            0,
+            0
+          ],
+          [
+            0,
+            0,
+            0
+          ]
+        ],
+        "bands": 0,
+        "seaLevel": 0,
+        "polarCap": 0,
+        "emissive": 0,
+        "equilibriumTemperatureK": 0
+      },
+      "placeFromElements": false
+    },
+    {
+      "index": 35,
+      "id": "triton",
+      "parentId": "neptune",
+      "initTag": "NeptuneSystem",
+      "kind": "satellite",
+      "displayNameEn": "Triton",
+      "displayNameRu": "Тритон",
+      "auDistance": 0.002371417442908832,
+      "orbitalPeriodDays": 5.877,
+      "earthRadiusScale": 0.2724,
+      "radiusKm": 1353.5,
+      "axialTiltDegrees": 0,
+      "artTiltXDegrees": 0,
+      "oblateness": 0,
+      "yawOffsetDegrees": -75,
+      "artRollDegrees": 0,
+      "shaderFlags": {
+        "hasNightTexture": false,
+        "hasSpecularMap": false,
+        "hasClouds": false
+      },
+      "useSphereIntersect": true,
+      "ambientFactor": 0,
+      "lod": {
+        "diffuse": "Triton_Diffuse",
+        "normal": "Triton_Normal",
+        "specular": null,
+        "night": null,
+        "clouds": null
+      },
+      "meshPath": null,
+      "sceneOrbitRadius": 37.5,
+      "orbitPlane": "xz",
+      "initialAnomalyRad": -1.57079633,
+      "spinDegPerSimSecond": -2.76,
+      "keplerian": {
+        "aKm": 354766.3,
+        "e": 0.000128,
+        "iDeg": 129.4889,
+        "OmegaDeg": 215.8459,
+        "omegaDeg": 95.766,
+        "M0Deg": 338.8725,
+        "nDegPerDay": 61.2565801,
+        "OmegaDotDegPerDay": 0.000718,
+        "omegaDotDegPerDay": 0.0012525
+      },
+      "cloudLayer": {
+        "diffuse": null,
+        "normal": null,
+        "scaleFactor": 0,
+        "spinDegPerSimSecond": 0,
+        "ambientFactor": 0
+      },
+      "hasCloudLayer": false,
+      "hasRings": false,
+      "hasTerrain": false,
+      "terrainAttribution": null,
+      "procedural": {
+        "enabled": false,
+        "mode": 0,
+        "seed": 0,
+        "colors": [
+          [
+            0,
+            0,
+            0
+          ],
+          [
+            0,
+            0,
+            0
+          ],
+          [
+            0,
+            0,
+            0
+          ]
+        ],
+        "bands": 0,
+        "seaLevel": 0,
+        "polarCap": 0,
+        "emissive": 0,
+        "equilibriumTemperatureK": 0
+      },
+      "placeFromElements": true
+    },
+    {
+      "index": 36,
+      "id": "charon",
+      "parentId": "pluto",
+      "initTag": "PlutoSystem",
+      "kind": "satellite",
+      "displayNameEn": "Charon",
+      "displayNameRu": "Харон",
+      "auDistance": 0.00013095774631236113,
+      "orbitalPeriodDays": 6.387,
+      "earthRadiusScale": 0.09512,
+      "radiusKm": 606,
+      "axialTiltDegrees": 0,
+      "artTiltXDegrees": 0,
+      "oblateness": 0,
+      "yawOffsetDegrees": -75,
+      "artRollDegrees": 0,
+      "shaderFlags": {
+        "hasNightTexture": false,
+        "hasSpecularMap": true,
+        "hasClouds": false
+      },
+      "useSphereIntersect": true,
+      "ambientFactor": 0,
+      "lod": {
+        "diffuse": "Charon_Diffuse",
+        "normal": "Charon_Normal",
+        "specular": "Charon_Specular",
+        "night": null,
+        "clouds": null
+      },
+      "meshPath": null,
+      "sceneOrbitRadius": 25,
+      "orbitPlane": "xz",
+      "initialAnomalyRad": -1.57079633,
+      "spinDegPerSimSecond": -2.76,
+      "keplerian": {
+        "aKm": 19591,
+        "e": 0.0002,
+        "iDeg": 0.08,
+        "OmegaDeg": 223.05,
+        "omegaDeg": 0,
+        "M0Deg": 0,
+        "nDegPerDay": 56.36449037106623,
+        "OmegaDotDegPerDay": 0,
+        "omegaDotDegPerDay": 0
+      },
+      "cloudLayer": {
+        "diffuse": null,
+        "normal": null,
+        "scaleFactor": 0,
+        "spinDegPerSimSecond": 0,
+        "ambientFactor": 0
+      },
+      "hasCloudLayer": false,
+      "hasRings": false,
+      "hasTerrain": false,
+      "terrainAttribution": null,
+      "procedural": {
+        "enabled": false,
+        "mode": 0,
+        "seed": 0,
+        "colors": [
+          [
+            0,
+            0,
+            0
+          ],
+          [
+            0,
+            0,
+            0
+          ],
+          [
+            0,
+            0,
+            0
+          ]
+        ],
+        "bands": 0,
+        "seaLevel": 0,
+        "polarCap": 0,
+        "emissive": 0,
+        "equilibriumTemperatureK": 0
+      },
+      "placeFromElements": false
+    }
+  ],
+  "atmospheres": [
+    {
+      "bodyId": "venus",
+      "oneil": {
+        "shellScale": 1.1,
+        "color": [
+          0.796078431372549,
+          0.6196078431372549,
+          0.27058823529411763
+        ],
+        "innerRadiusMinusEpsilon": true,
+        "outerRadius": 1.995,
+        "mieTint": [
+          1,
+          1,
+          1
+        ],
+        "hScaleFactor": 6,
+        "toneMapping": false
+      },
+      "physical": {
+        "enabled": true,
+        "groundRadiusKm": 6116.8,
+        "topRadiusKm": 6176.8,
+        "thicknessScale": 1,
+        "rayleighScattering": [
+          0.0016,
+          0.0038,
+          0.0093
+        ],
+        "rayleighScaleHeightKm": 5.1,
+        "mieScattering": [
+          0.05,
+          0.049,
+          0.045
+        ],
+        "mieExtinction": [
+          0.05,
+          0.05,
+          0.05
+        ],
+        "mieScaleHeightKm": 4,
+        "miePhaseG": 0.7,
+        "absorptionExtinction": [
+          0,
+          0.0008,
+          0.005
+        ],
+        "absorptionCenterKm": 10,
+        "absorptionHalfWidthKm": 20,
+        "groundAlbedo": [
+          0.85,
+          0.78,
+          0.6
+        ],
+        "exposure": 8
+      }
+    },
+    {
+      "bodyId": "earth",
+      "oneil": {
+        "shellScale": 1.1,
+        "color": [
+          0.3,
+          0.7,
+          1
+        ],
+        "innerRadiusMinusEpsilon": true,
+        "outerRadius": 2.1,
+        "mieTint": [
+          1,
+          1,
+          1
+        ],
+        "hScaleFactor": 6,
+        "toneMapping": false
+      },
+      "physical": {
+        "enabled": true,
+        "groundRadiusKm": 6360,
+        "topRadiusKm": 6460,
+        "thicknessScale": 2,
+        "rayleighScattering": [
+          0.005802,
+          0.013558,
+          0.0331
+        ],
+        "rayleighScaleHeightKm": 8,
+        "mieScattering": [
+          0.003996,
+          0.003996,
+          0.003996
+        ],
+        "mieExtinction": [
+          0.0044,
+          0.0044,
+          0.0044
+        ],
+        "mieScaleHeightKm": 1.2,
+        "miePhaseG": 0.8,
+        "absorptionExtinction": [
+          0.00065,
+          0.001881,
+          0.000085
+        ],
+        "absorptionCenterKm": 25,
+        "absorptionHalfWidthKm": 15,
+        "groundAlbedo": [
+          0.3,
+          0.3,
+          0.3
+        ],
+        "exposure": 6
+      }
+    },
+    {
+      "bodyId": "mars",
+      "oneil": {
+        "shellScale": 0.583,
+        "color": [
+          0.976,
+          0.302,
+          0.208
+        ],
+        "innerRadiusMinusEpsilon": true,
+        "outerRadius": 1.113,
+        "mieTint": [
+          1,
+          1,
+          1
+        ],
+        "hScaleFactor": 6,
+        "toneMapping": false
+      },
+      "physical": {
+        "enabled": true,
+        "groundRadiusKm": 3389.5,
+        "topRadiusKm": 3489.5,
+        "thicknessScale": 2,
+        "rayleighScattering": [
+          0.000116,
+          0.00027,
+          0.00066
+        ],
+        "rayleighScaleHeightKm": 11.1,
+        "mieScattering": [
+          0.044,
+          0.038,
+          0.031
+        ],
+        "mieExtinction": [
+          0.045,
+          0.045,
+          0.045
+        ],
+        "mieScaleHeightKm": 11,
+        "miePhaseG": 0.65,
+        "absorptionExtinction": [
+          0,
+          0,
+          0
+        ],
+        "absorptionCenterKm": 0,
+        "absorptionHalfWidthKm": 1,
+        "groundAlbedo": [
+          0.3,
+          0.17,
+          0.1
+        ],
+        "exposure": 7
+      }
+    },
+    {
+      "bodyId": "jupiter",
+      "oneil": {
+        "shellScale": 11.4,
+        "color": [
+          0.6,
+          0.5450980392156862,
+          0.47058823529411764
+        ],
+        "innerRadiusMinusEpsilon": true,
+        "outerRadius": 23.35,
+        "mieTint": [
+          1,
+          1,
+          1
+        ],
+        "hScaleFactor": 26,
+        "toneMapping": true
+      },
+      "physical": {
+        "enabled": true,
+        "groundRadiusKm": 71492,
+        "topRadiusKm": 71792,
+        "thicknessScale": 6,
+        "rayleighScattering": [
+          0.0006,
+          0.0014,
+          0.0033
+        ],
+        "rayleighScaleHeightKm": 27,
+        "mieScattering": [
+          0.0023,
+          0.0019,
+          0.0013
+        ],
+        "mieExtinction": [
+          0.0025,
+          0.0025,
+          0.0025
+        ],
+        "mieScaleHeightKm": 40,
+        "miePhaseG": 0.5,
+        "absorptionExtinction": [
+          0.0002,
+          0.00005,
+          0
+        ],
+        "absorptionCenterKm": 0,
+        "absorptionHalfWidthKm": 150,
+        "groundAlbedo": [
+          0.55,
+          0.5,
+          0.4
+        ],
+        "exposure": 5
+      }
+    },
+    {
+      "bodyId": "saturn",
+      "oneil": {
+        "shellScale": 9.34,
+        "color": [
+          0.32941176470588235,
+          0.5176470588235295,
+          0.6901960784313725
+        ],
+        "innerRadiusMinusEpsilon": true,
+        "outerRadius": 18.6,
+        "mieTint": [
+          1,
+          1,
+          1
+        ],
+        "hScaleFactor": 27,
+        "toneMapping": true
+      },
+      "physical": {
+        "enabled": true,
+        "groundRadiusKm": 60268,
+        "topRadiusKm": 60868,
+        "thicknessScale": 2.5,
+        "rayleighScattering": [
+          0.0002,
+          0.0005,
+          0.0012
+        ],
+        "rayleighScaleHeightKm": 60,
+        "mieScattering": [
+          0.00294,
+          0.00276,
+          0.00228
+        ],
+        "mieExtinction": [
+          0.003,
+          0.003,
+          0.003
+        ],
+        "mieScaleHeightKm": 80,
+        "miePhaseG": 0.5,
+        "absorptionExtinction": [
+          0.0001,
+          0.00003,
+          0
+        ],
+        "absorptionCenterKm": 0,
+        "absorptionHalfWidthKm": 300,
+        "groundAlbedo": [
+          0.62,
+          0.56,
+          0.42
+        ],
+        "exposure": 5
+      }
+    },
+    {
+      "bodyId": "uranus",
+      "oneil": {
+        "shellScale": 4,
+        "color": [
+          0.17647058823529413,
+          0.396078431372549,
+          0.4470588235294118
+        ],
+        "innerRadiusMinusEpsilon": true,
+        "outerRadius": 8.1,
+        "mieTint": [
+          1,
+          1,
+          1
+        ],
+        "hScaleFactor": 24,
+        "toneMapping": true
+      },
+      "physical": {
+        "enabled": true,
+        "groundRadiusKm": 25559,
+        "topRadiusKm": 25859,
+        "thicknessScale": 2,
+        "rayleighScattering": [
+          0.0017,
+          0.004,
+          0.0097
+        ],
+        "rayleighScaleHeightKm": 28,
+        "mieScattering": [
+          0.0026,
+          0.0039,
+          0.0039
+        ],
+        "mieExtinction": [
+          0.004,
+          0.004,
+          0.004
+        ],
+        "mieScaleHeightKm": 40,
+        "miePhaseG": 0.6,
+        "absorptionExtinction": [
+          0.004,
+          0.0005,
+          0.0001
+        ],
+        "absorptionCenterKm": 0,
+        "absorptionHalfWidthKm": 200,
+        "groundAlbedo": [
+          0.45,
+          0.62,
+          0.65
+        ],
+        "exposure": 5
+      }
+    },
+    {
+      "bodyId": "neptune",
+      "oneil": {
+        "shellScale": 3.9,
+        "color": [
+          0.24313725490196078,
+          0.3607843137254902,
+          0.6627450980392157
+        ],
+        "innerRadiusMinusEpsilon": true,
+        "outerRadius": 7.9,
+        "mieTint": [
+          1,
+          1,
+          1
+        ],
+        "hScaleFactor": 23,
+        "toneMapping": true
+      },
+      "physical": {
+        "enabled": true,
+        "groundRadiusKm": 24764,
+        "topRadiusKm": 24984,
+        "thicknessScale": 2.8,
+        "rayleighScattering": [
+          0.0021,
+          0.0048,
+          0.0116
+        ],
+        "rayleighScaleHeightKm": 20,
+        "mieScattering": [
+          0.0025,
+          0.0037,
+          0.0039
+        ],
+        "mieExtinction": [
+          0.004,
+          0.004,
+          0.004
+        ],
+        "mieScaleHeightKm": 30,
+        "miePhaseG": 0.6,
+        "absorptionExtinction": [
+          0.006,
+          0.0008,
+          0.0002
+        ],
+        "absorptionCenterKm": 0,
+        "absorptionHalfWidthKm": 150,
+        "groundAlbedo": [
+          0.35,
+          0.5,
+          0.7
+        ],
+        "exposure": 5
+      }
+    },
+    {
+      "bodyId": "pluto",
+      "oneil": {
+        "shellScale": 0.45,
+        "color": [
+          0.3607843137254902,
+          0.47058823529411764,
+          0.5529411764705883
+        ],
+        "innerRadiusMinusEpsilon": false,
+        "outerRadius": 1,
+        "mieTint": [
+          0.13725490196078433,
+          0.20392156862745098,
+          0.8627450980392157
+        ],
+        "hScaleFactor": 16,
+        "toneMapping": true
+      },
+      "physical": null
+    },
+    {
+      "bodyId": "titan",
+      "oneil": {
+        "shellScale": 0.504136,
+        "color": [
+          0.1568627450980392,
+          0.12941176470588237,
+          0.2823529411764706
+        ],
+        "innerRadiusMinusEpsilon": true,
+        "outerRadius": 0.842921,
+        "mieTint": [
+          0.36862745,
+          0.0666667,
+          0.0196078
+        ],
+        "hScaleFactor": 4.8,
+        "toneMapping": false
+      },
+      "physical": {
+        "enabled": true,
+        "groundRadiusKm": 2574.7,
+        "topRadiusKm": 3174.7,
+        "thicknessScale": 1,
+        "rayleighScattering": [
+          0.026,
+          0.061,
+          0.149
+        ],
+        "rayleighScaleHeightKm": 20.6,
+        "mieScattering": [
+          0.053,
+          0.048,
+          0.035
+        ],
+        "mieExtinction": [
+          0.055,
+          0.067,
+          0.085
+        ],
+        "mieScaleHeightKm": 60,
+        "miePhaseG": 0.65,
+        "absorptionExtinction": [
+          0,
+          0.0001,
+          0.0004
+        ],
+        "absorptionCenterKm": 80,
+        "absorptionHalfWidthKm": 160,
+        "groundAlbedo": [
+          0.15,
+          0.12,
+          0.08
+        ],
+        "exposure": 11
+      }
+    }
+  ]
+}
