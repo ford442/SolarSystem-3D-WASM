@@ -326,6 +326,44 @@ extern "C" {
         return activeApplication && activeApplication->GetMagneticFieldsEnabled() ? 1 : 0;
     }
 
+    // --- Space weather (SpaceWeatherController.cpp, docs/ARCHITECTURE.md §13) ---
+    // Application notifies "solarWind" / "kpOverride" / "timeScale" / "simulationEpoch" itself.
+    EMSCRIPTEN_KEEPALIVE void SetSolarWind(int enabled) {
+        if (activeApplication) {
+            activeApplication->SetSolarWindEnabled(enabled != 0);
+        }
+    }
+    EMSCRIPTEN_KEEPALIVE int GetSolarWind() {
+        return activeApplication && activeApplication->GetSolarWindEnabled() ? 1 : 0;
+    }
+    // Below 0: Kp from the wind; 0–9 holds every auroral oval there.
+    EMSCRIPTEN_KEEPALIVE void SetKpOverride(double kp) {
+        if (activeApplication) {
+            activeApplication->SetKpOverride(kp);
+        }
+    }
+    EMSCRIPTEN_KEEPALIVE double GetKpOverride() {
+        return activeApplication ? activeApplication->GetKpOverride() : -1.0;
+    }
+    EMSCRIPTEN_KEEPALIVE void LaunchCmeNow() {
+        if (activeApplication) {
+            activeApplication->LaunchCmeNow();
+        }
+    }
+    // A CME catalog index (GetSpaceWeatherJson's nextStorm / lastStorm .index); 1 if it played.
+    EMSCRIPTEN_KEEPALIVE int PlaySpaceWeatherEvent(int index) {
+        return activeApplication && activeApplication->PlaySpaceWeatherEvent(index) ? 1 : 0;
+    }
+    // `&cme=2003-10-29T06:00Z`: the date to that UTC instant with the wind on; 1 if it parsed.
+    EMSCRIPTEN_KEEPALIVE int JumpToSpaceWeatherDate(const char* isoUtc) {
+        return activeApplication && isoUtc && activeApplication->JumpToSpaceWeatherDate(isoUtc) ? 1 : 0;
+    }
+    EMSCRIPTEN_KEEPALIVE const char* GetSpaceWeatherJson() {
+        static std::string json;
+        json = activeApplication ? activeApplication->GetSpaceWeatherJson() : R"({"sol":false})";
+        return json.c_str();
+    }
+
     // --- WebXR stereo control surface ---
     EMSCRIPTEN_KEEPALIVE void SetXrSessionActive(int active) {
         if (!activeApplication) {

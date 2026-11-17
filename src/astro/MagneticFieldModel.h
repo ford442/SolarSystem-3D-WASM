@@ -23,4 +23,11 @@ glm::vec3 SampleField(const glm::vec3& magneticPos, const MagneticFieldParams& p
  */
 glm::mat3 TiltMatrix(float dipoleTiltDeg);
 
+/**
+ * Body frame from magnetic frame: the tilt, then poleAzimuthDeg about the spin axis (+Y).
+ * DipoleFrame(params) * (0, 1, 0) is the magnetic north pole in the body frame; the field
+ * lines (RenderMagneticFields), the auroral ovals and the solar-wind particles all use it.
+ */
+glm::mat3 DipoleFrame(const MagneticFieldParams& params);
+
 } // namespace MagneticFieldModel

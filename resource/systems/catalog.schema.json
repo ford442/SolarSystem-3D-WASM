@@ -131,6 +131,47 @@
                   "ambientFactor": { "type": "number" }
                 }
               },
+              "aurora": {
+                "type": "object",
+                "description": "Auroral shell (AuroraShell + aurora.fs; BodyCatalog::Auroras(), Sol's compiled as kSolAuroras). The look only: where the oval sits and how it moves with Kp is physics in src/astro/SpaceWeather.cpp. Primaries with a dipole field (Earth, the giants). See docs/ARCHITECTURE.md §13.",
+                "required": ["altitudeKm", "colorLow", "colorHigh", "colorEdge", "brightness"],
+                "properties": {
+                  "altitudeKm": { "type": "array", "items": { "type": "number", "exclusiveMinimum": 0 }, "minItems": 2, "maxItems": 2, "description": "[bottom, top] of the emitting layer above the surface (giants: above 1 bar)." },
+                  "colorLow": { "type": "array", "items": { "type": "number" }, "minItems": 3, "maxItems": 3, "description": "Linear RGB of the lower curtain (Earth: O 557.7 nm green)." },
+                  "colorHigh": { "type": "array", "items": { "type": "number" }, "minItems": 3, "maxItems": 3, "description": "Linear RGB of the upper glow (Earth: O 630.0 nm red)." },
+                  "colorEdge": { "type": "array", "items": { "type": "number" }, "minItems": 3, "maxItems": 3, "description": "Linear RGB of the storm-time lower border (Earth: N2+ 427.8 nm)." },
+                  "brightness": { "type": "number", "exclusiveMinimum": 0 },
+                  "notes": { "type": "string" }
+                }
+              },
+              "star": {
+                "type": "object",
+                "description": "The index-0 star: StarPhysics derives light, corona and glow from it (docs/ARCHITECTURE.md §12.2).",
+                "properties": {
+                  "activity": {
+                    "description": "A 0–1 flare level, or {flare, cycle} for a star with a sunspot cycle (SpaceWeather::EvaluateCycle, §13).",
+                    "oneOf": [
+                      { "type": "number", "minimum": 0, "maximum": 1 },
+                      {
+                        "type": "object",
+                        "properties": {
+                          "flare": { "type": "number", "minimum": 0, "maximum": 1 },
+                          "cycle": {
+                            "type": "object",
+                            "required": ["periodYears", "minimumYear", "meanPeakSunspotNumber"],
+                            "properties": {
+                              "periodYears": { "type": "number", "exclusiveMinimum": 0 },
+                              "minimumYear": { "type": "number", "description": "Decimal year of a cycle minimum (Sun: 2008.9)." },
+                              "cycleAtMinimum": { "type": "integer", "minimum": 1, "description": "Number of the cycle that starts at minimumYear; set, the Sun's observed cycle maxima (SILSO) scale each cycle." },
+                              "meanPeakSunspotNumber": { "type": "number", "exclusiveMinimum": 0 }
+                            }
+                          }
+                        }
+                      }
+                    ]
+                  }
+                }
+              },
               "atmosphere": {
                 "type": "object",
                 "description": "Atmosphere shell (BodyCatalog::Atmospheres(); Sol's compiled as kSolAtmospheres). `oneil` is the cheap single-scattering shell every quality preset can draw; optional `physical` is baked into transmittance/multi-scattering LUTs by tools/atmosphere_lut_baker (resource/atmosphere/<id>_*.ktx2) and drawn on Medium/Full. Rebake after editing `physical`. See docs/ARCHITECTURE.md §9.2.",

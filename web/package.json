@@ -25,6 +25,8 @@
     "generate:planet-metadata:check": "node ../scripts/generate-planet-metadata.mjs --check",
     "generate:texture-units": "node ../scripts/generate-texture-units.mjs",
     "generate:texture-units:check": "node ../scripts/generate-texture-units.mjs --check",
+    "generate:cme-list": "node ../scripts/generate-cme-list.mjs",
+    "generate:cme-list:check": "node ../scripts/generate-cme-list.mjs --check",
     "prebuild": "npm run generate:planet-metadata"
   },
   "devDependencies": {

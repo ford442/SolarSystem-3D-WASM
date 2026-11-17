@@ -3,10 +3,12 @@
 // controller rays and the asteroid belt, plus the toggles that gate them. Renderer::
 // methods; scene and camera state comes in through the FrameContext.
 #include "Renderer.h"
+#include "FrameContext.h"
 #include "Solar_System/StarSystemCatalog.h"
 #include "QualitySettings.h"
 #include "Solar_System/AsteroidField.h"
 #include "Solar_System/OrbitLayout.h"
+#include "astro/MagneticFieldModel.h"
 #include "astro/MagneticFieldTracer.h"
 #include "core/JobSystem.h"
 #include "render/MagneticFieldBloom.h"
@@ -106,8 +108,17 @@ void Renderer::RenderMagneticFields(const FrameContext& ctx) {
             glm::mat4 model(1.0f);
             model = glm::translate(model, position);
             model *= rotation;
-            model = glm::rotate(model, glm::radians(params.dipoleTiltDeg), glm::vec3(1.0f, 0.0f, 0.0f));
+            model *= glm::mat4(MagneticFieldModel::DipoleFrame(params));
             model = glm::scale(model, glm::vec3(radius));
+            // The wind's squeeze on the dayside and stretch into the tail (magneticFieldLine.vs).
+            const SpaceWeatherFrame::Body* weather =
+                ctx.scene.spaceWeather ? ctx.scene.spaceWeather->Find(static_cast<int>(body)) : nullptr;
+            if (weather) {
+                _magneticFieldRenderer->SetCompression(weather->sunward,
+                                                       weather->standoff / std::max(weather->quietStandoff, 1e-3f));
+            } else {
+                _magneticFieldRenderer->SetCompression(glm::vec3(1.0f, 0.0f, 0.0f), 1.0f);
+            }
             _magneticFieldRenderer->Draw(ctx.view.projection, ctx.view.view, model, params, body, camPos, now,
                                          ribbonWidthScale, opacityScale);
         };

@@ -24,7 +24,11 @@
     "radiusSolar": 0.943,
     "luminositySolar": 0.6354041,
     "massSolar": 0.905,
-    "activity": 0
+    "activity": 0,
+    "cyclePeriodYears": 0,
+    "cycleMinimumYear": 0,
+    "cycleAtMinimum": 0,
+    "cycleMeanPeakSunspots": 0
   },
   "layout": [
     {
@@ -607,5 +611,6 @@
       "placeFromElements": true
     }
   ],
-  "atmospheres": []
+  "atmospheres": [],
+  "auroras": []
 }

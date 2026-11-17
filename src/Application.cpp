@@ -374,6 +374,9 @@ void Application::PlaceSceneComponents() {
         if (component.clouds) {
             component.clouds->AdjustToParent();
         }
+        if (component.aurora) {
+            component.aurora->AdjustToParent();
+        }
         for (const auto& renderableAtmosphere : component.atmospheres) {
             // Before AdjustToParent: the two paths draw different shell sizes.
             renderableAtmosphere.atmosphere->SetPhysicalPathActive(physicalAtmosphere);
@@ -520,6 +523,10 @@ void Application::RenderFrame(int viewCount) {
             UpdateTerrain(viewCount);
             CullScene(viewCount);
             components = _observe.active ? 0 : _drawOrder.size();
+        });
+        TimeStage(FrameProfile::Stage::SpaceWeather, [&] {
+            UpdateSpaceWeather(viewCount);
+            _renderer.UpdateSpaceWeather(FrameContextFor(0));
         });
         return components;
     };
@@ -706,6 +713,7 @@ void Application::InitSceneObjects() {
     ApplySystemEnvOverride();
     _renderer.PrefetchCatalogVariants();
     InitStarSystem();
+    InitSpaceWeather();
 
     glfwShowWindow(_mainWindow);
 #ifdef _WIN32

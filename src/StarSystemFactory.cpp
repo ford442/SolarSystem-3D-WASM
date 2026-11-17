@@ -1,5 +1,6 @@
 #include "Application.h"
 #include "QualitySettings.h"
+#include "Solar_System/AuroraShell.h"
 #include "Solar_System/CatalogClouds.h"
 #include "Solar_System/CatalogSatellite.h"
 #include "Solar_System/SceneScale.h"
@@ -208,6 +209,11 @@ void Application::InitCatalogSystem(const MeshHolder& sphereModel, const std::st
                               TextureImage2D(GetLodStartTexturePath(cloudDiffuse.low, cloudDiffuse.high)),
                               TextureImage2D(GetLodStartTexturePath(cloudNormal.low, cloudNormal.high)));
         component.clouds = std::make_unique<CatalogClouds>(std::move(cloudsInfo), planet, *primary);
+    }
+
+    // render.aurora: the oval is drawn from SpaceWeather's magnetospheres, which are Sol's.
+    if (const auto* auroraRow = BodyCatalog::FindAurora(primary->id); auroraRow && StarSystemCatalog::IsSol()) {
+        component.aurora = std::make_unique<AuroraShell>(sphereModel, planet, *primary, *auroraRow);
     }
 
     if (primary->hasRings) {

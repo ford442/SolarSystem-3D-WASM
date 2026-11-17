@@ -45,6 +45,27 @@ public:
         float exposure = 1.0f;  // the catalog's render.atmosphere.physical.exposure
         int steps = 0;          // view-ray samples; 0 draws the gradient sky
     };
+    /**
+     * Earth's aurora overhead (common/aurora.glsl, docs/ARCHITECTURE.md §13): the oval from
+     * SpaceWeather, the look from render.aurora, marched from the observer.
+     */
+    struct Aurora {
+        glm::vec4 ovalRad{0.0f}; // equatorward midnight, noon; poleward midnight, noon
+        float bottom = 1.0157f;  // the emitting layer, Earth radii from the centre
+        float top = 1.047f;
+        float kp = 2.0f;
+        float brightness = 1.0f;
+        float time = 0.0f; // animation seconds
+        int mode = 0;      // QualityTierSettings::auroraMode: 0 static, 1 animated, 2 curtains
+        glm::vec3 colorLow{0.06f, 1.0f, 0.16f};
+        glm::vec3 colorHigh{1.0f, 0.06f, 0.05f};
+        glm::vec3 colorEdge{0.32f, 0.16f, 1.0f};
+    };
+    /**
+     * The geomagnetic north pole (80.65°N 72.68°W) in the horizon frame (+X East, +Y Up,
+     * +Z -North) of an observer at `latDeg`, `lonDeg`.
+     */
+    static glm::vec3 GeomagneticPoleInHorizon(double latDeg, double lonDeg);
 
     ObserveSky();
 
@@ -55,8 +76,8 @@ public:
      * `moonTexture` is the Moon's equirectangular diffuse map (GL_TEXTURE_2D, longitude 0 at the
      * centre, north at the top); 0 draws the plain lit disc until the Moon's system has loaded.
      */
-    void Render(const Observer::Sky& sky, const Frame& frame, unsigned int moonTexture = 0,
-                const Air* air = nullptr);
+    void Render(const Observer::Sky& sky, const Frame& frame, unsigned int moonTexture = 0, const Air* air = nullptr,
+                const Aurora* aurora = nullptr);
 
     /**
      * Colour factor for the Sun or Moon disc seen through the air at `apparentAltDeg`: the hue
@@ -113,6 +134,9 @@ private:
     void EnsureConstellationLines();
 
     std::unique_ptr<Shader> _skyShader;
+    // observeSky.fs with AURORA_ANIMATED / AURORA_CURTAINS, built the first time a tier asks.
+    std::unique_ptr<Shader> _skyAnimatedShader;
+    std::unique_ptr<Shader> _skyCurtainsShader;
     std::unique_ptr<Shader> _spriteShader;
     std::unique_ptr<Shader> _lineShader;
     GlVertexArray _emptyVao;

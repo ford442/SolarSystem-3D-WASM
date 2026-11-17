@@ -170,3 +170,26 @@ TEST(QualitySettingsTest, AntialiasPathFollowsWhatTheFrameDrawsInto) {
     EXPECT_EQ(ResolveAntialiasPath(false, 0), AntialiasPath::None);
     EXPECT_STREQ(AntialiasPathName(AntialiasPath::HdrResolve), "FXAA in HDR tone-map");
 }
+
+TEST(QualitySettingsTest, SpaceWeatherTiersMatchTheTicket) {
+    // Low and every mobile tier: no particles, a static oval, the photosphere sprite.
+    for (int preset = 0; preset <= 2; ++preset) {
+        const QualityTierSettings mobile = GetQualitySettings(preset, true);
+        EXPECT_EQ(mobile.solarWindParticles, 0) << preset;
+        EXPECT_EQ(mobile.auroraMode, 0) << preset;
+        EXPECT_EQ(mobile.photosphereMode, 0) << preset;
+    }
+    const QualityTierSettings low = GetQualitySettings(0, false);
+    EXPECT_EQ(low.solarWindParticles, 0);
+    EXPECT_EQ(low.auroraMode, 0);
+    EXPECT_EQ(low.photosphereMode, 0);
+    const QualityTierSettings medium = GetQualitySettings(1, false);
+    EXPECT_EQ(medium.solarWindParticles, 50000);
+    EXPECT_EQ(medium.auroraMode, 1);
+    EXPECT_EQ(medium.photosphereMode, 1);
+    const QualityTierSettings full = GetQualitySettings(2, false);
+    EXPECT_EQ(full.solarWindParticles, 200000);
+    EXPECT_EQ(full.auroraMode, 2);
+    EXPECT_EQ(full.photosphereMode, 2);
+    EXPECT_TRUE(full.enableMagneticBloom); // the curtains bloom through MagneticFieldBloom
+}

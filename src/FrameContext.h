@@ -46,6 +46,79 @@ struct CameraView {
     int eye = -1;           // -1 mono, 0/1 XR eye
 };
 
+/**
+ * Space weather this frame (Application::UpdateSpaceWeather, docs/ARCHITECTURE.md §13): what
+ * SpaceWeather::State derived from the date, mapped into the scene, plus which particle groups
+ * are worth drawing. Renderer packs it into the MagnetosphereUBO.
+ */
+struct SpaceWeatherFrame {
+    struct Body {
+        int slot = 0;                     // SpaceWeather::Magnetospheres() index: UBO slot, particle group - 1
+        int body = 0;                     // OrbitLayout::Body
+        glm::dvec3 heliocentric{0.0};     // scene units
+        glm::vec3 render{0.0f};           // render frame
+        float radius = 1.0f;              // drawn (scene units)
+        glm::vec3 pole{0.0f, 1.0f, 0.0f}; // magnetic north, scene axes
+        glm::vec3 sunward{1.0f, 0.0f, 0.0f};
+        float standoff = 10.0f; // drawn radii
+        float quietStandoff = 10.0f;
+        float flaring = 0.58f; // Shue α
+        float kp = 2.0f;
+        float windRatio = 1.0f; // wind speed / 400 km/s
+        float cmeStrength = 0.0f;
+        float densityRatio = 1.0f; // over the quiet density at this distance
+        glm::vec4 ovalRad{0.0f};   // equatorward midnight, noon; poleward midnight, noon
+        // render.aurora (Mercury, which has none, keeps these: its precipitation is drawn only).
+        glm::vec3 colorLow{0.8f, 0.85f, 1.0f};
+        glm::vec3 colorHigh{0.8f, 0.85f, 1.0f};
+        glm::vec3 colorEdge{0.8f, 0.85f, 1.0f};
+        float brightness = 0.0f;
+        float shellBottom = 1.0f; // the emitting layer, body radii from the centre
+        float shellTop = 1.0f;
+        bool groupActive = false; // its particle group runs this frame
+    };
+    struct Cme {
+        glm::vec3 direction{1.0f, 0.0f, 0.0f};
+        float frontAu = 0.0f;
+        float cosEdge = 0.0f;
+        float cosCore = 1.0f;
+        float speedRatio = 1.0f; // front speed / 400 km/s
+        float brightness = 1.0f;
+    };
+
+    bool windEnabled = false;
+    int particles = 0;       // the tier's budget (0 with the wind off)
+    int auroraMode = 0;      // QualityTierSettings::auroraMode
+    int photosphereMode = 0; // QualityTierSettings::photosphereMode
+    bool backgroundActive = false;
+    float visualDt = 0.0f; // seconds the particles advance this frame (0 paused)
+    float visualClock = 0.0f;
+    float auPerSecond = 0.0f; // background wind at 400 km/s, AU per visual second
+    float sunRotation = 0.0f; // rad per visual second, so the spiral winds as it does at 1 AU
+    float edgeAu = 6.5f;
+    float spawnAu = 0.01f;
+    float cyclePhase = 0.0f;
+    float beltHalfWidthRad = 0.35f; // the slow wind's streamer belt
+    unsigned frameCounter = 0;
+    std::vector<glm::vec2> knots; // OrbitLayout's AU → scene distance map: (AU, scene)
+    std::vector<Body> bodies;     // Magnetospheres() order; a body whose system is not loaded is absent
+    std::vector<Cme> cmes;
+
+    // The Sun's photosphere (star.fs PHOTOSPHERE / SUNSPOTS).
+    glm::vec4 spotBandsRad{0.0f}; // this cycle's latitude, half-width; the previous cycle's
+    glm::vec2 spotCoverage{0.0f};
+    float spotDays = 0.0f; // days since the cycle's minimum
+
+    const Body* Find(int body) const {
+        for (const Body& b : bodies) {
+            if (b.body == body) {
+                return &b;
+            }
+        }
+        return nullptr;
+    }
+};
+
 /** The scene as this frame's passes see it. Placement already happened in UpdateScene. */
 struct SceneSnapshot {
     // Non-const for the Sun's occlusion query, which a pass reads back. Nothing moves.
@@ -69,6 +142,8 @@ struct SceneSnapshot {
     // Earth's shell once its LUTs are resident: Observe's daytime sky. Null draws the gradient.
     const Atmosphere* observeEarthAtmosphere = nullptr;
     const SkyEvents::SkyEvent* nextSkyEvent = nullptr;
+    // Null outside Sol (the magnetospheres are Sol's) and before the first update.
+    const SpaceWeatherFrame* spaceWeather = nullptr;
 
     // Bodies flagged render.terrain that the camera is near (src/render/terrain/). `tiles`
     // is this frame's selection when the body draws as tiles instead of its sphere; null

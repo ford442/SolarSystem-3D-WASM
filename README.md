@@ -69,7 +69,10 @@ The project is an animated 3D scene with a model of the Solar System.
 - 💡 High-quality soft shadows using PCF and ray tracing
 - 💡 Omnidirectional shadow maps simulation when using a single unidirectional shadow map
 - 💡 Shadows from the clouds
-- 💡 Limb-darkened photosphere and a volumetric (instanced-slice) solar corona
+- 💡 Limb-darkened photosphere and a volumetric (instanced-slice) solar corona; on Medium/Full
+  animated granulation, and on Full sunspots that follow the 11-year cycle
+- 💡 Space weather: a GPU solar-wind particle stream, magnetopauses that compress under CMEs,
+  and auroral ovals on Earth and the giant planets
 - 💡 Lens flare
 - 🎵 Background music
 - ⚙️ FreeType status hints plus a browser settings panel for quality, time control, pause,
@@ -83,6 +86,7 @@ The web build is a small orrery you can send a URL into. None of this talks to l
 - **Date scrubber** — Simulation panel sets a Julian date; heliocentric positions come from the Standish/Keplerian ephemeris already in the WASM module.
 - **Orbit scale toggle** — Explorer **Orbit scale**: compressed (art spacing for navigation) vs realistic AU. Shareable as `?orbit=0` / `?orbit=1`.
 - **Magnetic fields** — Simulation toggle (also `M` on native) draws dipole/toroidal ribbons. Bloom on Medium/Full.
+- **Space weather** — Auroral ovals on Earth, Jupiter, Saturn, Uranus and Neptune that widen toward the equator as Kp rises. A **Solar wind** toggle streams particles (Medium and Full) past each magnetopause and down to the ovals. Curated CMEs (Carrington, Halloween 2003, May 2024, …) replay with **Play storm**, and an **Aurora Kp** slider and **Launch CME now** let you make your own. Share a storm with `?kp=7&cme=2003-10-29T06:00Z`. See [docs/ARCHITECTURE.md §13](docs/ARCHITECTURE.md).
 - **Sky-event overlays** — Next conjunction, eclipse, or transit chip plus documented landmarks (for example the 2017-08-21 total solar eclipse).
 - **Mission paths** — Sampled Voyager 1/2 polylines (`resource/missions/catalog.json`). Click a mission in Explorer to follow the probe; share with `?mission=voyager1&jd=…`. Low quality draws fewer samples.
 - **Guided tours** — **Play inner-system tour** runs a 60-second playlist (Sun → Earth scale modes → Saturn → 2017 eclipse). `?tour=inner-system&step=2` deep-links a beat; **Copy link to this tour step** reuses the share URL.
@@ -232,6 +236,20 @@ dipole / toroidal ribbons. While the mode is on, planet surfaces dim so the line
 and orbit paths fade (they stay available via the Orbit lines checkbox). Medium and Full add
 a half-resolution plasma bloom; Low keeps the Sun’s field only and skips bloom. Values are
 visual, not SI magnetosphere physics. The toggle persists in `localStorage` like orbit lines.
+With space weather, the ribbons' day side compresses with the magnetopause standoff.
+
+**Space weather** (Solar System only):
+
+- **Aurora.** Auroral ovals always draw, sized from the modelled Kp.
+- **Solar wind** (off by default, `?wind=1`) adds the particle stream on Medium (50k) and
+  Full (200k).
+- **Aurora Kp** holds every oval at a Kp from 0 to 9 (`?kp=`), and far left follows the wind.
+- **Launch CME now** sends an Earth-directed CME from the current date.
+- **Storms.** The sky-event chip lists the next catalogued geomagnetic storm (past the end of the
+  list, the latest one) and plays it from its launch. While a storm is on, a card gives Kp, the oval latitude and the magnetopause
+  distance.
+
+Native: `SOLARSYSTEM_SOLAR_WIND=1`, `SOLARSYSTEM_KP=7`, `SOLARSYSTEM_CME=2003-10-29T06:00Z`.
 
 ### Educational mode
 
@@ -243,6 +261,7 @@ shared link reproduces exactly what you were looking at.
 | **Date scrubber** | Simulation panel, or `P` / `+` / `-` / `.` keys; `?date=` in a deep link | Moves the simulation epoch. Planet positions come from JPL's Standish series; Pluto, Ceres, Vesta, Eris, Haumea, Makemake, and 1P/Halley from fixed Keplerian elements; the Moon, the four Galileans, Titan, and Triton from catalog Keplerian elements with secular node/periapsis rates. Every body's rotation is a function of the scrubbed date (IAU prime-meridian elements; Earth's map is turned so the real sub-solar longitude is under the Sun), so a shared `?date=` link shows the same face of every planet — and scrubbing back is exact. |
 | **Scale toggle** | Simulation panel, or `?scale=realistic` | Switches between artistic compressed orbits and AU-proportional spacing. |
 | **Magnetic fields** | `M` key or `?fields=1` | Dipole / toroidal ribbons (visual, not SI values) — see the note above. |
+| **Geomagnetic storms** | Simulation panel's storm chip, or `?cme=2003-10-29T06:00Z` | The next catalogued CME to reach Earth, or the latest once the date is past the list. **Play storm** starts just before its launch with the clock slowed, so the pulse can be followed out to Earth, where the magnetopause is pushed in and the oval moves toward the equator (~50° in the Halloween 2003 storm). Earth's numbers come from a pressure-balance / drag-model simulation calibrated to each storm's observed arrival and peak Kp. |
 | **Next sky event** | Simulation panel chip, or text hints overlay (`TAB`) | The next conjunction, solar or lunar eclipse, Mercury/Venus transit, or Galilean shadow transit. All four searches read the live ephemeris — nothing is baked — so scrubbing the date re-runs them. **Jump to event** moves the epoch to what the search found; **Play &lt;date&gt;** jumps to a documented landmark instead (2017-08-21 by default). Both go through `SetSimulationEpoch` / `?jd=`, so the resulting view is shareable. |
 | **Next conjunction** | Explorer chip | The conjunction-only chip, kept for the explorer panel: the next date two of Mercury, Venus, and Mars share a geocentric ecliptic longitude, with their apparent separation. |
 | **Eclipse shadows** | Automatic — scrub to an eclipse date and watch Earth | The Moon's umbra on Earth, and a Galilean moon's shadow on Jupiter, projected in the lighting pass from the moon's real ephemeris position. Whether a shadow happens is decided in kilometres, not in scene units, so over 2017–2019 the umbra appears on the real eclipse dates rather than at every new moon. Low quality draws a hard-edged disc; Full adds the penumbra falloff. |

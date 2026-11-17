@@ -70,8 +70,10 @@ set(SOLARSYSTEM_SOURCES_CORE
     src/CameraController.cpp
     src/TerrainController.cpp
     src/Cinematics.cpp
+    src/SpaceWeatherController.cpp
     src/SceneRenderer.cpp
     src/SceneOverlayRenderer.cpp
+    src/SpaceWeatherRenderer.cpp
     src/StarSystemFactory.cpp
     src/PlatformWindow.cpp
     src/InputHandler.cpp
@@ -103,6 +105,7 @@ set(SOLARSYSTEM_SOURCES_AUX
     src/gfx/HDR.cpp
     src/gfx/FloatLutTexture.cpp
     src/gfx/FrameUniforms.cpp
+    src/gfx/SpaceWeatherUniforms.cpp
     src/gfx/LineStripBatch.cpp
     src/gfx/SurfacePatch.cpp
     src/gfx/SurfacePatchMesh.cpp
@@ -114,6 +117,7 @@ set(SOLARSYSTEM_SOURCES_AUX
     src/render/XrPointerRenderer.cpp
     src/render/MagneticFieldLineRenderer.cpp
     src/render/MagneticFieldBloom.cpp
+    src/render/SolarWindRenderer.cpp
     # render/terrain/: cube-sphere height tiles (GL-free except TerrainRenderer)
     src/render/terrain/CubeSphere.cpp
     src/render/terrain/TerrainTile.cpp
@@ -143,6 +147,7 @@ set(SOLARSYSTEM_SOURCES_AUX
     src/astro/MagneticFieldParams.cpp
     src/astro/MagneticFieldModel.cpp
     src/astro/MagneticFieldTracer.cpp
+    src/astro/SpaceWeather.cpp
 )
 
 set(SOLARSYSTEM_SOURCES_SOLAR
@@ -168,6 +173,7 @@ set(SOLARSYSTEM_SOURCES_SOLAR
     src/Solar_System/CatalogBody.cpp
     src/Solar_System/CatalogSatellite.cpp
     src/Solar_System/CatalogClouds.cpp
+    src/Solar_System/AuroraShell.cpp
     src/Solar_System/CatalogMaterial.cpp
     src/Solar_System/CatalogMaterialVariants.cpp
 )
@@ -260,6 +266,9 @@ if(EMSCRIPTEN)
         "SHELL:--preload-file ${CMAKE_SOURCE_DIR}/resource/atmosphere@/resource/atmosphere"
         # Star-system catalogs (~150 KB): StarSystemCatalog loads one on LoadSystem (ARCHITECTURE §12).
         "SHELL:--preload-file ${CMAKE_SOURCE_DIR}/resource/systems/generated@/resource/systems/generated"
+        # CME catalog (~5 KB): space weather's storms (ARCHITECTURE §13). Only the list itself;
+        # resource/spaceweather/archive is scripts/generate-cme-list.mjs's DONKI snapshot.
+        "SHELL:--preload-file ${CMAKE_SOURCE_DIR}/resource/spaceweather/cmes.json@/resource/spaceweather/cmes.json"
         "SHELL:-sMODULARIZE=1"
         "SHELL:-sEXPORT_ES6=1"
         # 'GL' is needed so web/src/wasmBridge.ts can register the XRWebGLLayer's opaque
@@ -342,7 +351,8 @@ if(EMSCRIPTEN)
     set(SOLAR_EM_PRELOAD_DIRS shaders missions sky fonts textures_low atmosphere systems/generated)
     set(SOLAR_EM_LINK_INPUTS
         ${CMAKE_SOURCE_DIR}/scripts/wasm-exports.json
-        ${CMAKE_SOURCE_DIR}/resource/planet_manifest.json)
+        ${CMAKE_SOURCE_DIR}/resource/planet_manifest.json
+        ${CMAKE_SOURCE_DIR}/resource/spaceweather/cmes.json)
     foreach(preloadDir IN LISTS SOLAR_EM_PRELOAD_DIRS)
         file(GLOB_RECURSE preloadFiles CONFIGURE_DEPENDS "${CMAKE_SOURCE_DIR}/resource/${preloadDir}/*")
         list(APPEND SOLAR_EM_LINK_INPUTS ${preloadFiles})

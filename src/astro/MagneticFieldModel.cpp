@@ -46,4 +46,13 @@ glm::mat3 TiltMatrix(float dipoleTiltDeg) {
     return glm::mat3(glm::vec3(1.0f, 0.0f, 0.0f), glm::vec3(0.0f, c, s), glm::vec3(0.0f, -s, c));
 }
 
+glm::mat3 DipoleFrame(const MagneticFieldParams& params) {
+    const float rad = params.poleAzimuthDeg * (glm::pi<float>() / 180.0f);
+    const float c = std::cos(rad);
+    const float s = std::sin(rad);
+    // Rotation about +Y by the azimuth: +Z turns toward +X.
+    const glm::mat3 azimuth(glm::vec3(c, 0.0f, -s), glm::vec3(0.0f, 1.0f, 0.0f), glm::vec3(s, 0.0f, c));
+    return azimuth * TiltMatrix(params.dipoleTiltDeg);
+}
+
 } // namespace MagneticFieldModel

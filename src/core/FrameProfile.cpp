@@ -17,6 +17,7 @@ const char* StageName(Stage stage) {
         case Stage::Foreground: return "foreground";
         case Stage::Hud: return "hud";
         case Stage::Uploads: return "uploads";
+        case Stage::SpaceWeather: return "spaceWeather";
         case Stage::Count: break;
     }
     return "?";

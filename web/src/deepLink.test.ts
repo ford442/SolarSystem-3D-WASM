@@ -165,6 +165,29 @@ describe('parseDeepLinkFromUrl', () => {
             expect(parse('?x=1&y=2&z=3&yaw=4').camera).toBeUndefined();
         });
     });
+
+    describe('space weather', () => {
+        it('reads wind, kp and cme', () => {
+            expect(parse('?kp=7&cme=2003-10-29T06:00Z&wind=1')).toMatchObject({
+                kp: 7,
+                cme: '2003-10-29T06:00Z',
+                solarWind: true,
+            });
+            expect(parse('?cme=2024-05-10').cme).toBe('2024-05-10');
+            expect(parse('?cme=2024-05-10T17:36:30.5Z').cme).toBe('2024-05-10T17:36:30.5Z');
+            expect(parse('?kp=4.26').kp).toBe(4.3);
+            expect(parse('?wind=0').solarWind).toBe(false);
+        });
+
+        it('drops out-of-range Kp and malformed instants', () => {
+            for (const bad of ['-1', '9.5', 'storm', '']) {
+                expect(parse(`?kp=${bad}`).kp, bad).toBeUndefined();
+            }
+            for (const bad of ['yesterday', '2003-10-29T6Z', '29/10/2003', '2003-10-29T06:00+02:00']) {
+                expect(parse(`?cme=${encodeURIComponent(bad)}`).cme, bad).toBeUndefined();
+            }
+        });
+    });
 });
 
 describe('buildShareableUrl', () => {
@@ -177,6 +200,8 @@ describe('buildShareableUrl', () => {
         getShadowQuality: () => 2,
         getOrbitLines: () => false,
         getMagneticFields: () => true,
+        getSolarWind: () => true,
+        getKpOverride: () => 7,
         getFocusedPlanetIndex: () => PLANET_IDS.jupiter,
         getFocusedMission: () => ({ valid: true, id: 'voyager-1' }),
         getCameraPose: () => ({ x: 1.123456789123, y: -2, z: 3, yaw: 12.34, pitch: -5.67 }),
@@ -203,6 +228,8 @@ describe('buildShareableUrl', () => {
             shadows: true,
             orbitLines: false,
             magneticFields: true,
+            solarWind: true,
+            kp: 7,
             planet: PLANET_IDS.jupiter,
             mission: 'voyager-1',
         });
@@ -245,6 +272,12 @@ describe('buildShareableUrl', () => {
         const state = parseUrl(url.toString());
         expect(state.system).toBe('trappist-1');
         expect(state.planet).toBeUndefined();
+    });
+
+    it('leaves kp out while Kp follows the wind', () => {
+        const url = new URL(buildShareableUrl({ getSolarWind: () => false, getKpOverride: () => -1 }, BASE));
+        expect(url.searchParams.get('wind')).toBe('0');
+        expect(url.searchParams.has('kp')).toBe(false);
     });
 
     it('keeps a small time scale to three significant figures', () => {

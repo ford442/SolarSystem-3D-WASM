@@ -15,13 +15,14 @@
 namespace FrameProfile {
 
 enum class Stage : int {
-    Update,     // simulate, snapshot, terrain selection, cull
-    Background, // sky, orbit lines, flat corona
-    Shadow,     // per-component shadow maps
-    Scene,      // per-component colour passes
-    Foreground, // corona, belts, field lines, lens flare, HDR resolve
-    Hud,        // text overlay and loading bars
-    Uploads,    // texture queue and the budgeted upload pump
+    Update,       // simulate, snapshot, terrain selection, cull
+    Background,   // sky, orbit lines, flat corona
+    Shadow,       // per-component shadow maps
+    Scene,        // per-component colour passes
+    Foreground,   // corona, belts, field lines, lens flare, HDR resolve
+    Hud,          // text overlay and loading bars
+    Uploads,      // texture queue and the budgeted upload pump
+    SpaceWeather, // solar-wind particle advection (transform feedback); its draw is in Foreground
     Count,
 };
 constexpr std::size_t kStageCount = static_cast<std::size_t>(Stage::Count);

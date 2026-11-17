@@ -2,6 +2,7 @@
 #define SOLARSYSTEM_APPLICATION_TYPES_H
 
 #include "Solar_System/Atmosphere.h"
+#include "Solar_System/AuroraShell.h"
 #include "Solar_System/Clouds.h"
 #include "Solar_System/Planet.h"
 #include "Solar_System/PlanetaryRing.h"
@@ -29,6 +30,7 @@ struct RenderableSceneComponent {
     std::vector<std::shared_ptr<Satellite>> satellites;
     std::vector<RenderableAtmosphere> atmospheres;
     std::unique_ptr<Clouds> clouds;
+    std::unique_ptr<AuroraShell> aurora; // render.aurora: Earth and the giants (Sol only)
     std::unique_ptr<PlanetaryRing> planetaryRing;
 
     /** Every object of the component (planet, moons, shells, ring), for bounds and culling. */
@@ -43,6 +45,9 @@ struct RenderableSceneComponent {
         }
         if (clouds) {
             visit(static_cast<SpaceObject&>(*clouds));
+        }
+        if (aurora) {
+            visit(static_cast<SpaceObject&>(*aurora));
         }
         if (planetaryRing) {
             visit(static_cast<SpaceObject&>(*planetaryRing));

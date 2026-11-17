@@ -9,6 +9,7 @@ import type {
 import type { NextConjunction } from './conjunction.js';
 import { parseObserveStateJson, type ObserveState } from './observe.js';
 import { parseSkyEventJson, type NextSkyEvent } from './skyEvents.js';
+import { parseSpaceWeatherJson, type SpaceWeatherState } from './spaceWeather.js';
 import { createCachedCwrapExports } from './wasmBridge.exports.js';
 import { clearWasmCallback, emitWasmCallback, registerWasmCallbacks } from './wasmCallbacks.js';
 
@@ -241,6 +242,19 @@ export interface SolarSystemRuntime {
     getMagneticFields(): boolean;
     setMagneticFieldMode(enabled: boolean): void;
     getMagneticFieldMode(): boolean;
+    /** The solar-wind particles (space weather, ARCHITECTURE §13); the auroras draw either way. */
+    setSolarWind(enabled: boolean): void;
+    getSolarWind(): boolean;
+    /** < 0: Kp from the wind; 0–9 holds every auroral oval at that Kp. */
+    setKpOverride(kp: number): void;
+    getKpOverride(): number;
+    /** An Earth-directed CME leaving the Sun now (turns the wind on). */
+    launchCmeNow(): void;
+    /** Play catalog event `index` from its launch, slowed so the pulse is seen; false if out of range. */
+    playSpaceWeatherEvent(index: number): boolean;
+    /** Set the date to an ISO-8601 UTC instant (`&cme=`) with the wind on; false if it does not parse. */
+    jumpToSpaceWeatherDate(isoUtc: string): boolean;
+    getSpaceWeather(): SpaceWeatherState;
     setXrSessionActive(active: boolean): void;
     setXrBaseLayerFramebuffer(framebuffer: number): void;
     /**
@@ -387,6 +401,14 @@ export function createSolarSystemRuntime(instance: SolarSystemModule): SolarSyst
         getMagneticFields: () => exports.getMagneticFields() !== 0,
         setMagneticFieldMode: (enabled) => exports.setMagneticFieldMode(enabled ? 1 : 0),
         getMagneticFieldMode: () => exports.getMagneticFieldMode() !== 0,
+        setSolarWind: (enabled) => exports.setSolarWind(enabled ? 1 : 0),
+        getSolarWind: () => exports.getSolarWind() !== 0,
+        setKpOverride: (kp) => exports.setKpOverride(kp),
+        getKpOverride: () => exports.getKpOverride(),
+        launchCmeNow: () => exports.launchCmeNow(),
+        playSpaceWeatherEvent: (index) => exports.playSpaceWeatherEvent(index) !== 0,
+        jumpToSpaceWeatherDate: (isoUtc) => exports.jumpToSpaceWeatherDate(isoUtc) !== 0,
+        getSpaceWeather: () => parseSpaceWeatherJson(exports.getSpaceWeatherJson()),
         setXrSessionActive: (active) => exports.setXrSessionActive(active ? 1 : 0),
         setXrBaseLayerFramebuffer: exports.setXrBaseLayerFramebuffer,
         registerXrFramebuffer: (framebuffer) => {

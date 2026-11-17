@@ -12,6 +12,11 @@
 //    The Moon's shadow is a caster on every sample, so a total eclipse darkens the air
 //    overhead and leaves the distant horizon sunlit.
 //  - Gradient (Low): a cheap analytic sky from the Sun's altitude only.
+//
+// Over either, the aurora (common/aurora.glsl): Earth's auroral layer seen from inside, the
+// same emission the orbit view's shell draws, marched up from the observer. Its look follows
+// the tier like the shell's (docs/ARCHITECTURE.md §13).
+// permutations: AURORA_ANIMATED AURORA_CURTAINS
 
 in vec2 vNdc;
 
@@ -25,6 +30,8 @@ uniform float eclipse; // fraction of the Sun's disc covered by the Moon, 0..1
 #include "common/phase.glsl"
 #include "common/atmosphere_lut.glsl"
 #include "common/atmosphere_march.glsl"
+#include "common/noise_simplex3d.glsl"
+#include "common/aurora.glsl"
 
 uniform int uSteps;    // 0: gradient sky
 uniform float uExposure;
@@ -36,6 +43,15 @@ uniform vec3 moonOffsetKm;     // topocentric Moon centre, horizon frame
 uniform float moonRadiusKm;
 uniform float sunDistanceKm;
 uniform float sunRadiusKm;
+
+uniform int uAuroraSteps;     // 0: no aurora
+uniform vec3 uAuroraPole;     // geomagnetic north, horizon frame
+uniform vec4 uAuroraOval;     // radians (common/aurora.glsl)
+uniform vec3 uAuroraShell;    // bottom, top (Earth radii from the centre), observer radius
+uniform vec3 uAuroraActivity; // Kp, brightness, animation time
+uniform vec3 uAuroraColorLow;
+uniform vec3 uAuroraColorHigh;
+uniform vec3 uAuroraColorEdge;
 
 out vec4 fragColor;
 
@@ -67,6 +83,28 @@ vec3 Expose(vec3 luminance) {
     return 1.0 - exp(-luminance * uExposure);
 }
 
+// The aurora along `dir` from the observer: the planet's centre is straight down, so in the
+// sphere frame (Earth radius 1) the observer is at (0, r, 0).
+vec3 AuroraSky(vec3 dir, float darkness) {
+    if (uAuroraSteps <= 0 || darkness <= 0.0 || dir.y < -0.05) {
+        return vec3(0.0);
+    }
+    AuroraParams a;
+    AuroraFrame(a, uAuroraPole, sunDir);
+    a.oval = uAuroraOval;
+    a.bottom = uAuroraShell.x;
+    a.top = uAuroraShell.y;
+    a.kp = uAuroraActivity.x;
+    a.brightness = uAuroraActivity.y;
+    a.time = uAuroraActivity.z;
+    a.colorLow = uAuroraColorLow;
+    a.colorHigh = uAuroraColorHigh;
+    a.colorEdge = uAuroraColorEdge;
+    vec3 sky = AuroraMarch(a, vec3(0.0, uAuroraShell.z, 0.0), dir, 1e9, uAuroraSteps);
+    // Display-referred: a bright storm overhead is a strong green, never white.
+    return (1.0 - exp(-sky * 1.6)) * darkness;
+}
+
 void main() {
     vec4 viewPos = invProjection * vec4(vNdc, 1.0, 1.0);
     vec3 dir = normalize(invViewRot * normalize(viewPos.xyz / viewPos.w));
@@ -94,6 +132,7 @@ void main() {
         vec3 skyDir = dir.y < 0.002 ? normalize(vec3(dir.x, 0.002, dir.z)) : dir;
         vec3 skyLuminance = PhysicalSky(skyDir, throughput);
         vec3 sky = night + Expose(skyLuminance);
+        sky += AuroraSky(skyDir, 1.0 - smoothstep(-0.18, -0.04, sunAlt));
 
         // Ground: a flat Lambertian plane under the sunlight that reaches it plus sky light, for
         // which the horizon luminance at this azimuth stands in (half the hemisphere's worth:
@@ -132,6 +171,7 @@ void main() {
     // sunset: warm orange, brightest right at the horizon.
     float totality = smoothstep(0.97, 1.0, eclipse);
     sky += vec3(0.95, 0.45, 0.22) * pow(1.0 - up, 6.0) * 0.22 * totality * step(0.0, sunAlt);
+    sky += AuroraSky(dir.y < 0.002 ? normalize(vec3(dir.x, 0.002, dir.z)) : dir, 1.0 - smoothstep(-0.18, -0.04, sunAlt));
 
     // Ground: a flat dark plane lit by what the sky gives it.
     float groundLight = 0.012 + 0.10 * day + 0.03 * twilight;

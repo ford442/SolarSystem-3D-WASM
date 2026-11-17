@@ -4,6 +4,8 @@
 #include "Solar_System/TexturePaths.h"
 #include "Renderer.h"
 #include "render/MagneticFieldTraceJobs.h" // IWYU pragma: keep (~Renderer destroys the unique_ptr)
+#include "render/SolarWindRenderer.h"      // IWYU pragma: keep (~Renderer destroys the unique_ptr)
+#include "gfx/SpaceWeatherUniforms.h"      // IWYU pragma: keep (~Renderer destroys the unique_ptr)
 #include "gfx/TextureUnits.h"
 #include "JsBridge.h"
 #include "QualitySettings.h"
@@ -229,12 +231,18 @@ void Renderer::Release() {
     _textRenderer.reset();
     _shadowMapFBO.reset();
     for (Shader** shader :
-         {&_shadowMapShader, &_mainSkyBoxShader, &_mainTextShader, &_mainStarShader, &_mainCoronaStarShader,
-          &_mainPlanetShader, &_mainAtmosphereShader, &_mainCloudsShader, &_mainRingShader, &_hdrShader,
-          &_lensFlareShader, &_starGlowShader, &_pbrAtmosphereShader, &_coronaVolumeShader, &_screenFadeShader,
-          &_nearAtmosphereShader, &_nearPbrAtmosphereShader, &_nearCloudsShader, &_terrainShadowShader}) {
+         {&_shadowMapShader,         &_mainSkyBoxShader,   &_mainTextShader,       &_mainStarShader,
+          &_mainCoronaStarShader,    &_mainPlanetShader,   &_mainAtmosphereShader, &_mainCloudsShader,
+          &_mainRingShader,          &_hdrShader,          &_lensFlareShader,      &_starGlowShader,
+          &_pbrAtmosphereShader,     &_coronaVolumeShader, &_screenFadeShader,     &_nearAtmosphereShader,
+          &_nearPbrAtmosphereShader, &_nearCloudsShader,   &_terrainShadowShader,  &_solarWindUpdateShader,
+          &_solarWindDrawShader,     &_spriteStarShader}) {
         *shader = nullptr;
     }
+    _auroraShaders.fill(nullptr);
+    _starShaders.fill(nullptr);
+    _solarWind.reset();
+    _spaceWeatherUbo.reset();
     _planetVariants.fill(nullptr);
     _terrainVariants.fill(nullptr);
     _shaders.Clear();
@@ -330,7 +338,9 @@ void Renderer::RenderForeground(const FrameContext& ctx) {
     }
     RenderStarCoronaVolume(ctx);
     RenderAsteroidField(ctx);
+    RenderSolarWind(ctx);
     RenderMagneticFields(ctx);
+    RenderAuroraBloom(ctx);
 }
 
 void Renderer::RenderMonoEffects(const FrameContext& ctx) {
@@ -442,6 +452,7 @@ void Renderer::RenderPass(const FrameContext& ctx, const RenderableSceneComponen
         RenderAtmospheres(ctx, component);
         RenderClouds(ctx, component);
     }
+    RenderAurora(ctx, component);
     RenderPlanetaryRing(*_mainRingShader, component);
 }
 

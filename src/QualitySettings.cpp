@@ -1,4 +1,5 @@
 #include "QualitySettings.h"
+#include <algorithm>
 #include "core/Log.h"
 #include <cstdio>
 #include <cstdlib>
@@ -71,15 +72,27 @@ QualityTierSettings GetQualitySettings(int preset, bool mobile) {
     // rather than shader cost decides.
     if (mobile) {
         switch (preset) {
-            case 0: return {1024, 0, 0, false, false, 0, 400, 0, TextureLodTier::Low, false, 0, false, 0, 500, 3, 0, 0.0f, 0, true, "low"};
-            case 1: return {2048, 2, 0, true, true, 1, 900, 400, TextureLodTier::Mid, true, 8, false, 0, 1500, 3, 32, 12.0f, 4, false, "medium"};
-            default: return {3000, 2, 0, true, true, 1, 1400, 800, TextureLodTier::High, true, 12, true, 16, 2500, 4, 48, 10.0f, 4, false, "full"};
+            case 0:
+                return {1024, 0,    0, false, false, 0, 400, 0,    TextureLodTier::Low, false, 0, false, 0, 500, 3,
+                        0,    0.0f, 0, true,  0,     0, 0,   "low"};
+            case 1:
+                return {2048, 2,     0, true,  true, 1, 900, 400,     TextureLodTier::Mid, true, 8, false, 0, 1500, 3,
+                        32,   12.0f, 4, false, 0,    0, 0,   "medium"};
+            default:
+                return {3000, 2,     0, true,  true, 1, 1400, 800,   TextureLodTier::High, true, 12, true, 16, 2500, 4,
+                        48,   10.0f, 4, false, 0,    0, 0,    "full"};
         }
     }
     switch (preset) {
-        case 0: return {1024, 0, 0, false, false, 0, 600, 0, TextureLodTier::Low, false, 0, false, 0, 500, 3, 0, 0.0f, 0, true, "low"};
-        case 1: return {2048, 2, 0, true, true, 1, 1800, 800, TextureLodTier::Mid, true, 8, true, 16, 2000, 4, 64, 8.0f, 6, false, "medium"};
-        default: return {3000, 4, 4, true, true, 2, 4000, 2000, TextureLodTier::High, true, 16, true, 32, 5000, 5, 128, 6.0f, 8, false, "full"};
+        case 0:
+            return {1024, 0,    0, false, false, 0, 600, 0,    TextureLodTier::Low, false, 0, false, 0, 500, 3,
+                    0,    0.0f, 0, true,  0,     0, 0,   "low"};
+        case 1:
+            return {2048, 2,    0, true,  true,  1, 1800, 800,     TextureLodTier::Mid, true, 8, true, 16, 2000, 4,
+                    64,   8.0f, 6, false, 50000, 1, 1,    "medium"};
+        default:
+            return {3000, 4,    4, true,  true,   2, 4000, 2000,  TextureLodTier::High, true, 16, true, 32, 5000, 5,
+                    128,  6.0f, 8, false, 200000, 2, 2,    "full"};
     }
 }
 
@@ -124,6 +137,11 @@ void LogQualityTier(const QualityTierSettings& settings, bool hdrEnabled, int sh
              settings.asteroidInstanceCount,
              settings.kuiperInstanceCount, atmosphere.c_str(), corona.c_str(),
              settings.observeStarCount, settings.observeCoreConstellationsOnly ? " (20 figures)" : "");
+    static const char* const kAurora[] = {"static ring", "animated oval", "curtains + bloom"};
+    static const char* const kPhotosphere[] = {"sprite", "granulation", "granulation + spots"};
+    LOG_INFO("Quality", "Space weather: solar-wind particles=%d | aurora=%s | photosphere=%s",
+             settings.solarWindParticles, kAurora[std::clamp(settings.auroraMode, 0, 2)],
+             kPhotosphere[std::clamp(settings.photosphereMode, 0, 2)]);
 #ifdef __EMSCRIPTEN__
     LOG_INFO("Quality", "WebGL context samples are fixed when the context is created; reload with ?quality=%s to change them.",
              settings.name);

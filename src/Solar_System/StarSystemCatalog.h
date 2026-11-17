@@ -43,6 +43,7 @@ struct System {
     BodyCatalog::StarRow star{};
     std::vector<BodyCatalog::Entry> entries;
     std::vector<BodyCatalog::AtmosphereRow> atmospheres;
+    std::vector<BodyCatalog::AuroraRow> auroras;
     std::vector<OrbitLayout::BodyRow> layout;
 
     /** Stable storage for the rows' strings (a deque never moves what it holds). */

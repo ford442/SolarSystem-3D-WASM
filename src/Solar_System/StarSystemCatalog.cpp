@@ -286,6 +286,10 @@ std::unique_ptr<System> ParseRuntimeJson(const Json::Value& document, std::strin
         F(star["luminositySolar"], static_cast<float>(StarPhysics::LuminosityFromRadius(s.radiusSolar, teff)));
     s.massSolar = F(star["massSolar"]);
     s.activity = F(star["activity"]);
+    s.cyclePeriodYears = F(star["cyclePeriodYears"]);
+    s.cycleMinimumYear = F(star["cycleMinimumYear"]);
+    s.cycleAtMinimum = static_cast<int>(star["cycleAtMinimum"].AsNumber(0.0));
+    s.cycleMeanPeakSunspots = F(star["cycleMeanPeakSunspots"]);
 
     for (const Json::Value& row : document["layout"].Items()) {
         system->layout.push_back(ParseLayoutRow(row));
@@ -311,6 +315,17 @@ std::unique_ptr<System> ParseRuntimeJson(const Json::Value& document, std::strin
     }
     for (const Json::Value& a : document["atmospheres"].Items()) {
         system->atmospheres.push_back(ParseAtmosphere(*system, a));
+    }
+    for (const Json::Value& a : document["auroras"].Items()) {
+        BodyCatalog::AuroraRow row{};
+        row.bodyId = system->Intern(a["bodyId"].AsString());
+        row.bottomKm = F(a["bottomKm"]);
+        row.topKm = F(a["topKm"]);
+        row.colorLow = RgbFrom(a["colorLow"]);
+        row.colorHigh = RgbFrom(a["colorHigh"]);
+        row.colorEdge = RgbFrom(a["colorEdge"]);
+        row.brightness = F(a["brightness"], 1.0f);
+        system->auroras.push_back(row);
     }
     return system;
 }
@@ -428,6 +443,13 @@ Rows<AtmosphereRow> Atmospheres() {
     return {std::begin(kSolAtmospheres), std::end(kSolAtmospheres)};
 }
 
+Rows<AuroraRow> Auroras() {
+    if (const StarSystemCatalog::System* system = StarSystemCatalog::ActiveSystem()) {
+        return {system->auroras.data(), system->auroras.data() + system->auroras.size()};
+    }
+    return {std::begin(kSolAuroras), std::end(kSolAuroras)};
+}
+
 const StarRow& Star() {
     if (const StarSystemCatalog::System* system = StarSystemCatalog::ActiveSystem()) {
         return system->star;
@@ -455,6 +477,15 @@ const Entry* FindById(const char* id) {
 
 const AtmosphereRow* FindAtmosphere(const char* bodyId) {
     for (const AtmosphereRow& row : Atmospheres()) {
+        if (StrEq(row.bodyId, bodyId)) {
+            return &row;
+        }
+    }
+    return nullptr;
+}
+
+const AuroraRow* FindAurora(const char* bodyId) {
+    for (const AuroraRow& row : Auroras()) {
         if (StrEq(row.bodyId, bodyId)) {
             return &row;
         }

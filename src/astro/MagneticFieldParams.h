@@ -19,6 +19,11 @@ struct MagneticFieldParams {
     bool enabled = false;
     float dipoleMoment = 0.0f;
     float dipoleTiltDeg = 0.0f;
+    /**
+     * Turns the tilted pole about the body's spin axis (DipoleFrame): 0 leans it toward body
+     * +Z. Earth's 17.3° puts it on the geomagnetic north pole, 80.65°N 72.68°W (IGRF 2020).
+     */
+    float poleAzimuthDeg = 0.0f;
     float toroidalStrength = 0.0f;
     float torusRadiusScale = 1.4f;
     float extentScale = 4.0f;

@@ -180,6 +180,10 @@ input {
     right: max(16px, env(safe-area-inset-right));
     z-index: 900;
     width: min(310px, calc(100vw - 32px));
+    /* Taller than a 720 px screen when expanded: the header stays put and the controls scroll. */
+    display: flex;
+    flex-direction: column;
+    max-height: calc(100dvh - 32px - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px));
     overflow: hidden;
     color: #f7fbff;
     background: rgba(7, 13, 24, 0.88);
@@ -225,7 +229,10 @@ input {
 }
 
 .settings-controls {
+    min-height: 0;
     padding: 14px;
+    overflow-y: auto;
+    overscroll-behavior: contain;
 }
 
 .settings-panel.is-collapsed .settings-controls {
@@ -1032,6 +1039,7 @@ body.capturing #canvas {
         top: max(8px, env(safe-area-inset-top));
         right: max(8px, env(safe-area-inset-right));
         width: min(300px, calc(100vw - 16px));
+        max-height: calc(100dvh - 16px - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px));
     }
 
     .timeline-panel {
@@ -1301,4 +1309,48 @@ body.observe-mode #magnetic-fields-enabled {
 
 #perf-hud.is-slow {
     border-color: #e0a040;
+}
+
+/* Space weather (settings group, storm card): docs/ARCHITECTURE.md §13. */
+.space-weather-section {
+    display: grid;
+    gap: 6px;
+    margin-top: 4px;
+    padding-top: 8px;
+    border-top: 1px solid rgba(112, 203, 255, 0.18);
+}
+
+.space-weather-heading {
+    margin: 0;
+    font-size: 0.78rem;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: rgba(214, 233, 255, 0.72);
+}
+
+.storm-card {
+    position: fixed;
+    right: max(16px, env(safe-area-inset-right));
+    bottom: max(88px, calc(env(safe-area-inset-bottom) + 72px));
+    z-index: 840;
+    max-width: min(340px, calc(100vw - 32px));
+    padding: 10px 14px;
+    color: #f7fbff;
+    background: rgba(7, 13, 24, 0.84);
+    border: 1px solid rgba(120, 255, 170, 0.4);
+    border-radius: 10px;
+    font-size: 0.85rem;
+    line-height: 1.35;
+    pointer-events: none;
+}
+
+.storm-card-title {
+    margin: 0 0 4px;
+    font-weight: 600;
+    color: #9dffc0;
+}
+
+.storm-card-lines {
+    margin: 0;
+    padding-left: 16px;
 }

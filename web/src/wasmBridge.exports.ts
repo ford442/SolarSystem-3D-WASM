@@ -52,6 +52,14 @@ export interface CachedCwrapExports {
     getMagneticFields: () => number;
     setMagneticFieldMode: (enabled: number) => void;
     getMagneticFieldMode: () => number;
+    setSolarWind: (enabled: number) => void;
+    getSolarWind: () => number;
+    setKpOverride: (kp: number) => void;
+    getKpOverride: () => number;
+    launchCmeNow: () => void;
+    playSpaceWeatherEvent: (index: number) => number;
+    jumpToSpaceWeatherDate: (isoUtc: string) => number;
+    getSpaceWeatherJson: () => string;
     setXrSessionActive: (active: number) => void;
     setXrBaseLayerFramebuffer: (framebuffer: number) => void;
     setXrEyeCount: (count: number) => void;
@@ -139,6 +147,14 @@ export function createCachedCwrapExports(cwrap: SolarSystemCwrap): CachedCwrapEx
     getMagneticFields: cwrap('GetMagneticFields', 'number', []),
     setMagneticFieldMode: cwrap('SetMagneticFieldMode', null, ['number']),
     getMagneticFieldMode: cwrap('GetMagneticFieldMode', 'number', []),
+    setSolarWind: cwrap('SetSolarWind', null, ['number']),
+    getSolarWind: cwrap('GetSolarWind', 'number', []),
+    setKpOverride: cwrap('SetKpOverride', null, ['number']),
+    getKpOverride: cwrap('GetKpOverride', 'number', []),
+    launchCmeNow: cwrap('LaunchCmeNow', null, []),
+    playSpaceWeatherEvent: cwrap('PlaySpaceWeatherEvent', 'number', ['number']),
+    jumpToSpaceWeatherDate: cwrap('JumpToSpaceWeatherDate', 'number', ['string']),
+    getSpaceWeatherJson: cwrap('GetSpaceWeatherJson', 'string', []),
     setXrSessionActive: cwrap('SetXrSessionActive', null, ['number']),
     setXrBaseLayerFramebuffer: cwrap('SetXrBaseLayerFramebuffer', null, ['number']),
     setXrEyeCount: cwrap('SetXrEyeCount', null, ['number']),
@@ -175,4 +191,4 @@ export function createCachedCwrapExports(cwrap: SolarSystemCwrap): CachedCwrapEx
     };
 }
 
-export const EXPORT_COUNT = 83;
+export const EXPORT_COUNT = 91;
