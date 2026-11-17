@@ -1,6 +1,5 @@
-import { copyShareableLink, type DeepLinkViewState } from './deepLink.js';
+import { copyShareableLink, runtimeLinkReaders, type DeepLinkViewState } from './deepLink.js';
 import { getClipboard } from './dom.js';
-import { isoDateFromJulianDate } from './ephemeris.js';
 import { createTourPlayer, loadTour, type TourPlayer } from './tourPlayer.js';
 import type { SolarSystemRuntime } from './wasmBridge.js';
 import { registerWasmCallbacks } from './wasmCallbacks.js';
@@ -126,20 +125,7 @@ export function initEducationalLayer(options: {
     tourCopyStep.addEventListener('click', () => {
         const tour = player.currentTour();
         const step = player.currentStepIndex();
-        void copyShareableLink({
-            getQualityPreset: () => runtime.getQualityPreset(),
-            getTimeScale: () => runtime.getTimeScale(),
-            getPaused: () => runtime.getPaused(),
-            getSimulationEpoch: () => runtime.getSimulationEpoch(),
-            getOrbitScaleMode: () => runtime.getOrbitScaleMode(),
-            getShadowQuality: () => runtime.getShadowQuality(),
-            getOrbitLines: () => runtime.getOrbitLines(),
-            getMagneticFields: () => runtime.getMagneticFields(),
-            getFocusedPlanetIndex: () => runtime.getFocusedPlanetIndex(),
-            getFocusedMission: () => runtime.getFocusedMission(),
-            getCameraPose: () => runtime.getCameraPose(),
-            isoDateFromJulianDate,
-        })
+        void copyShareableLink(runtimeLinkReaders(runtime, { getObserveState: undefined }))
             .then((link) => {
                 const url = new URL(link);
                 if (tour) {

@@ -1,5 +1,8 @@
 import type { OrbitScaleMode, QualityPreset } from './SolarSystem.js';
 import { getClipboard } from './dom.js';
+import { isoDateFromJulianDate } from './ephemeris.js';
+import { systemBodyLinkNameInActiveIndex } from './systemPicker.js';
+import type { SolarSystemRuntime } from './wasmBridge.js';
 import { MAX_PLANET_INDEX, PLANET_ID_BY_INDEX, PLANET_IDS, type PlanetIndex } from './generated/planetIds.js';
 
 export interface DeepLinkViewState {
@@ -13,6 +16,11 @@ export interface DeepLinkViewState {
     shadows?: boolean;
     orbitLines?: boolean;
     magneticFields?: boolean;
+    /**
+     * `?system=`: a star system from systems/index.json other than Sol. C++ reads it (and its
+     * `planet=`, a letter like `e`) before the scene is built, so `planet` here stays Sol's.
+     */
+    system?: string;
     planet?: PlanetIndex;
     mission?: string;
     tour?: string;
@@ -63,6 +71,10 @@ export interface DeepLinkRuntimeReaders {
     getOrbitLines?: () => boolean;
     getMagneticFields?: () => boolean;
     getFocusedPlanetIndex?: () => number;
+    /** The active star system ("sol" when absent). */
+    getActiveSystemId?: () => string;
+    /** Outside Sol: the `planet=` name of a focus index (systemPicker.ts systemBodyLinkName). */
+    getSystemBodyLinkName?: (index: number) => string | undefined;
     getFocusedMission?: () => { valid: boolean; id: string } | null;
     getCameraPosition?: () => { x: number; y: number; z: number };
     getCameraYaw?: () => number;
@@ -158,6 +170,13 @@ function parseTimelineSource(value: string | null): string | undefined {
     }
 }
 
+/** Same rule as StarSystemCatalog::IsValidId; "sol" reads as no system (the default). */
+function parseSystemId(value: string | null): string | undefined {
+    if (!value) return undefined;
+    const normalized = value.toLowerCase();
+    return /^[a-z0-9-]{1,48}$/.test(normalized) && normalized !== 'sol' ? normalized : undefined;
+}
+
 function parseMode(value: string | null): 'explore' | 'observe' | undefined {
     if (!value) return undefined;
     const normalized = value.toLowerCase();
@@ -220,7 +239,10 @@ export function parseDeepLinkFromUrl(search = window.location.search): DeepLinkV
     const shadows = parseBooleanParam(params.get('shadows'));
     const orbitLines = parseBooleanParam(params.get('orbits') ?? params.get('orbitLines'));
     const magneticFields = parseBooleanParam(params.get('fields') ?? params.get('magneticFields'));
-    const planet = parsePlanetIndex(params.get('planet') ?? params.get('focus'));
+    const system = parseSystemId(params.get('system'));
+    // In another system `planet=e` names one of its bodies, which C++ resolves; a Sol index
+    // parsed from it would focus the wrong body.
+    const planet = system ? undefined : parsePlanetIndex(params.get('planet') ?? params.get('focus'));
     const mission = parseMissionId(params.get('mission') ?? params.get('probe'));
     const tour = parseTourId(params.get('tour'));
     const tourStep = parseFiniteNumber(params.get('step'));
@@ -249,6 +271,7 @@ export function parseDeepLinkFromUrl(search = window.location.search): DeepLinkV
         shadows,
         orbitLines,
         magneticFields,
+        system,
         planet,
         mission,
         tour,
@@ -265,6 +288,34 @@ export function hasDeepLinkViewState(state: DeepLinkViewState): boolean {
     return Object.values(state).some((value) => value !== undefined);
 }
 
+/**
+ * The readers "Copy view link", a tour step link and the context-loss reload all use. Pass
+ * `overrides` to drop one (`{ getObserveState: undefined }`) or add another.
+ */
+export function runtimeLinkReaders(
+    runtime: SolarSystemRuntime,
+    overrides: Partial<DeepLinkRuntimeReaders> = {},
+): DeepLinkRuntimeReaders {
+    return {
+        getQualityPreset: () => runtime.getQualityPreset(),
+        getTimeScale: () => runtime.getTimeScale(),
+        getPaused: () => runtime.getPaused(),
+        getSimulationEpoch: () => runtime.getSimulationEpoch(),
+        getOrbitScaleMode: () => runtime.getOrbitScaleMode(),
+        getShadowQuality: () => runtime.getShadowQuality(),
+        getOrbitLines: () => runtime.getOrbitLines(),
+        getMagneticFields: () => runtime.getMagneticFields(),
+        getFocusedPlanetIndex: () => runtime.getFocusedPlanetIndex(),
+        getFocusedMission: () => runtime.getFocusedMission(),
+        getActiveSystemId: () => runtime.getActiveSystemId(),
+        getSystemBodyLinkName: (index) => systemBodyLinkNameInActiveIndex(runtime.getActiveSystemId(), index),
+        getCameraPose: () => runtime.getCameraPose(),
+        getObserveState: () => runtime.getObserveState(),
+        isoDateFromJulianDate,
+        ...overrides,
+    };
+}
+
 /** Build a shareable URL for the current simulation view. */
 export function buildShareableUrl(readers: DeepLinkRuntimeReaders, baseUrl = window.location.href): string {
     const url = new URL(baseUrl);
@@ -277,7 +328,8 @@ export function buildShareableUrl(readers: DeepLinkRuntimeReaders, baseUrl = win
 
     const timeScale = readers.getTimeScale?.();
     if (timeScale !== undefined && Number.isFinite(timeScale)) {
-        url.searchParams.set('time', String(roundCoord(timeScale)));
+        // Three significant figures: another star system's arrival clock is a few hundredths.
+        url.searchParams.set('time', String(Number(timeScale.toPrecision(3))));
     }
 
     const paused = readers.getPaused?.();
@@ -328,13 +380,23 @@ export function buildShareableUrl(readers: DeepLinkRuntimeReaders, baseUrl = win
     }
 
     const focusedPlanet = readers.getFocusedPlanetIndex?.() ?? -1;
-    if (focusedPlanet >= 0 && focusedPlanet <= MAX_PLANET_INDEX) {
-        url.searchParams.set('planet', PLANET_ID_BY_INDEX[focusedPlanet as PlanetIndex]);
-    }
+    const systemId = readers.getActiveSystemId?.() ?? 'sol';
+    if (systemId !== 'sol') {
+        // Another star system: its id, and the focused body by letter. Missions are Sol's.
+        url.searchParams.set('system', systemId);
+        const name = focusedPlanet >= 0 ? readers.getSystemBodyLinkName?.(focusedPlanet) : undefined;
+        if (name) {
+            url.searchParams.set('planet', name);
+        }
+    } else {
+        if (focusedPlanet >= 0 && focusedPlanet <= MAX_PLANET_INDEX) {
+            url.searchParams.set('planet', PLANET_ID_BY_INDEX[focusedPlanet as PlanetIndex]);
+        }
 
-    const mission = readers.getFocusedMission?.();
-    if (mission?.valid && mission.id) {
-        url.searchParams.set('mission', mission.id);
+        const mission = readers.getFocusedMission?.();
+        if (mission?.valid && mission.id) {
+            url.searchParams.set('mission', mission.id);
+        }
     }
 
     const pose = readers.getCameraPose?.();

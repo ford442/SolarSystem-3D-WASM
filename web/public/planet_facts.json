@@ -1,6 +1,6 @@
 {
   "version": 2,
-  "generatedFrom": "resource/planets.catalog.json",
+  "generatedFrom": "resource/systems/sol.catalog.json",
   "indexConvention": "Sun=0 … Vesta=11 (frozen), Eris=12 … Halley=15; matches OrbitLayout::Body and Module focus APIs",
   "sceneNote": "Distances in the 3D scene are artistic. Toggle scale mode to compare compressed orbits vs AU-proportional spacing.",
   "bodies": [

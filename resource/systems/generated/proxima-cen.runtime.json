@@ -1,0 +1,275 @@
+{
+  "format": "solarsystem-runtime-catalog",
+  "version": 1,
+  "generatedFrom": "resource/systems/proxima-cen.catalog.json",
+  "id": "proxima-cen",
+  "name": {
+    "en": "Proxima Centauri",
+    "ru": "Проксима Центавра"
+  },
+  "distancePc": 1.301,
+  "spectralType": "M5.5 V",
+  "habitableZoneAu": {
+    "innerAu": 0.03705,
+    "outerAu": 0.05338
+  },
+  "star": {
+    "id": "proxima_cen",
+    "displayNameEn": "Proxima Centauri",
+    "displayNameRu": "Проксима Центавра",
+    "spectralType": "M5.5 V",
+    "effectiveTemperatureK": 2900,
+    "glowTemperatureK": 5778,
+    "radiusKm": 98093.7,
+    "radiusSolar": 0.141,
+    "luminositySolar": 0.00151,
+    "massSolar": 0.1221,
+    "activity": 0.77
+  },
+  "layout": [
+    {
+      "index": 0,
+      "id": "proxima_cen",
+      "compressedOffset": [
+        0,
+        0,
+        0
+      ],
+      "auDistance": 0,
+      "orbitalPeriodDays": 0,
+      "inclinationDeg": 0,
+      "siderealRotationDays": 0,
+      "primeMeridianDegJ2000": 0,
+      "primeMeridianRateDegPerDay": 0,
+      "trueRadius": false,
+      "kepler": null
+    },
+    {
+      "index": 1,
+      "id": "proxima_cen_d",
+      "compressedOffset": [
+        1500,
+        0,
+        0
+      ],
+      "auDistance": 0.02881,
+      "orbitalPeriodDays": 5.12338,
+      "inclinationDeg": 0,
+      "siderealRotationDays": 5.12338,
+      "primeMeridianDegJ2000": 184,
+      "primeMeridianRateDegPerDay": 70.266113386,
+      "trueRadius": false,
+      "kepler": {
+        "aAu": 0.028810000301695473,
+        "e": 0,
+        "iDeg": 0,
+        "OmegaDeg": 0,
+        "omegaDeg": 4,
+        "M0Deg": 0,
+        "nDegPerDay": 70.266113386
+      }
+    },
+    {
+      "index": 2,
+      "id": "proxima_cen_b",
+      "compressedOffset": [
+        -1290.4,
+        0,
+        1182.11
+      ],
+      "auDistance": 0.04848,
+      "orbitalPeriodDays": 11.18465,
+      "inclinationDeg": 0,
+      "siderealRotationDays": 11.18465,
+      "primeMeridianDegJ2000": 269.3949,
+      "primeMeridianRateDegPerDay": 32.186970536,
+      "trueRadius": false,
+      "kepler": {
+        "aAu": 0.048480000190270094,
+        "e": 0,
+        "iDeg": 0,
+        "OmegaDeg": 0,
+        "omegaDeg": 3.3,
+        "M0Deg": 86.0949,
+        "nDegPerDay": 32.186970536
+      }
+    }
+  ],
+  "entries": [
+    {
+      "index": 1,
+      "id": "proxima_cen_d",
+      "parentId": "proxima_cen",
+      "initTag": "proxima_cen_d",
+      "kind": "planet",
+      "displayNameEn": "Proxima Centauri d",
+      "displayNameRu": "Проксима Центавра d",
+      "auDistance": 0.02881,
+      "orbitalPeriodDays": 5.12338,
+      "earthRadiusScale": 0.692,
+      "radiusKm": 4408.5,
+      "axialTiltDegrees": 0,
+      "artTiltXDegrees": 0,
+      "oblateness": 0,
+      "yawOffsetDegrees": 0,
+      "artRollDegrees": 0,
+      "shaderFlags": {
+        "hasNightTexture": false,
+        "hasSpecularMap": false,
+        "hasClouds": false
+      },
+      "useSphereIntersect": false,
+      "ambientFactor": 0,
+      "lod": {
+        "diffuse": "",
+        "normal": "",
+        "specular": null,
+        "night": null,
+        "clouds": null
+      },
+      "meshPath": null,
+      "sceneOrbitRadius": 0,
+      "orbitPlane": "xz",
+      "initialAnomalyRad": 0,
+      "spinDegPerSimSecond": 0,
+      "keplerian": {
+        "aKm": 4309914.7,
+        "e": 0,
+        "iDeg": 0,
+        "OmegaDeg": 0,
+        "omegaDeg": 4,
+        "M0Deg": 0,
+        "nDegPerDay": 70.266113386,
+        "OmegaDotDegPerDay": 0,
+        "omegaDotDegPerDay": 0
+      },
+      "cloudLayer": {
+        "diffuse": null,
+        "normal": null,
+        "scaleFactor": 0,
+        "spinDegPerSimSecond": 0,
+        "ambientFactor": 0
+      },
+      "hasCloudLayer": false,
+      "hasRings": false,
+      "hasTerrain": false,
+      "terrainAttribution": null,
+      "procedural": {
+        "enabled": true,
+        "mode": 0,
+        "seed": 1,
+        "colors": [
+          [
+            0.07,
+            0.22,
+            0.45
+          ],
+          [
+            0.42,
+            0.45,
+            0.28
+          ],
+          [
+            0.92,
+            0.94,
+            0.97
+          ]
+        ],
+        "bands": 0,
+        "seaLevel": 0.55,
+        "polarCap": 0.75,
+        "emissive": 0,
+        "equilibriumTemperatureK": 282
+      },
+      "placeFromElements": true
+    },
+    {
+      "index": 2,
+      "id": "proxima_cen_b",
+      "parentId": "proxima_cen",
+      "initTag": "proxima_cen_b",
+      "kind": "planet",
+      "displayNameEn": "Proxima Centauri b",
+      "displayNameRu": "Проксима Центавра b",
+      "auDistance": 0.04848,
+      "orbitalPeriodDays": 11.18465,
+      "earthRadiusScale": 1.02,
+      "radiusKm": 6498.5,
+      "axialTiltDegrees": 0,
+      "artTiltXDegrees": 0,
+      "oblateness": 0,
+      "yawOffsetDegrees": 0,
+      "artRollDegrees": 0,
+      "shaderFlags": {
+        "hasNightTexture": false,
+        "hasSpecularMap": false,
+        "hasClouds": false
+      },
+      "useSphereIntersect": false,
+      "ambientFactor": 0,
+      "lod": {
+        "diffuse": "",
+        "normal": "",
+        "specular": null,
+        "night": null,
+        "clouds": null
+      },
+      "meshPath": null,
+      "sceneOrbitRadius": 0,
+      "orbitPlane": "xz",
+      "initialAnomalyRad": 0,
+      "spinDegPerSimSecond": 0,
+      "keplerian": {
+        "aKm": 7252504.8,
+        "e": 0,
+        "iDeg": 0,
+        "OmegaDeg": 0,
+        "omegaDeg": 3.3,
+        "M0Deg": 86.0949,
+        "nDegPerDay": 32.186970536,
+        "OmegaDotDegPerDay": 0,
+        "omegaDotDegPerDay": 0
+      },
+      "cloudLayer": {
+        "diffuse": null,
+        "normal": null,
+        "scaleFactor": 0,
+        "spinDegPerSimSecond": 0,
+        "ambientFactor": 0
+      },
+      "hasCloudLayer": false,
+      "hasRings": false,
+      "hasTerrain": false,
+      "terrainAttribution": null,
+      "procedural": {
+        "enabled": true,
+        "mode": 3,
+        "seed": 2,
+        "colors": [
+          [
+            0.45,
+            0.47,
+            0.5
+          ],
+          [
+            0.7,
+            0.74,
+            0.78
+          ],
+          [
+            0.95,
+            0.96,
+            0.98
+          ]
+        ],
+        "bands": 0,
+        "seaLevel": 0.35,
+        "polarCap": 0.45,
+        "emissive": 0,
+        "equilibriumTemperatureK": 218
+      },
+      "placeFromElements": true
+    }
+  ],
+  "atmospheres": []
+}

@@ -56,7 +56,7 @@ backend.
 
 | File | Role |
 |------|------|
-| `src/data/orbital-parameters.json` | Positions / scales from `resource/planets.catalog.json` (codegen) |
+| `src/data/orbital-parameters.json` | Positions / scales from `resource/systems/sol.catalog.json` (codegen) |
 | `src/data/companion-config.json` | Which bodies are full vs proxy, moons, skybox faces, bloom/tone-map settings, atmospheres, ring systems, music tracks |
 
 Runtime modules:

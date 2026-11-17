@@ -10,6 +10,7 @@ void NotifyPlanetFocused(int index);
 void NotifyMusicDuck(float duck);
 void NotifyNearestPlanetChanged(int jsIndex);
 void NotifyMissionFocused(int index);
+void NotifySystemChanged(const char* id, int phase);
 
 #else
 
@@ -20,6 +21,7 @@ inline void NotifyPlanetFocused(int) {}
 inline void NotifyMusicDuck(float) {}
 inline void NotifyNearestPlanetChanged(int) {}
 inline void NotifyMissionFocused(int) {}
+inline void NotifySystemChanged(const char*, int) {}
 
 #endif
 

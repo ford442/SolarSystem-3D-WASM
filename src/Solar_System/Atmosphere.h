@@ -1,12 +1,12 @@
 #ifndef SOLARSYSTEM_ATMOSPHERE_H
 #define SOLARSYSTEM_ATMOSPHERE_H
 #include "OuterShell.h"
-#include "BodyCatalog.generated.h"
+#include "BodyCatalog.h"
 #include "../gfx/GlHandle.h"
 
 /**
  * A planet's (or Titan's) atmosphere shell, configured from its catalog row
- * (render.atmosphere in planets.catalog.json).
+ * (render.atmosphere in resource/systems/sol.catalog.json).
  *
  * Two ways to draw it:
  *  - O'Neil (`row.oneil`): the single-scattering shell every preset can afford.

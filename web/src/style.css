@@ -639,6 +639,113 @@ input {
     font-size: 0.82rem;
 }
 
+/* Star-system picker (systemPicker.ts): one row per system, nearest first. */
+.system-picker {
+    margin-bottom: 12px;
+    padding-bottom: 12px;
+    border-bottom: 1px solid rgba(137, 209, 255, 0.18);
+}
+
+.system-picker[hidden] {
+    display: none;
+}
+
+.system-picker-head {
+    display: flex;
+    align-items: baseline;
+    gap: 8px;
+    margin-bottom: 8px;
+}
+
+.system-picker-label {
+    color: #9fdfff;
+    font-size: 0.75rem;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+}
+
+.system-current {
+    flex: 1;
+    min-width: 0;
+    overflow: hidden;
+    color: #f7fbff;
+    font-size: 0.9rem;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.system-home {
+    padding: 4px 10px;
+    color: #06121f;
+    font-weight: 700;
+    background: #79dcff;
+    border: 0;
+    border-radius: 6px;
+    cursor: pointer;
+    touch-action: manipulation;
+}
+
+.system-home:disabled {
+    opacity: 0.5;
+    cursor: default;
+}
+
+.system-list {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 4px;
+    max-height: 196px;
+    margin-bottom: 6px;
+    overflow-y: auto;
+}
+
+.system-btn {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    min-height: 34px;
+    padding: 6px 10px;
+    text-align: left;
+}
+
+.system-btn:disabled {
+    opacity: 0.55;
+    cursor: progress;
+}
+
+.system-swatch {
+    flex: none;
+    width: 12px;
+    height: 12px;
+    border-radius: 50%;
+    box-shadow: 0 0 6px currentColor;
+}
+
+.system-name {
+    flex: 1;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.system-distance {
+    flex: none;
+    color: #9fdfff;
+    font-size: 0.8rem;
+    font-variant-numeric: tabular-nums;
+}
+
+/* Missions, conjunctions and Observe are Sol's (Application refuses them elsewhere). */
+body.in-other-system #explorer-missions,
+body.in-other-system #explorer-conjunction {
+    display: none;
+}
+
+.observe-mode-btn:disabled {
+    opacity: 0.45;
+    cursor: not-allowed;
+}
+
 .explorer-missions {
     margin: 12px 0 4px;
 }

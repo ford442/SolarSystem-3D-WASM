@@ -24,12 +24,15 @@ struct FrameUniformData {
     float nearPlane = 0.0f;
     float framePad0 = 0.0f;
     float framePad1 = 0.0f;
+    /** rgb: the star's light relative to the Sun's (Star::GetLightTint); (1, 1, 1) in Sol. */
+    glm::vec4 starColor{1.0f};
 };
 static_assert(offsetof(FrameUniformData, proj) == 64, "std140: mat4 is 64 bytes");
 static_assert(offsetof(FrameUniformData, cameraPos) == 192, "std140: FrameUBO.cameraPos");
 static_assert(offsetof(FrameUniformData, farPlane) == 224, "std140: FrameUBO.farPlane");
 static_assert(offsetof(FrameUniformData, logDepthC) == 240, "std140: FrameUBO.logDepthC");
-static_assert(sizeof(FrameUniformData) == 256, "std140: FrameUBO size");
+static_assert(offsetof(FrameUniformData, starColor) == 256, "std140: FrameUBO.starColor");
+static_assert(sizeof(FrameUniformData) == 272, "std140: FrameUBO size");
 
 /**
  * One uniform buffer per view (mono, or each XR eye): both eyes are uploaded once per frame

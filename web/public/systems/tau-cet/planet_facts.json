@@ -1,0 +1,120 @@
+{
+  "version": 2,
+  "generatedFrom": "resource/systems/tau-cet.catalog.json",
+  "indexConvention": "Star=0, planets 1… by semi-major axis; matches the active system's OrbitLayout table",
+  "sceneNote": "Measured orbits and sizes; surfaces are procedural (no exoplanet has been imaged). Values marked fit are estimates.",
+  "bodies": [
+    {
+      "index": 0,
+      "id": "tau_cet",
+      "name": "Tau Ceti",
+      "nameRu": "Тау Кита",
+      "type": "star",
+      "diameterKm": 1154862,
+      "massEarths": 260697,
+      "siderealRotationDays": null,
+      "orbitalPeriodDays": null,
+      "distanceAu": 0,
+      "moons": 0,
+      "summary": "G8.5V star 11.8 light-years away; 3 known planets in the archive's composite table.",
+      "summaryRu": "Звезда класса G8.5V на расстоянии 11.8 св. лет; известных планет: 3.",
+      "spectralType": "G8.5V",
+      "effectiveTemperatureK": 5310,
+      "luminositySolar": 0.4950055,
+      "distancePc": 3.603
+    },
+    {
+      "index": 1,
+      "id": "tau_cet_g",
+      "name": "Tau Ceti g",
+      "nameRu": "Тау Кита g",
+      "type": "terrestrial",
+      "diameterKm": 15036,
+      "massEarths": 1.75,
+      "siderealRotationDays": 20,
+      "orbitalPeriodDays": 20,
+      "distanceAu": 0.133,
+      "moons": 0,
+      "summary": "Terrestrial discovered in 2017 (radial velocity); 27.98× Earth's insolation, equilibrium temperature ≈ 640 K.",
+      "summaryRu": "Планета земного типа, открыта в 2017 г. методом лучевых скоростей; освещённость 27.98 от земной, равновесная температура ≈ 640 K.",
+      "equilibriumTemperatureK": 639.7,
+      "irradianceEarth": 27.9838,
+      "discoveryYear": 2017,
+      "discoveryMethod": "Radial Velocity",
+      "fit": {
+        "inclination": true,
+        "meanAnomaly": true,
+        "rotation": "tidally-locked"
+      },
+      "surface": "scorched"
+    },
+    {
+      "index": 2,
+      "id": "tau_cet_h",
+      "name": "Tau Ceti h",
+      "nameRu": "Тау Кита h",
+      "type": "terrestrial",
+      "diameterKm": 15163,
+      "massEarths": 1.83,
+      "siderealRotationDays": 1,
+      "orbitalPeriodDays": 49.41,
+      "distanceAu": 0.243,
+      "moons": 0,
+      "summary": "Terrestrial discovered in 2017 (radial velocity); 8.38× Earth's insolation, equilibrium temperature ≈ 473 K.",
+      "summaryRu": "Планета земного типа, открыта в 2017 г. методом лучевых скоростей; освещённость 8.38 от земной, равновесная температура ≈ 473 K.",
+      "equilibriumTemperatureK": 473.2,
+      "irradianceEarth": 8.383,
+      "discoveryYear": 2017,
+      "discoveryMethod": "Radial Velocity",
+      "fit": {
+        "inclination": true,
+        "meanAnomaly": true,
+        "rotation": "unknown"
+      },
+      "surface": "scorched"
+    },
+    {
+      "index": 3,
+      "id": "tau_cet_f",
+      "name": "Tau Ceti f",
+      "nameRu": "Тау Кита f",
+      "type": "super-earth",
+      "diameterKm": 23063,
+      "massEarths": 3.93,
+      "siderealRotationDays": 1,
+      "orbitalPeriodDays": 636.13,
+      "distanceAu": 1.334,
+      "moons": 0,
+      "summary": "Super-earth discovered in 2017 (radial velocity); 0.28× Earth's insolation, equilibrium temperature ≈ 202 K.",
+      "summaryRu": "Суперземля, открыта в 2017 г. методом лучевых скоростей; освещённость 0.28 от земной, равновесная температура ≈ 202 K.",
+      "equilibriumTemperatureK": 202,
+      "irradianceEarth": 0.2782,
+      "discoveryYear": 2017,
+      "discoveryMethod": "Radial Velocity",
+      "fit": {
+        "inclination": true,
+        "meanAnomaly": true,
+        "rotation": "unknown"
+      },
+      "surface": "tundra"
+    }
+  ],
+  "scaleModes": {},
+  "system": {
+    "id": "tau-cet",
+    "name": "Tau Ceti",
+    "nameRu": "Тау Кита",
+    "distancePc": 3.603,
+    "habitableZoneAu": {
+      "innerAu": 0.67082,
+      "outerAu": 0.96642
+    },
+    "source": {
+      "table": "NASA Exoplanet Archive, Planetary Systems Composite Parameters (pscomppars)",
+      "url": "https://exoplanetarchive.ipac.caltech.edu/",
+      "archiveHostname": "tau Cet",
+      "referencePlaneInclinationDeg": 90
+    },
+    "sceneNoteRu": "Орбиты и размеры измерены; поверхности процедурные (ни одна экзопланета не сфотографирована). Значения с пометкой fit — оценки."
+  }
+}

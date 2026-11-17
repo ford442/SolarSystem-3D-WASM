@@ -1,12 +1,12 @@
 #ifndef SOLARSYSTEM_SYSTEMVISUALS_H
 #define SOLARSYSTEM_SYSTEMVISUALS_H
 
-#include "BodyCatalog.generated.h"
+#include "BodyCatalog.h"
 
 /**
  * Hand-tuned ring mesh numbers that are *not* in the planet catalog (rewriting rings as
  * JSON is a follow-up). The factory keys these by catalog body id when Entry.hasRings is
- * set. Atmospheres moved to the catalog: render.atmosphere → BodyCatalog::kAtmospheres.
+ * set. Atmospheres moved to the catalog: render.atmosphere → BodyCatalog::Atmospheres().
  */
 namespace SystemVisuals {
 

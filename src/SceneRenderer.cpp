@@ -10,6 +10,8 @@
 #include "ResourceManifest.h"
 #include "Solar_System/EclipseCaster.h"
 #include "Solar_System/AtmosphereModel.h"
+#include "Solar_System/BodyCatalog.h"
+#include "Solar_System/CatalogMaterial.h"
 #include "SimState.h"
 #include "Solar_System/OrbitLayout.h"
 #include "astro/Ephemeris.h"
@@ -33,6 +35,7 @@
 #include "gfx/Shader.h"
 #include "gfx/GlPlatform.h"
 #include "Solar_System/ObserveSky.h"
+#include "Solar_System/SceneScale.h"
 #include "Solar_System/Star.h"
 #include <algorithm>
 #include <array>
@@ -81,7 +84,7 @@ const std::vector<std::string> kNearSurfaceDefine{"NEAR_SURFACE"};
 // Every planetLighting variant some catalog row can draw with (CatalogMaterial::PossibleVariants).
 std::vector<unsigned> CatalogPlanetVariants() {
     std::vector<unsigned> variants{0};
-    for (const BodyCatalog::Entry& entry : BodyCatalog::kEntries) {
+    for (const BodyCatalog::Entry& entry : BodyCatalog::Entries()) {
         for (const unsigned variant : CatalogMaterial::PossibleVariants(CatalogMaterial::Material::FromEntry(entry))) {
             if (std::find(variants.begin(), variants.end(), variant) == variants.end()) {
                 variants.push_back(variant);
@@ -113,10 +116,11 @@ void Renderer::Init(const SimState& sim, FT_Library ft, glm::ivec2 display) {
     const ShaderSpec lensFlareSpec = Program("lensFlare.vs", "lensFlare.fs");
     const ShaderSpec starGlowSpec = Program("starGlow.vs", "starGlow.fs");
     const ShaderSpec coronaVolumeSpec = Program("starCoronaVolume.vs", "starCoronaVolume.fs");
+    const ShaderSpec screenFadeSpec = Program("screenFade.vs", "screenFade.fs");
     const std::vector<unsigned> planetVariants = CatalogPlanetVariants();
-    for (const ShaderSpec* spec : {&hdrSpec, &textSpec, &shadowSpec, &skyBoxSpec, &starSpec, &coronaSpec,
-                                   &atmosphereSpec, &pbrAtmosphereSpec, &cloudsSpec, &ringSpec, &lensFlareSpec,
-                                   &starGlowSpec, &coronaVolumeSpec}) {
+    for (const ShaderSpec* spec :
+         {&hdrSpec, &textSpec, &shadowSpec, &skyBoxSpec, &starSpec, &coronaSpec, &atmosphereSpec, &pbrAtmosphereSpec,
+          &cloudsSpec, &ringSpec, &lensFlareSpec, &starGlowSpec, &coronaVolumeSpec, &screenFadeSpec}) {
         _shaders.Prefetch(*spec);
     }
     for (const unsigned variant : planetVariants) {
@@ -153,6 +157,8 @@ void Renderer::Init(const SimState& sim, FT_Library ft, glm::ivec2 display) {
     if (!_coronaVolumeShader) {
         LOG_WARN("Corona", "volumetric corona shader unavailable; using the flat corona");
     }
+    _screenFadeShader = _shaders.TryGet(screenFadeSpec);
+    _screenFadeVao = GlVertexArray::Create();
     // The base variant must build; the others fall back to it in PlanetProgram if their own
     // compile failed.
     _planetVariants.fill(nullptr);
@@ -219,14 +225,14 @@ void Renderer::Release() {
     _lensFlare.reset();
     _skyBox.reset();
     _hdr.reset();
+    _screenFadeVao.reset();
     _textRenderer.reset();
     _shadowMapFBO.reset();
-    for (Shader** shader : {&_shadowMapShader, &_mainSkyBoxShader, &_mainTextShader, &_mainStarShader,
-                            &_mainCoronaStarShader, &_mainPlanetShader, &_mainAtmosphereShader,
-                            &_mainCloudsShader, &_mainRingShader, &_hdrShader, &_lensFlareShader,
-                            &_starGlowShader, &_pbrAtmosphereShader, &_coronaVolumeShader,
-                            &_nearAtmosphereShader, &_nearPbrAtmosphereShader, &_nearCloudsShader,
-                            &_terrainShadowShader}) {
+    for (Shader** shader :
+         {&_shadowMapShader, &_mainSkyBoxShader, &_mainTextShader, &_mainStarShader, &_mainCoronaStarShader,
+          &_mainPlanetShader, &_mainAtmosphereShader, &_mainCloudsShader, &_mainRingShader, &_hdrShader,
+          &_lensFlareShader, &_starGlowShader, &_pbrAtmosphereShader, &_coronaVolumeShader, &_screenFadeShader,
+          &_nearAtmosphereShader, &_nearPbrAtmosphereShader, &_nearCloudsShader, &_terrainShadowShader}) {
         *shader = nullptr;
     }
     _planetVariants.fill(nullptr);
@@ -292,6 +298,7 @@ void Renderer::BeginView(const FrameContext& ctx) {
         data.nearPlane = ctx.view.nearPlane;
         data.time = static_cast<float>(ctx.sim.animationSeconds);
         data.exposure = _starTuning.exposure;
+        data.starColor = glm::vec4(ctx.scene.sun ? ctx.scene.sun->GetLightTint() : glm::vec3(1.0f), 1.0f);
         _frameUniforms.Upload(viewIndex, data);
         _uploadedViews |= 1u << viewIndex;
     }
@@ -748,6 +755,7 @@ void Renderer::RenderStarCoronaVolume(const FrameContext& ctx) const {
     shader.SetFloat("sliceSpacing", (depthMax - depthMin) / static_cast<float>(_coronaSlices));
     shader.SetVec3("coronaColor", ctx.scene.sun->GetShiftColor());
     shader.SetFloat("coronaIntensity", kCoronaIntensity);
+    shader.SetFloat("activity", ctx.scene.sun->GetActivity());
     ctx.scene.sun->DrawCoronaSlices(_coronaSlices);
 
     glEnable(GL_CULL_FACE);
@@ -808,12 +816,38 @@ void Renderer::RenderStarEffects(const FrameContext& ctx) const {
 
     glBlendFunc(GL_ONE, GL_ONE);
     float intensity = glm::min(ctx.scene.sun->GetCurrentGlowSize() * ctx.scene.sun->GetVisibility(), 1.0f);
-    _lensFlare->Render(ctx.view.projection, ctx.view.view, ctx.scene.sun->GetPosition(), glm::vec3(1.0), ctx.view.aspect, 0.1, intensity, ringCameraInfo);
+    _lensFlare->Render(ctx.view.projection, ctx.view.view, ctx.scene.sun->GetPosition(), ctx.scene.sun->GetLightTint(),
+                       ctx.view.aspect, 0.1, intensity, ringCameraInfo);
 
     glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
     glDisable(GL_BLEND);
     glDepthMask(GL_TRUE);
     glEnable(GL_DEPTH_TEST);
+}
+
+void Renderer::RenderScreenFade(GLuint framebuffer, const glm::vec3& color, float amount) const {
+    if (amount <= 0.0f || !_screenFadeShader || !_screenFadeVao) {
+        return;
+    }
+    glBindFramebuffer(GL_FRAMEBUFFER, framebuffer);
+    glDisable(GL_DEPTH_TEST);
+    glDepthMask(GL_FALSE);
+    glEnable(GL_BLEND);
+    glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+    _screenFadeShader->Use();
+    _screenFadeShader->SetVec4("fadeColor", glm::vec4(color, std::min(amount, 1.0f)));
+    glBindVertexArray(_screenFadeVao.get());
+    glDrawArrays(GL_TRIANGLES, 0, 3);
+    glBindVertexArray(0);
+    glDisable(GL_BLEND);
+    glDepthMask(GL_TRUE);
+    glEnable(GL_DEPTH_TEST);
+}
+
+void Renderer::PrefetchCatalogVariants() {
+    for (const unsigned variant : CatalogPlanetVariants()) {
+        _shaders.Prefetch(PlanetSpec(variant));
+    }
 }
 
 void Renderer::RenderPlanetProxyMarkers(const FrameContext& ctx) const {
@@ -1165,7 +1199,7 @@ Renderer::EclipseUmbra Renderer::ComputeEclipseUmbra(const FrameContext& ctx, co
     // every new moon. Deciding in kilometres and only *drawing* at art scale is what keeps
     // eclipses as rare as they are. See docs/ARCHITECTURE.md § 11.
     constexpr float kEarthRadiusKm = 6371.0f;
-    constexpr float kSunRadiusKm = 695700.0f;
+    const auto kStarRadiusKm = static_cast<float>(SceneScale::StarRadiusKm()); // the active star (Sol: 695 700)
     constexpr float kAuKm = 149597870.7f;
 
     const std::shared_ptr<Planet>& planet = renderableComponent.planet;
@@ -1224,7 +1258,8 @@ Renderer::EclipseUmbra Renderer::ComputeEclipseUmbra(const FrameContext& ctx, co
     // distance. Using the drawn Sun radius would widen the penumbra by the full art-scale
     // mismatch between the moon orbit and the planet orbit.
     const float lightDistance = glm::length(sunPosition - planetPosition);
-    const float starRadius = lightDistance * (kSunRadiusKm / kAuKm);
+    // (Referenced to 1 AU, as for the Sun seen from Earth; only systems with moons cast.)
+    const float starRadius = lightDistance * (kStarRadiusKm / kAuKm);
 
     // Low drops the penumbra entirely: a zero-radius star gives a hard-edged disc, which is
     // one smoothstep and no extra bandwidth.
@@ -1240,12 +1275,15 @@ Renderer::EclipseUmbra Renderer::ComputeEclipseUmbra(const FrameContext& ctx, co
 
 const Shader& Renderer::PlanetProgram(unsigned variant) {
     using CatalogMaterial::kNearSurface;
+    using CatalogMaterial::kProcedural;
     using CatalogMaterial::kSphereIntersect;
     // Not built yet (or failed): drop the maps, keeping the sphere test and, close to a
     // surface, fragment depth (without it the facets around the eye clip wrongly); then drop
-    // NEAR_SURFACE too. Each candidate is submitted the first time it is asked for.
-    const unsigned candidates[] = {variant, variant & (kSphereIntersect | kNearSurface), variant & ~kNearSurface,
-                                   variant & kSphereIntersect};
+    // NEAR_SURFACE too. Each candidate is submitted the first time it is asked for. A
+    // procedural body keeps PROCEDURAL_SURFACE throughout: it has no maps to fall back to.
+    const unsigned keep = variant & kProcedural;
+    const unsigned candidates[] = {variant, (variant & (kSphereIntersect | kNearSurface)) | keep,
+                                   variant & ~kNearSurface, (variant & kSphereIntersect) | keep};
     for (const unsigned candidate : candidates) {
         Shader*& program = _planetVariants[candidate];
         if (!program) {
@@ -1371,6 +1409,8 @@ void Renderer::DrawLitBody(const FrameContext& ctx, const SpaceObject& body, con
 
 const Shader* Renderer::TerrainProgram(unsigned variant) {
     using CatalogMaterial::kNearSurface;
+    // Terrain bodies are textured (render.terrain is a Sol feature): never PROCEDURAL_SURFACE.
+    variant &= ~CatalogMaterial::kProcedural;
     // As PlanetProgram: drop the maps, then NEAR_SURFACE. A tile placed without it is in the
     // same place; only its depth is per vertex.
     const unsigned candidates[] = {variant, variant & kNearSurface, variant & ~kNearSurface, 0u};

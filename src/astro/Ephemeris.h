@@ -51,6 +51,15 @@ double DeltaTSeconds(double julianDateUt);
 HelioLB Position(int bodyIndex, double julianDate);
 
 /**
+ * Star-centric ecliptic lon/lat/radius for a fixed Keplerian element set at epoch J2000
+ * (a in AU, angles in degrees, mean motion in degrees per day): how OrbitLayout places the
+ * planets of a star system that has no analytic ephemeris. The "ecliptic" is then that
+ * system's reference plane.
+ */
+HelioLB KeplerianPosition(double aAu, double e, double iDeg, double OmegaDeg, double omegaDeg, double M0Deg,
+                          double nDegPerDay, double julianDate);
+
+/**
  * Pluggable position source. Julian dates are treated as UTC-ish for visualization —
  * we do not model TDB/TT offsets (~69 s), which is well under the ~arcmin accuracy the
  * Standish series itself provides. Do not treat this as a flight-dynamics tool.
@@ -72,7 +81,7 @@ public:
      * Axes are the J2000 ecliptic, same convention as PlanetHeliocentric: x toward the
      * equinox, z toward the north ecliptic pole. The Standish backend implements this for
      * the moons whose catalog rows carry real (non-placeholder) node and periapsis angles
-     * — see kKeplerianSatellites in Ephemeris.cpp. The Moon (16) is the exception: it comes from
+     * — the rows with orbit.placeFromElements (BodyCatalog::Entry::placeFromElements). The Moon (16) is the exception: it comes from
      * the Meeus ch. 47 lunar series (LunarTheory), not from catalog elements. Every other
      * satellite returns false and keeps its circular SatelliteOrbit offset.
      */

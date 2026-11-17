@@ -1,7 +1,7 @@
 # Planet metadata catalog
 
-**Canonical source:** [`planets.catalog.json`](planets.catalog.json)  
-**Schema:** [`planets.catalog.schema.json`](planets.catalog.schema.json)
+**Canonical source:** [`systems/sol.catalog.json`](systems/sol.catalog.json) (other star systems: [`systems/`](systems/), docs/ARCHITECTURE.md §12)  
+**Schema:** [`systems/catalog.schema.json`](systems/catalog.schema.json)
 
 ## Generate
 

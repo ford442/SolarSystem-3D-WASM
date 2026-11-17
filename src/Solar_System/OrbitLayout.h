@@ -28,8 +28,59 @@ enum class Body : int {
     Halley = 15
 };
 
-/** Number of bodies in the layout table; valid Body values are 0 … kBodyCount-1. */
+/**
+ * Number of focus bodies in *Sol's* table (Sun … 1P/Halley): the frozen focus indices of
+ * deep links and the FocusPlanet export. Another star system has its own count — use
+ * BodyCount() for "every body of the scene", kBodyCount only where Sol is meant.
+ */
 constexpr int kBodyCount = static_cast<int>(Body::Halley) + 1;
+
+/**
+ * Star-centric Keplerian elements (system reference plane, epoch J2000) that place a body
+ * whose system has no analytic ephemeris — every system but Sol. aAu == 0: none.
+ */
+struct KeplerElements {
+    double aAu = 0.0;
+    double e = 0.0;
+    double iDeg = 0.0;
+    double OmegaDeg = 0.0;
+    double omegaDeg = 0.0;
+    double M0Deg = 0.0;
+    double nDegPerDay = 0.0;
+};
+
+/**
+ * One focus body of the active system's layout table (row i is focus index i; row 0 the star).
+ * Sol's rows are compiled from OrbitLayoutBodies.generated.inc; another system's come from its
+ * runtime catalog (StarSystemCatalog), with `kepler` set.
+ */
+struct BodyRow {
+    glm::vec3 compressedOffset{0.0f};
+    float auDistance = 0.0f;
+    float orbitalPeriodDays = 0.0f;
+    float inclinationDeg = 0.0f;
+    float siderealRotationDays = 0.0f; // negative => retrograde
+    // IAU prime-meridian angle at J2000 and its rate: W = W0 + Wdot * days. Double, since
+    // Wdot times a century of days is millions of degrees. Negative rate => retrograde.
+    double primeMeridianDegJ2000 = 0.0;
+    double primeMeridianRateDegPerDay = 0.0;
+    KeplerElements kepler{};
+    /** Placed at its ephemeris distance on compressed scale too (Sol: Eris … Halley). */
+    bool trueRadius = false;
+};
+
+/**
+ * Make `rows[0 … count-1]` the layout table (another star system), or nullptr for Sol's
+ * compiled one. Refreshes positions for the current date; the render origin is kept (the
+ * caller moves the camera). StarSystemCatalog::Activate calls this; `rows` must outlive it.
+ */
+void SetSystemRows(const BodyRow* rows, int count);
+
+/** Focus bodies in the active system (star included): valid Body values are 0 … BodyCount()-1. */
+int BodyCount();
+
+/** True while the layout is Sol's (Standish ephemeris, Earth's solved spin, the art keys). */
+bool IsSolLayout();
 
 enum class ScaleMode : int {
     Compressed = 0,
@@ -62,7 +113,7 @@ double GetJulianDate();
 /** Advance the ephemeris epoch by scaled wall-clock seconds (spins follow from the date). */
 void Advance(float scaledDtSeconds);
 
-/** Reset to J2000.0, compressed scale, render origin at the Sun (tests). */
+/** Reset to J2000.0, compressed scale, render origin at the Sun, Sol's table (tests). */
 void ResetForTests();
 
 /**
@@ -171,7 +222,10 @@ float GetInclinationDegrees(Body body);
 /** Map wall-scaled seconds for one full orbit of this body at timeScale==1. */
 float GetOrbitPeriodSecondsAt1x(Body body);
 
-/** Map manifest / UI name to body id; returns Sun for unknown names. */
+/**
+ * Map manifest / UI name to body id; returns Sun (the star, index 0) for unknown names. Sol's
+ * names are fixed; another system's are its catalog display names and ids.
+ */
 Body BodyFromName(const std::string& name);
 
 } // namespace OrbitLayout

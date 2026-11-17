@@ -1,6 +1,6 @@
 #ifndef SOLARSYSTEM_CATALOGMATERIAL_H
 #define SOLARSYSTEM_CATALOGMATERIAL_H
-#include "BodyCatalog.generated.h"
+#include "BodyCatalog.h"
 #include <string>
 #include <vector>
 
@@ -29,10 +29,16 @@ struct Material {
     bool hasClouds;
     bool useSphereIntersect;
     float ambientFactor;
+    /** render.procedural: no maps, the PROCEDURAL_SURFACE permutation and these parameters. */
+    BodyCatalog::ProceduralSurface procedural{};
 
     static Material FromEntry(const BodyCatalog::Entry& entry) {
-        return {entry.shaderFlags.hasNightTexture, entry.shaderFlags.hasSpecularMap,
-                entry.shaderFlags.hasClouds, entry.useSphereIntersect, entry.ambientFactor};
+        return {entry.shaderFlags.hasNightTexture,
+                entry.shaderFlags.hasSpecularMap,
+                entry.shaderFlags.hasClouds,
+                entry.useSphereIntersect,
+                entry.ambientFactor,
+                entry.procedural};
     }
 };
 
@@ -54,8 +60,9 @@ enum VariantBit : unsigned {
     // NEAR_SURFACE: not a material switch. The Renderer adds it for a body close to the eye
     // (relative-to-eye vertices, fragment log depth; docs/ARCHITECTURE.md §11.1).
     kNearSurface = 1u << 4,
+    kProcedural = 1u << 5, // PROCEDURAL_SURFACE (render.procedural: exoplanets)
 };
-constexpr unsigned kVariantCount = 1u << 5;
+constexpr unsigned kVariantCount = 1u << 6;
 
 /**
  * The permutation this draw needs. A map flag only counts when its texture is resident;

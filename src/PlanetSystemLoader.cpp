@@ -8,6 +8,7 @@
 #include <deque>
 #include <functional>
 #include <string>
+#include <utility>
 
 void Application::LoadPlanetSystemManifests() {
 #ifdef __EMSCRIPTEN__
@@ -84,14 +85,23 @@ void Application::StartPlanetSystemDownload(PlanetSystemManifest& manifest, cons
 
     // Download required assets — decrement pendingDownloads on completion (success or failure)
     for (const auto& path : manifest.assetPaths) {
-        WebResourceFetcher::DownloadWithFallback({path}, path,
-            [&manifest, path](WebResourceFetcher::FetchOutcome outcome) {
-                manifest.pendingDownloads--;
-                if (outcome == WebResourceFetcher::FetchOutcome::Failed) {
-                    LOG_ERROR("StagedLoading", "Required asset %s failed for %s", path.c_str(),
-                              manifest.name.c_str());
+        // Found again by name, not held by reference: LoadSystem may have cleared the
+        // manifests (and bumped the generation) before the download lands.
+        auto onDone = [this, generation = _manifestGeneration, name = manifest.name,
+                       path](WebResourceFetcher::FetchOutcome outcome) {
+            if (generation != _manifestGeneration) {
+                return;
+            }
+            for (auto& m : _planetSystemManifests) {
+                if (m.name == name) {
+                    m.pendingDownloads--;
                 }
-            });
+            }
+            if (outcome == WebResourceFetcher::FetchOutcome::Failed) {
+                LOG_ERROR("StagedLoading", "Required asset %s failed for %s", path.c_str(), name.c_str());
+            }
+        };
+        WebResourceFetcher::DownloadWithFallback({path}, path, std::move(onDone));
     }
 
     // Download optional assets (moons, rings, clouds) — fire-and-forget.

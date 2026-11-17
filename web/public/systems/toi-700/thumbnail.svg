@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 160 72" width="160" height="72" role="img" aria-label="TOI-700">
+  <defs>
+    <radialGradient id="glow"><stop offset="0" stop-color="#ffc689" stop-opacity="0.9"/><stop offset="1" stop-color="#ffc689" stop-opacity="0"/></radialGradient>
+  </defs>
+  <rect width="160" height="72" fill="#05070d"/>
+  <line x1="29.839622056311278" y1="36" x2="154" y2="36" stroke="#ffffff" stroke-opacity="0.12" stroke-width="0.6"/>
+  <circle cx="16" cy="36" r="17.2" fill="url(#glow)"/>
+  <circle cx="16" cy="36" r="7.8" fill="#ffc689"/>
+  <circle cx="33.8" cy="36" r="1.57" fill="#c4ad95"/>
+  <circle cx="75.5" cy="36" r="2.55" fill="#95c4dd"/>
+  <circle cx="122.9" cy="36" r="1.53" fill="#adb390"/>
+  <circle cx="150.0" cy="36" r="1.71" fill="#adb390"/>
+</svg>

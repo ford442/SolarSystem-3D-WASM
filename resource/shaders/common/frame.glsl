@@ -15,4 +15,5 @@ layout(std140) uniform FrameUBO {
     float nearPlane;
     float framePad0;
     float framePad1;
+    vec4 starColor;  // rgb: the star's light relative to the Sun's; (1, 1, 1) in Sol
 } frame;

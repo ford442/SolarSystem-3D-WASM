@@ -1,0 +1,68 @@
+{
+  "version": 2,
+  "generatedFrom": "resource/systems/51-peg.catalog.json",
+  "indexConvention": "Star=0, planets 1… by semi-major axis; matches the active system's OrbitLayout table",
+  "sceneNote": "Measured orbits and sizes; surfaces are procedural (no exoplanet has been imaged). Values marked fit are estimates.",
+  "bodies": [
+    {
+      "index": 0,
+      "id": "51_peg",
+      "name": "51 Pegasi",
+      "nameRu": "51 Пегаса",
+      "type": "star",
+      "diameterKm": 1655766,
+      "massEarths": 356252,
+      "siderealRotationDays": null,
+      "orbitalPeriodDays": null,
+      "distanceAu": 0,
+      "moons": 0,
+      "summary": "G5V star 50.4 light-years away; 1 known planet in the archive's composite table.",
+      "summaryRu": "Звезда класса G5V на расстоянии 50.4 св. лет; известных планет: 1.",
+      "spectralType": "G5V",
+      "effectiveTemperatureK": 5761,
+      "luminositySolar": 1.3687055,
+      "distancePc": 15.461
+    },
+    {
+      "index": 1,
+      "id": "51_peg_b",
+      "name": "51 Pegasi b",
+      "nameRu": "51 Пегаса b",
+      "type": "hot jupiter",
+      "diameterKm": 179662,
+      "massEarths": 193.875,
+      "siderealRotationDays": 4.230797,
+      "orbitalPeriodDays": 4.2307966,
+      "distanceAu": 0.052,
+      "moons": 0,
+      "summary": "Hot jupiter discovered in 1995 (radial velocity); 506.18× Earth's insolation, equilibrium temperature ≈ 1329 K.",
+      "summaryRu": "Горячий юпитер, открыта в 1995 г. методом лучевых скоростей; освещённость 506.18 от земной, равновесная температура ≈ 1329 K.",
+      "equilibriumTemperatureK": 1328.9,
+      "irradianceEarth": 506.1781,
+      "discoveryYear": 1995,
+      "discoveryMethod": "Radial Velocity",
+      "fit": {
+        "rotation": "tidally-locked"
+      },
+      "surface": "hot-jupiter"
+    }
+  ],
+  "scaleModes": {},
+  "system": {
+    "id": "51-peg",
+    "name": "51 Pegasi",
+    "nameRu": "51 Пегаса",
+    "distancePc": 15.461,
+    "habitableZoneAu": {
+      "innerAu": 1.11547,
+      "outerAu": 1.607
+    },
+    "source": {
+      "table": "NASA Exoplanet Archive, Planetary Systems Composite Parameters (pscomppars)",
+      "url": "https://exoplanetarchive.ipac.caltech.edu/",
+      "archiveHostname": "51 Peg",
+      "referencePlaneInclinationDeg": 49.8
+    },
+    "sceneNoteRu": "Орбиты и размеры измерены; поверхности процедурные (ни одна экзопланета не сфотографирована). Значения с пометкой fit — оценки."
+  }
+}

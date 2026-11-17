@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 160 72" width="160" height="72" role="img" aria-label="Kepler-186">
+  <defs>
+    <radialGradient id="glow"><stop offset="0" stop-color="#ffce9b" stop-opacity="0.9"/><stop offset="1" stop-color="#ffce9b" stop-opacity="0"/></radialGradient>
+  </defs>
+  <rect width="160" height="72" fill="#05070d"/>
+  <line x1="30.02182599590226" y1="36" x2="154" y2="36" stroke="#ffffff" stroke-opacity="0.12" stroke-width="0.6"/>
+  <circle cx="16" cy="36" r="17.6" fill="url(#glow)"/>
+  <circle cx="16" cy="36" r="8.0" fill="#ffce9b"/>
+  <circle cx="34.0" cy="36" r="1.66" fill="#c4ad95"/>
+  <circle cx="46.6" cy="36" r="1.79" fill="#c4ad95"/>
+  <circle cx="71.7" cy="36" r="1.89" fill="#c4ad95"/>
+  <circle cx="87.4" cy="36" r="1.80" fill="#adb390"/>
+  <circle cx="150.0" cy="36" r="1.73" fill="#eaeff3"/>
+</svg>

@@ -1,6 +1,6 @@
 #ifndef SOLARSYSTEM_CATALOGCLOUDS_H
 #define SOLARSYSTEM_CATALOGCLOUDS_H
-#include "BodyCatalog.generated.h"
+#include "BodyCatalog.h"
 #include "Clouds.h"
 
 /**

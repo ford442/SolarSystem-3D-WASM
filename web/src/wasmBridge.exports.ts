@@ -25,6 +25,9 @@ export interface CachedCwrapExports {
     getFrameStatsJson: () => string;
     setGpuTimersEnabled: (enabled: number) => void;
     getFocusedMissionJson: () => string;
+    loadStarSystem: (id: string, focusIndex: number) => number;
+    getActiveSystemId: () => string;
+    isSystemJumpActive: () => number;
     setOrbitScaleMode: (mode: number) => void;
     getOrbitScaleMode: () => number;
     getNearestPlanetIndex: () => number;
@@ -109,6 +112,9 @@ export function createCachedCwrapExports(cwrap: SolarSystemCwrap): CachedCwrapEx
     getFrameStatsJson: cwrap('GetFrameStatsJson', 'string', []),
     setGpuTimersEnabled: cwrap('SetGpuTimersEnabled', null, ['number']),
     getFocusedMissionJson: cwrap('GetFocusedMissionJson', 'string', []),
+    loadStarSystem: cwrap('LoadStarSystem', 'number', ['string', 'number']),
+    getActiveSystemId: cwrap('GetActiveSystemId', 'string', []),
+    isSystemJumpActive: cwrap('IsSystemJumpActive', 'number', []),
     setOrbitScaleMode: cwrap('SetOrbitScaleMode', null, ['number']),
     getOrbitScaleMode: cwrap('GetOrbitScaleMode', 'number', []),
     getNearestPlanetIndex: cwrap('GetNearestPlanetIndex', 'number', []),
@@ -169,4 +175,4 @@ export function createCachedCwrapExports(cwrap: SolarSystemCwrap): CachedCwrapEx
     };
 }
 
-export const EXPORT_COUNT = 80;
+export const EXPORT_COUNT = 83;

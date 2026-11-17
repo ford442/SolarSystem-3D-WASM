@@ -5,6 +5,7 @@
 #include "FramePasses.h"
 #include "SystemModules.h"
 #include "gfx/FrameUniforms.h"
+#include "gfx/GlHandle.h"
 #include "astro/MissionCatalog.h"
 #include "gfx/ShaderLibrary.h"
 #include "Solar_System/CatalogMaterial.h"
@@ -97,6 +98,14 @@ public:
     void RenderMonoEffects(const FrameContext& ctx);
     /** Screen-space text after the scene: Observe's HUD, or distances and the hint list. */
     void RenderHud(const FrameContext& ctx);
+    /** A full-screen `color` over the frame at `amount` (0 = none): the star-system jump fade. */
+    void RenderScreenFade(GLuint framebuffer, const glm::vec3& color, float amount) const;
+    /**
+     * Start compiling every planetLighting variant the active catalog can draw with (after
+     * StarSystemCatalog::Activate): a new system's PROCEDURAL_SURFACE programs build while the
+     * jump is black instead of on its first frame.
+     */
+    void PrefetchCatalogVariants();
     /** Texture-upgrade progress line; also reports streaming progress to the page on web. */
     void RenderTextureLoadingProgress(const FrameContext& ctx) const;
     /** Whether atmospheres with LUTs should take the physical path this frame. */
@@ -241,6 +250,8 @@ private:
     // NEAR_SURFACE builds of the shell programs, compiled on first use (ShellProgram).
     Shader *_nearAtmosphereShader = nullptr, *_nearPbrAtmosphereShader = nullptr, *_nearCloudsShader = nullptr;
     Shader* _coronaVolumeShader = nullptr;
+    Shader* _screenFadeShader = nullptr;
+    GlVertexArray _screenFadeVao; // empty: screenFade.vs builds its triangle from gl_VertexID
     std::unique_ptr<LensFlare> _lensFlare;
     std::unique_ptr<SurfacePatchMesh> _surfacePatch;
     // What _surfacePatch was last built for, so the second XR eye reuses the first's patch.

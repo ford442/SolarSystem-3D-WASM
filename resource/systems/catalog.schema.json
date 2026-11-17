@@ -1,6 +1,6 @@
 {
   "$schema": "http://json-schema.org/draft-07/schema#",
-  "$id": "https://github.com/ford442/SolarSystem-3D-WASM/resource/planets.catalog.schema.json",
+  "$id": "https://github.com/ford442/SolarSystem-3D-WASM/resource/systems/catalog.schema.json",
   "title": "Solar System planet metadata catalog",
   "type": "object",
   "required": ["schemaVersion", "bodies", "scaleModes"],
@@ -133,7 +133,7 @@
               },
               "atmosphere": {
                 "type": "object",
-                "description": "Atmosphere shell (BodyCatalog::kAtmospheres). `oneil` is the cheap single-scattering shell every quality preset can draw; optional `physical` is baked into transmittance/multi-scattering LUTs by tools/atmosphere_lut_baker (resource/atmosphere/<id>_*.ktx2) and drawn on Medium/Full. Rebake after editing `physical`. See docs/ARCHITECTURE.md §9.2.",
+                "description": "Atmosphere shell (BodyCatalog::Atmospheres(); Sol's compiled as kSolAtmospheres). `oneil` is the cheap single-scattering shell every quality preset can draw; optional `physical` is baked into transmittance/multi-scattering LUTs by tools/atmosphere_lut_baker (resource/atmosphere/<id>_*.ktx2) and drawn on Medium/Full. Rebake after editing `physical`. See docs/ARCHITECTURE.md §9.2.",
                 "required": ["oneil"],
                 "properties": {
                   "oneil": {

@@ -431,6 +431,9 @@ TEST(Terrain, EveryProgramLinksWithItsSamplerUnits) {
     // tracks it as current would have its name reused by the next one.
     static std::vector<std::unique_ptr<Shader>> programs;
     for (unsigned variant = 0; variant < CatalogMaterial::kVariantCount; ++variant) {
+        if (variant & CatalogMaterial::kProcedural) {
+            continue; // terrain never draws a procedural body (Renderer::TerrainProgram masks it)
+        }
         SCOPED_TRACE(variant);
         programs.push_back(std::make_unique<Shader>("resource/shaders/terrain.vs", "resource/shaders/terrain.fs",
                                                     CatalogMaterial::Defines(variant)));

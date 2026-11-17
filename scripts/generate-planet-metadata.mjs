@@ -1,13 +1,22 @@
 #!/usr/bin/env node
 /**
- * Generate planet metadata artifacts from resource/planets.catalog.json.
+ * Generate planet metadata artifacts from the star-system catalogs in resource/systems/.
  *
- * Outputs:
+ * resource/systems/index.json lists the systems (Sol plus the exoplanet systems that
+ * scripts/generate-exoplanet-systems.mjs writes). Sol's catalog, sol.catalog.json, is the
+ * one the engine is compiled with:
  *   - web/public/planet_facts.json
  *   - web/threejs/src/data/orbital-parameters.json
  *   - resource/planet_manifest.json
  *   - src/Solar_System/OrbitLayoutBodies.generated.inc
  *   - src/Solar_System/BodyCatalog.generated.h
+ *   - web/src/generated/planetIds.ts
+ * and every system, Sol included, gets
+ *   - resource/systems/generated/<id>.runtime.json  (what StarSystemCatalog loads at run time;
+ *     Sol's is the test that the loader reproduces the compiled table)
+ *   - web/public/systems/<id>/planet_facts.json     (the explorer panel; Sol keeps the old path too)
+ *   - web/public/systems/<id>/thumbnail.svg         (the system picker)
+ *   - web/public/systems/index.json
  *
  * Usage:
  *   node scripts/generate-planet-metadata.mjs
@@ -35,8 +44,11 @@ import { dirname, join, relative } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '..');
-const catalogPath = join(root, 'resource/planets.catalog.json');
-const schemaPath = join(root, 'resource/planets.catalog.schema.json');
+const systemsDir = join(root, 'resource/systems');
+const systemsIndexPath = join(systemsDir, 'index.json');
+const schemaPath = join(systemsDir, 'catalog.schema.json');
+const SOL_ID = 'sol';
+const SOL_CATALOG_REL = 'resource/systems/sol.catalog.json';
 
 const OUT = {
   facts: join(root, 'web/public/planet_facts.json'),
@@ -46,6 +58,10 @@ const OUT = {
   orbitLayoutBodies: join(root, 'src/Solar_System/OrbitLayoutBodies.generated.inc'),
   bodyCatalog: join(root, 'src/Solar_System/BodyCatalog.generated.h'),
   planetIds: join(root, 'web/src/generated/planetIds.ts'),
+  runtime: (id) => join(root, `resource/systems/generated/${id}.runtime.json`),
+  systemFacts: (id) => join(root, `web/public/systems/${id}/planet_facts.json`),
+  thumbnail: (id) => join(root, `web/public/systems/${id}/thumbnail.svg`),
+  webIndex: join(root, 'web/public/systems/index.json'),
 };
 
 const args = new Set(process.argv.slice(2));
@@ -146,7 +162,44 @@ function validateAtmosphere(body) {
   }
 }
 
-function validateCatalog(catalog) {
+/**
+ * render.star on the index-0 body: what StarPhysics derives the light, corona and flare tint,
+ * irradiance and angular size from. glowTemperatureK is the glow spectrum's art calibration
+ * (5778 K, what the Sun was tuned at), the default for every star: its colour is the tint.
+ */
+function validateStar(body) {
+  const st = body.render?.star;
+  const where = `Star ${body.id} render.star`;
+  if (!st) throw new Error(`${where} is required (effectiveTemperatureK, radiusSolar, luminositySolar)`);
+  for (const key of ['effectiveTemperatureK', 'radiusSolar', 'luminositySolar']) {
+    if (!isFinitePositive(st[key])) throw new Error(`${where}.${key} must be a positive number`);
+  }
+  if (st.effectiveTemperatureK < 1000 || st.effectiveTemperatureK > 50000) {
+    throw new Error(`${where}.effectiveTemperatureK must be within 1000–50000 K`);
+  }
+  if (st.activity !== undefined && !(st.activity >= 0 && st.activity <= 1)) {
+    throw new Error(`${where}.activity must be in [0, 1]`);
+  }
+}
+
+const PROCEDURAL_MODES = new Set([0, 1, 2, 3]);
+
+/** render.procedural: the PROCEDURAL_SURFACE permutation's material (CatalogMaterial). */
+function validateProcedural(body) {
+  const pr = body.render.procedural;
+  const where = `Body ${body.id} render.procedural`;
+  if (!PROCEDURAL_MODES.has(pr.mode)) throw new Error(`${where}.mode must be 0 (rocky), 1 (banded), 2 (lava) or 3 (ice)`);
+  if (!Array.isArray(pr.colors) || pr.colors.length !== 3 || !pr.colors.every(isRgb)) {
+    throw new Error(`${where}.colors must be three [r, g, b] (linear)`);
+  }
+  if (!Number.isFinite(pr.seed)) throw new Error(`${where}.seed must be a number`);
+  const flags = body.render.shaderFlags || {};
+  if (flags.hasNightTexture || flags.hasSpecularMap || flags.hasClouds) {
+    throw new Error(`${where}: a procedural surface has no maps, so no shaderFlags`);
+  }
+}
+
+function validateCatalog(catalog, systemId) {
   if (catalog.schemaVersion !== 1) {
     throw new Error(`Unsupported schemaVersion: ${catalog.schemaVersion}`);
   }
@@ -316,32 +369,58 @@ function validateCatalog(catalog) {
     }
   }
 
-  if (indices.get(0) !== 'sun') {
-    throw new Error('Index 0 must be id "sun" (canonical OrbitLayout / explorer convention)');
+  const star = catalog.bodies.find((b) => b.index === 0);
+  if (!star || star.kind !== 'star') {
+    throw new Error('Index 0 must be the system\'s star (kind "star")');
+  }
+  validateStar(star);
+  if (catalog.bodies.some((b) => b.kind === 'star' && b.index !== 0)) {
+    throw new Error('One star per system: only index 0 may be kind "star"');
   }
 
-  const vesta = catalog.bodies.find((b) => b.id === 'vesta');
-  if (!vesta || vesta.index !== 11) {
-    throw new Error('Focus index 11 must remain id "vesta" (Sun=0 … Vesta=11 frozen)');
+  if (systemId === SOL_ID) {
+    // Sol's indices are frozen ABI: deep links, the FocusPlanet export and OrbitLayout::Body.
+    if (indices.get(0) !== 'sun') {
+      throw new Error('Index 0 must be id "sun" (canonical OrbitLayout / explorer convention)');
+    }
+    const vesta = catalog.bodies.find((b) => b.id === 'vesta');
+    if (!vesta || vesta.index !== 11) {
+      throw new Error('Focus index 11 must remain id "vesta" (Sun=0 … Vesta=11 frozen)');
+    }
+  } else {
+    if (catalog.system?.id !== systemId) {
+      throw new Error(`catalog.system.id "${catalog.system?.id}" must be the index id "${systemId}"`);
+    }
+    for (const body of catalog.bodies) {
+      if (body.kind === 'satellite' || !body.render || body.kind === 'star') continue;
+      // No exoplanet has a texture: their surfaces are render.procedural.
+      if (!body.render.procedural && !body.render.lod?.diffuse) {
+        throw new Error(`Body ${body.id} needs render.procedural or render.lod textures`);
+      }
+    }
+  }
+  for (const body of catalog.bodies) {
+    if (body.render?.procedural) validateProcedural(body);
   }
 
   // Lightweight schema presence check (full AJV optional).
   if (existsSync(schemaPath)) {
     const schema = readJson(schemaPath);
     if (!schema.required?.includes('bodies')) {
-      throw new Error('planets.catalog.schema.json looks invalid (missing bodies requirement)');
+      throw new Error('resource/systems/catalog.schema.json looks invalid (missing bodies requirement)');
     }
   }
 }
 
-function buildPlanetFacts(catalog) {
+function buildPlanetFacts(catalog, generatedFrom) {
+  const sol = catalog.system?.id === undefined || catalog.system.id === SOL_ID;
   const bodies = [...catalog.bodies]
     .filter(isFocusBody)
     .sort((a, b) => a.index - b.index)
     .map((body) => {
       const f = body.facts || {};
       const o = body.orbit || {};
-      return {
+      const row = {
         index: body.index,
         id: body.id,
         name: body.displayName?.en ?? body.id,
@@ -360,6 +439,22 @@ function buildPlanetFacts(catalog) {
         summary: f.summary?.en ?? '',
         summaryRu: f.summary?.ru,
       };
+      // Exoplanet systems: what the archive measured, and which numbers are estimates.
+      for (const key of [
+        'equilibriumTemperatureK',
+        'irradianceEarth',
+        'discoveryYear',
+        'discoveryMethod',
+        'spectralType',
+        'effectiveTemperatureK',
+        'luminositySolar',
+        'distancePc',
+      ]) {
+        if (f[key] !== undefined && f[key] !== null) row[key] = f[key];
+      }
+      if (body.fit && Object.keys(body.fit).length > 0) row.fit = body.fit;
+      if (body.render?.procedural) row.surface = body.render.procedural.style;
+      return row;
     });
 
   const scaleModes = {};
@@ -372,15 +467,29 @@ function buildPlanetFacts(catalog) {
     };
   }
 
-  return {
+  const facts = {
     version: 2,
-    generatedFrom: 'resource/planets.catalog.json',
+    generatedFrom,
     // Canonical focus indices: Sun=0 … Vesta=11 (frozen), then Eris=12 … Halley=15. Satellites are omitted from explorer facts.
-    indexConvention: 'Sun=0 … Vesta=11 (frozen), Eris=12 … Halley=15; matches OrbitLayout::Body and Module focus APIs',
+    indexConvention: sol
+      ? 'Sun=0 … Vesta=11 (frozen), Eris=12 … Halley=15; matches OrbitLayout::Body and Module focus APIs'
+      : 'Star=0, planets 1… by semi-major axis; matches the active system\'s OrbitLayout table',
     sceneNote: catalog.sceneNote?.en ?? '',
     bodies,
     scaleModes,
   };
+  if (!sol) {
+    facts.system = {
+      id: catalog.system.id,
+      name: catalog.system.name?.en,
+      nameRu: catalog.system.name?.ru,
+      distancePc: catalog.system.distancePc,
+      habitableZoneAu: catalog.system.habitableZoneAu,
+      source: catalog.system.source,
+      sceneNoteRu: catalog.sceneNote?.ru,
+    };
+  }
+  return facts;
 }
 
 function buildOrbitalParameters(catalog) {
@@ -405,8 +514,8 @@ function buildOrbitalParameters(catalog) {
 
   return {
     source:
-      'Generated from resource/planets.catalog.json — companion scale 1 unit = 1 C++ world unit',
-    generatedFrom: 'resource/planets.catalog.json',
+      `Generated from ${SOL_CATALOG_REL} — companion scale 1 unit = 1 C++ world unit`,
+    generatedFrom: `${SOL_CATALOG_REL}`,
     indexConvention: 'Body order follows catalog focus index (Sun excluded from this list)',
     bodies,
   };
@@ -438,7 +547,7 @@ function buildPlanetManifest(catalog) {
 
   return {
     version: 1,
-    generatedFrom: 'resource/planets.catalog.json',
+    generatedFrom: `${SOL_CATALOG_REL}`,
     // proxyPosition is heliocentric art offset (same as OrbitLayout compressedOffset).
     systems,
   };
@@ -501,7 +610,7 @@ function buildOrbitLayoutBodiesInc(catalog) {
     );
   });
   return [
-    '// AUTO-GENERATED by scripts/generate-planet-metadata.mjs from resource/planets.catalog.json.',
+    `// AUTO-GENERATED by scripts/generate-planet-metadata.mjs from ${SOL_CATALOG_REL}.`,
     '// Do not edit directly — run: node scripts/generate-planet-metadata.mjs',
     "// Included into OrbitLayout.cpp's kBodies[] initializer. Row order is focus index order",
     '// (Sun=0 … Halley=15). Satellites (index 16+) are not rows here.',
@@ -571,7 +680,7 @@ function buildPlanetIdsTs(catalog) {
   const focus = [...catalog.bodies].filter(isFocusBody).sort((a, b) => a.index - b.index);
   const last = focus[focus.length - 1].index;
   return [
-    '// AUTO-GENERATED by scripts/generate-planet-metadata.mjs from resource/planets.catalog.json',
+    `// AUTO-GENERATED by scripts/generate-planet-metadata.mjs from ${SOL_CATALOG_REL}`,
     '// — do not edit. Focus indices match OrbitLayout::Body and the FocusPlanet export.',
     '',
     '/** Catalog id → focus index. Sun=0 … Vesta=11 are frozen; satellites (16+) are not focusable. */',
@@ -594,79 +703,239 @@ function buildPlanetIdsTs(catalog) {
   ].join('\n');
 }
 
+/**
+ * One catalog row as BodyCatalog::Entry's fields, by their C++ names. The header prints it as
+ * an aggregate initializer (cppEntry) and the runtime JSON writes it as is, so the compiled
+ * Sol table and the files StarSystemCatalog loads cannot disagree on a field.
+ */
+function entryRow(body, byId) {
+  const r = body.render;
+  const flags = r.shaderFlags || {};
+  const lod = r.lod || {};
+  const o = body.orbit || {};
+  const k = o.keplerian || {};
+  const cloud = r.cloudLayer || {};
+  const parent = body.parent ? byId.get(body.parent) : null;
+  const pr = r.procedural;
+  const num = (v) => Number(v ?? 0);
+  return {
+    index: body.index,
+    id: body.id,
+    // A planet of an exoplanet system orbits the star; the C++ side keys heliocentric bodies
+    // by parentId == nullptr / the star, exactly as Sol's "sun".
+    parentId: body.parent ?? null,
+    initTag: body.system?.initTag ?? parent?.system?.initTag ?? body.id,
+    kind: body.kind,
+    displayNameEn: body.displayName?.en ?? body.id,
+    displayNameRu: body.displayName?.ru ?? body.displayName?.en ?? body.id,
+    auDistance: num(o.distanceAu),
+    orbitalPeriodDays: num(o.orbitalPeriodDays),
+    earthRadiusScale: Number(o.earthRadiusScale ?? 1),
+    radiusKm: trueRadiusKm(body),
+    axialTiltDegrees: num(o.axialTiltDegrees),
+    artTiltXDegrees: num(r.artTiltXDegrees),
+    oblateness: num(r.oblateness),
+    yawOffsetDegrees: num(o.yawOffsetDegrees),
+    artRollDegrees: num(o.artRollDegrees),
+    shaderFlags: {
+      hasNightTexture: !!flags.hasNightTexture,
+      hasSpecularMap: !!flags.hasSpecularMap,
+      hasClouds: !!flags.hasClouds,
+    },
+    useSphereIntersect: !!(r.useSphereIntersect ?? body.kind === 'satellite'),
+    ambientFactor: num(r.ambientFactor),
+    lod: {
+      diffuse: lod.diffuse ?? '',
+      normal: lod.normal ?? '',
+      specular: lod.specular ?? null,
+      night: lod.night ?? null,
+      clouds: lod.clouds ?? null,
+    },
+    meshPath: r.mesh ?? null,
+    sceneOrbitRadius: num(o.sceneOrbitRadius),
+    orbitPlane: o.orbitPlane === 'xy' ? 'xy' : 'xz',
+    initialAnomalyRad: num(o.initialAnomalyRad),
+    spinDegPerSimSecond: num(o.spinDegPerSimSecond),
+    keplerian: {
+      aKm: num(k.aKm),
+      e: num(k.e),
+      iDeg: num(k.iDeg),
+      OmegaDeg: num(k.OmegaDeg),
+      omegaDeg: num(k.omegaDeg),
+      M0Deg: num(k.M0Deg),
+      nDegPerDay: num(k.nDegPerDay),
+      OmegaDotDegPerDay: num(k.OmegaDotDegPerDay),
+      omegaDotDegPerDay: num(k.omegaDotDegPerDay),
+    },
+    cloudLayer: {
+      diffuse: cloud.diffuse ?? null,
+      normal: cloud.normal ?? null,
+      scaleFactor: num(cloud.scaleFactor),
+      spinDegPerSimSecond: num(cloud.spinDegPerSimSecond),
+      ambientFactor: num(cloud.ambientFactor),
+    },
+    hasCloudLayer: !!body.system?.hasCloudLayer,
+    hasRings: !!body.system?.hasRings,
+    hasTerrain: !!r.terrain,
+    terrainAttribution: r.terrain?.attribution ?? null,
+    procedural: {
+      enabled: !!pr,
+      mode: pr ? pr.mode : 0,
+      seed: pr ? num(pr.seed) : 0,
+      colors: pr ? pr.colors : [[0, 0, 0], [0, 0, 0], [0, 0, 0]],
+      bands: pr ? num(pr.bands) : 0,
+      seaLevel: pr ? num(pr.seaLevel) : 0,
+      polarCap: pr ? num(pr.polarCap) : 0,
+      emissive: pr ? num(pr.emissive) : 0,
+      equilibriumTemperatureK: pr ? num(pr.equilibriumTemperatureK) : 0,
+    },
+    placeFromElements: !!o.placeFromElements,
+  };
+}
+
+function cppRgb(v) {
+  return `{${cppFloat(v[0])}, ${cppFloat(v[1])}, ${cppFloat(v[2])}}`;
+}
+
+function cppEntry(e) {
+  const k = e.keplerian;
+  const c = e.cloudLayer;
+  const p = e.procedural;
+  return (
+    `    {${e.index}, ${cppString(e.id)}, ${cppNullableString(e.parentId)}, ` +
+    `${cppString(e.initTag)}, ${cppKind(e.kind)}, ` +
+    `${cppWideString(e.displayNameEn)}, ${cppWideString(e.displayNameRu)}, ` +
+    `${cppFloat(e.auDistance)}, ${cppFloat(e.orbitalPeriodDays)}, ` +
+    `${cppFloat(e.earthRadiusScale)}, ${cppFloat(e.radiusKm)}, ${cppFloat(e.axialTiltDegrees)}, ` +
+    `${cppFloat(e.artTiltXDegrees)}, ${cppFloat(e.oblateness)}, ${cppFloat(e.yawOffsetDegrees)}, ` +
+    `${cppFloat(e.artRollDegrees)}, ` +
+    `{${e.shaderFlags.hasNightTexture}, ${e.shaderFlags.hasSpecularMap}, ${e.shaderFlags.hasClouds}}, ` +
+    `${e.useSphereIntersect}, ${cppFloat(e.ambientFactor)}, ` +
+    `{${cppString(e.lod.diffuse)}, ${cppString(e.lod.normal)}, ` +
+    `${cppNullableString(e.lod.specular)}, ${cppNullableString(e.lod.night)}, ` +
+    `${cppNullableString(e.lod.clouds)}}, ${cppNullableString(e.meshPath)}, ` +
+    `${cppFloat(e.sceneOrbitRadius)}, ${cppOrbitPlane(e.orbitPlane)}, ` +
+    `${cppFloat(e.initialAnomalyRad)}, ${cppFloat(e.spinDegPerSimSecond)}, ` +
+    `{${cppFloat(k.aKm)}, ${cppFloat(k.e)}, ${cppFloat(k.iDeg)}, ${cppFloat(k.OmegaDeg)}, ` +
+    `${cppFloat(k.omegaDeg)}, ${cppFloat(k.M0Deg)}, ${cppFloat(k.nDegPerDay)}, ` +
+    `${cppFloat(k.OmegaDotDegPerDay)}, ${cppFloat(k.omegaDotDegPerDay)}}, ` +
+    `{${cppNullableString(c.diffuse)}, ${cppNullableString(c.normal)}, ` +
+    `${cppFloat(c.scaleFactor)}, ${cppFloat(c.spinDegPerSimSecond)}, ` +
+    `${cppFloat(c.ambientFactor)}}, ` +
+    `${e.hasCloudLayer}, ${e.hasRings}, ` +
+    `${e.hasTerrain}, ${cppNullableString(e.terrainAttribution)}, ` +
+    `{${p.enabled}, ${p.mode}, ${cppFloat(p.seed)}, {${p.colors.map(cppRgb).join(', ')}}, ` +
+    `${cppFloat(p.bands)}, ${cppFloat(p.seaLevel)}, ${cppFloat(p.polarCap)}, ${cppFloat(p.emissive)}, ` +
+    `${cppFloat(p.equilibriumTemperatureK)}}, ` +
+    `${e.placeFromElements}}, // ${e.id}`
+  );
+}
+
+/** render.atmosphere as BodyCatalog::AtmosphereRow's fields (same split as entryRow). */
+function atmosphereRow(body) {
+  const o = body.render.atmosphere.oneil;
+  const p = body.render.atmosphere.physical;
+  return {
+    bodyId: body.id,
+    oneil: {
+      shellScale: o.shellScale,
+      color: o.color,
+      innerRadiusMinusEpsilon: !!o.innerRadiusMinusEpsilon,
+      outerRadius: o.outerRadius,
+      mieTint: o.mieTint,
+      hScaleFactor: o.hScaleFactor,
+      toneMapping: !!o.toneMapping,
+    },
+    physical: p
+      ? {
+          enabled: true,
+          groundRadiusKm: p.groundRadiusKm,
+          topRadiusKm: p.topRadiusKm,
+          thicknessScale: p.thicknessScale,
+          rayleighScattering: p.rayleigh.scatteringPerKm,
+          rayleighScaleHeightKm: p.rayleigh.scaleHeightKm,
+          mieScattering: p.mie.scatteringPerKm,
+          mieExtinction: p.mie.extinctionPerKm,
+          mieScaleHeightKm: p.mie.scaleHeightKm,
+          miePhaseG: p.mie.phaseG,
+          absorptionExtinction: p.absorption.extinctionPerKm,
+          absorptionCenterKm: p.absorption.layerCenterKm,
+          absorptionHalfWidthKm: p.absorption.layerHalfWidthKm,
+          groundAlbedo: p.groundAlbedo,
+          exposure: p.exposure,
+        }
+      : null,
+  };
+}
+
+function cppAtmosphere(a) {
+  const o = a.oneil;
+  const p = a.physical;
+  const oneil =
+    `{${cppFloat(o.shellScale)}, ${cppRgb(o.color)}, ${o.innerRadiusMinusEpsilon}, ` +
+    `${cppFloat(o.outerRadius)}, ${cppRgb(o.mieTint)}, ${cppFloat(o.hScaleFactor)}, ${o.toneMapping}}`;
+  const physical = p
+    ? `{true, ${cppFloat(p.groundRadiusKm)}, ${cppFloat(p.topRadiusKm)}, ${cppFloat(p.thicknessScale)}, ` +
+      `${cppRgb(p.rayleighScattering)}, ${cppFloat(p.rayleighScaleHeightKm)}, ` +
+      `${cppRgb(p.mieScattering)}, ${cppRgb(p.mieExtinction)}, ` +
+      `${cppFloat(p.mieScaleHeightKm)}, ${cppFloat(p.miePhaseG)}, ` +
+      `${cppRgb(p.absorptionExtinction)}, ${cppFloat(p.absorptionCenterKm)}, ` +
+      `${cppFloat(p.absorptionHalfWidthKm)}, ${cppRgb(p.groundAlbedo)}, ${cppFloat(p.exposure)}}`
+    : '{}';
+  return `    {${cppString(a.bodyId)}, ${oneil}, ${physical}},`;
+}
+
+/** The index-0 body's render.star as BodyCatalog::StarRow. */
+function starRow(catalog) {
+  const body = catalog.bodies.find((b) => b.index === 0);
+  const st = body.render.star;
+  return {
+    id: body.id,
+    displayNameEn: body.displayName?.en ?? body.id,
+    displayNameRu: body.displayName?.ru ?? body.displayName?.en ?? body.id,
+    spectralType: st.spectralType ?? '',
+    effectiveTemperatureK: st.effectiveTemperatureK,
+    // Every star's glow ramp stays at the Sun's art calibration: colour comes from its Krystek
+    // tint (StarPhysics::RelativeTint), so the spectrum ramp must not redden it a second time.
+    glowTemperatureK: st.glowTemperatureK ?? 5778,
+    radiusKm: st.radiusSolar * 695700,
+    radiusSolar: st.radiusSolar,
+    luminositySolar: st.luminositySolar,
+    massSolar: st.massSolar ?? 0,
+    activity: st.activity ?? 0,
+  };
+}
+
+function cppStar(s) {
+  return (
+    `{${cppString(s.id)}, ${cppWideString(s.displayNameEn)}, ${cppWideString(s.displayNameRu)}, ` +
+    `${cppString(s.spectralType)}, ${cppFloat(s.effectiveTemperatureK)}, ${cppFloat(s.glowTemperatureK)}, ` +
+    `${cppDouble(s.radiusKm)}, ${cppFloat(s.radiusSolar)}, ${cppFloat(s.luminositySolar)}, ` +
+    `${cppFloat(s.massSolar)}, ${cppFloat(s.activity)}}`
+  );
+}
+
+/** The bodies BodyCatalog::Entry has rows for: everything with a render block but the star. */
+function entryBodies(catalog) {
+  return catalog.bodies.filter((b) => b.render && b.kind !== 'star').sort((a, b) => a.index - b.index);
+}
+
 function buildBodyCatalogHeader(catalog) {
   const byId = new Map(catalog.bodies.map((b) => [b.id, b]));
-  const bodies = catalog.bodies
-    .filter((b) => b.render)
-    .sort((a, b) => a.index - b.index);
-
-  const entries = bodies.map((body) => {
-    const r = body.render;
-    const flags = r.shaderFlags || {};
-    const lod = r.lod || {};
-    const o = body.orbit || {};
-    const k = o.keplerian || {};
-    const cloud = r.cloudLayer || {};
-    const parent = body.parent ? byId.get(body.parent) : null;
-    const initTag = body.system?.initTag ?? parent?.system?.initTag ?? body.id;
-    const kind = cppKind(body.kind);
-    return (
-      `    {${body.index}, ${cppString(body.id)}, ${cppNullableString(body.parent)}, ` +
-      `${cppString(initTag)}, ${kind}, ` +
-      `${cppWideString(body.displayName?.en ?? body.id)}, ` +
-      `${cppWideString(body.displayName?.ru ?? body.displayName?.en ?? body.id)}, ` +
-      `${cppFloat(o.distanceAu)}, ${cppFloat(o.orbitalPeriodDays)}, ` +
-      `${cppFloat(o.earthRadiusScale ?? 1)}, ${cppFloat(trueRadiusKm(body))}, ${cppFloat(o.axialTiltDegrees)}, ` +
-      `${cppFloat(r.artTiltXDegrees)}, ${cppFloat(r.oblateness)}, ${cppFloat(o.yawOffsetDegrees)}, ` +
-      `${cppFloat(o.artRollDegrees)}, ` +
-      `{${!!flags.hasNightTexture}, ${!!flags.hasSpecularMap}, ${!!flags.hasClouds}}, ` +
-      `${!!(r.useSphereIntersect ?? body.kind === 'satellite')}, ` +
-      `${cppFloat(r.ambientFactor)}, ` +
-      `{${cppString(lod.diffuse ?? '')}, ${cppString(lod.normal ?? '')}, ` +
-      `${cppNullableString(lod.specular)}, ${cppNullableString(lod.night)}, ` +
-      `${cppNullableString(lod.clouds)}}, ${cppNullableString(r.mesh)}, ` +
-      `${cppFloat(o.sceneOrbitRadius)}, ${cppOrbitPlane(o.orbitPlane)}, ` +
-      `${cppFloat(o.initialAnomalyRad)}, ${cppFloat(o.spinDegPerSimSecond)}, ` +
-      `{${cppFloat(k.aKm)}, ${cppFloat(k.e)}, ${cppFloat(k.iDeg)}, ${cppFloat(k.OmegaDeg)}, ` +
-      `${cppFloat(k.omegaDeg)}, ${cppFloat(k.M0Deg)}, ${cppFloat(k.nDegPerDay)}, ` +
-      `${cppFloat(k.OmegaDotDegPerDay)}, ${cppFloat(k.omegaDotDegPerDay)}}, ` +
-      `{${cppNullableString(cloud.diffuse)}, ${cppNullableString(cloud.normal)}, ` +
-      `${cppFloat(cloud.scaleFactor)}, ${cppFloat(cloud.spinDegPerSimSecond)}, ` +
-      `${cppFloat(cloud.ambientFactor)}}, ` +
-      `${!!body.system?.hasCloudLayer}, ${!!body.system?.hasRings}, ` +
-      `${!!r.terrain}, ${cppNullableString(r.terrain?.attribution)}}, // ${body.id}`
-    );
-  });
-
-  const rgb = (v) => `{${cppFloat(v[0])}, ${cppFloat(v[1])}, ${cppFloat(v[2])}}`;
-  const atmospheres = bodies
-    .filter((body) => body.render.atmosphere)
-    .map((body) => {
-      const o = body.render.atmosphere.oneil;
-      const p = body.render.atmosphere.physical;
-      const oneil =
-        `{${cppFloat(o.shellScale)}, ${rgb(o.color)}, ${!!o.innerRadiusMinusEpsilon}, ` +
-        `${cppFloat(o.outerRadius)}, ${rgb(o.mieTint)}, ${cppFloat(o.hScaleFactor)}, ${!!o.toneMapping}}`;
-      const physicalRow = p
-        ? `{true, ${cppFloat(p.groundRadiusKm)}, ${cppFloat(p.topRadiusKm)}, ${cppFloat(p.thicknessScale)}, ` +
-          `${rgb(p.rayleigh.scatteringPerKm)}, ${cppFloat(p.rayleigh.scaleHeightKm)}, ` +
-          `${rgb(p.mie.scatteringPerKm)}, ${rgb(p.mie.extinctionPerKm)}, ` +
-          `${cppFloat(p.mie.scaleHeightKm)}, ${cppFloat(p.mie.phaseG)}, ` +
-          `${rgb(p.absorption.extinctionPerKm)}, ${cppFloat(p.absorption.layerCenterKm)}, ` +
-          `${cppFloat(p.absorption.layerHalfWidthKm)}, ${rgb(p.groundAlbedo)}, ${cppFloat(p.exposure)}}`
-        : '{}';
-      return `    {${cppString(body.id)}, ${oneil}, ${physicalRow}},`;
-    });
+  const bodies = entryBodies(catalog);
+  const entries = bodies.map((body) => cppEntry(entryRow(body, byId)));
+  const atmospheres = bodies.filter((body) => body.render.atmosphere).map((body) => cppAtmosphere(atmosphereRow(body)));
 
   return [
     '#pragma once',
-    '// AUTO-GENERATED by scripts/generate-planet-metadata.mjs from resource/planets.catalog.json.',
+    `// AUTO-GENERATED by scripts/generate-planet-metadata.mjs from ${SOL_CATALOG_REL}.`,
     '// Do not edit directly — run: node scripts/generate-planet-metadata.mjs',
     '//',
-    '// CatalogBody / CatalogSatellite / CatalogClouds consume these rows. Mercury–Pluto and',
-    '// catalog moons are constructed from this table (plus SystemVisuals for ring meshes).',
+    '// The row types every star system uses, and Sol\'s rows compiled in. Code reads the',
+    '// *active* system through BodyCatalog.h (Entries(), FindById, …), which is these tables',
+    '// for Sol and a StarSystemCatalog-loaded copy of the same structs for any other system.',
     '// Axial tilt SSOT is orbit.axialTiltDegrees, applied as Rotate(Z) then optional artTiltX.',
-    '// See docs/ARCHITECTURE.md §2.1.',
+    '// See docs/ARCHITECTURE.md §2.1 and §12.',
     '',
     '#include <cstdint>',
     '',
@@ -675,6 +944,10 @@ function buildBodyCatalogHeader(catalog) {
     'enum class Kind : uint8_t { Star = 0, Planet = 1, DwarfPlanet = 2, Satellite = 3, Comet = 4 };',
     'enum class OrbitPlane : uint8_t { XZ = 0, XY = 1 };',
     '',
+    'struct Rgb {',
+    '    float r, g, b;',
+    '};',
+    '',
     'struct ShaderFlags {',
     '    bool hasNightTexture;',
     '    bool hasSpecularMap;',
@@ -682,7 +955,7 @@ function buildBodyCatalogHeader(catalog) {
     '};',
     '',
     'struct TextureLodIds {',
-    '    const char* diffuse;',
+    '    const char* diffuse; // "" for a procedural surface',
     '    const char* normal;',
     '    const char* specular; // nullptr if this body has no specular map.',
     '    const char* night;    // nullptr if no night map (Earth).',
@@ -707,6 +980,23 @@ function buildBodyCatalogHeader(catalog) {
     '    float scaleFactor;',
     '    float spinDegPerSimSecond;',
     '    float ambientFactor;',
+    '};',
+    '',
+    '/**',
+    ' * render.procedural: a surface drawn from noise (planetLighting PROCEDURAL_SURFACE) for a',
+    ' * body with no texture — every exoplanet. The generator picks the palette from the',
+    ' * equilibrium temperature and size (scripts/generate-exoplanet-systems.mjs).',
+    ' */',
+    'struct ProceduralSurface {',
+    '    bool enabled;',
+    '    uint8_t mode; // 0 rocky continents, 1 banded gas, 2 lava, 3 ice',
+    '    float seed;',
+    '    Rgb colors[3];  // low / mid / high (linear); for gas: belts, zones, highlights',
+    '    float bands;    // gas: zonal band count',
+    '    float seaLevel; // rocky: noise level below which colors[0] (ocean) shows',
+    '    float polarCap; // |sin latitude| above which colors[2] (ice) caps the poles; 0 none',
+    '    float emissive; // lava / hot giants: self-lit strength of colors[2]',
+    '    float equilibriumTemperatureK;',
     '};',
     '',
     'struct Entry {',
@@ -741,41 +1031,23 @@ function buildBodyCatalogHeader(catalog) {
     '    bool hasRings;',
     '    bool hasTerrain;                // render.terrain: height tiles close up (render/terrain/)',
     '    const char* terrainAttribution; // their elevation data\'s credit; nullptr without',
+    '    ProceduralSurface procedural;',
+    '    bool placeFromElements; // orbit.placeFromElements: the Keplerian row places it (Ephemeris)',
     '};',
     '',
-    'inline constexpr Entry kEntries[] = {',
+    '// One row per body; generated data, so clang-format leaves the long rows alone.',
+    '// clang-format off',
+    'inline constexpr Entry kSolEntries[] = {',
     ...entries,
     '};',
+    '// clang-format on',
     '',
     ...strEqHelper(),
-    '',
-    '/** Row for a catalog index, or nullptr when that body has no render descriptor. */',
-    'inline constexpr const Entry* FindByIndex(int index) {',
-    '    for (const Entry& entry : kEntries) {',
-    '        if (entry.index == index) {',
-    '            return &entry;',
-    '        }',
-    '    }',
-    '    return nullptr;',
-    '}',
-    '',
-    'inline constexpr const Entry* FindById(const char* id) {',
-    '    for (const Entry& entry : kEntries) {',
-    '        if (StrEq(entry.id, id)) {',
-    '            return &entry;',
-    '        }',
-    '    }',
-    '    return nullptr;',
-    '}',
     '',
     '// ---------------------------------------------------------------------------------',
     '// Atmospheres (render.atmosphere). `oneil` is the cheap shell every preset can draw;',
     '// `physical` (enabled == true) is baked into LUTs under resource/atmosphere/ by',
     '// tools/atmosphere_lut_baker and drawn by atmospherePbr.fs. See ARCHITECTURE §9.2.',
-    '',
-    'struct Rgb {',
-    '    float r, g, b;',
-    '};',
     '',
     'struct AtmosphereOneil {',
     '    float shellScale;             // shell mesh scale (sphere.obj has radius 2)',
@@ -811,31 +1083,193 @@ function buildBodyCatalogHeader(catalog) {
     '    AtmospherePhysical physical;',
     '};',
     '',
-    'inline constexpr AtmosphereRow kAtmospheres[] = {',
+    '// clang-format off',
+    'inline constexpr AtmosphereRow kSolAtmospheres[] = {',
     ...atmospheres,
     '};',
+    '// clang-format on',
     '',
-    'inline constexpr const AtmosphereRow* FindAtmosphere(const char* bodyId) {',
-    '    for (const AtmosphereRow& row : kAtmospheres) {',
-    '        if (StrEq(row.bodyId, bodyId)) {',
-    '            return &row;',
-    '        }',
-    '    }',
-    '    return nullptr;',
-    '}',
+    '// ---------------------------------------------------------------------------------',
+    '// The star (index 0, render.star). StarPhysics derives the light tint, corona and flare',
+    '// colour, irradiance and angular size from it; docs/ARCHITECTURE.md §12.2.',
     '',
-    '/** Primary (non-satellite) body for a staged-loading initTag, or nullptr. */',
-    'inline constexpr const Entry* FindPrimaryByInitTag(const char* initTag) {',
-    '    for (const Entry& entry : kEntries) {',
-    '        if (entry.kind != Kind::Satellite && StrEq(entry.initTag, initTag)) {',
-    '            return &entry;',
-    '        }',
-    '    }',
-    '    return nullptr;',
-    '}',
+    'struct StarRow {',
+    '    const char* id;',
+    '    const wchar_t* displayNameEn;',
+    '    const wchar_t* displayNameRu;',
+    '    const char* spectralType;',
+    '    float effectiveTemperatureK;',
+    '    float glowTemperatureK; // the glow spectrum\'s art calibration (Sol: 5778 K)',
+    '    double radiusKm;',
+    '    float radiusSolar;',
+    '    float luminositySolar;',
+    '    float massSolar;',
+    '    float activity; // 0–1 flare/activity look of the corona (a visual, not a model)',
+    '};',
+    '',
+    '// clang-format off',
+    `inline constexpr StarRow kSolStar = ${cppStar(starRow(catalog))};`,
+    '// clang-format on',
     '',
     '} // namespace BodyCatalog',
   ].join('\n');
+}
+
+/**
+ * OrbitLayout's per-body table for one system (OrbitLayout::BodyRow), focus bodies in index
+ * order: the same numbers OrbitLayoutBodies.generated.inc compiles for Sol, plus the Keplerian
+ * elements that place a body whose system has no analytic ephemeris (every system but Sol).
+ */
+function layoutRows(catalog) {
+  return [...catalog.bodies]
+    .filter(isFocusBody)
+    .sort((a, b) => a.index - b.index)
+    .map((body) => {
+      const o = body.orbit || {};
+      const spin = primeMeridian(body);
+      const k = o.keplerian;
+      return {
+        index: body.index,
+        id: body.id,
+        compressedOffset: o.compressedOffset || [0, 0, 0],
+        auDistance: Number(o.distanceAu ?? 0),
+        orbitalPeriodDays: Number(o.orbitalPeriodDays ?? 0),
+        inclinationDeg: Number(o.inclinationDeg ?? 0),
+        siderealRotationDays: Number(o.siderealRotationDays ?? 0),
+        primeMeridianDegJ2000: spin.w0Deg,
+        primeMeridianRateDegPerDay: spin.rateDegPerDay,
+        trueRadius: !!o.trueRadius,
+        kepler:
+          o.placeFromElements && k
+            ? {
+                aAu: k.aKm / 149597870.7,
+                e: k.e,
+                iDeg: k.iDeg,
+                OmegaDeg: k.OmegaDeg,
+                omegaDeg: k.omegaDeg,
+                M0Deg: k.M0Deg,
+                nDegPerDay: k.nDegPerDay,
+              }
+            : null,
+      };
+    });
+}
+
+function catalogRel(entry) {
+  return `resource/systems/${entry.catalog}`;
+}
+
+/** resource/systems/generated/<id>.runtime.json: everything StarSystemCatalog needs, flat. */
+function buildRuntimeJson(entry, catalog) {
+  const byId = new Map(catalog.bodies.map((b) => [b.id, b]));
+  const bodies = entryBodies(catalog);
+  return {
+    format: 'solarsystem-runtime-catalog',
+    version: 1,
+    generatedFrom: catalogRel(entry),
+    id: entry.id,
+    name: catalog.system?.name ?? entry.name,
+    distancePc: catalog.system?.distancePc ?? entry.distancePc ?? 0,
+    spectralType: catalog.system?.spectralType ?? null,
+    habitableZoneAu: catalog.system?.habitableZoneAu ?? null,
+    star: starRow(catalog),
+    layout: layoutRows(catalog),
+    entries: bodies.map((body) => entryRow(body, byId)),
+    atmospheres: bodies.filter((body) => body.render.atmosphere).map(atmosphereRow),
+  };
+}
+
+function srgbHex(linear) {
+  return `#${linear
+    .map((c) => {
+      const n = Math.min(Math.max(c, 0), 1);
+      const s = n <= 0.0031308 ? 12.92 * n : 1.055 * Math.pow(n, 1 / 2.4) - 0.055;
+      return Math.round(s * 255)
+        .toString(16)
+        .padStart(2, '0');
+    })
+    .join('')}`;
+}
+
+/**
+ * web/public/systems/<id>/thumbnail.svg for the picker: the star in its blackbody colour on
+ * the left, the planets along a log-distance axis, sized by radius. No image files needed.
+ */
+function buildThumbnailSvg(entry, catalog) {
+  const width = 160;
+  const height = 72;
+  const cy = height / 2;
+  const star = catalog.bodies.find((b) => b.index === 0);
+  const planets = catalog.bodies
+    .filter((b) => isFocusBody(b) && b.index > 0 && (b.kind === 'planet' || b.kind === 'dwarf_planet'))
+    .filter((b) => Number(b.orbit?.distanceAu) > 0)
+    .sort((a, b) => a.orbit.distanceAu - b.orbit.distanceAu);
+  const starColor = entry.starColor ?? catalog.system?.starColor ?? '#fff4e0';
+  const starRadius = Math.max(5, Math.min(14, 9 + 3 * Math.log10(star.render?.star?.radiusSolar ?? 1)));
+  const logs = planets.map((p) => Math.log10(p.orbit.distanceAu));
+  const lo = Math.min(...logs);
+  const hi = Math.max(...logs);
+  const x0 = 26 + starRadius;
+  const x1 = width - 10;
+  const color = (body) => {
+    if (body.render?.procedural) return srgbHex(body.render.procedural.colors[1]);
+    return body.assets?.fallbackColor ?? '#9aa4b0';
+  };
+  const dots = planets.map((p, i) => {
+    const t = hi > lo ? (logs[i] - lo) / (hi - lo) : 0.5;
+    const x = x0 + t * (x1 - x0);
+    const r = Math.max(1.4, Math.min(5.5, 1.6 * Math.sqrt(p.orbit.earthRadiusScale ?? 1)));
+    return `  <circle cx="${x.toFixed(1)}" cy="${cy}" r="${r.toFixed(2)}" fill="${color(p)}"/>`;
+  });
+  const name = (catalog.system?.name?.en ?? entry.name?.en ?? entry.id).replace(/&/g, '&amp;').replace(/</g, '&lt;');
+  return [
+    `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${width} ${height}" width="${width}" height="${height}" role="img" aria-label="${name}">`,
+    '  <defs>',
+    `    <radialGradient id="glow"><stop offset="0" stop-color="${starColor}" stop-opacity="0.9"/><stop offset="1" stop-color="${starColor}" stop-opacity="0"/></radialGradient>`,
+    '  </defs>',
+    `  <rect width="${width}" height="${height}" fill="#05070d"/>`,
+    `  <line x1="${x0 - 4}" y1="${cy}" x2="${x1 + 4}" y2="${cy}" stroke="#ffffff" stroke-opacity="0.12" stroke-width="0.6"/>`,
+    `  <circle cx="16" cy="${cy}" r="${(starRadius * 2.2).toFixed(1)}" fill="url(#glow)"/>`,
+    `  <circle cx="16" cy="${cy}" r="${starRadius.toFixed(1)}" fill="${starColor}"/>`,
+    ...dots,
+    '</svg>',
+    '',
+  ].join('\n');
+}
+
+/** web/public/systems/index.json: index.json with each thumbnail confirmed and the body count checked. */
+function buildWebIndex(index, catalogs) {
+  return {
+    version: index.version,
+    archive: index.archive,
+    systems: index.systems.map((entry) => {
+      const catalog = catalogs.get(entry.id);
+      const focus = catalog.bodies.filter((b) => isFocusBody(b) && b.index > 0);
+      if (focus.length !== entry.bodyCount) {
+        throw new Error(
+          `resource/systems/index.json: ${entry.id}.bodyCount is ${entry.bodyCount} but its catalog has ${focus.length} focus bodies`,
+        );
+      }
+      const star = catalog.bodies.find((b) => b.index === 0);
+      return {
+        id: entry.id,
+        name: entry.name,
+        distancePc: entry.distancePc,
+        starClass: entry.starClass,
+        starTemperatureK: star.render.star.effectiveTemperatureK,
+        starColor: entry.starColor,
+        bodyCount: entry.bodyCount,
+        thumbnail: entry.thumbnail,
+        observe: !!entry.observe,
+        facts: entry.id === SOL_ID ? 'planet_facts.json' : `systems/${entry.id}/planet_facts.json`,
+        // Focus ids by index, for ?system=…&planet=<id or letter> deep links before the facts load.
+        bodies: [...catalog.bodies]
+          .filter(isFocusBody)
+          .sort((a, b) => a.index - b.index)
+          .map((b) => b.id),
+      };
+    }),
+  };
 }
 
 function writeIfChanged(path, content, { checkOnly: check }) {
@@ -892,24 +1326,54 @@ function updateAssetManifestChecksums() {
   return { updated, missing, result };
 }
 
-function main() {
-  if (!existsSync(catalogPath)) {
-    console.error(`Catalog not found: ${catalogPath}`);
+function loadSystems() {
+  if (!existsSync(systemsIndexPath)) {
+    console.error(`System index not found: ${systemsIndexPath}`);
     process.exit(1);
   }
+  const index = readJson(systemsIndexPath);
+  if (!Array.isArray(index.systems) || index.systems[0]?.id !== SOL_ID) {
+    throw new Error('resource/systems/index.json must list "sol" first');
+  }
+  const catalogs = new Map();
+  for (const entry of index.systems) {
+    const path = join(systemsDir, entry.catalog);
+    if (!existsSync(path)) throw new Error(`${entry.id}: catalog ${entry.catalog} not found in resource/systems/`);
+    const catalog = readJson(path);
+    try {
+      validateCatalog(catalog, entry.id);
+    } catch (error) {
+      throw new Error(`${entry.catalog}: ${error.message}`);
+    }
+    catalogs.set(entry.id, catalog);
+  }
+  return { index, catalogs };
+}
 
-  const catalog = readJson(catalogPath);
-  validateCatalog(catalog);
+function main() {
+  const { index, catalogs } = loadSystems();
+  const catalog = catalogs.get(SOL_ID);
 
   const outputs = [
-    { path: OUT.facts, text: stableStringify(buildPlanetFacts(catalog)) },
+    { path: OUT.facts, text: stableStringify(buildPlanetFacts(catalog, SOL_CATALOG_REL)) },
     { path: OUT.orbital, text: stableStringify(buildOrbitalParameters(catalog)) },
     { path: OUT.manifest, text: stableStringify(buildPlanetManifest(catalog)) },
     { path: OUT.orbitLayoutBodies, text: buildOrbitLayoutBodiesInc(catalog) },
     { path: OUT.bodyCatalog, text: buildBodyCatalogHeader(catalog) },
     { path: OUT.planetIds, text: buildPlanetIdsTs(catalog) },
+    { path: OUT.webIndex, text: stableStringify(buildWebIndex(index, catalogs)) },
   ];
-
+  for (const entry of index.systems) {
+    const systemCatalog = catalogs.get(entry.id);
+    outputs.push({ path: OUT.runtime(entry.id), text: stableStringify(buildRuntimeJson(entry, systemCatalog)) });
+    outputs.push({ path: OUT.thumbnail(entry.id), text: buildThumbnailSvg(entry, systemCatalog) });
+    if (entry.id !== SOL_ID) {
+      outputs.push({
+        path: OUT.systemFacts(entry.id),
+        text: stableStringify(buildPlanetFacts(systemCatalog, catalogRel(entry))),
+      });
+    }
+  }
   let dirty = false;
   for (const { path, text } of outputs) {
     const { changed } = writeIfChanged(path, text, { checkOnly });

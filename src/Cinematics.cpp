@@ -3,8 +3,9 @@
 // preload switches a cinematic needs. The timeline itself is evaluated in TypeScript
 // (web/src/timeline.ts); everything here is a query or a setter it calls between frames.
 #include "Application.h"
-#include "Solar_System/BodyCatalog.generated.h"
+#include "Solar_System/BodyCatalog.h"
 #include "Solar_System/CatalogSatellite.h"
+#include "Solar_System/OrbitLayout.h"
 #include "Solar_System/SceneScale.h"
 #include "assets/TextureLoadingQueue.h"
 #include "core/Log.h"
@@ -38,7 +39,7 @@ const char* KindSlug(BodyCatalog::Kind kind) {
 
 int MaxCatalogIndex() {
     int maxIndex = 0;
-    for (const BodyCatalog::Entry& entry : BodyCatalog::kEntries) {
+    for (const BodyCatalog::Entry& entry : BodyCatalog::Entries()) {
         maxIndex = std::max(maxIndex, entry.index);
     }
     return maxIndex;
@@ -141,7 +142,7 @@ std::shared_ptr<const SpaceObject> Application::FindSceneBody(int catalogIndex) 
     for (const auto& component : _renderableSceneComponents) {
         if (entry->kind != BodyCatalog::Kind::Satellite) {
             // Primaries by name, as FocusPlanetByIndex: catalog index = OrbitLayout::Body.
-            if (component.planet && catalogIndex < OrbitLayout::kBodyCount) {
+            if (component.planet && catalogIndex < OrbitLayout::BodyCount()) {
                 const std::wstring& wideName = component.planet->GetEngName();
                 if (OrbitLayout::BodyFromName(std::string(wideName.begin(), wideName.end())) ==
                     static_cast<OrbitLayout::Body>(catalogIndex)) {
@@ -161,10 +162,12 @@ std::shared_ptr<const SpaceObject> Application::FindSceneBody(int catalogIndex) 
 }
 
 std::string Application::GetBodyCatalogJson() const {
-    std::string json = R"([{"index":0,"id":"sun","name":"Sun","parent":null,"kind":"star","radiusKm":)" +
-                       std::to_string(SceneScale::kSunRadiusKm) + "}";
+    const BodyCatalog::StarRow& star = BodyCatalog::Star();
+    std::string json = std::string(R"([{"index":0,"id":")") + star.id + R"(","name":")" +
+                       AsciiName(star.displayNameEn) + R"(","parent":null,"kind":"star","radiusKm":)" +
+                       std::to_string(star.radiusKm) + "}";
     char buffer[256];
-    for (const BodyCatalog::Entry& entry : BodyCatalog::kEntries) {
+    for (const BodyCatalog::Entry& entry : BodyCatalog::Entries()) {
         const std::string parent = entry.parentId ? std::string("\"") + entry.parentId + "\"" : "null";
         std::snprintf(buffer, sizeof(buffer), R"(,{"index":%d,"id":"%s","name":"%s","parent":%s,"kind":"%s","radiusKm":%.3f})",
                       entry.index, entry.id, AsciiName(entry.displayNameEn).c_str(), parent.c_str(),
@@ -195,7 +198,7 @@ std::string Application::GetSceneStateJson() {
             position = object->GetWorldPosition();
             radius = DrawnRadius(*object);
         } else if (const BodyCatalog::Entry* entry = BodyCatalog::FindByIndex(index);
-                   entry && entry->kind != BodyCatalog::Kind::Satellite && index < OrbitLayout::kBodyCount) {
+                   entry && entry->kind != BodyCatalog::Kind::Satellite && index < OrbitLayout::BodyCount()) {
             // Not loaded yet (web staged loading): where the ephemeris puts it.
             position = OrbitLayout::GetHeliocentricScenePosition(static_cast<OrbitLayout::Body>(index));
             radius = SceneScale::BodyRadius(*entry);
@@ -229,7 +232,7 @@ void Application::PreloadBodySystem(int catalogIndex) {
     if (entry && entry->kind == BodyCatalog::Kind::Satellite && entry->parentId) {
         entry = BodyCatalog::FindById(entry->parentId);
     }
-    if (entry && entry->index > 0 && entry->index < OrbitLayout::kBodyCount) {
+    if (entry && entry->index > 0 && entry->index < OrbitLayout::BodyCount()) {
         ActivatePlanetSystem(static_cast<OrbitLayout::Body>(entry->index));
     }
 }

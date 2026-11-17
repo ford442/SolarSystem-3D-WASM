@@ -1,5 +1,5 @@
 import type { MusicPlayer } from './music';
-import { copyShareableLink, type DeepLinkViewState } from './deepLink';
+import { copyShareableLink, runtimeLinkReaders, type DeepLinkViewState } from './deepLink';
 import { eventVisibilitySuffix } from './observe';
 import { bindSkyEventChip } from './skyEvents';
 import { isoDateFromJulianDate, isoDateUtcNow, julianDateFromIsoDate, julianDateUtcNow } from './ephemeris';
@@ -143,7 +143,11 @@ export function initSettingsPanel(options: SettingsPanelInitOptions): void {
     function currentPanelSettings(): PersistedSettings {
         return {
             quality: Number(qualitySelect.value) as QualityPreset,
-            timeScale: Math.pow(10, Number(timeScaleInput.value)),
+            // Another system's arrival clock is not a preference; keep Sol's saved speed.
+            timeScale:
+                runtime.getActiveSystemId() === 'sol'
+                    ? Math.pow(10, Number(timeScaleInput.value))
+                    : (readPersistedSettings().timeScale ?? 1),
             paused: pausedInput.checked,
             shadows: shadowsInput.checked,
             orbitLines: orbitLinesInput.checked,
@@ -255,7 +259,10 @@ export function initSettingsPanel(options: SettingsPanelInitOptions): void {
     const saved = readPersistedSettings();
     const defaultQuality: QualityPreset = isMobileDevice ? 0 : 2;
     const quality = deepLink.quality ?? saved.quality ?? defaultQuality;
-    const timeScale = deepLink.timeScale ?? saved.timeScale ?? runtime.getTimeScale();
+    // Outside Sol C++ chose an arrival clock for the system (SystemJump.cpp ArrivalTimeScale);
+    // the saved speed is Sol's.
+    const inOtherSystem = runtime.getActiveSystemId() !== 'sol';
+    const timeScale = deepLink.timeScale ?? (inOtherSystem ? undefined : saved.timeScale) ?? runtime.getTimeScale();
     const paused = deepLink.paused ?? saved.paused ?? runtime.getPaused();
     const shadows = deepLink.shadows ?? saved.shadows ?? true;
     const orbitLines = deepLink.orbitLines ?? saved.orbitLines ?? true;
@@ -412,21 +419,7 @@ export function initSettingsPanel(options: SettingsPanelInitOptions): void {
     });
 
     copyViewLinkButton.addEventListener('click', () => {
-        void copyShareableLink({
-            getQualityPreset: () => runtime.getQualityPreset(),
-            getTimeScale: () => runtime.getTimeScale(),
-            getPaused: () => runtime.getPaused(),
-            getSimulationEpoch: () => runtime.getSimulationEpoch(),
-            getOrbitScaleMode: () => runtime.getOrbitScaleMode(),
-            getShadowQuality: () => runtime.getShadowQuality(),
-            getOrbitLines: () => runtime.getOrbitLines(),
-            getMagneticFields: () => runtime.getMagneticFields(),
-            getFocusedPlanetIndex: () => runtime.getFocusedPlanetIndex(),
-            getFocusedMission: () => runtime.getFocusedMission(),
-            getCameraPose: () => runtime.getCameraPose(),
-            getObserveState: () => runtime.getObserveState(),
-            isoDateFromJulianDate,
-        })
+        void copyShareableLink(runtimeLinkReaders(runtime))
             .then(() => {
                 settingsStatus.textContent = 'View link copied to clipboard';
             })

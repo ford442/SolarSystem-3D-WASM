@@ -79,7 +79,22 @@ public:
     void ApplyShadowQuality(int quality);
     void ApplyOrbitScaleMode(int mode);
     void FocusPlanetByIndex(int idx);
+    /** As FocusPlanetByIndex, framing the body from `fromDirection` (unit, body to camera). */
+    void FocusPlanetByIndex(int idx, const glm::vec3& fromDirection);
     int GetFocusedPlanetIndex() const;
+
+    // --- Star systems (SystemJump.cpp; docs/ARCHITECTURE.md §12) ----------------------------
+    /**
+     * Travel to star system `id` ("sol", "trappist-1", … from resource/systems/index.json): the
+     * frame washes into the star's colour and goes black, the scene is swapped (LoadSystem), then
+     * it fades in on `focusIndex` (or, with -1, the system's Earth-like planet). False, and no
+     * jump, for an id with no runtime catalog. Before the scene exists it just selects the system.
+     */
+    bool RequestSystemJump(const std::string& id, int focusIndex = -1);
+    /** Swap the scene to `id` at once: tear it down, activate the catalog, rebuild, land the camera. */
+    bool LoadSystem(const std::string& id, int focusIndex = -1);
+    const std::string& GetActiveSystemId() const;
+    bool IsSystemJumpActive() const { return _jump.phase != SystemJump::Phase::None; }
     void FocusMissionByIndex(int idx);
     int GetFocusedMissionIndex() const;
     int GetMissionCount() const;
@@ -303,8 +318,31 @@ private:
     mutable double _nextSkyEventComputedJd = 0.0;
     mutable bool _nextSkyEventCached = false;
 
+    /** The fade-swap-fade of RequestSystemJump, advanced once per frame by UpdateSystemJump. */
+    struct SystemJump {
+        enum class Phase { None, Out, Black, In } phase = Phase::None;
+        double seconds = 0.0; // into this phase
+        std::string target;
+        int focusIndex = -1;
+        glm::vec3 departureColor{1.0f}; // the departing star's light
+    };
+    SystemJump _jump;
+    glm::vec3 _screenFadeColor{0.0f};
+    float _screenFadeAmount = 0.0f;
+    /** Where the camera lands once a system chosen before the scene existed is built (-1: Earth-like). */
+    int _pendingSystemFocus = -1;
+    bool _pendingSystemLanding = false;
+    void UpdateSystemJump(double deltaSeconds);
+    /** Drop every body, the star, the staged manifests and their in-flight downloads. */
+    void TearDownStarSystem();
+    /** Put the camera outside `focusIndex`'s orbit (or the Earth-like planet's) and fly it in. */
+    void LandCameraInSystem(int focusIndex);
+    void ApplySystemEnvOverride(); // SOLARSYSTEM_SYSTEM=<id>: start in another system, natively
+
     // Staged-loading infrastructure for all planet systems (WASM only)
     std::vector<PlanetSystemManifest> _planetSystemManifests;
+    /** Bumped when LoadSystem drops the manifests, so their in-flight download callbacks stand down. */
+    int _manifestGeneration = 0;
     std::unique_ptr<MeshHolder> _sphereModel;
 
     // Shadow/color/overlay/HDR draw passes and the GPU resources they own — see Renderer.h.

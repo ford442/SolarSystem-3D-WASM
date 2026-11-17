@@ -1,0 +1,947 @@
+{
+  "format": "solarsystem-runtime-catalog",
+  "version": 1,
+  "generatedFrom": "resource/systems/kepler-90.catalog.json",
+  "id": "kepler-90",
+  "name": {
+    "en": "Kepler-90",
+    "ru": "Kepler-90"
+  },
+  "distancePc": 848.254,
+  "spectralType": null,
+  "habitableZoneAu": {
+    "innerAu": 1.29888,
+    "outerAu": 1.87123
+  },
+  "star": {
+    "id": "kepler_90",
+    "displayNameEn": "Kepler-90",
+    "displayNameRu": "Kepler-90",
+    "spectralType": "",
+    "effectiveTemperatureK": 6080,
+    "glowTemperatureK": 5778,
+    "radiusKm": 834840,
+    "radiusSolar": 1.2,
+    "luminositySolar": 1.855795,
+    "massSolar": 1.2,
+    "activity": 0
+  },
+  "layout": [
+    {
+      "index": 0,
+      "id": "kepler_90",
+      "compressedOffset": [
+        0,
+        0,
+        0
+      ],
+      "auDistance": 0,
+      "orbitalPeriodDays": 0,
+      "inclinationDeg": 0,
+      "siderealRotationDays": 0,
+      "primeMeridianDegJ2000": 0,
+      "primeMeridianRateDegPerDay": 0,
+      "trueRadius": false,
+      "kepler": null
+    },
+    {
+      "index": 1,
+      "id": "kepler_90_b",
+      "compressedOffset": [
+        1500,
+        0,
+        0
+      ],
+      "auDistance": 0.074,
+      "orbitalPeriodDays": 7.008151,
+      "inclinationDeg": -0.34,
+      "siderealRotationDays": 7.008151,
+      "primeMeridianDegJ2000": 336.5348,
+      "primeMeridianRateDegPerDay": 51.368756181,
+      "trueRadius": false,
+      "kepler": {
+        "aAu": 0.07399999978743013,
+        "e": 0,
+        "iDeg": -0.34,
+        "OmegaDeg": 0,
+        "omegaDeg": 90,
+        "M0Deg": 66.5348,
+        "nDegPerDay": 51.368756181
+      }
+    },
+    {
+      "index": 2,
+      "id": "kepler_90_c",
+      "compressedOffset": [
+        -1290.4,
+        0,
+        1182.11
+      ],
+      "auDistance": 0.089,
+      "orbitalPeriodDays": 8.719375,
+      "inclinationDeg": -0.06,
+      "siderealRotationDays": 8.719375,
+      "primeMeridianDegJ2000": 234.7272,
+      "primeMeridianRateDegPerDay": 41.287362913,
+      "trueRadius": false,
+      "kepler": {
+        "aAu": 0.08900000005147132,
+        "e": 0,
+        "iDeg": -0.06,
+        "OmegaDeg": 0,
+        "omegaDeg": 90,
+        "M0Deg": 324.7272,
+        "nDegPerDay": 41.287362913
+      }
+    },
+    {
+      "index": 3,
+      "id": "kepler_90_i",
+      "compressedOffset": [
+        174.85,
+        0,
+        -1992.34
+      ],
+      "auDistance": 0.120138,
+      "orbitalPeriodDays": 14.44912,
+      "inclinationDeg": -0.54,
+      "siderealRotationDays": 14.44912,
+      "primeMeridianDegJ2000": 14.6749,
+      "primeMeridianRateDegPerDay": 24.915012125,
+      "trueRadius": false,
+      "kepler": {
+        "aAu": 0.12013808429159682,
+        "e": 0,
+        "iDeg": -0.54,
+        "OmegaDeg": 0,
+        "omegaDeg": 90,
+        "M0Deg": 104.6749,
+        "nDegPerDay": 24.915012125
+      }
+    },
+    {
+      "index": 4,
+      "id": "kepler_90_d",
+      "compressedOffset": [
+        1368.99,
+        0,
+        1785.6
+      ],
+      "auDistance": 0.32,
+      "orbitalPeriodDays": 59.73667,
+      "inclinationDeg": -0.03,
+      "siderealRotationDays": 1,
+      "primeMeridianDegJ2000": 0,
+      "primeMeridianRateDegPerDay": 360,
+      "trueRadius": false,
+      "kepler": {
+        "aAu": 0.31999999983956995,
+        "e": 0,
+        "iDeg": -0.03,
+        "OmegaDeg": 0,
+        "omegaDeg": 90,
+        "M0Deg": 107.0373,
+        "nDegPerDay": 6.026449081
+      }
+    },
+    {
+      "index": 5,
+      "id": "kepler_90_e",
+      "compressedOffset": [
+        -2461.78,
+        0,
+        -435.45
+      ],
+      "auDistance": 0.42,
+      "orbitalPeriodDays": 91.93913,
+      "inclinationDeg": 0.05,
+      "siderealRotationDays": 1,
+      "primeMeridianDegJ2000": 0,
+      "primeMeridianRateDegPerDay": 360,
+      "trueRadius": false,
+      "kepler": {
+        "aAu": 0.42000000004010757,
+        "e": 0,
+        "iDeg": 0.05,
+        "OmegaDeg": 0,
+        "omegaDeg": 90,
+        "M0Deg": 279.4754,
+        "nDegPerDay": 3.915634181
+      }
+    },
+    {
+      "index": 6,
+      "id": "kepler_90_f",
+      "compressedOffset": [
+        2320.33,
+        0,
+        -1476
+      ],
+      "auDistance": 0.48,
+      "orbitalPeriodDays": 124.9144,
+      "inclinationDeg": 0.03,
+      "siderealRotationDays": 1,
+      "primeMeridianDegJ2000": 0,
+      "primeMeridianRateDegPerDay": 360,
+      "trueRadius": false,
+      "kepler": {
+        "aAu": 0.4799999997593549,
+        "e": 0,
+        "iDeg": 0.03,
+        "OmegaDeg": 0,
+        "omegaDeg": 90,
+        "M0Deg": 230.0207,
+        "nDegPerDay": 2.881973576
+      }
+    },
+    {
+      "index": 7,
+      "id": "kepler_90_g",
+      "compressedOffset": [
+        -778.81,
+        0,
+        2897.15
+      ],
+      "auDistance": 0.71704,
+      "orbitalPeriodDays": 210.73514,
+      "inclinationDeg": 0.18,
+      "siderealRotationDays": 1,
+      "primeMeridianDegJ2000": 0,
+      "primeMeridianRateDegPerDay": 360,
+      "trueRadius": false,
+      "kepler": {
+        "aAu": 0.7170399999550262,
+        "e": 0.0292,
+        "iDeg": 0.18,
+        "OmegaDeg": 0,
+        "omegaDeg": 114.6,
+        "M0Deg": 228.7771,
+        "nDegPerDay": 1.708305506
+      }
+    },
+    {
+      "index": 8,
+      "id": "kepler_90_h",
+      "compressedOffset": [
+        -1497.95,
+        0,
+        -2884.21
+      ],
+      "auDistance": 0.97062,
+      "orbitalPeriodDays": 331.60296,
+      "inclinationDeg": 0.187,
+      "siderealRotationDays": 1,
+      "primeMeridianDegJ2000": 0,
+      "primeMeridianRateDegPerDay": 360,
+      "trueRadius": false,
+      "kepler": {
+        "aAu": 0.9706200002751779,
+        "e": 0.0276,
+        "iDeg": 0.187,
+        "OmegaDeg": 0,
+        "omegaDeg": 119,
+        "M0Deg": 210.4035,
+        "nDegPerDay": 1.085635665
+      }
+    }
+  ],
+  "entries": [
+    {
+      "index": 1,
+      "id": "kepler_90_b",
+      "parentId": "kepler_90",
+      "initTag": "kepler_90_b",
+      "kind": "planet",
+      "displayNameEn": "Kepler-90 b",
+      "displayNameRu": "Kepler-90 b",
+      "auDistance": 0.074,
+      "orbitalPeriodDays": 7.008151,
+      "earthRadiusScale": 1.31,
+      "radiusKm": 8346,
+      "axialTiltDegrees": 0,
+      "artTiltXDegrees": 0,
+      "oblateness": 0,
+      "yawOffsetDegrees": 0,
+      "artRollDegrees": 0,
+      "shaderFlags": {
+        "hasNightTexture": false,
+        "hasSpecularMap": false,
+        "hasClouds": false
+      },
+      "useSphereIntersect": false,
+      "ambientFactor": 0,
+      "lod": {
+        "diffuse": "",
+        "normal": "",
+        "specular": null,
+        "night": null,
+        "clouds": null
+      },
+      "meshPath": null,
+      "sceneOrbitRadius": 0,
+      "orbitPlane": "xz",
+      "initialAnomalyRad": 0,
+      "spinDegPerSimSecond": 0,
+      "keplerian": {
+        "aKm": 11070242.4,
+        "e": 0,
+        "iDeg": -0.34,
+        "OmegaDeg": 0,
+        "omegaDeg": 90,
+        "M0Deg": 66.5348,
+        "nDegPerDay": 51.368756181,
+        "OmegaDotDegPerDay": 0,
+        "omegaDotDegPerDay": 0
+      },
+      "cloudLayer": {
+        "diffuse": null,
+        "normal": null,
+        "scaleFactor": 0,
+        "spinDegPerSimSecond": 0,
+        "ambientFactor": 0
+      },
+      "hasCloudLayer": false,
+      "hasRings": false,
+      "hasTerrain": false,
+      "terrainAttribution": null,
+      "procedural": {
+        "enabled": true,
+        "mode": 2,
+        "seed": 1,
+        "colors": [
+          [
+            0.05,
+            0.04,
+            0.04
+          ],
+          [
+            0.2,
+            0.12,
+            0.09
+          ],
+          [
+            1,
+            0.38,
+            0.06
+          ]
+        ],
+        "bands": 0,
+        "seaLevel": 0.55,
+        "polarCap": 0,
+        "emissive": 1.4,
+        "equilibriumTemperatureK": 1062
+      },
+      "placeFromElements": true
+    },
+    {
+      "index": 2,
+      "id": "kepler_90_c",
+      "parentId": "kepler_90",
+      "initTag": "kepler_90_c",
+      "kind": "planet",
+      "displayNameEn": "Kepler-90 c",
+      "displayNameRu": "Kepler-90 c",
+      "auDistance": 0.089,
+      "orbitalPeriodDays": 8.719375,
+      "earthRadiusScale": 1.19,
+      "radiusKm": 7581.5,
+      "axialTiltDegrees": 0,
+      "artTiltXDegrees": 0,
+      "oblateness": 0,
+      "yawOffsetDegrees": 0,
+      "artRollDegrees": 0,
+      "shaderFlags": {
+        "hasNightTexture": false,
+        "hasSpecularMap": false,
+        "hasClouds": false
+      },
+      "useSphereIntersect": false,
+      "ambientFactor": 0,
+      "lod": {
+        "diffuse": "",
+        "normal": "",
+        "specular": null,
+        "night": null,
+        "clouds": null
+      },
+      "meshPath": null,
+      "sceneOrbitRadius": 0,
+      "orbitPlane": "xz",
+      "initialAnomalyRad": 0,
+      "spinDegPerSimSecond": 0,
+      "keplerian": {
+        "aKm": 13314210.5,
+        "e": 0,
+        "iDeg": -0.06,
+        "OmegaDeg": 0,
+        "omegaDeg": 90,
+        "M0Deg": 324.7272,
+        "nDegPerDay": 41.287362913,
+        "OmegaDotDegPerDay": 0,
+        "omegaDotDegPerDay": 0
+      },
+      "cloudLayer": {
+        "diffuse": null,
+        "normal": null,
+        "scaleFactor": 0,
+        "spinDegPerSimSecond": 0,
+        "ambientFactor": 0
+      },
+      "hasCloudLayer": false,
+      "hasRings": false,
+      "hasTerrain": false,
+      "terrainAttribution": null,
+      "procedural": {
+        "enabled": true,
+        "mode": 0,
+        "seed": 2,
+        "colors": [
+          [
+            0.32,
+            0.22,
+            0.15
+          ],
+          [
+            0.55,
+            0.42,
+            0.3
+          ],
+          [
+            0.72,
+            0.62,
+            0.5
+          ]
+        ],
+        "bands": 0,
+        "seaLevel": 0,
+        "polarCap": 0,
+        "emissive": 0,
+        "equilibriumTemperatureK": 987
+      },
+      "placeFromElements": true
+    },
+    {
+      "index": 3,
+      "id": "kepler_90_i",
+      "parentId": "kepler_90",
+      "initTag": "kepler_90_i",
+      "kind": "planet",
+      "displayNameEn": "Kepler-90 i",
+      "displayNameRu": "Kepler-90 i",
+      "auDistance": 0.120138,
+      "orbitalPeriodDays": 14.44912,
+      "earthRadiusScale": 1.32,
+      "radiusKm": 8409.5,
+      "axialTiltDegrees": 0,
+      "artTiltXDegrees": 0,
+      "oblateness": 0,
+      "yawOffsetDegrees": 0,
+      "artRollDegrees": 0,
+      "shaderFlags": {
+        "hasNightTexture": false,
+        "hasSpecularMap": false,
+        "hasClouds": false
+      },
+      "useSphereIntersect": false,
+      "ambientFactor": 0,
+      "lod": {
+        "diffuse": "",
+        "normal": "",
+        "specular": null,
+        "night": null,
+        "clouds": null
+      },
+      "meshPath": null,
+      "sceneOrbitRadius": 0,
+      "orbitPlane": "xz",
+      "initialAnomalyRad": 0,
+      "spinDegPerSimSecond": 0,
+      "keplerian": {
+        "aKm": 17972401.6,
+        "e": 0,
+        "iDeg": -0.54,
+        "OmegaDeg": 0,
+        "omegaDeg": 90,
+        "M0Deg": 104.6749,
+        "nDegPerDay": 24.915012125,
+        "OmegaDotDegPerDay": 0,
+        "omegaDotDegPerDay": 0
+      },
+      "cloudLayer": {
+        "diffuse": null,
+        "normal": null,
+        "scaleFactor": 0,
+        "spinDegPerSimSecond": 0,
+        "ambientFactor": 0
+      },
+      "hasCloudLayer": false,
+      "hasRings": false,
+      "hasTerrain": false,
+      "terrainAttribution": null,
+      "procedural": {
+        "enabled": true,
+        "mode": 0,
+        "seed": 3,
+        "colors": [
+          [
+            0.32,
+            0.22,
+            0.15
+          ],
+          [
+            0.55,
+            0.42,
+            0.3
+          ],
+          [
+            0.72,
+            0.62,
+            0.5
+          ]
+        ],
+        "bands": 0,
+        "seaLevel": 0,
+        "polarCap": 0,
+        "emissive": 0,
+        "equilibriumTemperatureK": 709
+      },
+      "placeFromElements": true
+    },
+    {
+      "index": 4,
+      "id": "kepler_90_d",
+      "parentId": "kepler_90",
+      "initTag": "kepler_90_d",
+      "kind": "planet",
+      "displayNameEn": "Kepler-90 d",
+      "displayNameRu": "Kepler-90 d",
+      "auDistance": 0.32,
+      "orbitalPeriodDays": 59.73667,
+      "earthRadiusScale": 2.87,
+      "radiusKm": 18285,
+      "axialTiltDegrees": 0,
+      "artTiltXDegrees": 0,
+      "oblateness": 0,
+      "yawOffsetDegrees": 0,
+      "artRollDegrees": 0,
+      "shaderFlags": {
+        "hasNightTexture": false,
+        "hasSpecularMap": false,
+        "hasClouds": false
+      },
+      "useSphereIntersect": false,
+      "ambientFactor": 0,
+      "lod": {
+        "diffuse": "",
+        "normal": "",
+        "specular": null,
+        "night": null,
+        "clouds": null
+      },
+      "meshPath": null,
+      "sceneOrbitRadius": 0,
+      "orbitPlane": "xz",
+      "initialAnomalyRad": 0,
+      "spinDegPerSimSecond": 0,
+      "keplerian": {
+        "aKm": 47871318.6,
+        "e": 0,
+        "iDeg": -0.03,
+        "OmegaDeg": 0,
+        "omegaDeg": 90,
+        "M0Deg": 107.0373,
+        "nDegPerDay": 6.026449081,
+        "OmegaDotDegPerDay": 0,
+        "omegaDotDegPerDay": 0
+      },
+      "cloudLayer": {
+        "diffuse": null,
+        "normal": null,
+        "scaleFactor": 0,
+        "spinDegPerSimSecond": 0,
+        "ambientFactor": 0
+      },
+      "hasCloudLayer": false,
+      "hasRings": false,
+      "hasTerrain": false,
+      "terrainAttribution": null,
+      "procedural": {
+        "enabled": true,
+        "mode": 1,
+        "seed": 4,
+        "colors": [
+          [
+            0.13,
+            0.32,
+            0.55
+          ],
+          [
+            0.3,
+            0.55,
+            0.72
+          ],
+          [
+            0.62,
+            0.82,
+            0.9
+          ]
+        ],
+        "bands": 5,
+        "seaLevel": 0,
+        "polarCap": 0,
+        "emissive": 0,
+        "equilibriumTemperatureK": 520
+      },
+      "placeFromElements": true
+    },
+    {
+      "index": 5,
+      "id": "kepler_90_e",
+      "parentId": "kepler_90",
+      "initTag": "kepler_90_e",
+      "kind": "planet",
+      "displayNameEn": "Kepler-90 e",
+      "displayNameRu": "Kepler-90 e",
+      "auDistance": 0.42,
+      "orbitalPeriodDays": 91.93913,
+      "earthRadiusScale": 2.66,
+      "radiusKm": 16947,
+      "axialTiltDegrees": 0,
+      "artTiltXDegrees": 0,
+      "oblateness": 0,
+      "yawOffsetDegrees": 0,
+      "artRollDegrees": 0,
+      "shaderFlags": {
+        "hasNightTexture": false,
+        "hasSpecularMap": false,
+        "hasClouds": false
+      },
+      "useSphereIntersect": false,
+      "ambientFactor": 0,
+      "lod": {
+        "diffuse": "",
+        "normal": "",
+        "specular": null,
+        "night": null,
+        "clouds": null
+      },
+      "meshPath": null,
+      "sceneOrbitRadius": 0,
+      "orbitPlane": "xz",
+      "initialAnomalyRad": 0,
+      "spinDegPerSimSecond": 0,
+      "keplerian": {
+        "aKm": 62831105.7,
+        "e": 0,
+        "iDeg": 0.05,
+        "OmegaDeg": 0,
+        "omegaDeg": 90,
+        "M0Deg": 279.4754,
+        "nDegPerDay": 3.915634181,
+        "OmegaDotDegPerDay": 0,
+        "omegaDotDegPerDay": 0
+      },
+      "cloudLayer": {
+        "diffuse": null,
+        "normal": null,
+        "scaleFactor": 0,
+        "spinDegPerSimSecond": 0,
+        "ambientFactor": 0
+      },
+      "hasCloudLayer": false,
+      "hasRings": false,
+      "hasTerrain": false,
+      "terrainAttribution": null,
+      "procedural": {
+        "enabled": true,
+        "mode": 1,
+        "seed": 5,
+        "colors": [
+          [
+            0.13,
+            0.32,
+            0.55
+          ],
+          [
+            0.3,
+            0.55,
+            0.72
+          ],
+          [
+            0.62,
+            0.82,
+            0.9
+          ]
+        ],
+        "bands": 5,
+        "seaLevel": 0,
+        "polarCap": 0,
+        "emissive": 0,
+        "equilibriumTemperatureK": 450
+      },
+      "placeFromElements": true
+    },
+    {
+      "index": 6,
+      "id": "kepler_90_f",
+      "parentId": "kepler_90",
+      "initTag": "kepler_90_f",
+      "kind": "planet",
+      "displayNameEn": "Kepler-90 f",
+      "displayNameRu": "Kepler-90 f",
+      "auDistance": 0.48,
+      "orbitalPeriodDays": 124.9144,
+      "earthRadiusScale": 2.88,
+      "radiusKm": 18348.5,
+      "axialTiltDegrees": 0,
+      "artTiltXDegrees": 0,
+      "oblateness": 0,
+      "yawOffsetDegrees": 0,
+      "artRollDegrees": 0,
+      "shaderFlags": {
+        "hasNightTexture": false,
+        "hasSpecularMap": false,
+        "hasClouds": false
+      },
+      "useSphereIntersect": false,
+      "ambientFactor": 0,
+      "lod": {
+        "diffuse": "",
+        "normal": "",
+        "specular": null,
+        "night": null,
+        "clouds": null
+      },
+      "meshPath": null,
+      "sceneOrbitRadius": 0,
+      "orbitPlane": "xz",
+      "initialAnomalyRad": 0,
+      "spinDegPerSimSecond": 0,
+      "keplerian": {
+        "aKm": 71806977.9,
+        "e": 0,
+        "iDeg": 0.03,
+        "OmegaDeg": 0,
+        "omegaDeg": 90,
+        "M0Deg": 230.0207,
+        "nDegPerDay": 2.881973576,
+        "OmegaDotDegPerDay": 0,
+        "omegaDotDegPerDay": 0
+      },
+      "cloudLayer": {
+        "diffuse": null,
+        "normal": null,
+        "scaleFactor": 0,
+        "spinDegPerSimSecond": 0,
+        "ambientFactor": 0
+      },
+      "hasCloudLayer": false,
+      "hasRings": false,
+      "hasTerrain": false,
+      "terrainAttribution": null,
+      "procedural": {
+        "enabled": true,
+        "mode": 1,
+        "seed": 6,
+        "colors": [
+          [
+            0.13,
+            0.32,
+            0.55
+          ],
+          [
+            0.3,
+            0.55,
+            0.72
+          ],
+          [
+            0.62,
+            0.82,
+            0.9
+          ]
+        ],
+        "bands": 5,
+        "seaLevel": 0,
+        "polarCap": 0,
+        "emissive": 0,
+        "equilibriumTemperatureK": 407
+      },
+      "placeFromElements": true
+    },
+    {
+      "index": 7,
+      "id": "kepler_90_g",
+      "parentId": "kepler_90",
+      "initTag": "kepler_90_g",
+      "kind": "planet",
+      "displayNameEn": "Kepler-90 g",
+      "displayNameRu": "Kepler-90 g",
+      "auDistance": 0.71704,
+      "orbitalPeriodDays": 210.73514,
+      "earthRadiusScale": 7.718,
+      "radiusKm": 49171.5,
+      "axialTiltDegrees": 0,
+      "artTiltXDegrees": 0,
+      "oblateness": 0,
+      "yawOffsetDegrees": 0,
+      "artRollDegrees": 0,
+      "shaderFlags": {
+        "hasNightTexture": false,
+        "hasSpecularMap": false,
+        "hasClouds": false
+      },
+      "useSphereIntersect": false,
+      "ambientFactor": 0,
+      "lod": {
+        "diffuse": "",
+        "normal": "",
+        "specular": null,
+        "night": null,
+        "clouds": null
+      },
+      "meshPath": null,
+      "sceneOrbitRadius": 0,
+      "orbitPlane": "xz",
+      "initialAnomalyRad": 0,
+      "spinDegPerSimSecond": 0,
+      "keplerian": {
+        "aKm": 107267657.2,
+        "e": 0.0292,
+        "iDeg": 0.18,
+        "OmegaDeg": 0,
+        "omegaDeg": 114.6,
+        "M0Deg": 228.7771,
+        "nDegPerDay": 1.708305506,
+        "OmegaDotDegPerDay": 0,
+        "omegaDotDegPerDay": 0
+      },
+      "cloudLayer": {
+        "diffuse": null,
+        "normal": null,
+        "scaleFactor": 0,
+        "spinDegPerSimSecond": 0,
+        "ambientFactor": 0
+      },
+      "hasCloudLayer": false,
+      "hasRings": false,
+      "hasTerrain": false,
+      "terrainAttribution": null,
+      "procedural": {
+        "enabled": true,
+        "mode": 1,
+        "seed": 7,
+        "colors": [
+          [
+            0.5,
+            0.38,
+            0.25
+          ],
+          [
+            0.82,
+            0.7,
+            0.52
+          ],
+          [
+            0.95,
+            0.9,
+            0.8
+          ]
+        ],
+        "bands": 12,
+        "seaLevel": 0,
+        "polarCap": 0,
+        "emissive": 0,
+        "equilibriumTemperatureK": 342
+      },
+      "placeFromElements": true
+    },
+    {
+      "index": 8,
+      "id": "kepler_90_h",
+      "parentId": "kepler_90",
+      "initTag": "kepler_90_h",
+      "kind": "planet",
+      "displayNameEn": "Kepler-90 h",
+      "displayNameRu": "Kepler-90 h",
+      "auDistance": 0.97062,
+      "orbitalPeriodDays": 331.60296,
+      "earthRadiusScale": 11.252,
+      "radiusKm": 71686.5,
+      "axialTiltDegrees": 0,
+      "artTiltXDegrees": 0,
+      "oblateness": 0,
+      "yawOffsetDegrees": 0,
+      "artRollDegrees": 0,
+      "shaderFlags": {
+        "hasNightTexture": false,
+        "hasSpecularMap": false,
+        "hasClouds": false
+      },
+      "useSphereIntersect": false,
+      "ambientFactor": 0,
+      "lod": {
+        "diffuse": "",
+        "normal": "",
+        "specular": null,
+        "night": null,
+        "clouds": null
+      },
+      "meshPath": null,
+      "sceneOrbitRadius": 0,
+      "orbitPlane": "xz",
+      "initialAnomalyRad": 0,
+      "spinDegPerSimSecond": 0,
+      "keplerian": {
+        "aKm": 145202685.3,
+        "e": 0.0276,
+        "iDeg": 0.187,
+        "OmegaDeg": 0,
+        "omegaDeg": 119,
+        "M0Deg": 210.4035,
+        "nDegPerDay": 1.085635665,
+        "OmegaDotDegPerDay": 0,
+        "omegaDotDegPerDay": 0
+      },
+      "cloudLayer": {
+        "diffuse": null,
+        "normal": null,
+        "scaleFactor": 0,
+        "spinDegPerSimSecond": 0,
+        "ambientFactor": 0
+      },
+      "hasCloudLayer": false,
+      "hasRings": false,
+      "hasTerrain": false,
+      "terrainAttribution": null,
+      "procedural": {
+        "enabled": true,
+        "mode": 1,
+        "seed": 8,
+        "colors": [
+          [
+            0.55,
+            0.58,
+            0.6
+          ],
+          [
+            0.78,
+            0.76,
+            0.68
+          ],
+          [
+            0.92,
+            0.9,
+            0.85
+          ]
+        ],
+        "bands": 10,
+        "seaLevel": 0,
+        "polarCap": 0,
+        "emissive": 0,
+        "equilibriumTemperatureK": 294
+      },
+      "placeFromElements": true
+    }
+  ],
+  "atmospheres": []
+}

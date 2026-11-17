@@ -1,0 +1,137 @@
+{
+  "version": 2,
+  "generatedFrom": "resource/systems/toi-700.catalog.json",
+  "indexConvention": "Star=0, planets 1… by semi-major axis; matches the active system's OrbitLayout table",
+  "sceneNote": "Measured orbits and sizes; surfaces are procedural (no exoplanet has been imaged). Values marked fit are estimates.",
+  "bodies": [
+    {
+      "index": 0,
+      "id": "toi_700",
+      "name": "TOI-700",
+      "nameRu": "TOI-700",
+      "type": "star",
+      "diameterKm": 571031,
+      "massEarths": 138838,
+      "siderealRotationDays": null,
+      "orbitalPeriodDays": null,
+      "distanceAu": 0,
+      "moons": 0,
+      "summary": "M2.5 V star 101.5 light-years away; 4 known planets in the archive's composite table.",
+      "summaryRu": "Звезда класса M2.5 V на расстоянии 101.5 св. лет; известных планет: 4.",
+      "spectralType": "M2.5 V",
+      "effectiveTemperatureK": 3459,
+      "luminositySolar": 0.0233002,
+      "distancePc": 31.127
+    },
+    {
+      "index": 1,
+      "id": "toi_700_b",
+      "name": "TOI-700 b",
+      "nameRu": "TOI-700 b",
+      "type": "terrestrial",
+      "diameterKm": 12271,
+      "massEarths": 0.849,
+      "siderealRotationDays": 9.97722,
+      "orbitalPeriodDays": 9.97722,
+      "distanceAu": 0.0678,
+      "moons": 0,
+      "summary": "Terrestrial discovered in 2020 (transit); 5.07× Earth's insolation, equilibrium temperature ≈ 417 K.",
+      "summaryRu": "Планета земного типа, открыта в 2020 г. транзитным методом; освещённость 5.07 от земной, равновесная температура ≈ 417 K.",
+      "equilibriumTemperatureK": 417,
+      "irradianceEarth": 5.0687,
+      "discoveryYear": 2020,
+      "discoveryMethod": "Transit",
+      "fit": {
+        "rotation": "tidally-locked"
+      },
+      "surface": "scorched"
+    },
+    {
+      "index": 2,
+      "id": "toi_700_c",
+      "name": "TOI-700 c",
+      "nameRu": "TOI-700 c",
+      "type": "sub-neptune",
+      "diameterKm": 32301,
+      "massEarths": 6.96,
+      "siderealRotationDays": 16.051104,
+      "orbitalPeriodDays": 16.0511039,
+      "distanceAu": 0.0931,
+      "moons": 0,
+      "summary": "Sub-neptune discovered in 2020 (transit); 2.69× Earth's insolation, equilibrium temperature ≈ 356 K.",
+      "summaryRu": "Мини-нептун, открыта в 2020 г. транзитным методом; освещённость 2.69 от земной, равновесная температура ≈ 356 K.",
+      "equilibriumTemperatureK": 356,
+      "irradianceEarth": 2.6882,
+      "discoveryYear": 2020,
+      "discoveryMethod": "Transit",
+      "fit": {
+        "rotation": "tidally-locked"
+      },
+      "surface": "ice-giant"
+    },
+    {
+      "index": 3,
+      "id": "toi_700_e",
+      "name": "TOI-700 e",
+      "nameRu": "TOI-700 e",
+      "type": "terrestrial",
+      "diameterKm": 11710,
+      "massEarths": 0.718,
+      "siderealRotationDays": 27.810124,
+      "orbitalPeriodDays": 27.810124,
+      "distanceAu": 0.1336,
+      "moons": 0,
+      "summary": "Terrestrial discovered in 2023 (transit); 1.31× Earth's insolation, equilibrium temperature ≈ 273 K.",
+      "summaryRu": "Планета земного типа, открыта в 2023 г. транзитным методом; освещённость 1.31 от земной, равновесная температура ≈ 273 K.",
+      "equilibriumTemperatureK": 272.9,
+      "irradianceEarth": 1.3054,
+      "discoveryYear": 2023,
+      "discoveryMethod": "Transit",
+      "fit": {
+        "rotation": "tidally-locked"
+      },
+      "surface": "ocean"
+    },
+    {
+      "index": 4,
+      "id": "toi_700_d",
+      "name": "TOI-700 d",
+      "nameRu": "TOI-700 d",
+      "type": "terrestrial",
+      "diameterKm": 14590,
+      "massEarths": 1.58,
+      "siderealRotationDays": 37.423457,
+      "orbitalPeriodDays": 37.423457,
+      "distanceAu": 0.1642,
+      "moons": 0,
+      "summary": "Terrestrial discovered in 2020 (transit); 0.86× Earth's insolation, equilibrium temperature ≈ 269 K.",
+      "summaryRu": "Планета земного типа, открыта в 2020 г. транзитным методом; освещённость 0.86 от земной, равновесная температура ≈ 269 K.",
+      "equilibriumTemperatureK": 268.8,
+      "irradianceEarth": 0.8642,
+      "discoveryYear": 2020,
+      "discoveryMethod": "Transit",
+      "fit": {
+        "rotation": "tidally-locked"
+      },
+      "surface": "ocean"
+    }
+  ],
+  "scaleModes": {},
+  "system": {
+    "id": "toi-700",
+    "name": "TOI-700",
+    "nameRu": "TOI-700",
+    "distancePc": 31.127,
+    "habitableZoneAu": {
+      "innerAu": 0.14554,
+      "outerAu": 0.20967
+    },
+    "source": {
+      "table": "NASA Exoplanet Archive, Planetary Systems Composite Parameters (pscomppars)",
+      "url": "https://exoplanetarchive.ipac.caltech.edu/",
+      "archiveHostname": "TOI-700",
+      "referencePlaneInclinationDeg": 89.73
+    },
+    "sceneNoteRu": "Орбиты и размеры измерены; поверхности процедурные (ни одна экзопланета не сфотографирована). Значения с пометкой fit — оценки."
+  }
+}

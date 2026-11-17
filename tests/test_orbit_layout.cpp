@@ -8,7 +8,7 @@
 #include "astro/Ephemeris.h"
 #include "astro/Observer.h"
 #include "astro/SkyEvents.h"
-#include "Solar_System/BodyCatalog.generated.h"
+#include "Solar_System/BodyCatalog.h"
 #include "Solar_System/OrbitLayout.h"
 
 namespace {

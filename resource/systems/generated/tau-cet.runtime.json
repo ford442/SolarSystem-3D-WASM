@@ -1,0 +1,387 @@
+{
+  "format": "solarsystem-runtime-catalog",
+  "version": 1,
+  "generatedFrom": "resource/systems/tau-cet.catalog.json",
+  "id": "tau-cet",
+  "name": {
+    "en": "Tau Ceti",
+    "ru": "Тау Кита"
+  },
+  "distancePc": 3.603,
+  "spectralType": "G8.5V",
+  "habitableZoneAu": {
+    "innerAu": 0.67082,
+    "outerAu": 0.96642
+  },
+  "star": {
+    "id": "tau_cet",
+    "displayNameEn": "Tau Ceti",
+    "displayNameRu": "Тау Кита",
+    "spectralType": "G8.5V",
+    "effectiveTemperatureK": 5310,
+    "glowTemperatureK": 5778,
+    "radiusKm": 577431,
+    "radiusSolar": 0.83,
+    "luminositySolar": 0.4950055,
+    "massSolar": 0.783,
+    "activity": 0
+  },
+  "layout": [
+    {
+      "index": 0,
+      "id": "tau_cet",
+      "compressedOffset": [
+        0,
+        0,
+        0
+      ],
+      "auDistance": 0,
+      "orbitalPeriodDays": 0,
+      "inclinationDeg": 0,
+      "siderealRotationDays": 0,
+      "primeMeridianDegJ2000": 0,
+      "primeMeridianRateDegPerDay": 0,
+      "trueRadius": false,
+      "kepler": null
+    },
+    {
+      "index": 1,
+      "id": "tau_cet_g",
+      "compressedOffset": [
+        1500,
+        0,
+        0
+      ],
+      "auDistance": 0.133,
+      "orbitalPeriodDays": 20,
+      "inclinationDeg": 0,
+      "siderealRotationDays": 20,
+      "primeMeridianDegJ2000": 215.341,
+      "primeMeridianRateDegPerDay": 18,
+      "trueRadius": false,
+      "kepler": {
+        "aAu": 0.1329999999792778,
+        "e": 0.06,
+        "iDeg": 0,
+        "OmegaDeg": 0,
+        "omegaDeg": 35.341,
+        "M0Deg": 0,
+        "nDegPerDay": 18
+      }
+    },
+    {
+      "index": 2,
+      "id": "tau_cet_h",
+      "compressedOffset": [
+        -1290.4,
+        0,
+        1182.11
+      ],
+      "auDistance": 0.243,
+      "orbitalPeriodDays": 49.41,
+      "inclinationDeg": 0,
+      "siderealRotationDays": 1,
+      "primeMeridianDegJ2000": 0,
+      "primeMeridianRateDegPerDay": 360,
+      "trueRadius": false,
+      "kepler": {
+        "aAu": 0.2430000001330233,
+        "e": 0.23,
+        "iDeg": 0,
+        "OmegaDeg": 0,
+        "omegaDeg": 7.45,
+        "M0Deg": 0,
+        "nDegPerDay": 7.285974499
+      }
+    },
+    {
+      "index": 3,
+      "id": "tau_cet_f",
+      "compressedOffset": [
+        174.85,
+        0,
+        -1992.34
+      ],
+      "auDistance": 1.334,
+      "orbitalPeriodDays": 636.13,
+      "inclinationDeg": 0,
+      "siderealRotationDays": 1,
+      "primeMeridianDegJ2000": 0,
+      "primeMeridianRateDegPerDay": 360,
+      "trueRadius": false,
+      "kepler": {
+        "aAu": 1.3339999999077528,
+        "e": 0.16,
+        "iDeg": 0,
+        "OmegaDeg": 0,
+        "omegaDeg": 119.75,
+        "M0Deg": 0,
+        "nDegPerDay": 0.56592206
+      }
+    }
+  ],
+  "entries": [
+    {
+      "index": 1,
+      "id": "tau_cet_g",
+      "parentId": "tau_cet",
+      "initTag": "tau_cet_g",
+      "kind": "planet",
+      "displayNameEn": "Tau Ceti g",
+      "displayNameRu": "Тау Кита g",
+      "auDistance": 0.133,
+      "orbitalPeriodDays": 20,
+      "earthRadiusScale": 1.18,
+      "radiusKm": 7518,
+      "axialTiltDegrees": 0,
+      "artTiltXDegrees": 0,
+      "oblateness": 0,
+      "yawOffsetDegrees": 0,
+      "artRollDegrees": 0,
+      "shaderFlags": {
+        "hasNightTexture": false,
+        "hasSpecularMap": false,
+        "hasClouds": false
+      },
+      "useSphereIntersect": false,
+      "ambientFactor": 0,
+      "lod": {
+        "diffuse": "",
+        "normal": "",
+        "specular": null,
+        "night": null,
+        "clouds": null
+      },
+      "meshPath": null,
+      "sceneOrbitRadius": 0,
+      "orbitPlane": "xz",
+      "initialAnomalyRad": 0,
+      "spinDegPerSimSecond": 0,
+      "keplerian": {
+        "aKm": 19896516.8,
+        "e": 0.06,
+        "iDeg": 0,
+        "OmegaDeg": 0,
+        "omegaDeg": 35.341,
+        "M0Deg": 0,
+        "nDegPerDay": 18,
+        "OmegaDotDegPerDay": 0,
+        "omegaDotDegPerDay": 0
+      },
+      "cloudLayer": {
+        "diffuse": null,
+        "normal": null,
+        "scaleFactor": 0,
+        "spinDegPerSimSecond": 0,
+        "ambientFactor": 0
+      },
+      "hasCloudLayer": false,
+      "hasRings": false,
+      "hasTerrain": false,
+      "terrainAttribution": null,
+      "procedural": {
+        "enabled": true,
+        "mode": 0,
+        "seed": 1,
+        "colors": [
+          [
+            0.32,
+            0.22,
+            0.15
+          ],
+          [
+            0.55,
+            0.42,
+            0.3
+          ],
+          [
+            0.72,
+            0.62,
+            0.5
+          ]
+        ],
+        "bands": 0,
+        "seaLevel": 0,
+        "polarCap": 0,
+        "emissive": 0,
+        "equilibriumTemperatureK": 639.7
+      },
+      "placeFromElements": true
+    },
+    {
+      "index": 2,
+      "id": "tau_cet_h",
+      "parentId": "tau_cet",
+      "initTag": "tau_cet_h",
+      "kind": "planet",
+      "displayNameEn": "Tau Ceti h",
+      "displayNameRu": "Тау Кита h",
+      "auDistance": 0.243,
+      "orbitalPeriodDays": 49.41,
+      "earthRadiusScale": 1.19,
+      "radiusKm": 7581.5,
+      "axialTiltDegrees": 0,
+      "artTiltXDegrees": 0,
+      "oblateness": 0,
+      "yawOffsetDegrees": 0,
+      "artRollDegrees": 0,
+      "shaderFlags": {
+        "hasNightTexture": false,
+        "hasSpecularMap": false,
+        "hasClouds": false
+      },
+      "useSphereIntersect": false,
+      "ambientFactor": 0,
+      "lod": {
+        "diffuse": "",
+        "normal": "",
+        "specular": null,
+        "night": null,
+        "clouds": null
+      },
+      "meshPath": null,
+      "sceneOrbitRadius": 0,
+      "orbitPlane": "xz",
+      "initialAnomalyRad": 0,
+      "spinDegPerSimSecond": 0,
+      "keplerian": {
+        "aKm": 36352282.6,
+        "e": 0.23,
+        "iDeg": 0,
+        "OmegaDeg": 0,
+        "omegaDeg": 7.45,
+        "M0Deg": 0,
+        "nDegPerDay": 7.285974499,
+        "OmegaDotDegPerDay": 0,
+        "omegaDotDegPerDay": 0
+      },
+      "cloudLayer": {
+        "diffuse": null,
+        "normal": null,
+        "scaleFactor": 0,
+        "spinDegPerSimSecond": 0,
+        "ambientFactor": 0
+      },
+      "hasCloudLayer": false,
+      "hasRings": false,
+      "hasTerrain": false,
+      "terrainAttribution": null,
+      "procedural": {
+        "enabled": true,
+        "mode": 0,
+        "seed": 2,
+        "colors": [
+          [
+            0.32,
+            0.22,
+            0.15
+          ],
+          [
+            0.55,
+            0.42,
+            0.3
+          ],
+          [
+            0.72,
+            0.62,
+            0.5
+          ]
+        ],
+        "bands": 0,
+        "seaLevel": 0,
+        "polarCap": 0,
+        "emissive": 0,
+        "equilibriumTemperatureK": 473.2
+      },
+      "placeFromElements": true
+    },
+    {
+      "index": 3,
+      "id": "tau_cet_f",
+      "parentId": "tau_cet",
+      "initTag": "tau_cet_f",
+      "kind": "planet",
+      "displayNameEn": "Tau Ceti f",
+      "displayNameRu": "Тау Кита f",
+      "auDistance": 1.334,
+      "orbitalPeriodDays": 636.13,
+      "earthRadiusScale": 1.81,
+      "radiusKm": 11531.5,
+      "axialTiltDegrees": 0,
+      "artTiltXDegrees": 0,
+      "oblateness": 0,
+      "yawOffsetDegrees": 0,
+      "artRollDegrees": 0,
+      "shaderFlags": {
+        "hasNightTexture": false,
+        "hasSpecularMap": false,
+        "hasClouds": false
+      },
+      "useSphereIntersect": false,
+      "ambientFactor": 0,
+      "lod": {
+        "diffuse": "",
+        "normal": "",
+        "specular": null,
+        "night": null,
+        "clouds": null
+      },
+      "meshPath": null,
+      "sceneOrbitRadius": 0,
+      "orbitPlane": "xz",
+      "initialAnomalyRad": 0,
+      "spinDegPerSimSecond": 0,
+      "keplerian": {
+        "aKm": 199563559.5,
+        "e": 0.16,
+        "iDeg": 0,
+        "OmegaDeg": 0,
+        "omegaDeg": 119.75,
+        "M0Deg": 0,
+        "nDegPerDay": 0.56592206,
+        "OmegaDotDegPerDay": 0,
+        "omegaDotDegPerDay": 0
+      },
+      "cloudLayer": {
+        "diffuse": null,
+        "normal": null,
+        "scaleFactor": 0,
+        "spinDegPerSimSecond": 0,
+        "ambientFactor": 0
+      },
+      "hasCloudLayer": false,
+      "hasRings": false,
+      "hasTerrain": false,
+      "terrainAttribution": null,
+      "procedural": {
+        "enabled": true,
+        "mode": 3,
+        "seed": 3,
+        "colors": [
+          [
+            0.45,
+            0.47,
+            0.5
+          ],
+          [
+            0.7,
+            0.74,
+            0.78
+          ],
+          [
+            0.95,
+            0.96,
+            0.98
+          ]
+        ],
+        "bands": 0,
+        "seaLevel": 0.35,
+        "polarCap": 0.45,
+        "emissive": 0,
+        "equilibriumTemperatureK": 202
+      },
+      "placeFromElements": true
+    }
+  ],
+  "atmospheres": []
+}

@@ -1,0 +1,16 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 160 72" width="160" height="72" role="img" aria-label="TRAPPIST-1">
+  <defs>
+    <radialGradient id="glow"><stop offset="0" stop-color="#ffa74e" stop-opacity="0.9"/><stop offset="1" stop-color="#ffa74e" stop-opacity="0"/></radialGradient>
+  </defs>
+  <rect width="160" height="72" fill="#05070d"/>
+  <line x1="28.22882876621265" y1="36" x2="154" y2="36" stroke="#ffffff" stroke-opacity="0.12" stroke-width="0.6"/>
+  <circle cx="16" cy="36" r="13.7" fill="url(#glow)"/>
+  <circle cx="16" cy="36" r="6.2" fill="#ffa74e"/>
+  <circle cx="32.2" cy="36" r="1.69" fill="#c4ad95"/>
+  <circle cx="54.3" cy="36" r="1.68" fill="#c4ad95"/>
+  <circle cx="78.3" cy="36" r="1.42" fill="#adb390"/>
+  <circle cx="97.4" cy="36" r="1.53" fill="#adb390"/>
+  <circle cx="116.7" cy="36" r="1.64" fill="#dadfe5"/>
+  <circle cx="130.4" cy="36" r="1.70" fill="#dadfe5"/>
+  <circle cx="150.0" cy="36" r="1.40" fill="#eaeff3"/>
+</svg>

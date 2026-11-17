@@ -11,6 +11,11 @@ export interface WasmModuleCallbacks {
     onNearestPlanetChanged?: (index: number) => void;
     /** Mission index whenever mission follow starts or stops (-1 when it stops). */
     onMissionFocused?: (index: number) => void;
+    /**
+     * A star-system jump (Application::RequestSystemJump): phase 0 started (fading out), 1 the
+     * scene is now `id` (bodies, focus indices and facts changed), 2 faded in, -1 refused.
+     */
+    onSystemChanged?: (id: string, phase: number) => void;
 }
 
 type CallbackKey = keyof WasmModuleCallbacks;

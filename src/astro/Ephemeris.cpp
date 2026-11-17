@@ -1,6 +1,6 @@
 #include "Ephemeris.h"
 
-#include "../Solar_System/BodyCatalog.generated.h"
+#include "../Solar_System/BodyCatalog.h"
 #include "LunarTheory.h"
 
 #include <algorithm>
@@ -18,13 +18,15 @@ constexpr double kDaysPerCentury = 36525.0;
 constexpr double kKmPerAu = 149597870.7;
 constexpr int kMoonId = 16;
 
-// Catalog satellites whose orbit.keplerian row carries real angles for all six elements.
-// Every other satellite row still ships OmegaDeg / omegaDeg / M0Deg = 0 placeholders, which
-// would swing the moon into a plainly wrong plane, so those keep the circular
-// SatelliteOrbit offset. Add an id here once its catalog row gets measured angles.
+// Catalog satellites are placed from their orbit.keplerian row only where the row sets
+// orbit.placeFromElements (BodyCatalog::Entry::placeFromElements): the rows whose six
+// elements are all measured (Io, Europa, Ganymede, Callisto, Titan, Triton today). Every
+// other satellite row still ships OmegaDeg / omegaDeg / M0Deg = 0 placeholders, which would
+// swing the moon into a plainly wrong plane, so those keep the circular SatelliteOrbit
+// offset. Set the flag on a row once it gets measured angles; no C++ edit.
 //
 // Two documented approximations:
-// The Moon is not in this list: it comes from the Meeus ch. 47 series (LunarTheory), because
+// The Moon does not use the flag: it comes from the Meeus ch. 47 series (LunarTheory), because
 // mean elements cannot get its evection, variation and annual equation (up to 2.4 deg).
 //
 //  - Elements are J2000-epoch mean elements. The node and periapsis rates the row carries
@@ -34,14 +36,6 @@ constexpr int kMoonId = 16;
 //    published frame. For the Galileans and Titan the published frame is the
 //    parent's Laplace plane, so their orbit planes come out tilted by the parent's own
 //    obliquity (~3.1 deg for Jupiter, ~26.7 deg for Saturn) from the truth.
-constexpr int kKeplerianSatellites[] = {
-    19, // Io
-    20, // Europa
-    21, // Ganymede
-    22, // Callisto
-    28, // Titan
-    35, // Triton
-};
 
 struct Elements {
     double a0, aDot;   // AU, AU/Cy
@@ -208,12 +202,8 @@ HelioLB fromOrbitalPlane(double a, double e, double IDeg, double OmDeg, double w
 }
 
 bool hasKeplerianSolution(int satelliteId) {
-    for (const int id : kKeplerianSatellites) {
-        if (id == satelliteId) {
-            return true;
-        }
-    }
-    return false;
+    const BodyCatalog::Entry* entry = BodyCatalog::FindByIndex(satelliteId);
+    return entry && entry->placeFromElements;
 }
 
 HelioLB standishPosition(const Elements& el, double jd) {
@@ -399,6 +389,12 @@ const IEphemeris& GetBackend() {
 
 void SetBackend(const IEphemeris* backend) {
     g_backend = backend;
+}
+
+HelioLB KeplerianPosition(double aAu, double e, double iDeg, double OmegaDeg, double omegaDeg, double M0Deg,
+                          double nDegPerDay, double julianDate) {
+    const double M = wrapDeg180(M0Deg + nDegPerDay * (julianDate - kJ2000));
+    return fromOrbitalPlane(aAu, e, iDeg, OmegaDeg, omegaDeg, M);
 }
 
 HelioLB Position(int bodyIndex, double julianDate) {

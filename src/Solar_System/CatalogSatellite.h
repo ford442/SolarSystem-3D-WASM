@@ -1,6 +1,6 @@
 #ifndef SOLARSYSTEM_CATALOGSATELLITE_H
 #define SOLARSYSTEM_CATALOGSATELLITE_H
-#include "BodyCatalog.generated.h"
+#include "BodyCatalog.h"
 #include "CatalogMaterial.h"
 #include "Satellite.h"
 

@@ -1,0 +1,401 @@
+{
+  "schemaVersion": 1,
+  "system": {
+    "id": "tau-cet",
+    "name": {
+      "en": "Tau Ceti",
+      "ru": "Тау Кита"
+    },
+    "distancePc": 3.603,
+    "spectralType": "G8.5V",
+    "starColor": "#ffeadb",
+    "habitableZoneAu": {
+      "innerAu": 0.67082,
+      "outerAu": 0.96642
+    },
+    "source": {
+      "table": "NASA Exoplanet Archive, Planetary Systems Composite Parameters (pscomppars)",
+      "url": "https://exoplanetarchive.ipac.caltech.edu/",
+      "archiveHostname": "tau Cet",
+      "referencePlaneInclinationDeg": 90
+    }
+  },
+  "sceneNote": {
+    "en": "Measured orbits and sizes; surfaces are procedural (no exoplanet has been imaged). Values marked fit are estimates.",
+    "ru": "Орбиты и размеры измерены; поверхности процедурные (ни одна экзопланета не сфотографирована). Значения с пометкой fit — оценки."
+  },
+  "initTagAllowlist": [
+    "tau_cet_g",
+    "tau_cet_h",
+    "tau_cet_f"
+  ],
+  "bodies": [
+    {
+      "id": "tau_cet",
+      "index": 0,
+      "kind": "star",
+      "parent": null,
+      "displayName": {
+        "en": "Tau Ceti",
+        "ru": "Тау Кита"
+      },
+      "type": "star",
+      "facts": {
+        "diameterKm": 1154862,
+        "massEarths": 260697,
+        "siderealRotationDays": null,
+        "orbitalPeriodDays": null,
+        "distanceAu": 0,
+        "moons": 0,
+        "distancePc": 3.603,
+        "spectralType": "G8.5V",
+        "effectiveTemperatureK": 5310,
+        "luminositySolar": 0.4950055,
+        "summary": {
+          "en": "G8.5V star 11.8 light-years away; 3 known planets in the archive's composite table.",
+          "ru": "Звезда класса G8.5V на расстоянии 11.8 св. лет; известных планет: 3."
+        }
+      },
+      "orbit": {
+        "compressedOffset": [
+          0,
+          0,
+          0
+        ],
+        "inclinationDeg": 0,
+        "siderealRotationDays": null,
+        "orbitalPeriodDays": null,
+        "distanceAu": 0,
+        "axialTiltDegrees": 0,
+        "earthRadiusScale": 1,
+        "rotationRate": 0
+      },
+      "render": {
+        "star": {
+          "effectiveTemperatureK": 5310,
+          "radiusSolar": 0.83,
+          "luminositySolar": 0.4950055,
+          "massSolar": 0.783,
+          "spectralType": "G8.5V",
+          "activity": 0
+        }
+      },
+      "includeInCompanion": false
+    },
+    {
+      "id": "tau_cet_g",
+      "index": 1,
+      "kind": "planet",
+      "parent": "tau_cet",
+      "displayName": {
+        "en": "Tau Ceti g",
+        "ru": "Тау Кита g"
+      },
+      "type": "terrestrial",
+      "facts": {
+        "diameterKm": 15036,
+        "massEarths": 1.75,
+        "siderealRotationDays": 20,
+        "orbitalPeriodDays": 20,
+        "distanceAu": 0.133,
+        "moons": 0,
+        "equilibriumTemperatureK": 639.7,
+        "irradianceEarth": 27.9838,
+        "discoveryYear": 2017,
+        "discoveryMethod": "Radial Velocity",
+        "summary": {
+          "en": "Terrestrial discovered in 2017 (radial velocity); 27.98× Earth's insolation, equilibrium temperature ≈ 640 K.",
+          "ru": "Планета земного типа, открыта в 2017 г. методом лучевых скоростей; освещённость 27.98 от земной, равновесная температура ≈ 640 K."
+        }
+      },
+      "orbit": {
+        "compressedOffset": [
+          1500,
+          0,
+          0
+        ],
+        "inclinationDeg": 0,
+        "siderealRotationDays": 20,
+        "orbitalPeriodDays": 20,
+        "distanceAu": 0.133,
+        "axialTiltDegrees": 0,
+        "earthRadiusScale": 1.18,
+        "rotationRate": 0,
+        "primeMeridianDegJ2000": 215.341,
+        "primeMeridianRateDegPerDay": 18,
+        "keplerian": {
+          "aKm": 19896516.8,
+          "e": 0.06,
+          "iDeg": 0,
+          "OmegaDeg": 0,
+          "omegaDeg": 35.341,
+          "M0Deg": 0,
+          "nDegPerDay": 18,
+          "OmegaDotDegPerDay": 0,
+          "omegaDotDegPerDay": 0
+        },
+        "placeFromElements": true
+      },
+      "system": {
+        "name": "Tau Ceti g",
+        "initTag": "tau_cet_g",
+        "activationRadius": 800,
+        "lodThreshold": 20
+      },
+      "render": {
+        "shaderFlags": {
+          "hasNightTexture": false,
+          "hasSpecularMap": false,
+          "hasClouds": false
+        },
+        "ambientFactor": 0,
+        "procedural": {
+          "seed": 1,
+          "equilibriumTemperatureK": 639.7,
+          "style": "scorched",
+          "mode": 0,
+          "colors": [
+            [
+              0.32,
+              0.22,
+              0.15
+            ],
+            [
+              0.55,
+              0.42,
+              0.3
+            ],
+            [
+              0.72,
+              0.62,
+              0.5
+            ]
+          ],
+          "seaLevel": 0,
+          "polarCap": 0,
+          "emissive": 0
+        }
+      },
+      "fit": {
+        "inclination": true,
+        "meanAnomaly": true,
+        "rotation": "tidally-locked"
+      },
+      "archive": {
+        "plName": "tau Cet g",
+        "observedInclinationDeg": null
+      },
+      "includeInCompanion": false
+    },
+    {
+      "id": "tau_cet_h",
+      "index": 2,
+      "kind": "planet",
+      "parent": "tau_cet",
+      "displayName": {
+        "en": "Tau Ceti h",
+        "ru": "Тау Кита h"
+      },
+      "type": "terrestrial",
+      "facts": {
+        "diameterKm": 15163,
+        "massEarths": 1.83,
+        "siderealRotationDays": 1,
+        "orbitalPeriodDays": 49.41,
+        "distanceAu": 0.243,
+        "moons": 0,
+        "equilibriumTemperatureK": 473.2,
+        "irradianceEarth": 8.383,
+        "discoveryYear": 2017,
+        "discoveryMethod": "Radial Velocity",
+        "summary": {
+          "en": "Terrestrial discovered in 2017 (radial velocity); 8.38× Earth's insolation, equilibrium temperature ≈ 473 K.",
+          "ru": "Планета земного типа, открыта в 2017 г. методом лучевых скоростей; освещённость 8.38 от земной, равновесная температура ≈ 473 K."
+        }
+      },
+      "orbit": {
+        "compressedOffset": [
+          -1290.4,
+          0,
+          1182.11
+        ],
+        "inclinationDeg": 0,
+        "siderealRotationDays": 1,
+        "orbitalPeriodDays": 49.41,
+        "distanceAu": 0.243,
+        "axialTiltDegrees": 0,
+        "earthRadiusScale": 1.19,
+        "rotationRate": 0,
+        "primeMeridianDegJ2000": 0,
+        "primeMeridianRateDegPerDay": 360,
+        "keplerian": {
+          "aKm": 36352282.6,
+          "e": 0.23,
+          "iDeg": 0,
+          "OmegaDeg": 0,
+          "omegaDeg": 7.45,
+          "M0Deg": 0,
+          "nDegPerDay": 7.285974499,
+          "OmegaDotDegPerDay": 0,
+          "omegaDotDegPerDay": 0
+        },
+        "placeFromElements": true
+      },
+      "system": {
+        "name": "Tau Ceti h",
+        "initTag": "tau_cet_h",
+        "activationRadius": 800,
+        "lodThreshold": 20
+      },
+      "render": {
+        "shaderFlags": {
+          "hasNightTexture": false,
+          "hasSpecularMap": false,
+          "hasClouds": false
+        },
+        "ambientFactor": 0,
+        "procedural": {
+          "seed": 2,
+          "equilibriumTemperatureK": 473.2,
+          "style": "scorched",
+          "mode": 0,
+          "colors": [
+            [
+              0.32,
+              0.22,
+              0.15
+            ],
+            [
+              0.55,
+              0.42,
+              0.3
+            ],
+            [
+              0.72,
+              0.62,
+              0.5
+            ]
+          ],
+          "seaLevel": 0,
+          "polarCap": 0,
+          "emissive": 0
+        }
+      },
+      "fit": {
+        "inclination": true,
+        "meanAnomaly": true,
+        "rotation": "unknown"
+      },
+      "archive": {
+        "plName": "tau Cet h",
+        "observedInclinationDeg": null
+      },
+      "includeInCompanion": false
+    },
+    {
+      "id": "tau_cet_f",
+      "index": 3,
+      "kind": "planet",
+      "parent": "tau_cet",
+      "displayName": {
+        "en": "Tau Ceti f",
+        "ru": "Тау Кита f"
+      },
+      "type": "super-earth",
+      "facts": {
+        "diameterKm": 23063,
+        "massEarths": 3.93,
+        "siderealRotationDays": 1,
+        "orbitalPeriodDays": 636.13,
+        "distanceAu": 1.334,
+        "moons": 0,
+        "equilibriumTemperatureK": 202,
+        "irradianceEarth": 0.2782,
+        "discoveryYear": 2017,
+        "discoveryMethod": "Radial Velocity",
+        "summary": {
+          "en": "Super-earth discovered in 2017 (radial velocity); 0.28× Earth's insolation, equilibrium temperature ≈ 202 K.",
+          "ru": "Суперземля, открыта в 2017 г. методом лучевых скоростей; освещённость 0.28 от земной, равновесная температура ≈ 202 K."
+        }
+      },
+      "orbit": {
+        "compressedOffset": [
+          174.85,
+          0,
+          -1992.34
+        ],
+        "inclinationDeg": 0,
+        "siderealRotationDays": 1,
+        "orbitalPeriodDays": 636.13,
+        "distanceAu": 1.334,
+        "axialTiltDegrees": 0,
+        "earthRadiusScale": 1.81,
+        "rotationRate": 0,
+        "primeMeridianDegJ2000": 0,
+        "primeMeridianRateDegPerDay": 360,
+        "keplerian": {
+          "aKm": 199563559.5,
+          "e": 0.16,
+          "iDeg": 0,
+          "OmegaDeg": 0,
+          "omegaDeg": 119.75,
+          "M0Deg": 0,
+          "nDegPerDay": 0.56592206,
+          "OmegaDotDegPerDay": 0,
+          "omegaDotDegPerDay": 0
+        },
+        "placeFromElements": true
+      },
+      "system": {
+        "name": "Tau Ceti f",
+        "initTag": "tau_cet_f",
+        "activationRadius": 800,
+        "lodThreshold": 20
+      },
+      "render": {
+        "shaderFlags": {
+          "hasNightTexture": false,
+          "hasSpecularMap": false,
+          "hasClouds": false
+        },
+        "ambientFactor": 0,
+        "procedural": {
+          "seed": 3,
+          "equilibriumTemperatureK": 202,
+          "style": "tundra",
+          "mode": 3,
+          "colors": [
+            [
+              0.45,
+              0.47,
+              0.5
+            ],
+            [
+              0.7,
+              0.74,
+              0.78
+            ],
+            [
+              0.95,
+              0.96,
+              0.98
+            ]
+          ],
+          "seaLevel": 0.35,
+          "polarCap": 0.45,
+          "emissive": 0
+        }
+      },
+      "fit": {
+        "inclination": true,
+        "meanAnomaly": true,
+        "rotation": "unknown"
+      },
+      "archive": {
+        "plName": "tau Cet f",
+        "observedInclinationDeg": null
+      },
+      "includeInCompanion": false
+    }
+  ]
+}

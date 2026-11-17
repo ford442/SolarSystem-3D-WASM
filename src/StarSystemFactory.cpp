@@ -3,6 +3,13 @@
 #include "Solar_System/CatalogClouds.h"
 #include "Solar_System/CatalogSatellite.h"
 #include "Solar_System/SceneScale.h"
+#include "Solar_System/BodyCatalog.h"
+#include "Solar_System/OrbitLayout.h"
+#include "Solar_System/Star.h"
+#include "Solar_System/StarSystemCatalog.h"
+#include "Solar_System/TexturePaths.h"
+#include "astro/MagneticFieldParams.h"
+#include "astro/StarPhysics.h"
 #include "Solar_System/SystemVisuals.h"
 #include "Solar_System/AtmosphereModel.h"
 #include "gfx/FloatLutTexture.h"
@@ -96,16 +103,31 @@ RenderableAtmosphere MakeAtmosphere(const MeshHolder& sphereModel, const BodyCat
 void Application::InitStarSystem() {
     _sphereModel = std::make_unique<MeshHolder>("resource/models/sphere.obj");
 
-    StarInfo sunInfo(*_sphereModel, TextureImage2D(TexturePaths::Resolve("resource/textures_low/Star_Spectrum_Low.dds")),
-                     _renderer.GetStarTuning().temperatureKelvin, 696342.0, glm::vec3(0.99607843, 0.890196078, 0.725490196), L"Sun", L"Солнце");
+    // The active system's star (render.star). For the Sun every derived number is the one it
+    // always had: 696 342 x 1, the 5778 K glow calibration, and a light tint of exactly 1.
+    const BodyCatalog::StarRow& star = BodyCatalog::Star();
+    _renderer.GetStarTuning().temperatureKelvin = star.glowTemperatureK;
+    StarInfo sunInfo(*_sphereModel,
+                     TextureImage2D(TexturePaths::Resolve("resource/textures_low/Star_Spectrum_Low.dds")),
+                     star.glowTemperatureK, static_cast<float>(696342.0 * star.radiusSolar),
+                     glm::vec3(0.99607843, 0.890196078, 0.725490196), star.displayNameEn, star.displayNameRu);
+    sunInfo.lightTint = StarPhysics::RelativeTint(star.effectiveTemperatureK);
+    sunInfo.activity = star.activity;
     _sun = std::make_shared<Sun>(std::move(sunInfo));
-    _sun->SetMagneticField(MagneticFieldCatalog::IntrinsicParamsForBody(OrbitLayout::Body::Sun));
+    if (StarSystemCatalog::IsSol()) {
+        _sun->SetMagneticField(MagneticFieldCatalog::IntrinsicParamsForBody(OrbitLayout::Body::Sun));
+    }
 
 #ifdef __EMSCRIPTEN__
-    LoadPlanetSystemManifests();
-#else
+    if (StarSystemCatalog::IsSol()) {
+        LoadPlanetSystemManifests();
+        return;
+    }
+    // Another system has no planet manifests (no textures to stage: its planets are
+    // PROCEDURAL_SURFACE), so it is built at once, like native.
+#endif
     std::unordered_set<std::string> initialized;
-    for (const BodyCatalog::Entry& entry : BodyCatalog::kEntries) {
+    for (const BodyCatalog::Entry& entry : BodyCatalog::Entries()) {
         if (entry.kind == BodyCatalog::Kind::Satellite) {
             continue;
         }
@@ -115,13 +137,12 @@ void Application::InitStarSystem() {
         initialized.insert(entry.initTag);
         InitCatalogSystem(*_sphereModel, entry.initTag);
     }
-#endif
 }
 
 void Application::InitCatalogBody(const MeshHolder& sphereModel, OrbitLayout::Body body) {
     const BodyCatalog::Entry* entry = BodyCatalog::FindByIndex(static_cast<int>(body));
     if (!entry) {
-        LOG_ERROR("CatalogBody", "No render descriptor for focus index %d — check planets.catalog.json",
+        LOG_ERROR("CatalogBody", "No render descriptor for focus index %d — check resource/systems/<id>.catalog.json",
                   static_cast<int>(body));
         return;
     }
@@ -131,20 +152,23 @@ void Application::InitCatalogBody(const MeshHolder& sphereModel, OrbitLayout::Bo
 void Application::InitCatalogSystem(const MeshHolder& sphereModel, const std::string& initTag) {
     const BodyCatalog::Entry* primary = BodyCatalog::FindPrimaryByInitTag(initTag.c_str());
     if (!primary) {
-        LOG_ERROR("CatalogBody", "No primary body for initTag \"%s\" — check planets.catalog.json", initTag.c_str());
+        LOG_ERROR("CatalogBody", "No primary body for initTag \"%s\" — check resource/systems/<id>.catalog.json",
+                  initTag.c_str());
         return;
     }
 
     PlanetInfo info = MakePlanetInfo(sphereModel, *primary);
     std::shared_ptr<Planet> planet = std::make_shared<CatalogBody>(std::move(info), _sun, *primary);
-    planet->SetMagneticField(
-        MagneticFieldCatalog::IntrinsicParamsForBody(static_cast<OrbitLayout::Body>(primary->index)));
+    if (StarSystemCatalog::IsSol()) { // the field models are Sol's bodies, by focus index
+        planet->SetMagneticField(
+            MagneticFieldCatalog::IntrinsicParamsForBody(static_cast<OrbitLayout::Body>(primary->index)));
+    }
 
     std::vector<std::shared_ptr<Satellite>> satellites;
     // Moons whose catalog row carries render.atmosphere (Titan). Their shells render with
     // this component, after the primary's.
     std::vector<std::pair<std::shared_ptr<Satellite>, const BodyCatalog::AtmosphereRow*>> satelliteAtmospheres;
-    for (const BodyCatalog::Entry& entry : BodyCatalog::kEntries) {
+    for (const BodyCatalog::Entry& entry : BodyCatalog::Entries()) {
         if (entry.kind != BodyCatalog::Kind::Satellite || !entry.parentId ||
             !BodyCatalog::StrEq(entry.parentId, primary->id)) {
             continue;

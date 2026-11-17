@@ -304,6 +304,11 @@ export interface ObservePanelController {
     /** Fraction of a day for the UTC time field; 0 when it is empty. */
     timeOfDayDays(): number;
     isActive(): boolean;
+    /**
+     * Observe stands on Earth, so it exists only in Sol (systems/index.json `observe`). Outside
+     * it the button is greyed out with `reason` as its tooltip; C++ refuses the mode as well.
+     */
+    setAvailable(available: boolean, reason?: string): void;
 }
 
 const STORAGE_KEY = 'solar-system.observe.v1';
@@ -577,7 +582,12 @@ export function initObservePanel(options: ObservePanelOptions): ObservePanelCont
         status.textContent = 'Observe: look around with the mouse or touch; scroll to zoom';
     }
 
+    const observeTitle = observeButton.title;
+
     observeButton.addEventListener('click', () => {
+        if (observeButton.disabled) {
+            return;
+        }
         if (!runtime.getObserveMode()) {
             enterObserve();
         }
@@ -750,5 +760,11 @@ export function initObservePanel(options: ObservePanelOptions): ObservePanelCont
     return {
         timeOfDayDays: () => parseTimeOfDayDays(timeInput.value) ?? 0,
         isActive: () => runtime.getObserveMode(),
+        setAvailable: (available, reason) => {
+            observeButton.disabled = !available;
+            observeButton.title = available ? observeTitle : (reason ?? observeTitle);
+            observeButton.setAttribute('aria-disabled', String(!available));
+            refresh();
+        },
     };
 }

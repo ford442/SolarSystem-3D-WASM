@@ -1,0 +1,608 @@
+{
+  "schemaVersion": 1,
+  "system": {
+    "id": "kepler-186",
+    "name": {
+      "en": "Kepler-186",
+      "ru": "Kepler-186"
+    },
+    "distancePc": 177.594,
+    "spectralType": "M1",
+    "starColor": "#ffce9b",
+    "habitableZoneAu": {
+      "innerAu": 0.19355,
+      "outerAu": 0.27884
+    },
+    "source": {
+      "table": "NASA Exoplanet Archive, Planetary Systems Composite Parameters (pscomppars)",
+      "url": "https://exoplanetarchive.ipac.caltech.edu/",
+      "archiveHostname": "Kepler-186",
+      "referencePlaneInclinationDeg": 89.84
+    }
+  },
+  "sceneNote": {
+    "en": "Measured orbits and sizes; surfaces are procedural (no exoplanet has been imaged). Values marked fit are estimates.",
+    "ru": "Орбиты и размеры измерены; поверхности процедурные (ни одна экзопланета не сфотографирована). Значения с пометкой fit — оценки."
+  },
+  "initTagAllowlist": [
+    "kepler_186_b",
+    "kepler_186_c",
+    "kepler_186_d",
+    "kepler_186_e",
+    "kepler_186_f"
+  ],
+  "bodies": [
+    {
+      "id": "kepler_186",
+      "index": 0,
+      "kind": "star",
+      "parent": null,
+      "displayName": {
+        "en": "Kepler-186",
+        "ru": "Kepler-186"
+      },
+      "type": "star",
+      "facts": {
+        "diameterKm": 656741,
+        "massEarths": 159148,
+        "siderealRotationDays": null,
+        "orbitalPeriodDays": null,
+        "distanceAu": 0,
+        "moons": 0,
+        "distancePc": 177.594,
+        "spectralType": "M1",
+        "effectiveTemperatureK": 3788,
+        "luminositySolar": 0.0412098,
+        "summary": {
+          "en": "M1 star 579.2 light-years away; 5 known planets in the archive's composite table.",
+          "ru": "Звезда класса M1 на расстоянии 579.2 св. лет; известных планет: 5."
+        }
+      },
+      "orbit": {
+        "compressedOffset": [
+          0,
+          0,
+          0
+        ],
+        "inclinationDeg": 0,
+        "siderealRotationDays": null,
+        "orbitalPeriodDays": null,
+        "distanceAu": 0,
+        "axialTiltDegrees": 0,
+        "earthRadiusScale": 1,
+        "rotationRate": 0
+      },
+      "render": {
+        "star": {
+          "effectiveTemperatureK": 3788,
+          "radiusSolar": 0.472,
+          "luminositySolar": 0.0412098,
+          "massSolar": 0.478,
+          "spectralType": "M1",
+          "activity": 0.09
+        }
+      },
+      "includeInCompanion": false
+    },
+    {
+      "id": "kepler_186_b",
+      "index": 1,
+      "kind": "planet",
+      "parent": "kepler_186",
+      "displayName": {
+        "en": "Kepler-186 b",
+        "ru": "Kepler-186 b"
+      },
+      "type": "terrestrial",
+      "facts": {
+        "diameterKm": 13634,
+        "massEarths": 1.24,
+        "siderealRotationDays": 3.886791,
+        "orbitalPeriodDays": 3.8867907,
+        "distanceAu": 0.0343,
+        "moons": 0,
+        "equilibriumTemperatureK": 571,
+        "irradianceEarth": 35.0277,
+        "discoveryYear": 2014,
+        "discoveryMethod": "Transit",
+        "summary": {
+          "en": "Terrestrial discovered in 2014 (transit); 35.03× Earth's insolation, equilibrium temperature ≈ 571 K.",
+          "ru": "Планета земного типа, открыта в 2014 г. транзитным методом; освещённость 35.03 от земной, равновесная температура ≈ 571 K."
+        }
+      },
+      "orbit": {
+        "compressedOffset": [
+          1500,
+          0,
+          0
+        ],
+        "inclinationDeg": -0.24,
+        "siderealRotationDays": 3.886791,
+        "orbitalPeriodDays": 3.8867907,
+        "distanceAu": 0.0343,
+        "axialTiltDegrees": 0,
+        "earthRadiusScale": 1.07,
+        "rotationRate": 0,
+        "primeMeridianDegJ2000": 181.5851,
+        "primeMeridianRateDegPerDay": 92.621400993,
+        "keplerian": {
+          "aKm": 5131207,
+          "e": 0,
+          "iDeg": -0.24,
+          "OmegaDeg": 0,
+          "omegaDeg": 90,
+          "M0Deg": 271.5851,
+          "nDegPerDay": 92.621400993,
+          "OmegaDotDegPerDay": 0,
+          "omegaDotDegPerDay": 0
+        },
+        "placeFromElements": true
+      },
+      "system": {
+        "name": "Kepler-186 b",
+        "initTag": "kepler_186_b",
+        "activationRadius": 800,
+        "lodThreshold": 20
+      },
+      "render": {
+        "shaderFlags": {
+          "hasNightTexture": false,
+          "hasSpecularMap": false,
+          "hasClouds": false
+        },
+        "ambientFactor": 0,
+        "procedural": {
+          "seed": 1,
+          "equilibriumTemperatureK": 571,
+          "style": "scorched",
+          "mode": 0,
+          "colors": [
+            [
+              0.32,
+              0.22,
+              0.15
+            ],
+            [
+              0.55,
+              0.42,
+              0.3
+            ],
+            [
+              0.72,
+              0.62,
+              0.5
+            ]
+          ],
+          "seaLevel": 0,
+          "polarCap": 0,
+          "emissive": 0
+        }
+      },
+      "fit": {
+        "argumentOfPeriastron": true,
+        "rotation": "tidally-locked"
+      },
+      "archive": {
+        "plName": "Kepler-186 b",
+        "observedInclinationDeg": 89.6
+      },
+      "includeInCompanion": false
+    },
+    {
+      "id": "kepler_186_c",
+      "index": 2,
+      "kind": "planet",
+      "parent": "kepler_186",
+      "displayName": {
+        "en": "Kepler-186 c",
+        "ru": "Kepler-186 c"
+      },
+      "type": "super-earth",
+      "facts": {
+        "diameterKm": 15928,
+        "massEarths": 2.1,
+        "siderealRotationDays": 7.267302,
+        "orbitalPeriodDays": 7.267302,
+        "distanceAu": 0.0451,
+        "moons": 0,
+        "equilibriumTemperatureK": 464,
+        "irradianceEarth": 20.2603,
+        "discoveryYear": 2014,
+        "discoveryMethod": "Transit",
+        "summary": {
+          "en": "Super-earth discovered in 2014 (transit); 20.26× Earth's insolation, equilibrium temperature ≈ 464 K.",
+          "ru": "Суперземля, открыта в 2014 г. транзитным методом; освещённость 20.26 от земной, равновесная температура ≈ 464 K."
+        }
+      },
+      "orbit": {
+        "compressedOffset": [
+          -1290.4,
+          0,
+          1182.11
+        ],
+        "inclinationDeg": 0.06,
+        "siderealRotationDays": 7.267302,
+        "orbitalPeriodDays": 7.267302,
+        "distanceAu": 0.0451,
+        "axialTiltDegrees": 0,
+        "earthRadiusScale": 1.25,
+        "rotationRate": 0,
+        "primeMeridianDegJ2000": 117.5031,
+        "primeMeridianRateDegPerDay": 49.536953329,
+        "keplerian": {
+          "aKm": 6746864,
+          "e": 0,
+          "iDeg": 0.06,
+          "OmegaDeg": 0,
+          "omegaDeg": 90,
+          "M0Deg": 207.5031,
+          "nDegPerDay": 49.536953329,
+          "OmegaDotDegPerDay": 0,
+          "omegaDotDegPerDay": 0
+        },
+        "placeFromElements": true
+      },
+      "system": {
+        "name": "Kepler-186 c",
+        "initTag": "kepler_186_c",
+        "activationRadius": 800,
+        "lodThreshold": 20
+      },
+      "render": {
+        "shaderFlags": {
+          "hasNightTexture": false,
+          "hasSpecularMap": false,
+          "hasClouds": false
+        },
+        "ambientFactor": 0,
+        "procedural": {
+          "seed": 2,
+          "equilibriumTemperatureK": 464,
+          "style": "scorched",
+          "mode": 0,
+          "colors": [
+            [
+              0.32,
+              0.22,
+              0.15
+            ],
+            [
+              0.55,
+              0.42,
+              0.3
+            ],
+            [
+              0.72,
+              0.62,
+              0.5
+            ]
+          ],
+          "seaLevel": 0,
+          "polarCap": 0,
+          "emissive": 0
+        }
+      },
+      "fit": {
+        "argumentOfPeriastron": true,
+        "rotation": "tidally-locked"
+      },
+      "archive": {
+        "plName": "Kepler-186 c",
+        "observedInclinationDeg": 89.9
+      },
+      "includeInCompanion": false
+    },
+    {
+      "id": "kepler_186_d",
+      "index": 3,
+      "kind": "planet",
+      "parent": "kepler_186",
+      "displayName": {
+        "en": "Kepler-186 d",
+        "ru": "Kepler-186 d"
+      },
+      "type": "super-earth",
+      "facts": {
+        "diameterKm": 17839,
+        "massEarths": 2.54,
+        "siderealRotationDays": 13.342996,
+        "orbitalPeriodDays": 13.342996,
+        "distanceAu": 0.0781,
+        "moons": 0,
+        "equilibriumTemperatureK": 379,
+        "irradianceEarth": 6.7561,
+        "discoveryYear": 2014,
+        "discoveryMethod": "Transit",
+        "summary": {
+          "en": "Super-earth discovered in 2014 (transit); 6.76× Earth's insolation, equilibrium temperature ≈ 379 K.",
+          "ru": "Суперземля, открыта в 2014 г. транзитным методом; освещённость 6.76 от земной, равновесная температура ≈ 379 K."
+        }
+      },
+      "orbit": {
+        "compressedOffset": [
+          174.85,
+          0,
+          -1992.34
+        ],
+        "inclinationDeg": -0.74,
+        "siderealRotationDays": 13.342996,
+        "orbitalPeriodDays": 13.342996,
+        "distanceAu": 0.0781,
+        "axialTiltDegrees": 0,
+        "earthRadiusScale": 1.4,
+        "rotationRate": 0,
+        "primeMeridianDegJ2000": 25.3268,
+        "primeMeridianRateDegPerDay": 26.98044727,
+        "keplerian": {
+          "aKm": 11683593.7,
+          "e": 0,
+          "iDeg": -0.74,
+          "OmegaDeg": 0,
+          "omegaDeg": 90,
+          "M0Deg": 115.3268,
+          "nDegPerDay": 26.98044727,
+          "OmegaDotDegPerDay": 0,
+          "omegaDotDegPerDay": 0
+        },
+        "placeFromElements": true
+      },
+      "system": {
+        "name": "Kepler-186 d",
+        "initTag": "kepler_186_d",
+        "activationRadius": 800,
+        "lodThreshold": 20
+      },
+      "render": {
+        "shaderFlags": {
+          "hasNightTexture": false,
+          "hasSpecularMap": false,
+          "hasClouds": false
+        },
+        "ambientFactor": 0,
+        "procedural": {
+          "seed": 3,
+          "equilibriumTemperatureK": 379,
+          "style": "scorched",
+          "mode": 0,
+          "colors": [
+            [
+              0.32,
+              0.22,
+              0.15
+            ],
+            [
+              0.55,
+              0.42,
+              0.3
+            ],
+            [
+              0.72,
+              0.62,
+              0.5
+            ]
+          ],
+          "seaLevel": 0,
+          "polarCap": 0,
+          "emissive": 0
+        }
+      },
+      "fit": {
+        "argumentOfPeriastron": true,
+        "rotation": "tidally-locked"
+      },
+      "archive": {
+        "plName": "Kepler-186 d",
+        "observedInclinationDeg": 89.1
+      },
+      "includeInCompanion": false
+    },
+    {
+      "id": "kepler_186_e",
+      "index": 4,
+      "kind": "planet",
+      "parent": "kepler_186",
+      "displayName": {
+        "en": "Kepler-186 e",
+        "ru": "Kepler-186 e"
+      },
+      "type": "super-earth",
+      "facts": {
+        "diameterKm": 16182,
+        "massEarths": 2.15,
+        "siderealRotationDays": 22.407704,
+        "orbitalPeriodDays": 22.407704,
+        "distanceAu": 0.11,
+        "moons": 0,
+        "equilibriumTemperatureK": 319,
+        "irradianceEarth": 3.4058,
+        "discoveryYear": 2014,
+        "discoveryMethod": "Transit",
+        "summary": {
+          "en": "Super-earth discovered in 2014 (transit); 3.41× Earth's insolation, equilibrium temperature ≈ 319 K.",
+          "ru": "Суперземля, открыта в 2014 г. транзитным методом; освещённость 3.41 от земной, равновесная температура ≈ 319 K."
+        }
+      },
+      "orbit": {
+        "compressedOffset": [
+          1368.99,
+          0,
+          1785.6
+        ],
+        "inclinationDeg": 0,
+        "siderealRotationDays": 22.407704,
+        "orbitalPeriodDays": 22.407704,
+        "distanceAu": 0.11,
+        "axialTiltDegrees": 0,
+        "earthRadiusScale": 1.27,
+        "rotationRate": 0,
+        "primeMeridianDegJ2000": 54.3652,
+        "primeMeridianRateDegPerDay": 16.065903048,
+        "keplerian": {
+          "aKm": 16455765.8,
+          "e": 0,
+          "iDeg": 0,
+          "OmegaDeg": 0,
+          "omegaDeg": 90,
+          "M0Deg": 144.3652,
+          "nDegPerDay": 16.065903048,
+          "OmegaDotDegPerDay": 0,
+          "omegaDotDegPerDay": 0
+        },
+        "placeFromElements": true
+      },
+      "system": {
+        "name": "Kepler-186 e",
+        "initTag": "kepler_186_e",
+        "activationRadius": 800,
+        "lodThreshold": 20
+      },
+      "render": {
+        "shaderFlags": {
+          "hasNightTexture": false,
+          "hasSpecularMap": false,
+          "hasClouds": false
+        },
+        "ambientFactor": 0,
+        "procedural": {
+          "seed": 4,
+          "equilibriumTemperatureK": 319,
+          "style": "ocean",
+          "mode": 0,
+          "colors": [
+            [
+              0.07,
+              0.22,
+              0.45
+            ],
+            [
+              0.42,
+              0.45,
+              0.28
+            ],
+            [
+              0.92,
+              0.94,
+              0.97
+            ]
+          ],
+          "seaLevel": 0.55,
+          "polarCap": 0.75,
+          "emissive": 0
+        }
+      },
+      "fit": {
+        "argumentOfPeriastron": true,
+        "rotation": "tidally-locked"
+      },
+      "archive": {
+        "plName": "Kepler-186 e",
+        "observedInclinationDeg": 89.84
+      },
+      "includeInCompanion": false
+    },
+    {
+      "id": "kepler_186_f",
+      "index": 5,
+      "kind": "planet",
+      "parent": "kepler_186",
+      "displayName": {
+        "en": "Kepler-186 f",
+        "ru": "Kepler-186 f"
+      },
+      "type": "terrestrial",
+      "facts": {
+        "diameterKm": 14908,
+        "massEarths": 1.71,
+        "siderealRotationDays": 1,
+        "orbitalPeriodDays": 129.9441,
+        "distanceAu": 0.432,
+        "moons": 0,
+        "equilibriumTemperatureK": 177,
+        "irradianceEarth": 0.2208,
+        "discoveryYear": 2014,
+        "discoveryMethod": "Transit",
+        "summary": {
+          "en": "Terrestrial discovered in 2014 (transit); 0.22× Earth's insolation, equilibrium temperature ≈ 177 K.",
+          "ru": "Планета земного типа, открыта в 2014 г. транзитным методом; освещённость 0.22 от земной, равновесная температура ≈ 177 K."
+        }
+      },
+      "orbit": {
+        "compressedOffset": [
+          -2461.78,
+          0,
+          -435.45
+        ],
+        "inclinationDeg": 0.12,
+        "siderealRotationDays": 1,
+        "orbitalPeriodDays": 129.9441,
+        "distanceAu": 0.432,
+        "axialTiltDegrees": 0,
+        "earthRadiusScale": 1.17,
+        "rotationRate": 0,
+        "primeMeridianDegJ2000": 0,
+        "primeMeridianRateDegPerDay": 360,
+        "keplerian": {
+          "aKm": 64626280.1,
+          "e": 0.04,
+          "iDeg": 0.12,
+          "OmegaDeg": 0,
+          "omegaDeg": 90,
+          "M0Deg": 120.9602,
+          "nDegPerDay": 2.770422051,
+          "OmegaDotDegPerDay": 0,
+          "omegaDotDegPerDay": 0
+        },
+        "placeFromElements": true
+      },
+      "system": {
+        "name": "Kepler-186 f",
+        "initTag": "kepler_186_f",
+        "activationRadius": 800,
+        "lodThreshold": 20
+      },
+      "render": {
+        "shaderFlags": {
+          "hasNightTexture": false,
+          "hasSpecularMap": false,
+          "hasClouds": false
+        },
+        "ambientFactor": 0,
+        "procedural": {
+          "seed": 5,
+          "equilibriumTemperatureK": 177,
+          "style": "ice",
+          "mode": 3,
+          "colors": [
+            [
+              0.55,
+              0.6,
+              0.66
+            ],
+            [
+              0.82,
+              0.86,
+              0.9
+            ],
+            [
+              0.97,
+              0.98,
+              1
+            ]
+          ],
+          "seaLevel": 0.2,
+          "polarCap": 0.2,
+          "emissive": 0
+        }
+      },
+      "fit": {
+        "argumentOfPeriastron": true,
+        "rotation": "unknown"
+      },
+      "archive": {
+        "plName": "Kepler-186 f",
+        "observedInclinationDeg": 89.96
+      },
+      "includeInCompanion": false
+    }
+  ]
+}

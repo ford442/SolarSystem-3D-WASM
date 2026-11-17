@@ -2,6 +2,7 @@
 // State machine and JS-facing state only — the maths is Observer.cpp, the drawing is
 // ObserveSky.cpp / Renderer::RenderObserveSky. See docs/ARCHITECTURE.md.
 #include "Application.h"
+#include "Solar_System/StarSystemCatalog.h"
 #include "JsBridge.h"
 #include "astro/Ephemeris.h"
 #include "Solar_System/Atmosphere.h"
@@ -26,6 +27,10 @@ float wrapDegrees(float deg) {
 
 void Application::SetObserveMode(bool active) {
     if (active == _observe.active) {
+        return;
+    }
+    if (active && !StarSystemCatalog::IsSol()) {
+        LOG_WARN("Observe", "Observe stands on Earth: it is only available in the Solar System");
         return;
     }
 

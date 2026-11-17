@@ -44,6 +44,17 @@ describe('parseDeepLinkFromUrl', () => {
         });
     });
 
+    describe('system', () => {
+        it('reads a valid id, lowercased, and treats sol as the default', () => {
+            expect(parse('?system=TRAPPIST-1&planet=e')).toMatchObject({ system: 'trappist-1', planet: undefined });
+            expect(parse('?system=trappist-1&planet=3').planet).toBeUndefined();
+            expect(parse('?system=sol&planet=mars')).toMatchObject({ system: undefined, planet: PLANET_IDS.mars });
+            for (const bad of ['tau_cet', '../x', 'a'.repeat(49)]) {
+                expect(parse(`?system=${bad}`).system, bad).toBeUndefined();
+            }
+        });
+    });
+
     describe('settings', () => {
         it('reads quality by name, alias or number', () => {
             expect(parse('?quality=low').quality).toBe(0);
@@ -213,6 +224,32 @@ describe('buildShareableUrl', () => {
             const url = new URL(buildShareableUrl({ getFocusedPlanetIndex: () => none }, BASE));
             expect(url.searchParams.has('planet'), String(none)).toBe(false);
         }
+    });
+
+    it('names another star system and its focused body by letter, and leaves out missions there', () => {
+        const url = new URL(
+            buildShareableUrl(
+                {
+                    ...readers,
+                    getActiveSystemId: () => 'trappist-1',
+                    getFocusedPlanetIndex: () => 4,
+                    getSystemBodyLinkName: (index) => (index === 4 ? 'e' : undefined),
+                },
+                BASE,
+            ),
+        );
+        expect(url.searchParams.get('system')).toBe('trappist-1');
+        expect(url.searchParams.get('planet')).toBe('e');
+        expect(url.searchParams.has('mission')).toBe(false);
+        // C++ resolves the letter; the page must not read it as a Sol index.
+        const state = parseUrl(url.toString());
+        expect(state.system).toBe('trappist-1');
+        expect(state.planet).toBeUndefined();
+    });
+
+    it('keeps a small time scale to three significant figures', () => {
+        const url = new URL(buildShareableUrl({ getTimeScale: () => 0.0123456 }, BASE));
+        expect(url.searchParams.get('time')).toBe('0.0123');
     });
 
     it('writes only what the readers provide, and skips non-finite numbers', () => {

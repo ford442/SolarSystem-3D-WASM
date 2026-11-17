@@ -1,8 +1,11 @@
 #ifndef SOLARSYSTEM_SCENESCALE_H
 #define SOLARSYSTEM_SCENESCALE_H
 
-#include "BodyCatalog.generated.h"
+#include "BodyCatalog.h"
 #include "OrbitLayout.h"
+
+#include <algorithm>
+#include <cmath>
 
 /**
  * Lengths of the true-scale world in scene units, per scale mode (docs/ARCHITECTURE.md §11.1).
@@ -23,6 +26,7 @@ constexpr double kKmPerAu = 149597870.7;
 constexpr double kKmPerSceneUnit = kKmPerAu / static_cast<double>(OrbitLayout::kAuToSceneUnits);
 /** sphere.obj's radius: catalog bodies scale it by earthRadiusScale on compressed scale. */
 constexpr float kMeshRadius = 2.0f;
+/** The Sun's radius (IAU nominal); the active star's is StarRadiusKm(). */
 constexpr double kSunRadiusKm = 695700.0;
 /** The Sun's drawn radius on compressed scale (sphere.obj at Sun::TakeStarSystemCenter's 0.5). */
 constexpr float kSunArtRadius = 1.0f;
@@ -49,9 +53,23 @@ inline float BodySizeFactor(const BodyCatalog::Entry& entry) {
     return static_cast<float>(KmToScene(entry.radiusKm) / (kMeshRadius * entry.earthRadiusScale));
 }
 
-/** BodySizeFactor for the Sun, which has no catalog row. */
+/** The active system's star radius in km (render.star; 695 700 for the Sun). */
+inline double StarRadiusKm() {
+    return BodyCatalog::Star().radiusKm;
+}
+
+/**
+ * The star's drawn radius on compressed scale: the Sun's 1 times √(R / R☉), clamped, so a red
+ * dwarf reads smaller than the Sun without vanishing next to its art-sized planets. Exactly
+ * kSunArtRadius for the Sun (√1 = 1), so Sol is unchanged.
+ */
+inline float SunArtRadius() {
+    return kSunArtRadius * std::clamp(std::sqrt(BodyCatalog::Star().radiusSolar), 0.35f, 3.0f);
+}
+
+/** BodySizeFactor for the star, which has no Entry row (it has a StarRow). */
 inline float SunSizeFactor() {
-    return IsTrueScale() ? static_cast<float>(KmToScene(kSunRadiusKm) / kSunArtRadius) : 1.0f;
+    return IsTrueScale() ? static_cast<float>(KmToScene(StarRadiusKm()) / SunArtRadius()) : 1.0f;
 }
 
 /** Drawn (equatorial) radius in scene units. */
@@ -60,7 +78,7 @@ inline float BodyRadius(const BodyCatalog::Entry& entry) {
 }
 
 inline float SunRadius() {
-    return kSunArtRadius * SunSizeFactor();
+    return SunArtRadius() * SunSizeFactor();
 }
 
 /**

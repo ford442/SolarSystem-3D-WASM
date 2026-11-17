@@ -3,6 +3,7 @@
 // controller rays and the asteroid belt, plus the toggles that gate them. Renderer::
 // methods; scene and camera state comes in through the FrameContext.
 #include "Renderer.h"
+#include "Solar_System/StarSystemCatalog.h"
 #include "QualitySettings.h"
 #include "Solar_System/AsteroidField.h"
 #include "Solar_System/OrbitLayout.h"
@@ -86,6 +87,9 @@ void Renderer::CollectMagneticFieldTraces() {
 
 void Renderer::RenderMagneticFields(const FrameContext& ctx) {
     CollectMagneticFieldTraces();
+    if (!StarSystemCatalog::IsSol()) {
+        return; // the field models are the Sun's and Sol's planets'
+    }
     if (!_magneticFieldsEnabled || !_magneticFieldRenderer || _magneticFieldRenderer->Empty()) {
         return;
     }
@@ -182,7 +186,7 @@ void Renderer::RenderOrbitPaths(const FrameContext& ctx) const {
     const float orbitAlpha = _magneticFieldsEnabled ? 0.08f : 0.35f;
     const glm::vec4 color(0.45f, 0.55f, 0.75f, orbitAlpha);
 
-    for (int i = 1; i < OrbitLayout::kBodyCount; ++i) {
+    for (int i = 1; i < OrbitLayout::BodyCount(); ++i) {
         const auto body = static_cast<OrbitLayout::Body>(i);
         const float radius = OrbitLayout::GetOrbitRadius(body);
         if (radius < 0.001f) {

@@ -12,6 +12,8 @@ FetchContent_MakeAvailable(googletest)
 
 set(SOLARSYSTEM_TEST_SOURCES
     ${CMAKE_SOURCE_DIR}/src/Solar_System/OrbitLayout.cpp
+    ${CMAKE_SOURCE_DIR}/src/Solar_System/StarSystemCatalog.cpp
+    ${CMAKE_SOURCE_DIR}/src/core/Json.cpp
     ${CMAKE_SOURCE_DIR}/src/Solar_System/AsteroidOrbit.cpp
     ${CMAKE_SOURCE_DIR}/src/astro/Ephemeris.cpp
     ${CMAKE_SOURCE_DIR}/src/astro/SkyEvents.cpp
@@ -75,6 +77,9 @@ add_executable(SolarSystemTests
     test_eclipse_caster.cpp
     test_mission_catalog.cpp
     test_body_catalog.cpp
+    test_star_physics.cpp
+    test_star_systems.cpp
+    test_json.cpp
     test_texture_formats.cpp
     test_shader_source.cpp
     test_atmosphere_model.cpp

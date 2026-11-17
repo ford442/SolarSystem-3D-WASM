@@ -89,7 +89,7 @@ TEST(AtmosphereModel, TransmittanceFallsTowardTheHorizon) {
 }
 
 TEST(AtmosphereModel, BakedTablesStayInRange) {
-    for (const BodyCatalog::AtmosphereRow& row : BodyCatalog::kAtmospheres) {
+    for (const BodyCatalog::AtmosphereRow& row : BodyCatalog::Atmospheres()) {
         if (!row.physical.enabled) {
             continue;
         }
@@ -240,7 +240,7 @@ TEST(Ktx2Writer, RejectsMismatchedPixelCount) {
 // The committed LUTs parse, are the right shape, and were baked from the current catalog.
 // (The AtmosphereLutsFresh ctest re-bakes and compares values; this is the cheap check.)
 TEST(AtmosphereModel, CommittedLutsMatchTheCatalog) {
-    for (const BodyCatalog::AtmosphereRow& row : BodyCatalog::kAtmospheres) {
+    for (const BodyCatalog::AtmosphereRow& row : BodyCatalog::Atmospheres()) {
         if (!row.physical.enabled) {
             continue;
         }
@@ -266,7 +266,7 @@ TEST(AtmosphereModel, CommittedLutsMatchTheCatalog) {
 TEST(AtmosphereModel, CommittedLutsFitSizeBudget) {
     constexpr std::streamoff kBudgetBytes = 1'200'000;
     std::streamoff total = 0;
-    for (const BodyCatalog::AtmosphereRow& row : BodyCatalog::kAtmospheres) {
+    for (const BodyCatalog::AtmosphereRow& row : BodyCatalog::Atmospheres()) {
         if (!row.physical.enabled) {
             continue;
         }

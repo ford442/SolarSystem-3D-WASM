@@ -15,6 +15,14 @@ struct StarInfo {
     std::wstring engName;
     std::wstring otherLangName;
     glm::vec3 glowTintMult;
+    /**
+     * The star's light relative to the Sun's (StarPhysics::RelativeTint of render.star's
+     * effective temperature): (1, 1, 1) for the Sun. Multiplies the glow tint, the corona and
+     * every lit surface (FrameUBO.starColor).
+     */
+    glm::vec3 lightTint{1.0f};
+    /** render.star.activity: 0 for the Sun; a flaring red dwarf's corona churns with it (a visual, not a model). */
+    float activity = 0.0f;
 
     explicit StarInfo(MeshHolder model, TextureImage2D spectrum, float temperature,
                       float radius, const glm::vec3& glowTintMult, std::wstring engName = L"", std::wstring otherLangName = L"") :
@@ -46,6 +54,8 @@ public:
     GLuint GetStarSpectrumTexture() const;
     glm::vec3 GetShiftColor() const;
     glm::vec3 GetGlowTintMult() const;
+    glm::vec3 GetLightTint() const { return _lightTint; }
+    float GetActivity() const { return _activity; }
     /** Drawn radius in scene units (sphere.obj's radius 2 times the Sun's 0.5 scale). */
     virtual float GetSceneRadius() const { return 1.0f; }
     /** `count` instances of the unit glow quad: the slices of the volumetric corona. */
@@ -59,6 +69,8 @@ private:
     float _visibility = 1.0;
     float _currentGlowSize = 0.0;
     glm::vec3 _starShiftColor = glm::vec3(), _glowTintMult;
+    glm::vec3 _lightTint{1.0f};
+    float _activity = 0.0f;
     TextureImage2D _starSpectrumTexture;
     std::array<GlQuery, 2> _starOcclusion; // native only: WebGL 2 has no GL_SAMPLES_PASSED
     GlVertexArray _glowVao;
