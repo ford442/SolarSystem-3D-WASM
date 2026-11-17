@@ -20,18 +20,23 @@ struct ShaderSpec {
     std::string fragment;
     std::string geometry; // native only; empty = no geometry stage
     std::vector<std::string> defines;
+    /**
+     * Vertex outputs captured by transform feedback, interleaved into one buffer in this order
+     * (glTransformFeedbackVaryings before link). Empty for an ordinary program.
+     */
+    std::vector<std::string> feedbackVaryings;
 
     ShaderSpec() = default;
     ShaderSpec(std::string vertexPath, std::string fragmentPath, std::vector<std::string> permutationDefines = {},
                std::string geometryPath = {});
 
     bool operator<(const ShaderSpec& other) const {
-        return std::tie(vertex, fragment, geometry, defines) <
-               std::tie(other.vertex, other.fragment, other.geometry, other.defines);
+        return std::tie(vertex, fragment, geometry, defines, feedbackVaryings) <
+               std::tie(other.vertex, other.fragment, other.geometry, other.defines, other.feedbackVaryings);
     }
     bool operator==(const ShaderSpec& other) const {
-        return std::tie(vertex, fragment, geometry, defines) ==
-               std::tie(other.vertex, other.fragment, other.geometry, other.defines);
+        return std::tie(vertex, fragment, geometry, defines, feedbackVaryings) ==
+               std::tie(other.vertex, other.fragment, other.geometry, other.defines, other.feedbackVaryings);
     }
     /** "planetLighting.vs + planetLighting.fs [HAS_CLOUDS]" for logs. */
     std::string Describe() const;

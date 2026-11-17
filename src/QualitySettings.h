@@ -44,6 +44,13 @@ struct QualityTierSettings {
     // Observe's constellation lines: only the 20 `core` figures of constellation_lines.json
     // (Low), or all of them. Either way a segment is drawn only if both its stars are.
     bool observeCoreConstellationsOnly;
+    // Space weather (docs/ARCHITECTURE.md §13). Solar-wind particles when the layer is on (0:
+    // none); the auroral shell's look — 0 a static ring, 1 an animated oval, 2 curtains with
+    // bloom; the Sun's photosphere — 0 the spectrum sprite, 1 granulation, 2 granulation and
+    // the sunspot cycle's spots. Low and every mobile tier keep the frame time they had.
+    int solarWindParticles;
+    int auroraMode;
+    int photosphereMode;
     const char* name;
 };
 

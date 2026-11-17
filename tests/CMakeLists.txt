@@ -23,6 +23,7 @@ set(SOLARSYSTEM_TEST_SOURCES
     ${CMAKE_SOURCE_DIR}/src/astro/MagneticFieldParams.cpp
     ${CMAKE_SOURCE_DIR}/src/astro/MagneticFieldModel.cpp
     ${CMAKE_SOURCE_DIR}/src/astro/MagneticFieldTracer.cpp
+    ${CMAKE_SOURCE_DIR}/src/astro/SpaceWeather.cpp
     ${CMAKE_SOURCE_DIR}/src/QualitySettings.cpp
     ${CMAKE_SOURCE_DIR}/src/assets/PlanetManifestLoader.cpp
     ${CMAKE_SOURCE_DIR}/src/astro/MissionCatalog.cpp
@@ -68,6 +69,7 @@ add_executable(SolarSystemTests
     test_web_resource_fetcher.cpp
     test_asteroid_field.cpp
     test_magnetic_field.cpp
+    test_space_weather.cpp
     test_sky_events.cpp
     test_observer.cpp
     test_lunar_theory.cpp
@@ -125,6 +127,7 @@ find_package(glfw3 REQUIRED)
 add_executable(SolarSystemGlTests
     gl/test_gl.cpp
     gl/test_gpu_timer.cpp
+    gl/test_solar_wind.cpp
     ${CMAKE_SOURCE_DIR}/src/gfx/GpuTimer.cpp
     ${CMAKE_SOURCE_DIR}/src/core/Log.cpp
     ${CMAKE_SOURCE_DIR}/src/core/JobSystem.cpp
@@ -132,6 +135,8 @@ add_executable(SolarSystemGlTests
     ${CMAKE_SOURCE_DIR}/src/gfx/ShaderSource.cpp
     ${CMAKE_SOURCE_DIR}/src/gfx/GlCapabilities.cpp
     ${CMAKE_SOURCE_DIR}/src/gfx/FrameUniforms.cpp
+    ${CMAKE_SOURCE_DIR}/src/gfx/SpaceWeatherUniforms.cpp
+    ${CMAKE_SOURCE_DIR}/src/render/SolarWindRenderer.cpp
     ${CMAKE_SOURCE_DIR}/src/gfx/LineStripBatch.cpp
     ${CMAKE_SOURCE_DIR}/src/gfx/ShadowMapFBO.cpp
     ${CMAKE_SOURCE_DIR}/src/gfx/HDR.cpp

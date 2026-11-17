@@ -59,7 +59,9 @@ MagneticFieldParams IntrinsicParamsForBody(OrbitLayout::Body body) {
         case OrbitLayout::Body::Earth:
             p.enabled = true;
             p.dipoleMoment = 1.0f;
-            p.dipoleTiltDeg = 11.0f;
+            // The IGRF-2020 centred dipole: geomagnetic north pole at 80.65°N 72.68°W.
+            p.dipoleTiltDeg = 9.35f;
+            p.poleAzimuthDeg = 17.32f;
             p.extentScale = 4.2f;
             p.seedCount = 18;
             p.samplesPerLine = 64;

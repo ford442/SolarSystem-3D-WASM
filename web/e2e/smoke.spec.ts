@@ -46,6 +46,17 @@ test('WASM module boots and staged loading reacts to camera pose', async ({ page
         undefined,
         { timeout: 10_000 },
     );
+    // Space weather (ARCHITECTURE §13): the preloaded CME list reaches the page through
+    // GetSpaceWeatherJson, and the storm chip offers a catalogued storm whatever the date.
+    await page.waitForFunction(
+        () => {
+            const chip = document.getElementById('next-storm');
+            const text = document.getElementById('next-storm-text')?.textContent ?? '';
+            return !!chip && !chip.hasAttribute('hidden') && / storm: /i.test(text);
+        },
+        undefined,
+        { timeout: 10_000 },
+    );
 
     await page.waitForFunction(
         () => document.querySelectorAll('#explorer-mission-list button').length >= 1,

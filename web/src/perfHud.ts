@@ -10,7 +10,16 @@
  */
 import type { SolarSystemRuntime } from './wasmBridge.js';
 
-export const FRAME_STAGES = ['update', 'background', 'shadow', 'scene', 'foreground', 'hud', 'uploads'] as const;
+export const FRAME_STAGES = [
+    'update',
+    'background',
+    'shadow',
+    'scene',
+    'foreground',
+    'hud',
+    'uploads',
+    'spaceWeather',
+] as const;
 export type FrameStage = (typeof FRAME_STAGES)[number];
 export type StageTimes = Record<FrameStage, number>;
 

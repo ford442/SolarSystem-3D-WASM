@@ -1,8 +1,53 @@
 import { copyShareableLink, runtimeLinkReaders, type DeepLinkViewState } from './deepLink.js';
 import { getClipboard } from './dom.js';
+import { stormCard } from './spaceWeather.js';
 import { createTourPlayer, loadTour, type TourPlayer } from './tourPlayer.js';
 import type { SolarSystemRuntime } from './wasmBridge.js';
 import { registerWasmCallbacks } from './wasmCallbacks.js';
+
+/**
+ * The storm card (space weather, ARCHITECTURE §13): while Earth is in a geomagnetic storm or a
+ * CME is on its way there, what the wind is doing, in GetSpaceWeatherJson's numbers. Polled:
+ * the storm comes and goes with the simulated date, which nothing signals.
+ */
+export function initStormCard(options: {
+    runtime: SolarSystemRuntime;
+    card: HTMLElement;
+    title: HTMLElement;
+    lines: HTMLElement;
+    intervalMs?: number;
+}): { refresh: () => void } {
+    const { runtime, card, title, lines } = options;
+    let shown = '';
+    const refresh = (): void => {
+        const content = stormCard(runtime.getSpaceWeather());
+        card.hidden = content === null;
+        if (!content) {
+            shown = '';
+            return;
+        }
+        const key = content.title + content.lines.join('\n');
+        if (key === shown) {
+            return;
+        }
+        shown = key;
+        title.textContent = content.title;
+        lines.replaceChildren(
+            ...content.lines.map((line) => {
+                const item = document.createElement('li');
+                item.textContent = line;
+                return item;
+            }),
+        );
+    };
+    window.setInterval(() => {
+        if (!document.hidden) {
+            refresh();
+        }
+    }, options.intervalMs ?? 500);
+    refresh();
+    return { refresh };
+}
 
 export function initEducationalLayer(options: {
     runtime: SolarSystemRuntime;

@@ -64,7 +64,7 @@ and `web-debug`; `build-web.sh` wraps the web ones. All write `compile_commands.
 - Web: `npm run lint` (typescript-eslint strict-type-checked), `npm run format:check` (Prettier), `npm run test:unit`
   (Vitest), `npm run test:scripts` (the wasm-export generator). DOM lookups go through `web/src/dom.ts`
   `queryRequired(id, HTMLButtonElement)`, which throws a named error at startup if `index.html` drifts.
-- Generated, never hand-edited: `web/src/SolarSystem.d.ts` signature blocks and `wasmBridge.exports.ts` (from the C
+- Generated, never hand-edited: `resource/spaceweather/cmes.json` (`npm run generate:cme-list`), `web/src/SolarSystem.d.ts` signature blocks and `wasmBridge.exports.ts` (from the C
   declarations in `WasmExports.cpp`), `web/src/generated/planetIds.ts` (from `resource/systems/sol.catalog.json`).
 
 ## Code Architecture
@@ -86,6 +86,7 @@ and `web-debug`; `build-web.sh` wraps the web ones. All write `compile_commands.
   - `XrSession.cpp` — WebXR eye state and the stereo render pass (web only)
   - `TerrainController.cpp` — terrain fetch hook, per-frame tile selection into the frame snapshot, the `[Terrain]` log line
   - `Cinematics.cpp` — what web timelines and capture call: body catalog / scene state JSON, surface queries, system preload, HUD mask, `BeginCapture`/`StepCaptureFrame`/`EndCapture` (ARCHITECTURE §11.2)
+  - `SpaceWeatherController.cpp` — evaluates `astro/SpaceWeather` each frame into `SpaceWeatherFrame` (snapshot), the solar-wind/Kp/CME controls and `GetSpaceWeatherJson` (ARCHITECTURE §13)
 - `Renderer.h` — The `Renderer` class: shadow/color/overlay/HDR draw passes and the GPU
   resources they own (shaders, shadow FBO, HDR, skybox, lens flare, text renderer, orbit/
   mission/magnetic-field overlay meshes), all private. `Application` holds one (`_renderer`).
@@ -97,6 +98,7 @@ and `web-debug`; `build-web.sh` wraps the web ones. All write `compile_commands.
   - Scene objects hold no shader: a pass calls `SpaceObject::Draw(shader)` with the program it bound
   - `SceneRenderer.cpp` — shadow/color passes for planets, atmospheres, rings, clouds, text overlays
   - `SceneOverlayRenderer.cpp` — magnetic field ribbons, orbit paths, mission paths, asteroid belt
+  - `SpaceWeatherRenderer.cpp` — `MagnetosphereUBO`, solar-wind particles (transform feedback), auroral shells and their bloom, the photosphere permutation per tier
 - `SystemModules.h` — Convenience headers bundling system includes (GL itself comes from `gfx/GlPlatform.h`)
 
 **Subsystem folders** (ARCHITECTURE §7.2; there is no `Auxiliary_Modules/` any more)
@@ -105,7 +107,7 @@ and `web-debug`; `build-web.sh` wraps the web ones. All write `compile_commands.
 - `render/` — features built on `gfx/`: `LensFlare`, `TextRenderer`, orbit/mission/XR-pointer/magnetic-field renderers, field-line bloom
 - `assets/` — `WebResourceFetcher` (callback-based `emscripten_async_wget2`; the blocking `emscripten_wget_data` path is gone — see "No blocking fetches" below), `TextureDecode` (GL-free DDS/KTX2 → `TexturePayload`, run in jobs), `UploadQueue` (per-frame upload byte budget), `ModelCache` (Assimp parse in a job → `MeshPayload`), `TextureLoadingQueue`, `TextureLODController`, `PlanetManifestLoader`, `TextureFormatSupport`, `BlockCompression`
 - `render/terrain/` — cube-sphere height tiles for `render.terrain` bodies (Moon, Mars, Mercury, Earth): GL-free `CubeSphere`/`TerrainTile`/`TerrainQuadtree`/`TileCache`/`TerrainSystem` (unit-tested in `test_terrain_quadtree.cpp`) plus the GL `TerrainRenderer`; `TerrainController.cpp` runs it per frame, `terrain.vs`/`terrain.fs` share the catalog material through `common/planet_surface.glsl`. Tiles are baked offline (`scripts/bake-terrain-tiles.py`), never committed; Low never fetches one (ARCHITECTURE §11.3)
-- `astro/` — GL-free: `Ephemeris`, `SkyEvents`, `Observer`, `LunarTheory`, `StarCatalog`, `MissionCatalog`, `MagneticField*` models, `SeatedView.h`
+- `astro/` — GL-free: `Ephemeris`, `SkyEvents`, `Observer`, `LunarTheory`, `StarCatalog`, `MissionCatalog`, `MagneticField*` models, `SpaceWeather` (standoffs, Kp, ovals, sunspot cycle, CMEs; `tests/test_space_weather.cpp`), `SeatedView.h`
 - Headers carry no `using namespace`, and `Renderer.h` forward-declares the GPU helpers it holds by `unique_ptr` — include their headers in the `.cpp` that uses them. `scripts/check-source-rules.sh` and `scripts/check-gl-handles.sh` (CI) enforce both rules plus "no `std::cout`/`std::cerr` in `src/`"
 
 **Solar System** (`Solar_System/`)
@@ -169,6 +171,7 @@ and `web-debug`; `build-web.sh` wraps the web ones. All write `compile_commands.
 - **Baked atmosphere LUTs**: `render.atmosphere.physical` is baked by `tools/atmosphere_lut_baker` into `resource/atmosphere/*.ktx2`, which are committed. After editing it, rerun the generator and the baker; the `AtmosphereLutsFresh` ctest fails on a stale bake.
 - **Precision and scale** (ARCHITECTURE §11.1): world positions are heliocentric doubles (`GetWorldPosition`, `Camera::GetWorldPosition`); the render origin sits on the camera every frame in both modes, so scene floats are world minus camera taken in double (`OrbitLayout::ToRenderFrame`) and the view matrix has no translation. Realistic scale is true scale (Earth 0.081 units); compressed is a per-body remap, and art lengths tied to a body multiply by `SpaceObject::SizeFactor()`. Don't keep a render-frame position across frames (shift it in `Application::MoveRenderOrigin`, or better store the world position). Close to a body its programs use the `NEAR_SURFACE` permutation (fragment log depth, relative-to-eye vertices, `gfx/SurfacePatch` under a camera metres up). Native `SOLARSYSTEM_SCALE=realistic` switches scale at start-up.
 - **Poses are functions of the date**: planets (`OrbitLayout`), moons (`SatelliteOrbit::EphemerisOffset` / `MeanAnomalyAt`), and spins (`SpinDegreesAt`) derive from `OrbitLayout::GetJulianDate()`. Do not add per-frame accumulators — they break date-scrubber jumps. Planet spins are date functions too: `OrbitLayout::AxialSpinDegreesAt(body, jd)` evaluates the catalog's IAU `primeMeridianDegJ2000` + `primeMeridianRateDegPerDay` (Earth is solved for the true sub-solar longitude, ARCHITECTURE §11), and there is no `g_axialSpinDeg`. A hovering camera (inside `CameraNavigation::kHoverRadii`) co-rotates with its anchor via `CarryEye`; the light box fits the visible cap near a planet (`gfx/ShadowFit.h`, ARCHITECTURE §7.5).
+- **Space weather** (ARCHITECTURE §13): physics is `astro/SpaceWeather` (GL-free, a function of the date plus the Kp override and hand-launched CMEs), TS only formats `GetSpaceWeatherJson()`. Kp comes from the model, never from a GPU readback of particles. The aurora (`render.aurora` rows → `AuroraShell`, `common/aurora.glsl`, shared with `observeSky.fs`) always draws in Sol; the solar wind is a toggle (`SOLARSYSTEM_SOLAR_WIND=1`, `?wind=1`) whose 7 particle groups are culled separately and cost nothing — not even a UBO upload — when off or on Low. Tier fields: `solarWindParticles`, `auroraMode`, `photosphereMode`. CMEs: `resource/spaceweather/cmes.json` (curated + DONKI via `npm run generate:cme-list`, snapshot in `archive/`, `--check` in CI). Native `SOLARSYSTEM_KP=<0–9>`, `SOLARSYSTEM_CME=<ISO UTC>`; web `?kp=7&cme=2003-10-29T06:00Z`
 - **Animation time is the frame-delta sum**: animated shaders and overlays read `SimState::animationSeconds` (FrameUBO `time`), not `glfwGetTime()`, so a capture that steps a fixed 1/fps per frame is deterministic. Don't read wall-clock time in a pass.
 - **Context is MSAA-free when HDR is on; the tone-map pass antialiases**: `ContextMsaaSamples()` returns 0 for any tier with HDR, and `hdr.fs` runs FXAA on the tone-mapped value (ARCHITECTURE §9.6). `web/src/webglContext.ts` is the only place web context attributes are set — don't add a second table in C++.
 - **Fetched assets are cached by the page, not by C++**: `WebResourceFetcher` calls `window['__solarSystemFetchAsset']` (`web/src/assetCache.ts`, Cache API, named by asset base) when present and only writes the bytes to MEMFS (ARCHITECTURE §6.1.1). Preloaded `.data` is unaffected. Off under `npm run dev`; `?assetcache=0|1` overrides.

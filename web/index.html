@@ -264,6 +264,19 @@
                             </button>
                         </div>
                     </div>
+                    <div id="next-storm" class="conjunction-chip" hidden>
+                        <p id="next-storm-text" class="conjunction-chip-text"></p>
+                        <div class="conjunction-chip-actions">
+                            <button
+                                id="next-storm-play"
+                                class="conjunction-chip-jump"
+                                type="button"
+                                title="Go to the CME's launch, slowed so its pulse can be followed to Earth"
+                            >
+                                Play storm
+                            </button>
+                        </div>
+                    </div>
 
                     <label class="settings-slider" for="time-scale">
                         <span>Time scale</span>
@@ -304,6 +317,33 @@
                         <input id="magnetic-fields-enabled" type="checkbox" />
                     </label>
 
+                    <section class="space-weather-section" aria-label="Space weather">
+                        <p class="space-weather-heading">Space weather</p>
+                        <label
+                            class="settings-switch"
+                            for="solar-wind-enabled"
+                            title="Particles streaming from the Sun, piling up at each magnetopause and funnelling down to the auroral ovals. Medium and Full only."
+                        >
+                            <span>Solar wind</span>
+                            <input id="solar-wind-enabled" type="checkbox" />
+                        </label>
+                        <label class="settings-slider" for="kp-override">
+                            <span>Aurora Kp</span>
+                            <output id="kp-override-value" for="kp-override">Auto</output>
+                        </label>
+                        <input
+                            id="kp-override"
+                            type="range"
+                            min="-1"
+                            max="9"
+                            step="0.5"
+                            value="-1"
+                            aria-describedby="kp-override-help"
+                        />
+                        <small id="kp-override-help">Far left: Kp from the solar wind. 5 and up is a storm.</small>
+                        <button id="launch-cme" class="settings-share" type="button">Launch CME now</button>
+                    </section>
+
                     <label class="settings-slider" for="music-volume">
                         <span>Music volume</span>
                         <output id="music-volume-value" for="music-volume">30%</output>
@@ -341,6 +381,10 @@
             </div>
         </aside>
         <div id="tour-caption" class="tour-caption" hidden></div>
+        <aside id="storm-card" class="storm-card" aria-live="polite" hidden>
+            <p id="storm-card-title" class="storm-card-title"></p>
+            <ul id="storm-card-lines" class="storm-card-lines"></ul>
+        </aside>
         <section id="timeline-panel" class="timeline-panel" aria-label="Cinematic timeline" hidden>
             <div class="timeline-row">
                 <select id="timeline-select" class="timeline-select" aria-label="Timeline"></select>

@@ -29,6 +29,8 @@ struct Rows {
 Rows<Entry> Entries();
 /** The active system's render.atmosphere rows. */
 Rows<AtmosphereRow> Atmospheres();
+/** The active system's render.aurora rows (the look; the oval is SpaceWeather's). */
+Rows<AuroraRow> Auroras();
 /** The active system's star (render.star on index 0). */
 const StarRow& Star();
 
@@ -36,6 +38,7 @@ const StarRow& Star();
 const Entry* FindByIndex(int index);
 const Entry* FindById(const char* id);
 const AtmosphereRow* FindAtmosphere(const char* bodyId);
+const AuroraRow* FindAurora(const char* bodyId);
 /** Primary (non-satellite) body for a staged-loading initTag, or nullptr. */
 const Entry* FindPrimaryByInitTag(const char* initTag);
 

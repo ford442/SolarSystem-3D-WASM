@@ -325,7 +325,23 @@ bool ObserveSky::ProjectToPixels(const glm::vec3& dir, const Frame& frame, glm::
     return true;
 }
 
-void ObserveSky::Render(const Observer::Sky& sky, const Frame& frame, unsigned int moonTexture, const Air* air) {
+glm::vec3 ObserveSky::GeomagneticPoleInHorizon(double latDeg, double lonDeg) {
+    constexpr double kDeg = 3.14159265358979323846 / 180.0;
+    // IGRF-2020 centred dipole: the same pole MagneticFieldModel::DipoleFrame gives Earth.
+    const double poleLat = 80.65 * kDeg;
+    const double poleLon = -72.68 * kDeg;
+    const glm::dvec3 pole(std::cos(poleLat) * std::cos(poleLon), std::cos(poleLat) * std::sin(poleLon),
+                          std::sin(poleLat));
+    const double lat = latDeg * kDeg;
+    const double lon = lonDeg * kDeg;
+    const glm::dvec3 east(-std::sin(lon), std::cos(lon), 0.0);
+    const glm::dvec3 north(-std::sin(lat) * std::cos(lon), -std::sin(lat) * std::sin(lon), std::cos(lat));
+    const glm::dvec3 up(std::cos(lat) * std::cos(lon), std::cos(lat) * std::sin(lon), std::sin(lat));
+    return glm::vec3(glm::normalize(glm::dvec3(glm::dot(pole, east), glm::dot(pole, up), -glm::dot(pole, north))));
+}
+
+void ObserveSky::Render(const Observer::Sky& sky, const Frame& frame, unsigned int moonTexture, const Air* air,
+                        const Aurora* aurora) {
     const Observer::SkyBody& sun = sky.bodies[Observer::kSkySun];
     const Observer::SkyBody& moon = sky.bodies[Observer::kSkyMoon];
     // Light comes from where the Sun is; its disc is drawn where refraction shows it.
@@ -339,31 +355,63 @@ void ObserveSky::Render(const Observer::Sky& sky, const Frame& frame, unsigned i
 
     // 1. Sky gradient and ground, one fullscreen triangle.
     glDisable(GL_BLEND);
-    _skyShader->Use();
-    _skyShader->SetMat3("invViewRot", glm::transpose(frame.viewRot)); // rotation: transpose = inverse
-    _skyShader->SetMat4("invProjection", glm::inverse(frame.projection));
-    _skyShader->SetVec3("sunDir", sunLightDir);
-    _skyShader->SetFloat("eclipse", static_cast<float>(sky.sunCoverage));
-    _skyShader->SetInt("uSteps", physical ? air->steps : 0);
+    Shader* skyShader = _skyShader.get();
+    if (aurora && aurora->mode == 1) {
+        if (!_skyAnimatedShader) {
+            _skyAnimatedShader =
+                std::make_unique<Shader>("resource/shaders/observeSky.vs", "resource/shaders/observeSky.fs",
+                                         std::vector<std::string>{"AURORA_ANIMATED"});
+        }
+        skyShader = _skyAnimatedShader.get();
+    } else if (aurora && aurora->mode >= 2) {
+        if (!_skyCurtainsShader) {
+            _skyCurtainsShader =
+                std::make_unique<Shader>("resource/shaders/observeSky.vs", "resource/shaders/observeSky.fs",
+                                         std::vector<std::string>{"AURORA_CURTAINS"});
+        }
+        skyShader = _skyCurtainsShader.get();
+    }
+    const Shader& skyProgram = *skyShader;
+    skyProgram.Use();
+    skyProgram.SetMat3("invViewRot", glm::transpose(frame.viewRot)); // rotation: transpose = inverse
+    skyProgram.SetMat4("invProjection", glm::inverse(frame.projection));
+    skyProgram.SetVec3("sunDir", sunLightDir);
+    skyProgram.SetFloat("eclipse", static_cast<float>(sky.sunCoverage));
+    skyProgram.SetInt("uSteps", physical ? air->steps : 0);
+    if (aurora) {
+        static constexpr int kAuroraSteps[] = {4, 8, 16};
+        skyProgram.SetInt("uAuroraSteps", kAuroraSteps[std::clamp(aurora->mode, 0, 2)]);
+        skyProgram.SetVec3("uAuroraPole", GeomagneticPoleInHorizon(sky.site.latDeg, sky.site.lonDeg));
+        skyProgram.SetVec4("uAuroraOval", aurora->ovalRad);
+        skyProgram.SetVec3("uAuroraShell",
+                           glm::vec3(aurora->bottom, aurora->top,
+                                     1.0f + static_cast<float>(std::max(sky.site.altM, 2.0) / 6371000.0)));
+        skyProgram.SetVec3("uAuroraActivity", glm::vec3(aurora->kp, aurora->brightness, aurora->time));
+        skyProgram.SetVec3("uAuroraColorLow", aurora->colorLow);
+        skyProgram.SetVec3("uAuroraColorHigh", aurora->colorHigh);
+        skyProgram.SetVec3("uAuroraColorEdge", aurora->colorEdge);
+    } else {
+        skyProgram.SetInt("uAuroraSteps", 0);
+    }
     if (physical) {
         const AtmosphereModel::Params& params = air->params;
-        _skyShader->SetFloat("uExposure", air->exposure);
-        _skyShader->SetFloat("uAtmosphere.bottomRadius", static_cast<float>(params.bottomRadius));
-        _skyShader->SetFloat("uAtmosphere.topRadius", static_cast<float>(params.topRadius));
-        _skyShader->SetVec3("uAtmosphere.rayleighScattering", glm::vec3(params.rayleighScattering));
-        _skyShader->SetFloat("uAtmosphere.rayleighScaleHeight", static_cast<float>(params.rayleighScaleHeight));
-        _skyShader->SetVec3("uAtmosphere.mieScattering", glm::vec3(params.mieScattering));
-        _skyShader->SetVec3("uAtmosphere.mieExtinction", glm::vec3(params.mieExtinction));
-        _skyShader->SetFloat("uAtmosphere.mieScaleHeight", static_cast<float>(params.mieScaleHeight));
-        _skyShader->SetFloat("uAtmosphere.miePhaseG", static_cast<float>(params.miePhaseG));
-        _skyShader->SetVec3("uAtmosphere.absorptionExtinction", glm::vec3(params.absorptionExtinction));
-        _skyShader->SetFloat("uAtmosphere.absorptionCenter", static_cast<float>(params.absorptionCenter));
-        _skyShader->SetFloat("uAtmosphere.absorptionHalfWidth", static_cast<float>(params.absorptionHalfWidth));
-        _skyShader->SetFloat("observerAltitudeKm", static_cast<float>(sky.site.altM / 1000.0));
-        _skyShader->SetVec3("moonOffsetKm", toVec3(moon.dir) * static_cast<float>(moon.distanceKm));
-        _skyShader->SetFloat("moonRadiusKm", kMoonRadiusKm);
-        _skyShader->SetFloat("sunDistanceKm", static_cast<float>(sun.distanceKm));
-        _skyShader->SetFloat("sunRadiusKm", kSunRadiusKm);
+        skyProgram.SetFloat("uExposure", air->exposure);
+        skyProgram.SetFloat("uAtmosphere.bottomRadius", static_cast<float>(params.bottomRadius));
+        skyProgram.SetFloat("uAtmosphere.topRadius", static_cast<float>(params.topRadius));
+        skyProgram.SetVec3("uAtmosphere.rayleighScattering", glm::vec3(params.rayleighScattering));
+        skyProgram.SetFloat("uAtmosphere.rayleighScaleHeight", static_cast<float>(params.rayleighScaleHeight));
+        skyProgram.SetVec3("uAtmosphere.mieScattering", glm::vec3(params.mieScattering));
+        skyProgram.SetVec3("uAtmosphere.mieExtinction", glm::vec3(params.mieExtinction));
+        skyProgram.SetFloat("uAtmosphere.mieScaleHeight", static_cast<float>(params.mieScaleHeight));
+        skyProgram.SetFloat("uAtmosphere.miePhaseG", static_cast<float>(params.miePhaseG));
+        skyProgram.SetVec3("uAtmosphere.absorptionExtinction", glm::vec3(params.absorptionExtinction));
+        skyProgram.SetFloat("uAtmosphere.absorptionCenter", static_cast<float>(params.absorptionCenter));
+        skyProgram.SetFloat("uAtmosphere.absorptionHalfWidth", static_cast<float>(params.absorptionHalfWidth));
+        skyProgram.SetFloat("observerAltitudeKm", static_cast<float>(sky.site.altM / 1000.0));
+        skyProgram.SetVec3("moonOffsetKm", toVec3(moon.dir) * static_cast<float>(moon.distanceKm));
+        skyProgram.SetFloat("moonRadiusKm", kMoonRadiusKm);
+        skyProgram.SetFloat("sunDistanceKm", static_cast<float>(sun.distanceKm));
+        skyProgram.SetFloat("sunRadiusKm", kSunRadiusKm);
         // Units come from the shader's `layout(binding = TU_*)` qualifiers (gfx/TextureUnits.h).
         glBindTextureUnit(Unit(TextureUnit::TransmittanceLut), air->transmittanceLut);
         glBindTextureUnit(Unit(TextureUnit::MultiScatteringLut), air->multiScatteringLut);

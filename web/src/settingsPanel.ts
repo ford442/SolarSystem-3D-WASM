@@ -1,7 +1,8 @@
 import type { MusicPlayer } from './music';
 import { copyShareableLink, runtimeLinkReaders, type DeepLinkViewState } from './deepLink';
 import { eventVisibilitySuffix } from './observe';
-import { bindSkyEventChip } from './skyEvents';
+import { bindSkyEventChip, bindStormChip } from './skyEvents';
+import { chipStorm, formatKpOverride, formatStormChip } from './spaceWeather';
 import { isoDateFromJulianDate, isoDateUtcNow, julianDateFromIsoDate, julianDateUtcNow } from './ephemeris';
 import type { QualityPreset } from './SolarSystem.js';
 import type { SettingsChangeField, SolarSystemRuntime } from './wasmBridge';
@@ -18,6 +19,9 @@ export interface PersistedSettings {
     shadows: boolean;
     orbitLines: boolean;
     magneticFields: boolean;
+    solarWind: boolean;
+    /** < 0: Kp from the wind. */
+    kpOverride: number;
     musicVolume: number;
     musicMuted: boolean;
     simulationDate?: string;
@@ -38,6 +42,10 @@ export interface SettingsPanelElements {
     shadowsInput: HTMLInputElement;
     orbitLinesInput: HTMLInputElement;
     magneticFieldsInput: HTMLInputElement;
+    solarWindInput: HTMLInputElement;
+    kpOverrideInput: HTMLInputElement;
+    kpOverrideValue: HTMLOutputElement;
+    launchCmeButton: HTMLButtonElement;
     musicVolumeInput: HTMLInputElement;
     musicVolumeValue: HTMLOutputElement;
     musicMutedInput: HTMLInputElement;
@@ -48,6 +56,9 @@ export interface SettingsPanelElements {
     skyEventText: HTMLElement;
     skyEventJump: HTMLButtonElement;
     skyEventLandmark: HTMLButtonElement;
+    stormChip: HTMLElement;
+    stormText: HTMLElement;
+    stormPlay: HTMLButtonElement;
 }
 
 export interface SettingsPanelInitOptions {
@@ -89,6 +100,11 @@ function readPersistedSettings(): Partial<PersistedSettings> {
                     : typeof parsed.magneticFieldMode === 'boolean'
                       ? parsed.magneticFieldMode
                       : undefined,
+            solarWind: typeof parsed.solarWind === 'boolean' ? parsed.solarWind : undefined,
+            kpOverride:
+                typeof parsed.kpOverride === 'number' && Number.isFinite(parsed.kpOverride)
+                    ? normalizeKpOverride(parsed.kpOverride)
+                    : undefined,
             musicVolume:
                 typeof parsed.musicVolume === 'number' && Number.isFinite(parsed.musicVolume)
                     ? Math.min(100, Math.max(0, Math.round(parsed.musicVolume)))
@@ -103,6 +119,11 @@ function readPersistedSettings(): Partial<PersistedSettings> {
         console.warn('[Settings] Could not read saved settings:', error);
         return {};
     }
+}
+
+/** The slider's value: -1 (Kp from the wind) or 0–9 in half steps. */
+function normalizeKpOverride(kp: number): number {
+    return kp < 0 ? -1 : Math.min(9, Math.round(kp * 2) / 2);
 }
 
 function formatTimeScale(scale: number): string {
@@ -128,6 +149,10 @@ export function initSettingsPanel(options: SettingsPanelInitOptions): void {
         shadowsInput,
         orbitLinesInput,
         magneticFieldsInput,
+        solarWindInput,
+        kpOverrideInput,
+        kpOverrideValue,
+        launchCmeButton,
         musicVolumeInput,
         musicVolumeValue,
         musicMutedInput,
@@ -138,6 +163,9 @@ export function initSettingsPanel(options: SettingsPanelInitOptions): void {
         skyEventText,
         skyEventJump,
         skyEventLandmark,
+        stormChip,
+        stormText,
+        stormPlay,
     } = elements;
 
     function currentPanelSettings(): PersistedSettings {
@@ -152,6 +180,8 @@ export function initSettingsPanel(options: SettingsPanelInitOptions): void {
             shadows: shadowsInput.checked,
             orbitLines: orbitLinesInput.checked,
             magneticFields: magneticFieldsInput.checked,
+            solarWind: solarWindInput.checked,
+            kpOverride: Number(kpOverrideInput.value),
             musicVolume: Number(musicVolumeInput.value),
             musicMuted: musicMutedInput.checked,
             simulationDate: simulationDateInput.value || undefined,
@@ -177,6 +207,12 @@ export function initSettingsPanel(options: SettingsPanelInitOptions): void {
         musicVolumeInput.value = String(clamped);
         updateMusicVolumeDisplay(clamped);
         music.setVolume(clamped / 100);
+    }
+
+    function updateKpOverrideDisplay(kp: number): void {
+        const label = formatKpOverride(kp);
+        kpOverrideValue.value = label;
+        kpOverrideValue.textContent = label;
     }
 
     function updateTimeScaleDisplay(scale: number): void {
@@ -239,6 +275,16 @@ export function initSettingsPanel(options: SettingsPanelInitOptions): void {
             case 'magneticFieldMode':
                 magneticFieldsInput.checked = runtime.getMagneticFields();
                 break;
+            case 'solarWind':
+                solarWindInput.checked = runtime.getSolarWind();
+                break;
+            case 'kpOverride':
+                if (document.activeElement !== kpOverrideInput) {
+                    const kp = normalizeKpOverride(runtime.getKpOverride());
+                    kpOverrideInput.value = String(kp);
+                    updateKpOverrideDisplay(kp);
+                }
+                break;
         }
     }
 
@@ -267,6 +313,9 @@ export function initSettingsPanel(options: SettingsPanelInitOptions): void {
     const shadows = deepLink.shadows ?? saved.shadows ?? true;
     const orbitLines = deepLink.orbitLines ?? saved.orbitLines ?? true;
     const magneticFields = deepLink.magneticFields ?? saved.magneticFields ?? false;
+    // A `cme=` link is about the storm, so it turns the wind on unless the link says otherwise.
+    const solarWind = deepLink.solarWind ?? (deepLink.cme !== undefined ? true : undefined) ?? saved.solarWind ?? false;
+    const kpOverride = normalizeKpOverride(deepLink.kp ?? saved.kpOverride ?? -1);
     const musicVolumePercent = saved.musicVolume ?? Math.round(music.getVolume() * 100);
     const musicMuted = saved.musicMuted ?? music.getMuted();
     const simulationDate =
@@ -283,6 +332,9 @@ export function initSettingsPanel(options: SettingsPanelInitOptions): void {
     shadowsInput.checked = shadows;
     orbitLinesInput.checked = orbitLines;
     magneticFieldsInput.checked = magneticFields;
+    solarWindInput.checked = solarWind;
+    kpOverrideInput.value = String(kpOverride);
+    updateKpOverrideDisplay(kpOverride);
     applyMusicVolumePercent(musicVolumePercent);
     musicMutedInput.checked = musicMuted;
 
@@ -303,6 +355,16 @@ export function initSettingsPanel(options: SettingsPanelInitOptions): void {
     runtime.setShadowQuality(shadowQualityForPreset(quality, shadows));
     runtime.setOrbitLines(orbitLines);
     runtime.setMagneticFields(magneticFields);
+    runtime.setKpOverride(kpOverride);
+    if (deepLink.cme !== undefined) {
+        // After the date above: the link's instant wins, and C++ turns the wind on with it.
+        if (runtime.jumpToSpaceWeatherDate(deepLink.cme)) {
+            simulationDateInput.value = isoDateFromJulianDate(runtime.getSimulationEpoch());
+        } else {
+            console.warn('[SpaceWeather] cme= is not an ISO-8601 UTC time:', deepLink.cme);
+        }
+    }
+    runtime.setSolarWind(solarWind);
     music.setMuted(musicMuted);
     if (!musicMuted) {
         music.setVolume(musicVolumePercent / 100);
@@ -393,6 +455,35 @@ export function initSettingsPanel(options: SettingsPanelInitOptions): void {
         persistPanelSettings();
     });
 
+    solarWindInput.addEventListener('change', () => {
+        runtime.setSolarWind(solarWindInput.checked);
+        // The particles are a Medium/Full effect (QualitySettings.cpp); Low keeps only the auroras.
+        settingsStatus.textContent = solarWindInput.checked
+            ? Number(qualitySelect.value) > 0 && !isMobileDevice
+                ? 'Solar wind on'
+                : 'Solar wind on (particles need Medium or Full)'
+            : 'Solar wind off';
+        persistPanelSettings();
+    });
+
+    kpOverrideInput.addEventListener('input', () => {
+        const kp = normalizeKpOverride(Number(kpOverrideInput.value));
+        updateKpOverrideDisplay(kp);
+        runtime.setKpOverride(kp);
+        settingsStatus.textContent = kp < 0 ? 'Aurora follows the solar wind' : `Aurora held at Kp ${kp.toFixed(1)}`;
+        persistPanelSettings();
+    });
+
+    launchCmeButton.addEventListener('click', () => {
+        if (!runtime.getSpaceWeather().sol) {
+            settingsStatus.textContent = 'CMEs are launched from the Sun: switch to the Solar System';
+            return;
+        }
+        runtime.launchCmeNow();
+        settingsStatus.textContent = 'CME launched toward Earth';
+        persistPanelSettings();
+    });
+
     musicVolumeInput.addEventListener('input', () => {
         const percent = Number(musicVolumeInput.value);
         updateMusicVolumeDisplay(percent);
@@ -438,6 +529,9 @@ export function initSettingsPanel(options: SettingsPanelInitOptions): void {
         shadowsInput.checked = true;
         orbitLinesInput.checked = true;
         magneticFieldsInput.checked = false;
+        solarWindInput.checked = false;
+        kpOverrideInput.value = '-1';
+        updateKpOverrideDisplay(-1);
         musicMutedInput.checked = false;
         updateTimeScaleDisplay(1);
         applyMusicVolumePercent(30);
@@ -447,6 +541,8 @@ export function initSettingsPanel(options: SettingsPanelInitOptions): void {
         runtime.setShadowQuality(resetShadowQuality);
         runtime.setOrbitLines(true);
         runtime.setMagneticFields(false);
+        runtime.setSolarWind(false);
+        runtime.setKpOverride(-1);
         music.setMuted(false);
         music.setVolume(0.3);
         const nowIso = isoDateUtcNow();
@@ -470,17 +566,37 @@ export function initSettingsPanel(options: SettingsPanelInitOptions): void {
             persistPanelSettings();
         },
     });
+    const storm = bindStormChip({
+        chip: stormChip,
+        text: stormText,
+        playButton: stormPlay,
+        getStormText: () => formatStormChip(runtime.getSpaceWeather()),
+        playStorm: () => {
+            const storm = chipStorm(runtime.getSpaceWeather())?.storm;
+            if (!storm || !runtime.playSpaceWeatherEvent(storm.index)) {
+                return false;
+            }
+            settingsStatus.textContent = `Playing ${storm.name || storm.id}`;
+            return true;
+        },
+        onPlayed: () => {
+            simulationDateInput.value = isoDateFromJulianDate(runtime.getSimulationEpoch());
+            persistPanelSettings();
+        },
+    });
     subscribeSettingsChanges((field) => {
         syncFieldFromRuntime(field);
         if (field === 'simulationEpoch' || field === 'observeMode' || field === 'observeSite') {
             skyEvent.refresh();
+            storm.refresh();
         }
     });
-    // Settings arrive as events; this tick is only for the chip, which goes stale as simulated
+    // Settings arrive as events; this tick is only for the chips, which go stale as simulated
     // time runs past the event (nothing signals that). The C++ side caches the search.
     window.setInterval(() => {
         if (!document.hidden) {
             skyEvent.refresh();
+            storm.refresh();
         }
     }, 2000);
 }

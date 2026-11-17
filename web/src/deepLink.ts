@@ -16,6 +16,12 @@ export interface DeepLinkViewState {
     shadows?: boolean;
     orbitLines?: boolean;
     magneticFields?: boolean;
+    /** `?wind=`: the solar-wind particles (space weather, ARCHITECTURE §13). */
+    solarWind?: boolean;
+    /** `?kp=`: hold every auroral oval at this Kp (0–9). */
+    kp?: number;
+    /** `?cme=2003-10-29T06:00Z`: start at that UTC instant with the wind on (C++ parses it). */
+    cme?: string;
     /**
      * `?system=`: a star system from systems/index.json other than Sol. C++ reads it (and its
      * `planet=`, a letter like `e`) before the scene is built, so `planet` here stays Sol's.
@@ -70,6 +76,9 @@ export interface DeepLinkRuntimeReaders {
     getShadowQuality?: () => number;
     getOrbitLines?: () => boolean;
     getMagneticFields?: () => boolean;
+    getSolarWind?: () => boolean;
+    /** < 0 when Kp follows the wind (then no `kp=`). */
+    getKpOverride?: () => number;
     getFocusedPlanetIndex?: () => number;
     /** The active star system ("sol" when absent). */
     getActiveSystemId?: () => string;
@@ -140,6 +149,19 @@ function parseOrbitScale(value: string | null): OrbitScaleMode | undefined {
     const asNumber = Number(value);
     if (asNumber === 0 || asNumber === 1) return asNumber;
     return undefined;
+}
+
+/** 0–9 in steps of 0.1. */
+function parseKp(value: string | null): number | undefined {
+    const kp = parseFiniteNumber(value);
+    return kp !== undefined && kp >= 0 && kp <= 9 ? Math.round(kp * 10) / 10 : undefined;
+}
+
+/** An ISO-8601 UTC date or instant (SpaceWeather::ParseIsoUtc's forms); C++ does the parsing. */
+function parseCmeInstant(value: string | null): string | undefined {
+    if (!value) return undefined;
+    const trimmed = value.trim();
+    return /^\d{4}-\d{2}-\d{2}(T\d{2}:\d{2}(:\d{2}(\.\d{1,3})?)?Z?)?$/.test(trimmed) ? trimmed : undefined;
 }
 
 function parseSimulationDate(value: string | null): string | undefined {
@@ -239,6 +261,9 @@ export function parseDeepLinkFromUrl(search = window.location.search): DeepLinkV
     const shadows = parseBooleanParam(params.get('shadows'));
     const orbitLines = parseBooleanParam(params.get('orbits') ?? params.get('orbitLines'));
     const magneticFields = parseBooleanParam(params.get('fields') ?? params.get('magneticFields'));
+    const solarWind = parseBooleanParam(params.get('wind'));
+    const kp = parseKp(params.get('kp'));
+    const cme = parseCmeInstant(params.get('cme'));
     const system = parseSystemId(params.get('system'));
     // In another system `planet=e` names one of its bodies, which C++ resolves; a Sol index
     // parsed from it would focus the wrong body.
@@ -271,6 +296,9 @@ export function parseDeepLinkFromUrl(search = window.location.search): DeepLinkV
         shadows,
         orbitLines,
         magneticFields,
+        solarWind,
+        kp,
+        cme,
         system,
         planet,
         mission,
@@ -305,6 +333,8 @@ export function runtimeLinkReaders(
         getShadowQuality: () => runtime.getShadowQuality(),
         getOrbitLines: () => runtime.getOrbitLines(),
         getMagneticFields: () => runtime.getMagneticFields(),
+        getSolarWind: () => runtime.getSolarWind(),
+        getKpOverride: () => runtime.getKpOverride(),
         getFocusedPlanetIndex: () => runtime.getFocusedPlanetIndex(),
         getFocusedMission: () => runtime.getFocusedMission(),
         getActiveSystemId: () => runtime.getActiveSystemId(),
@@ -363,6 +393,15 @@ export function buildShareableUrl(readers: DeepLinkRuntimeReaders, baseUrl = win
     const magneticFields = readers.getMagneticFields?.();
     if (magneticFields !== undefined) {
         url.searchParams.set('fields', magneticFields ? '1' : '0');
+    }
+
+    const solarWind = readers.getSolarWind?.();
+    if (solarWind !== undefined) {
+        url.searchParams.set('wind', solarWind ? '1' : '0');
+    }
+    const kp = readers.getKpOverride?.();
+    if (kp !== undefined && kp >= 0) {
+        url.searchParams.set('kp', String(Math.round(kp * 10) / 10));
     }
 
     // In Observe the view is a site plus a look direction; a fly-through pose or focus target

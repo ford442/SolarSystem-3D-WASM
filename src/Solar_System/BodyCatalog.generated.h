@@ -228,10 +228,39 @@ struct StarRow {
     float luminositySolar;
     float massSolar;
     float activity; // 0–1 flare/activity look of the corona (a visual, not a model)
+    // render.star.activity.cycle: a sunspot cycle (SpaceWeather::EvaluateCycle); period 0 = none.
+    float cyclePeriodYears;
+    float cycleMinimumYear;      // decimal year of a minimum (Sol: 2008.9)
+    int cycleAtMinimum;          // number of the cycle that starts there; > 0 uses the Sun's observed maxima
+    float cycleMeanPeakSunspots; // peak smoothed sunspot number of an unnumbered cycle
 };
 
 // clang-format off
-inline constexpr StarRow kSolStar = {"sun", L"Sun", L"Солнце", "G2V", 5772.0f, 5778.0f, 695700.0, 1.0f, 1.0f, 1.0f, 0.0f};
+inline constexpr StarRow kSolStar = {"sun", L"Sun", L"Солнце", "G2V", 5772.0f, 5778.0f, 695700.0, 1.0f, 1.0f, 1.0f, 0.0f, 11.0f, 2008.9f, 24, 179.0f};
+// clang-format on
+
+// ---------------------------------------------------------------------------------
+// Auroras (render.aurora): the look of the auroral shell (AuroraShell, aurora.fs). The
+// oval and its response to the wind are physics in src/astro/SpaceWeather.cpp; §13.
+
+struct AuroraRow {
+    const char* bodyId;
+    float bottomKm; // emission altitudes above the surface (giants: above 1 bar)
+    float topKm;
+    Rgb colorLow;  // linear: the lower curtain (Earth: O 557.7 nm)
+    Rgb colorHigh; // the upper glow (Earth: O 630.0 nm)
+    Rgb colorEdge; // the storm-time lower border (Earth: N2+ 427.8 nm)
+    float brightness;
+};
+
+// clang-format off
+inline constexpr AuroraRow kSolAuroras[] = {
+    {"earth", 100.0f, 300.0f, {0.06f, 1.0f, 0.16f}, {1.0f, 0.06f, 0.05f}, {0.32f, 0.16f, 1.0f}, 1.0f},
+    {"jupiter", 250.0f, 900.0f, {0.42f, 0.5f, 1.0f}, {0.72f, 0.38f, 1.0f}, {0.85f, 0.85f, 1.0f}, 1.6f},
+    {"saturn", 700.0f, 1600.0f, {0.55f, 0.4f, 1.0f}, {1.0f, 0.32f, 0.7f}, {0.9f, 0.8f, 1.0f}, 0.8f},
+    {"uranus", 600.0f, 1600.0f, {0.4f, 0.6f, 1.0f}, {0.6f, 0.45f, 1.0f}, {0.85f, 0.9f, 1.0f}, 0.35f},
+    {"neptune", 600.0f, 1600.0f, {0.4f, 0.55f, 1.0f}, {0.6f, 0.42f, 1.0f}, {0.85f, 0.9f, 1.0f}, 0.3f},
+};
 // clang-format on
 
 } // namespace BodyCatalog

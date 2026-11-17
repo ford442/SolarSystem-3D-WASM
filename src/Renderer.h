@@ -11,6 +11,7 @@
 #include "Solar_System/CatalogMaterial.h"
 #include "Solar_System/ObserveSky.h"
 #include <array>
+#include <cstddef>
 #include <deque>
 #include <memory>
 #include <string>
@@ -29,6 +30,8 @@ class MissionPathRenderer;
 class OrbitPathRenderer;
 class ShadowMapFBO;
 class SkyBox;
+class SolarWindRenderer;
+class SpaceWeatherUniformBuffer;
 class SurfacePatchMesh;
 class TerrainRenderer;
 class TextRenderer;
@@ -94,6 +97,11 @@ public:
     void ShadowMapPass(const FrameContext& ctx, const RenderableSceneComponent& component);
     void RenderPass(const FrameContext& ctx, const RenderableSceneComponent& component);
     void RenderForeground(const FrameContext& ctx);
+    /**
+     * Space weather (SpaceWeatherRenderer.cpp, docs/ARCHITECTURE.md §13), once a frame after
+     * the scene is placed: the MagnetosphereUBO upload and the solar-wind particle update.
+     */
+    void UpdateSpaceWeather(const FrameContext& ctx);
     /** Mono only: staged-loading proxy labels, then the star glow, HDR composite and lens flare. */
     void RenderMonoEffects(const FrameContext& ctx);
     /** Screen-space text after the scene: Observe's HUD, or distances and the hint list. */
@@ -175,6 +183,17 @@ private:
     void RenderPbrAtmosphere(const FrameContext& ctx, const RenderableAtmosphere& renderableAtmosphere,
                              const RenderableSceneComponent& component);
     void RenderClouds(const FrameContext& ctx, const RenderableSceneComponent& component);
+    // Space weather (SpaceWeatherRenderer.cpp).
+    /** The component's auroral oval, additive, after its atmosphere and clouds. */
+    void RenderAurora(const FrameContext& ctx, const RenderableSceneComponent& component);
+    /** Full tier: every visible oval again into the field-line bloom, blurred and added. */
+    void RenderAuroraBloom(const FrameContext& ctx);
+    /** The solar-wind particles, additive points in the HDR target. */
+    void RenderSolarWind(const FrameContext& ctx) const;
+    /** The aurora program for a tier's look, built on first use (null until it has compiled). */
+    Shader* AuroraProgram(int auroraMode);
+    /** The photosphere program for a tier (star.fs PHOTOSPHERE / SUNSPOTS), or the sprite. */
+    Shader* StarProgram(int photosphereMode);
     void RenderPlanetaryRing(const Shader& shader, const RenderableSceneComponent& component) const;
     void RenderStar(const FrameContext& ctx) const;
     void RenderSpaceObjectDistance(const FrameContext& ctx, const SpaceObject* spaceObject) const;
@@ -273,6 +292,18 @@ private:
     std::unique_ptr<MagneticFieldTraceJobs> _magneticFieldTraces; // build in flight, if any
     std::vector<std::unique_ptr<MissionPathRenderer>> _missionPathMeshes;
     glm::dvec3 _missionPathOrigin{0.0}; // world point the path vertices are relative to
+
+    // Space weather (SpaceWeatherRenderer.cpp). Programs are owned by _shaders and built on
+    // first use, so a tier that never asks for one never compiles it.
+    static constexpr std::size_t kSolarWindGroupCount = 7; // SolarWindRenderer::kMaxGroups
+    std::unique_ptr<SpaceWeatherUniformBuffer> _spaceWeatherUbo;
+    std::unique_ptr<SolarWindRenderer> _solarWind;
+    std::array<bool, kSolarWindGroupCount> _solarWindGroups{};
+    Shader* _solarWindUpdateShader = nullptr;
+    Shader* _solarWindDrawShader = nullptr;
+    std::array<Shader*, 3> _auroraShaders{}; // static, animated, curtains
+    std::array<Shader*, 3> _starShaders{};   // sprite (_mainStarShader's spec), granulation, spots
+    Shader* _spriteStarShader = nullptr;     // star.vs + star.fs with no permutation
 
     bool _orbitLinesEnabled = true;
     bool _magneticFieldsEnabled = false;

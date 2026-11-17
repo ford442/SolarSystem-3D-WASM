@@ -237,6 +237,7 @@ bool Application::LoadSystem(const std::string& id, int focusIndex) {
     }
     _renderer.PrefetchCatalogVariants();
     InitStarSystem();
+    InitSpaceWeather(); // the new star's cycle; CMEs launched by hand were the last system's
     // The sky-event caches are Sol's; searched afresh after a round trip.
     _nextConjunctionCached = false;
     _nextSkyEventCached = false;

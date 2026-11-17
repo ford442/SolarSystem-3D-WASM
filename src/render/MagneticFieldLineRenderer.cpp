@@ -42,6 +42,7 @@ void MagneticFieldLineRenderer::Draw(const glm::mat4& projection, const glm::mat
     _shader->SetFloat("uFlowSpeed", params.flowSpeed);
     _shader->SetFloat("uBaseOpacity", params.opacity * opacityScale);
     _shader->SetVec3("lineColor", params.color);
+    _shader->SetVec4("uCompression", _compression);
 
     for (const auto& batch : _batches) {
         if (batch.body != body || batch.mesh.Empty()) {

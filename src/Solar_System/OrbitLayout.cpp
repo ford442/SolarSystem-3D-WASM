@@ -249,6 +249,24 @@ float GetAuDistance(Body body) {
     return row(body).auDistance;
 }
 
+std::vector<glm::dvec2> AuToSceneKnots() {
+    if (g_scaleMode == ScaleMode::Realistic) {
+        return {glm::dvec2(1.0, static_cast<double>(kAuToSceneUnits))};
+    }
+    if (g_compressedKeys.empty()) {
+        rebuildCompressedKeys();
+    }
+    if (g_compressedKeys.empty()) {
+        return {glm::dvec2(1.0, static_cast<double>(kAuToSceneUnits))};
+    }
+    std::vector<glm::dvec2> knots;
+    knots.reserve(g_compressedKeys.size());
+    for (const Key& key : g_compressedKeys) {
+        knots.emplace_back(key.au, key.scene);
+    }
+    return knots;
+}
+
 double AuToSceneDistanceDouble(double au) {
     if (au <= 0.0) {
         return 0.0;

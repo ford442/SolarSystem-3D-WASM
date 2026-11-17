@@ -177,9 +177,44 @@ function validateStar(body) {
   if (st.effectiveTemperatureK < 1000 || st.effectiveTemperatureK > 50000) {
     throw new Error(`${where}.effectiveTemperatureK must be within 1000–50000 K`);
   }
-  if (st.activity !== undefined && !(st.activity >= 0 && st.activity <= 1)) {
-    throw new Error(`${where}.activity must be in [0, 1]`);
+  const activity = st.activity;
+  if (activity !== undefined && typeof activity !== 'object') {
+    if (!(activity >= 0 && activity <= 1)) throw new Error(`${where}.activity must be in [0, 1]`);
+  } else if (activity !== undefined) {
+    if (activity.flare !== undefined && !(activity.flare >= 0 && activity.flare <= 1)) {
+      throw new Error(`${where}.activity.flare must be in [0, 1]`);
+    }
+    const c = activity.cycle;
+    if (c !== undefined) {
+      if (!isFinitePositive(c.periodYears)) throw new Error(`${where}.activity.cycle.periodYears must be positive`);
+      if (!Number.isFinite(c.minimumYear)) throw new Error(`${where}.activity.cycle.minimumYear must be a year`);
+      if (!isFinitePositive(c.meanPeakSunspotNumber)) {
+        throw new Error(`${where}.activity.cycle.meanPeakSunspotNumber must be positive`);
+      }
+      if (c.cycleAtMinimum !== undefined && !(Number.isInteger(c.cycleAtMinimum) && c.cycleAtMinimum > 0)) {
+        throw new Error(`${where}.activity.cycle.cycleAtMinimum must be a positive integer`);
+      }
+    }
   }
+}
+
+/**
+ * render.aurora: the auroral shell (AuroraShell, aurora.fs) on a body with a dipole field.
+ * The oval itself (where, how wide, how far it moves with Kp) is physics and lives in
+ * src/astro/SpaceWeather.cpp; this is the look. Colours are linear RGB.
+ */
+function validateAurora(body) {
+  const a = body.render.aurora;
+  const where = `Body ${body.id} render.aurora`;
+  if (!Array.isArray(a.altitudeKm) || a.altitudeKm.length !== 2 || !a.altitudeKm.every(isFinitePositive) ||
+      a.altitudeKm[0] >= a.altitudeKm[1]) {
+    throw new Error(`${where}.altitudeKm must be [bottom, top] km, bottom < top`);
+  }
+  for (const key of ['colorLow', 'colorHigh', 'colorEdge']) {
+    if (!isRgb(a[key])) throw new Error(`${where}.${key} must be [r, g, b] (linear)`);
+  }
+  if (!isFinitePositive(a.brightness)) throw new Error(`${where}.brightness must be positive`);
+  if (body.kind === 'satellite') throw new Error(`${where}: only primaries carry an aurora`);
 }
 
 const PROCEDURAL_MODES = new Set([0, 1, 2, 3]);
@@ -301,6 +336,9 @@ function validateCatalog(catalog, systemId) {
   for (const body of catalog.bodies) {
     if (body.render?.atmosphere) {
       validateAtmosphere(body);
+    }
+    if (body.render?.aurora) {
+      validateAurora(body);
     }
     // Spin is a function of the date: W = W0 + Wdot * (days since J2000) (OrbitLayout::
     // GetAxialSpinDegrees), so a focus body's rate must agree with its sidereal day. Bodies
@@ -902,8 +940,34 @@ function starRow(catalog) {
     radiusSolar: st.radiusSolar,
     luminositySolar: st.luminositySolar,
     massSolar: st.massSolar ?? 0,
-    activity: st.activity ?? 0,
+    // render.star.activity is a flare level, or {flare, cycle} for a star with a sunspot cycle.
+    activity: (typeof st.activity === 'object' ? st.activity.flare : st.activity) ?? 0,
+    cyclePeriodYears: st.activity?.cycle?.periodYears ?? 0,
+    cycleMinimumYear: st.activity?.cycle?.minimumYear ?? 0,
+    cycleAtMinimum: st.activity?.cycle?.cycleAtMinimum ?? 0,
+    cycleMeanPeakSunspots: st.activity?.cycle?.meanPeakSunspotNumber ?? 0,
   };
+}
+
+/** render.aurora as BodyCatalog::AuroraRow's fields. */
+function auroraRow(body) {
+  const a = body.render.aurora;
+  return {
+    bodyId: body.id,
+    bottomKm: a.altitudeKm[0],
+    topKm: a.altitudeKm[1],
+    colorLow: a.colorLow,
+    colorHigh: a.colorHigh,
+    colorEdge: a.colorEdge,
+    brightness: a.brightness,
+  };
+}
+
+function cppAurora(a) {
+  return (
+    `    {${cppString(a.bodyId)}, ${cppFloat(a.bottomKm)}, ${cppFloat(a.topKm)}, ${cppRgb(a.colorLow)}, ` +
+    `${cppRgb(a.colorHigh)}, ${cppRgb(a.colorEdge)}, ${cppFloat(a.brightness)}},`
+  );
 }
 
 function cppStar(s) {
@@ -911,7 +975,8 @@ function cppStar(s) {
     `{${cppString(s.id)}, ${cppWideString(s.displayNameEn)}, ${cppWideString(s.displayNameRu)}, ` +
     `${cppString(s.spectralType)}, ${cppFloat(s.effectiveTemperatureK)}, ${cppFloat(s.glowTemperatureK)}, ` +
     `${cppDouble(s.radiusKm)}, ${cppFloat(s.radiusSolar)}, ${cppFloat(s.luminositySolar)}, ` +
-    `${cppFloat(s.massSolar)}, ${cppFloat(s.activity)}}`
+    `${cppFloat(s.massSolar)}, ${cppFloat(s.activity)}, ${cppFloat(s.cyclePeriodYears)}, ` +
+    `${cppFloat(s.cycleMinimumYear)}, ${s.cycleAtMinimum}, ${cppFloat(s.cycleMeanPeakSunspots)}}`
   );
 }
 
@@ -925,6 +990,7 @@ function buildBodyCatalogHeader(catalog) {
   const bodies = entryBodies(catalog);
   const entries = bodies.map((body) => cppEntry(entryRow(body, byId)));
   const atmospheres = bodies.filter((body) => body.render.atmosphere).map((body) => cppAtmosphere(atmosphereRow(body)));
+  const auroras = bodies.filter((body) => body.render.aurora).map((body) => cppAurora(auroraRow(body)));
 
   return [
     '#pragma once',
@@ -1105,10 +1171,35 @@ function buildBodyCatalogHeader(catalog) {
     '    float luminositySolar;',
     '    float massSolar;',
     '    float activity; // 0–1 flare/activity look of the corona (a visual, not a model)',
+    '    // render.star.activity.cycle: a sunspot cycle (SpaceWeather::EvaluateCycle); period 0 = none.',
+    '    float cyclePeriodYears;',
+    '    float cycleMinimumYear;      // decimal year of a minimum (Sol: 2008.9)',
+    '    int cycleAtMinimum;          // number of the cycle that starts there; > 0 uses the Sun\'s observed maxima',
+    '    float cycleMeanPeakSunspots; // peak smoothed sunspot number of an unnumbered cycle',
     '};',
     '',
     '// clang-format off',
     `inline constexpr StarRow kSolStar = ${cppStar(starRow(catalog))};`,
+    '// clang-format on',
+    '',
+    '// ---------------------------------------------------------------------------------',
+    '// Auroras (render.aurora): the look of the auroral shell (AuroraShell, aurora.fs). The',
+    '// oval and its response to the wind are physics in src/astro/SpaceWeather.cpp; §13.',
+    '',
+    'struct AuroraRow {',
+    '    const char* bodyId;',
+    '    float bottomKm; // emission altitudes above the surface (giants: above 1 bar)',
+    '    float topKm;',
+    '    Rgb colorLow;  // linear: the lower curtain (Earth: O 557.7 nm)',
+    '    Rgb colorHigh; // the upper glow (Earth: O 630.0 nm)',
+    '    Rgb colorEdge; // the storm-time lower border (Earth: N2+ 427.8 nm)',
+    '    float brightness;',
+    '};',
+    '',
+    '// clang-format off',
+    'inline constexpr AuroraRow kSolAuroras[] = {',
+    ...auroras,
+    '};',
     '// clang-format on',
     '',
     '} // namespace BodyCatalog',
@@ -1176,6 +1267,7 @@ function buildRuntimeJson(entry, catalog) {
     layout: layoutRows(catalog),
     entries: bodies.map((body) => entryRow(body, byId)),
     atmospheres: bodies.filter((body) => body.render.atmosphere).map(atmosphereRow),
+    auroras: bodies.filter((body) => body.render.aurora).map(auroraRow),
   };
 }
 

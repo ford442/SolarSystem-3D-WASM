@@ -1,8 +1,10 @@
 #ifndef SOLARSYSTEM_ORBITLAYOUT_H
 #define SOLARSYSTEM_ORBITLAYOUT_H
 
+#include <glm/vec2.hpp>
 #include <glm/vec3.hpp>
 #include <string>
+#include <vector>
 
 // Canonical body indices match FocusPlanet / planet_facts.json (0=Sun … 9=Pluto,
 // then catalog-only dwarf/belt bodies).
@@ -169,6 +171,13 @@ float AuToSceneDistance(float au);
 
 /** AuToSceneDistance in double. */
 double AuToSceneDistanceDouble(double au);
+
+/**
+ * The (AU, scene) knots AuToSceneDistanceDouble interpolates through, increasing in AU, and
+ * proportional below the first and past the last: one knot at 1 AU on realistic scale. For a
+ * shader that has to place AU positions the way the scene does (common/space_weather.glsl).
+ */
+std::vector<glm::dvec2> AuToSceneKnots();
 
 /**
  * Map a heliocentric AU vector in scene axes (ecliptic x,z,y) to scene units.

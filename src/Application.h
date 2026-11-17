@@ -9,6 +9,7 @@
 #include "astro/MissionCatalog.h"
 #include "astro/Observer.h"
 #include "astro/SkyEvents.h"
+#include "astro/SpaceWeather.h"
 #include "PlanetSystemManifest.h"
 #include "Solar_System/AsteroidField.h"
 #include "Solar_System/SolarSystem.h"
@@ -147,6 +148,25 @@ public:
     bool GetOrbitLinesEnabled() const;
     void SetMagneticFieldsEnabled(bool enabled);
     bool GetMagneticFieldsEnabled() const;
+
+    // --- Space weather (SpaceWeatherController.cpp; astro/SpaceWeather.h, ARCHITECTURE §13) --
+    /** The solar-wind particles (the settings panel's "Solar wind"); auroras draw either way. */
+    void SetSolarWindEnabled(bool enabled);
+    bool GetSolarWindEnabled() const { return _spaceWeatherWind; }
+    /** < 0: Kp from the wind; 0–9 holds every oval at that Kp. */
+    void SetKpOverride(double kp);
+    double GetKpOverride() const { return _spaceWeather.KpOverride(); }
+    /** An Earth-directed CME leaving the Sun now; turns the wind on so it shows. */
+    void LaunchCmeNow();
+    /**
+     * Play catalog event `index` (GetSpaceWeatherJson's nextStorm / lastStorm): the date goes to
+     * its launch, the wind on, and the orrery slows so the pulse takes ~8 s to reach Earth.
+     */
+    bool PlaySpaceWeatherEvent(int index);
+    /** Set the date to an ISO-8601 UTC instant (`&cme=2003-10-29T06:00Z`) with the wind on. */
+    bool JumpToSpaceWeatherDate(const std::string& isoUtc);
+    /** SpaceWeather::State::ToJson for this frame, with the renderer's settings. */
+    std::string GetSpaceWeatherJson() const;
 
     // --- Timelines and capture (Cinematics.cpp; web/src/timeline.ts, web/src/capture.ts) --
     /**
@@ -353,6 +373,17 @@ private:
     HudState _frameHud;
     // Each mission's probe position at this frame's date (UpdateScene); nullopt off its trajectory.
     std::vector<std::optional<glm::vec3>> _missionProbes;
+
+    // --- Space weather (SpaceWeatherController.cpp, docs/ARCHITECTURE.md §13) --------------
+    SpaceWeather::State _spaceWeather;
+    SpaceWeatherFrame _spaceWeatherFrame;
+    bool _spaceWeatherWind = false;
+    bool _spaceWeatherLoaded = false;
+    double _spaceWeatherClock = 0.0; // visual seconds the particles have run
+    /** The CME list and the star's cycle, once (and again after LoadSystem). */
+    void InitSpaceWeather();
+    /** After CullScene: the model at this frame's date, mapped into _spaceWeatherFrame. */
+    void UpdateSpaceWeather(int viewCount);
 
     // --- Terrain (TerrainController.cpp; src/render/terrain/, docs/ARCHITECTURE.md §11.3) --
     std::unique_ptr<Terrain::TerrainSystem> _terrain;

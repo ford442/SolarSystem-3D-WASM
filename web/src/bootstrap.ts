@@ -3,7 +3,7 @@ import Module, { type SolarSystemModule, type SolarSystemModuleConfig } from './
 import { buildShareableUrl, parseDeepLinkFromUrl, runtimeLinkReaders } from './deepLink';
 import { queryRequired, queryRequiredIn } from './dom';
 import { showFatalPanel } from './fatalOverlay';
-import { initEducationalLayer } from './educationalLayer';
+import { initEducationalLayer, initStormCard } from './educationalLayer';
 import { initObservePanel, type ObservePanelController } from './observe';
 import { publishInitConfig, resolveInitConfig } from './initialSettings';
 import { PlanetExplorer } from './planetExplorer';
@@ -42,6 +42,10 @@ const pausedInput = queryRequired('simulation-paused', HTMLInputElement);
 const shadowsInput = queryRequired('shadows-enabled', HTMLInputElement);
 const orbitLinesInput = queryRequired('orbit-lines-enabled', HTMLInputElement);
 const magneticFieldsInput = queryRequired('magnetic-fields-enabled', HTMLInputElement);
+const solarWindInput = queryRequired('solar-wind-enabled', HTMLInputElement);
+const kpOverrideInput = queryRequired('kp-override', HTMLInputElement);
+const kpOverrideValue = queryRequired('kp-override-value', HTMLOutputElement);
+const launchCmeButton = queryRequired('launch-cme', HTMLButtonElement);
 const musicVolumeInput = queryRequired('music-volume', HTMLInputElement);
 const musicVolumeValue = queryRequired('music-volume-value', HTMLOutputElement);
 const musicMutedInput = queryRequired('music-muted', HTMLInputElement);
@@ -52,6 +56,12 @@ const skyEventChip = queryRequired('next-sky-event');
 const skyEventText = queryRequired('next-sky-event-text');
 const skyEventJump = queryRequired('next-sky-event-jump', HTMLButtonElement);
 const skyEventLandmark = queryRequired('next-sky-event-landmark', HTMLButtonElement);
+const stormChip = queryRequired('next-storm');
+const stormText = queryRequired('next-storm-text');
+const stormPlay = queryRequired('next-storm-play', HTMLButtonElement);
+const stormCardElement = queryRequired('storm-card');
+const stormCardTitle = queryRequired('storm-card-title');
+const stormCardLines = queryRequired('storm-card-lines');
 const observeElements = {
     exploreButton: queryRequired('mode-explore', HTMLButtonElement),
     observeButton: queryRequired('mode-observe', HTMLButtonElement),
@@ -394,6 +404,10 @@ void startModule()
                     shadowsInput,
                     orbitLinesInput,
                     magneticFieldsInput,
+                    solarWindInput,
+                    kpOverrideInput,
+                    kpOverrideValue,
+                    launchCmeButton,
                     musicVolumeInput,
                     musicVolumeValue,
                     musicMutedInput,
@@ -404,6 +418,9 @@ void startModule()
                     skyEventText,
                     skyEventJump,
                     skyEventLandmark,
+                    stormChip,
+                    stormText,
+                    stormPlay,
                 },
                 runtime,
                 music,
@@ -474,6 +491,8 @@ void startModule()
                 tourCaption,
                 settingsStatus,
             });
+
+            initStormCard({ runtime, card: stormCardElement, title: stormCardTitle, lines: stormCardLines });
 
             initTimelineEditor({ runtime, canvas, deepLink, tourPlayer, caption: tourCaption });
 

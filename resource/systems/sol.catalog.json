@@ -106,7 +106,15 @@
           "massSolar": 1,
           "spectralType": "G2V",
           "glowTemperatureK": 5778,
-          "activity": 0
+          "activity": {
+            "flare": 0,
+            "cycle": {
+              "periodYears": 11,
+              "minimumYear": 2008.9,
+              "cycleAtMinimum": 24,
+              "meanPeakSunspotNumber": 179
+            }
+          }
         }
       },
       "includeInCompanion": false
@@ -384,6 +392,14 @@
           "spinDegPerSimSecond": 1.125,
           "ambientFactor": 1
         },
+        "aurora": {
+          "altitudeKm": [100, 300],
+          "colorLow": [0.06, 1.0, 0.16],
+          "colorHigh": [1.0, 0.06, 0.05],
+          "colorEdge": [0.32, 0.16, 1.0],
+          "brightness": 1.0,
+          "notes": "O 557.7 nm green below ~200 km, O 630.0 nm red above, N2+ 427.8 nm blue-violet on the lower border in storms."
+        },
         "atmosphere": {
           "oneil": {
             "shellScale": 1.1,
@@ -606,6 +622,14 @@
           "specular": null
         },
         "oblateness": 0.06487,
+        "aurora": {
+          "altitudeKm": [250, 900],
+          "colorLow": [0.42, 0.5, 1.0],
+          "colorHigh": [0.72, 0.38, 1.0],
+          "colorEdge": [0.85, 0.85, 1.0],
+          "brightness": 1.6,
+          "notes": "H2 Lyman and Werner bands (ultraviolet) drawn as the blue of the 427.8 nm look; the brightest aurora in the system."
+        },
         "atmosphere": {
           "oneil": {
             "shellScale": 11.4,
@@ -728,6 +752,14 @@
         },
         "artTiltXDegrees": -15,
         "oblateness": 0.09796,
+        "aurora": {
+          "altitudeKm": [700, 1600],
+          "colorLow": [0.55, 0.4, 1.0],
+          "colorHigh": [1.0, 0.32, 0.7],
+          "colorEdge": [0.9, 0.8, 1.0],
+          "brightness": 0.8,
+          "notes": "H2 ultraviolet and H3+ infrared, drawn violet to magenta."
+        },
         "atmosphere": {
           "oneil": {
             "shellScale": 9.34,
@@ -856,6 +888,14 @@
           "ambientFactor": 0
         },
         "oblateness": 0.02293,
+        "aurora": {
+          "altitudeKm": [600, 1600],
+          "colorLow": [0.4, 0.6, 1.0],
+          "colorHigh": [0.6, 0.45, 1.0],
+          "colorEdge": [0.85, 0.9, 1.0],
+          "brightness": 0.35,
+          "notes": "Faint H2 and H3+ emission around an offset, tilted dipole."
+        },
         "atmosphere": {
           "oneil": {
             "shellScale": 4,
@@ -973,6 +1013,14 @@
           "ambientFactor": 0
         },
         "oblateness": 0.01708,
+        "aurora": {
+          "altitudeKm": [600, 1600],
+          "colorLow": [0.4, 0.55, 1.0],
+          "colorHigh": [0.6, 0.42, 1.0],
+          "colorEdge": [0.85, 0.9, 1.0],
+          "brightness": 0.3,
+          "notes": "Faint H2 emission around an offset, tilted dipole."
+        },
         "atmosphere": {
           "oneil": {
             "shellScale": 3.9,

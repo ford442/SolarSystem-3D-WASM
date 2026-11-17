@@ -269,6 +269,46 @@ export interface SolarSystemCwrap {
     argTypes: [],
   ): () => number;
   (
+    ident: 'SetSolarWind',
+    returnType: null,
+    argTypes: ['number'],
+  ): (enabled: number) => void;
+  (
+    ident: 'GetSolarWind',
+    returnType: 'number',
+    argTypes: [],
+  ): () => number;
+  (
+    ident: 'SetKpOverride',
+    returnType: null,
+    argTypes: ['number'],
+  ): (kp: number) => void;
+  (
+    ident: 'GetKpOverride',
+    returnType: 'number',
+    argTypes: [],
+  ): () => number;
+  (
+    ident: 'LaunchCmeNow',
+    returnType: null,
+    argTypes: [],
+  ): () => void;
+  (
+    ident: 'PlaySpaceWeatherEvent',
+    returnType: 'number',
+    argTypes: ['number'],
+  ): (index: number) => number;
+  (
+    ident: 'JumpToSpaceWeatherDate',
+    returnType: 'number',
+    argTypes: ['string'],
+  ): (isoUtc: string) => number;
+  (
+    ident: 'GetSpaceWeatherJson',
+    returnType: 'string',
+    argTypes: [],
+  ): () => string;
+  (
     ident: 'SetXrSessionActive',
     returnType: null,
     argTypes: ['number'],
@@ -449,7 +489,9 @@ export type SettingsChangeField =
   | 'observeSite'
   | 'observeTimeRate'
   | 'observeConstellations'
-  | 'orbitScaleMode';
+  | 'orbitScaleMode'
+  | 'solarWind'
+  | 'kpOverride';
 
 export interface SolarSystemModuleConfig {
   canvas: HTMLCanvasElement;
@@ -558,6 +600,14 @@ export interface SolarSystemModule {
   _GetMagneticFields: () => number;
   _SetMagneticFieldMode: (enabled: number) => void;
   _GetMagneticFieldMode: () => number;
+  _SetSolarWind: (enabled: number) => void;
+  _GetSolarWind: () => number;
+  _SetKpOverride: (kp: number) => void;
+  _GetKpOverride: () => number;
+  _LaunchCmeNow: () => void;
+  _PlaySpaceWeatherEvent: (index: number) => number;
+  _JumpToSpaceWeatherDate: (isoUtc: number) => number;
+  _GetSpaceWeatherJson: () => number;
   _SetXrSessionActive: (active: number) => void;
   _SetXrBaseLayerFramebuffer: (framebuffer: number) => void;
   _SetXrEyeCount: (count: number) => void;

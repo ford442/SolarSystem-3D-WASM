@@ -454,6 +454,7 @@ logging out of `src/`.
 | | `Shader` / `ShaderLibrary` | Deferred compile/link (`KHR_parallel_shader_compile`), link-time uniform table with a value cache, hot reload; programs keyed by `ShaderSpec` (files + permutation defines) (§9.1) |
 | | `ShaderSource` | GL-free source assembly: `#version` rewrite, `common/preamble.glsl`, permutation `#define`s, `#include`, sampler bindings, `#line` bookkeeping (§9.1) |
 | | `FrameUniforms`, `TextureUnits.h` | The per-view `FrameUBO` and the shared texture-unit list (§9.1) |
+| | `SpaceWeatherUniforms` | The `MagnetosphereUBO` (std140, binding 1) the solar-wind programs read (§13.2) |
 | | `Mesh`, `MeshHolder`, `Vertex.h`, `LineStripBatch` | Model meshes (with bounding radius and a CPU copy of their triangles) and the one ribbon VAO layout |
 | | `MeshAnchor.h`, `SurfacePatch`, `SurfacePatchMesh` | Relative-to-eye vertex placement and the re-tessellated facets under a camera metres up (§11.1) |
 | | `TextureImage2D`, `FloatLutTexture` | DDS/KTX2 load, reload, mip level management; baked RGBA16F LUTs (quiet `nullopt` instead of a checkerboard) |
@@ -463,7 +464,8 @@ logging out of `src/`.
 | | `OrbitPathRenderer` | Faint heliocentric `GL_LINE_LOOP` guides |
 | | `MissionPathRenderer` | Sampled probe ribbons (Voyager); quality downsample; AU→scene via `HelioAuToScene` |
 | | `XrPointerRenderer` | WebXR controller rays (skipped on Low) |
-| | `MagneticFieldLineMesh` / `MagneticFieldLineRenderer` / `MagneticFieldBloom` | Optional dipole+toroidal ribbons (static VBO, GPU flow, half-res bloom on Medium+, separate from the star HDR FBO) |
+| | `MagneticFieldLineMesh` / `MagneticFieldLineRenderer` / `MagneticFieldBloom` | Optional dipole+toroidal ribbons (static VBO, GPU flow, half-res bloom on Medium+, separate from the star HDR FBO); the day side squeezed by the space-weather standoff (§13) |
+| | `SolarWindRenderer` | Solar-wind particles: ping-pong transform-feedback buffers in seven groups, culled per group (§13.2) |
 | `render/terrain/` | `CubeSphere`, `TerrainTile`, `TerrainQuadtree` | GL-free: equal-angle cube-sphere tile keys and float-exact placement, R16 KTX2 tile parse and Catmull-Rom upsample, screen-space-error selection with horizon/frustum/light-box culling and the geomorph (§11.3) |
 | | `TileCache`, `TerrainSystem` | GL-free: one LRU of tiles under the tier's byte budget with an in-flight cap; when each flagged body swaps its sphere for tiles, and the floor's surface radius (§11.3) |
 | | `TerrainRenderer` | The shared 65×65 grid with skirts and a height texture per drawn tile; draws a selection with the bound program |
@@ -477,6 +479,7 @@ logging out of `src/`.
 | | `Observer`, `LunarTheory`, `SeatedView.h` | Ground-observer maths: sidereal time, precession, ecliptic→equatorial→horizon frames (X=East, Y=Up, Z=−North), Moon parallax, `ComputeSky` for the Sun, Moon and naked-eye planets, `DiscOverlapFraction`; the XR seated-sky rotation (§7.4) |
 | | `MissionCatalog` | Probe trajectory samples (`resource/missions/catalog.json`) |
 | | `MagneticFieldParams` / `MagneticFieldModel` / `MagneticFieldTracer` | Per-body field parameters, the dipole+toroidal model and the line tracer behind the ribbons |
+| | `SpaceWeather` | Magnetopause standoffs, the ambient wind, Kp and the auroral ovals, the sunspot cycle, the CME list and its drag model (§13.1) |
 
 **Tests.** `SolarSystemTests` is GL-free (it links GL only for the inline `GlHandle`
 destructors, which never run on an empty handle). `SolarSystemGlTests` (`tests/gl/`) opens a
@@ -484,7 +487,9 @@ hidden GLFW window with a real GL 4.6 core context and checks handles, that ever
 planetLighting permutation links and reads `FrameUBO` at its binding, sampler units, the
 uniform cache, the shadow/HDR framebuffers, one `LineStripBatch` draw read back with
 `glReadPixels`, a DDS upload that must not fall back, that every terrain permutation links
-with its sampler units, and that a terrain tile lands where `CubeSphere` puts it. CI runs it under Xvfb/llvmpipe; with no display it skips
+with its sampler units, that a terrain tile lands where `CubeSphere` puts it, that the
+solar-wind feedback seeds, moves and precipitates its groups, and that sunspots darken only
+the butterfly bands (§13). CI runs it under Xvfb/llvmpipe; with no display it skips
 (`MESA_GL_VERSION_OVERRIDE=4.6 MESA_GLSL_VERSION_OVERRIDE=460 xvfb-run -a <build>/tests/SolarSystemGlTests`).
 
 ### 7.3 Scene objects
@@ -1534,8 +1539,8 @@ RequestSystemJump(id)       Out 0.9 s: fade to the departing star's colour, then
 - **Arrival clock.** Sol keeps `SimState{}.timeScale`. Other systems start with the landing
   planet moving about 1°/s along its orbit: 100–10 000× real time, and never below the
   slider's 0.01 floor.
-- **Sol-only features.** Observe mode, missions, belts, the magnetic field and sky events stand
-  on Earth or Sol data. Outside Sol they are refused or empty, and the page greys out
+- **Sol-only features.** Observe mode, missions, belts, the magnetic field, sky events and space
+  weather's magnetospheres and CMEs (§13) stand on Earth or Sol data. Outside Sol they are refused or empty, and the page greys out
   Observe.
 - **Web.** `systemPicker.ts` lists `index.json` with Sol first, then by distance, plus a
   "⌂ Sol" home button. It calls `LoadStarSystem` and follows `Module['onSystemChanged']`.
@@ -1554,7 +1559,166 @@ RequestSystemJump(id)       Out 0.9 s: fade to the departing star's colour, then
 3. Rebuild. The runtime JSON is preloaded, and `StarSystemTest.EverySystemInTheIndexLoads`
    parses it.
 
-## 13. Common pitfalls
+## 13. Space weather
+
+The magnetic-field layer (§7.3) becomes a simulation: the solar wind streams out of the Sun,
+presses each magnetosphere in, drives the auroral ovals, and carries CMEs that set off
+geomagnetic storms. The Sun's sunspot cycle sets the background. Work is split by language:
+
+- **Physics** lives in C++ and is GL-free and unit-tested: `src/astro/SpaceWeather.{h,cpp}`.
+- **Application side.** `src/SpaceWeatherController.cpp` evaluates the model, fills the
+  frame snapshot and handles the controls.
+- **Renderer side.** `src/SpaceWeatherRenderer.cpp` handles the UBO, particles, aurora and
+  photosphere, and `render/SolarWindRenderer` holds the particle buffers.
+- **Shaders** are declared permutations that the self-test covers.
+- **TypeScript** (`web/src/spaceWeather.ts`) only parses and formats `GetSpaceWeatherJson()`.
+
+The magnetospheres and the CME list are Sol data, gated on `StarSystemCatalog::IsSol()`. The
+sunspot cycle is the active star's `render.star.activity.cycle`.
+
+### 13.1 The model
+
+The model is a function of the date, plus the Kp override and any CME launched by hand. A date
+jump, the scrubber or a capture therefore lands on the same state, and nothing accumulates per
+frame. Distances are true ones (AU, km, planet radii), and the renderer maps them into the
+scene.
+
+| Piece | What it is | Checked by (`tests/test_space_weather.cpp`) |
+|-------|------------|---------------------------------------------|
+| Pressure | P = m_p·n·v², n = 5 cm⁻³ / r² in a 400 km/s slow wind | `QuietWindPressureAtEarthIsAboutOneNanopascal` |
+| Standoff | r_mp = R_p · inflation · ((2B₀)² / 2μ₀P)^(1/6). The factor 2 is the Chapman–Ferraro compression; inflation stands for the Io/Enceladus plasma disc (Jupiter 1.6, Saturn 1.25) | `EarthQuietStandoffIsTenEarthRadii`, `JupiterStandoffIsSixtyToNinetyJovianRadii`, `OtherStandoffsMatchSpacecraftCrossings` |
+| Shape | Shue et al. (1997): r(θ) = r₀ (2 / (1 + cos θ))^α | `ShueMagnetopauseFlaresTowardTheTail` |
+| Ambient wind | Streamer belt (its half-width follows the cycle), fast streams from coronal holes, Parker spiral tan ψ = Ωr cos λ / v | `ParkerSpiralIsFortyFiveDegreesAtEarth` |
+| Kp | coupling = (P/P₀)^(2/3) · (v/v₀) · geoeffectiveness; Kp = 2 + 1.25 log₂(coupling), clamped to 0–9 | `QuietWindGivesTheBaselineKp` |
+| Ovals | Earth: Feldstein–Starkov linearised, with the midnight equatorward edge at 66° at Kp 0 moving down ~2° per Kp. The giants have their own `OvalModel`. The override holds every oval | `EarthOvalMovesEquatorwardWithKp`, `KpOverrideHoldsEveryOval` |
+| Cycle | 11 years from the 2008.9 minimum; Hathaway shape with SILSO amplitudes; Spörer latitude 28° · e^(−t/90 months); two butterfly wings (this cycle and the last) | `SunspotCycleReachesMaximumIn2014`, `SporerLawMovesSpotsEquatorward` |
+| CMEs | Drag-based model (Vršnak 2013). Each catalog event is calibrated so its front reaches Earth at the observed shock and its peak Kp is the observed one. At most 4 are active at once | `HalloweenCmeArrivesWhenObservedAndSaturatesKp`, `CommittedCmeListCalibratesToEveryObservedArrival` |
+
+Kp is the model's. It is not counted from particles reaching the cusps on the GPU: a readback
+would stall the frame, and it would tie Kp to the tier's particle count. The particles are the
+picture, and the precipitating ones carry the model's numbers.
+
+**The CME list.** `resource/spaceweather/cmes.json` is preloaded on web. It holds the curated
+events (Carrington 1859, March 1989, Bastille Day 2000, Halloween 2003 ×2, November 2003, the
+July 2012 near miss, St. Patrick's Day 2015, September 2017, Gannon May 2024, October 2024)
+plus NASA DONKI's Earth-impacting CMEs from 2010 onward, written by
+`scripts/generate-cme-list.mjs`. DONKI's rows are snapshotted in
+`resource/spaceweather/archive/donki.json`, so `--offline` rebuilds without the network and
+`npm run generate:cme-list:check` (CI) fails on drift. "Launch CME now" adds an Earth-directed
+1800 km/s CME with a 50° half-angle at the current date.
+
+### 13.2 Frame flow
+
+```
+Update stage
+ └─ SpaceWeather stage   Application::UpdateSpaceWeather: Evaluate(jd, heliocentric positions)
+                         → SpaceWeatherFrame (FrameContext.h) in SceneSnapshot::spaceWeather
+                         Renderer::UpdateSpaceWeather: star program for the tier + spot uniforms;
+                         if particles > 0, pack MagnetosphereUBO (binding 1) and advect
+                         by transform feedback
+Scene pass               AuroraShell per magnetosphere component (aurora.fs), before the rings
+Foreground               corona, belts, RenderSolarWind (additive points), field lines
+                         (magneticFieldLine.vs squeezes the day side by standoff / quiet standoff),
+                         aurora bloom (Full)
+Observe                  observeSky.fs marches the same common/aurora.glsl shell from the ground
+```
+
+**Particles** (`render/SolarWindRenderer`, `solarWindUpdate.vs`, `solarWind.vs`/`.fs`):
+
+- **Groups.** There are seven: the background stream (45%) and one per magnetosphere
+  (Mercury, Earth and the four giants). Each is culled on its own. The background needs the
+  view, more than 40 px and a camera within 3× the stream's edge; a magnetosphere needs the
+  frustum and a quiet standoff spanning more than 6 px. A culled group neither advects nor
+  draws, so the wind costs nothing at Pluto. A group that comes back into view reseeds.
+- **Buffers.** Each particle is two `vec4`s (32 bytes) in a pair of ping-pong `GlBuffer`s.
+  Each group is updated with `glBindBufferRange` over its slice under `GL_RASTERIZER_DISCARD`,
+  and the transform-feedback buffer is unbound before drawing, because WebGL refuses a buffer
+  bound for feedback and as an attribute at once. WebGL 2 has transform feedback natively, so
+  no `-sFULL_ES3` is needed.
+- **Motion.** The background follows the Parker spiral at the evaluated wind speed. A
+  magnetosphere group's particles deflect round the Shue magnetopause. Those that reach a cusp
+  precipitate down the field to the oval, turning the auroral colour only near its end, and
+  flash on arrival.
+- **Clipping.** Particles whose alpha would add nothing are clipped in the vertex shader. They
+  are most of a group (the faded tail, the far flanks, parcels spawning), and rasterising
+  zeros was most of the draw's fill.
+- **Scale.** True AU reach the scene through `OrbitLayout::AuToSceneKnots()` (the compressed
+  scale's knots, or one linear knot on realistic) in the UBO. On the compressed scale the
+  drawn magnetosphere is capped so its tail (20 standoffs) spans at most 0.35 of the body's
+  distance from the Sun; the ovals and Kp keep their physical values.
+- **Clock.** The visual clock is the frame delta, capped at 0.1 s. It is 0 when paused or in
+  Observe. Parcels move at the wind speed times the orrery's days per second, clamped to
+  0.02–0.25 AU/s, so the stream reads at any time scale.
+
+### 13.3 Aurora
+
+`render.aurora` rows sit on Earth, Jupiter, Saturn, Uranus and Neptune. Each row gives
+`altitudeKm` [bottom, top], `colorLow`, `colorHigh`, `colorEdge` and `brightness`. Earth uses
+O 557.7 nm green below, O 630.0 nm red above, and N₂⁺ 427.8 nm blue-violet on the lower
+border in storms. Jupiter's H₂ bands are drawn blue. `StarSystemFactory` gives each such
+component an `AuroraShell`: a sphere at the top of the layer, placed like the cloud deck but not
+spun, because the oval hangs on the magnetic pole in the Sun's frame.
+
+`aurora.fs` and `observeSky.fs` include `common/aurora.glsl` and differ only in where the ray
+starts:
+
+- **Placement.** The oval sits on the dipole's pole (`MagneticFieldParams` through the body's
+  rotation), with its boundaries from §13.1, cosine-blended from magnetic noon to midnight.
+- **Night side.** Only the night side emits.
+- **Tiers.** `AURORA_ANIMATED` moves the brightness along the oval on `frame.time`, and
+  `AURORA_CURTAINS` adds folded sheets with vertical rays. Neither gives a static ring.
+- **Ray march.** From space the march takes 1, 6 or 14 steps per tier; from the ground in
+  Observe it takes 4, 8 or 16, using the geomagnetic pole at 80.65° N 72.68° W.
+
+### 13.4 Photosphere
+
+`star.fs` declares `PHOTOSPHERE SUNSPOTS`. Without either, the original sprite is unchanged.
+
+- **`PHOTOSPHERE`** animates granulation at three scales on `frame.time`.
+- **`SUNSPOTS`** adds two butterfly wings: this cycle's at `uSpotBands.xy` (latitude,
+  half-width) and the previous cycle's at `.zw`, weighted by `uSpotCoverage`. Spots rotate
+  differentially (Snodgrass) over `uSpotDays` and have umbrae, penumbrae and limb faculae.
+
+The GL test `Photosphere.SunspotsDarkenTheButterflyBandsAndNothingElse` renders the cap at
+maximum and minimum, and checks that only the ±20° wings darken.
+
+### 13.5 Tiers
+
+| Tier | Solar-wind particles | Aurora | Photosphere |
+|------|----------------------|--------|-------------|
+| Low, and every mobile preset | none | static ring | sprite |
+| Medium | 50 000 | animated oval | granulation |
+| Full | 200 000 | curtains + bloom | granulation + spots |
+
+These are `QualitySettings::solarWindParticles`, `auroraMode` and `photosphereMode`. The
+`[Quality]` log line names them.
+
+**Defaults.** The aurora always draws in Sol. The wind is a toggle and is off by default; with
+no particles nothing is packed, uploaded or advected.
+
+**Cost.** Low's frame time is unchanged against the previous build (llvmpipe, interleaved runs:
+p10 29.9 → 30.0 ms, p50 44.8 → 43.0 ms). On Full the wind is two passes of 200k vertices: the
+update and the draw. llvmpipe shades vertices on one thread, so there the wind costs about as
+much as the rest of the frame. That says nothing about a GPU, where 400k vertices is well under
+the shadow pass's 3000² depth fill.
+
+### 13.6 Controls and the page
+
+| | |
+|-|-|
+| Exports (`WasmExports.cpp`) | `SetSolarWind` / `GetSolarWind`, `SetKpOverride` / `GetKpOverride` (< 0: Kp from the wind), `LaunchCmeNow`, `PlaySpaceWeatherEvent(index)`, `JumpToSpaceWeatherDate(iso)`, `GetSpaceWeatherJson()` |
+| `onSettingsChanged` fields | `solarWind`, `kpOverride` |
+| Settings panel | "Space weather" group: solar wind, an "Aurora Kp" slider (far left is Auto), "Launch CME now". Persisted with the panel |
+| Sky-event chip | "Next geomagnetic storm" with "Play storm". Past the catalog's end (today, by default) it offers the latest catalogued storm instead. `PlaySpaceWeatherEvent` goes to just before the launch, turns the wind on and slows the clock so the transit takes about 8 s |
+| Storm card | `educationalLayer.ts` `initStormCard`: while Earth's Kp ≥ 5 or a CME is on its way to Earth, it shows the oval latitude, the standoff, the wind and the CME front, polled from `GetSpaceWeatherJson()` |
+| Deep link | `?kp=7&cme=2003-10-29T06:00Z&wind=1`. `cme=` takes an ISO-8601 UTC date or instant, which C++ parses (`SpaceWeather::ParseIsoUtc`), and turns the wind on; "Copy view link" writes `wind=` and `kp=` |
+| Native | `SOLARSYSTEM_SOLAR_WIND=0\|1`, `SOLARSYSTEM_KP=<0–9>`, `SOLARSYSTEM_CME=<ISO>` |
+
+The acceptance case is the link above. At the first Halloween CME's arrival, Earth's oval
+reaches ~50° magnetic latitude, and the day side is compressed within an hour of the shock
+(standoff below 0.8 of quiet; `HalloweenCmeArrivesWhenObservedAndSaturatesKp`).
+
+## 14. Common pitfalls
 
 1. Do not use a blocking main loop on WASM.
 2. Do not spawn `std::thread` in the web build.
@@ -1571,7 +1735,7 @@ RequestSystemJump(id)       Out 0.9 s: fade to the departing star's colour, then
 
 ---
 
-## 14. Local verification (summary)
+## 15. Local verification (summary)
 
 ```bash
 ./build-web.sh
@@ -1603,7 +1767,7 @@ Full scenarios: [docs/plans/TESTING_GUIDE.md](plans/TESTING_GUIDE.md).
 
 ---
 
-## 15. Related documentation
+## 16. Related documentation
 
 | Document | Purpose |
 |----------|---------|

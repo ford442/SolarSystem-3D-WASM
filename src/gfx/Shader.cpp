@@ -1,6 +1,8 @@
 #include "Shader.h"
 #include "GlCapabilities.h"
+#include "GlPlatform.h"
 #include "FrameUniforms.h"
+#include "SpaceWeatherUniforms.h"
 #include "../core/Log.h"
 #include <algorithm>
 #include <cstring>
@@ -65,6 +67,9 @@ std::string ShaderSpec::Describe() const {
             description += (i > 0 ? " " : "") + defines[i];
         }
         description += "]";
+    }
+    if (!feedbackVaryings.empty()) {
+        description += " -> feedback";
     }
     return description;
 }
@@ -163,6 +168,14 @@ void Shader::SubmitStages() {
     if (pending->geometry) {
         glAttachShader(program, pending->geometry.get());
     }
+    if (!_spec.feedbackVaryings.empty()) {
+        std::vector<const char*> names;
+        names.reserve(_spec.feedbackVaryings.size());
+        for (const std::string& name : _spec.feedbackVaryings) {
+            names.push_back(name.c_str());
+        }
+        glTransformFeedbackVaryings(program, static_cast<GLsizei>(names.size()), names.data(), GL_INTERLEAVED_ATTRIBS);
+    }
     glLinkProgram(program);
     _pending = std::move(pending);
 }
@@ -242,6 +255,10 @@ void Shader::Introspect(const std::vector<ShaderSource::SamplerBinding>& sampler
     _usesFrameUniforms = frameBlock != GL_INVALID_INDEX;
     if (_usesFrameUniforms) {
         glUniformBlockBinding(program, frameBlock, FrameUniformBuffer::kBinding);
+    }
+    const GLuint spaceWeatherBlock = glGetUniformBlockIndex(program, "MagnetosphereUBO");
+    if (spaceWeatherBlock != GL_INVALID_INDEX) {
+        glUniformBlockBinding(program, spaceWeatherBlock, SpaceWeatherUniformBuffer::kBinding);
     }
 }
 

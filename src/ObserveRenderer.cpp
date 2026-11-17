@@ -1,10 +1,12 @@
 // Observe-mode drawing on the Renderer side: view setup for the ObserveSky pass and the
 // text overlay (compass, body names, readout). The sky itself is Solar_System/ObserveSky.cpp.
 #include "Renderer.h"
+#include "FrameContext.h"
 #include "astro/SeatedView.h"
 #include "astro/Observer.h"
 #include "render/TextRenderer.h"
 #include "Solar_System/Atmosphere.h"
+#include "Solar_System/BodyCatalog.h"
 #include "Solar_System/OrbitLayout.h"
 #include <algorithm>
 #include <cmath>
@@ -65,8 +67,26 @@ void Renderer::RenderObserveSky(const FrameContext& ctx) {
         air.steps = _pbrAtmosphereSteps;
         airPtr = &air;
     }
+    // Earth's aurora overhead: the oval the orbit view's shell draws (docs/ARCHITECTURE.md §13).
+    ObserveSky::Aurora aurora;
+    const ObserveSky::Aurora* auroraPtr = nullptr;
+    const SpaceWeatherFrame::Body* earth =
+        ctx.scene.spaceWeather ? ctx.scene.spaceWeather->Find(static_cast<int>(OrbitLayout::Body::Earth)) : nullptr;
+    if (const BodyCatalog::AuroraRow* row = BodyCatalog::FindAurora("earth"); earth && row) {
+        aurora.ovalRad = earth->ovalRad;
+        aurora.bottom = earth->shellBottom;
+        aurora.top = earth->shellTop;
+        aurora.kp = earth->kp;
+        aurora.brightness = row->brightness;
+        aurora.time = static_cast<float>(ctx.sim.animationSeconds);
+        aurora.mode = ctx.scene.spaceWeather->auroraMode;
+        aurora.colorLow = glm::vec3(row->colorLow.r, row->colorLow.g, row->colorLow.b);
+        aurora.colorHigh = glm::vec3(row->colorHigh.r, row->colorHigh.g, row->colorHigh.b);
+        aurora.colorEdge = glm::vec3(row->colorEdge.r, row->colorEdge.g, row->colorEdge.b);
+        auroraPtr = &aurora;
+    }
     _observeSky->SetConstellationsVisible(ctx.scene.observe && ctx.scene.observe->constellations);
-    _observeSky->Render(*ctx.scene.observeSky, frame, ctx.scene.observeMoonTexture, airPtr);
+    _observeSky->Render(*ctx.scene.observeSky, frame, ctx.scene.observeMoonTexture, airPtr, auroraPtr);
 
 #ifdef __EMSCRIPTEN__
     if (ctx.xr) {
