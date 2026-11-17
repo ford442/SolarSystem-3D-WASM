@@ -10,6 +10,7 @@
 #include "SimState.h"
 #include "WasmExports.h"
 #include "assets/TextureLoadingQueue.h"
+#include "assets/UploadQueue.h"
 #include "Solar_System/OrbitLayout.h"
 #include "Solar_System/SceneScale.h"
 #include "core/Log.h"
@@ -68,6 +69,7 @@ void Application::RunOneFrame() {
 
         // Update progress bar
         UpdateLoadingProgress();
+        PumpUploads();
 
         if (_resourcesPending <= 0) {
              LOG_INFO("Loading", "All resources downloaded. Initializing scene...");
@@ -125,6 +127,7 @@ void Application::RunOneFrame() {
     if (_xr.active) {
         RenderXrStereoFrame();
         TextureLoadingQueue::GetInstance().ProcessQueue();
+        PumpUploads();
 #ifdef SOLARSYSTEM_USE_SDL_MIXER
         UpdateBackgroundMusic();
 #endif
@@ -140,6 +143,7 @@ void Application::RunOneFrame() {
     _renderer.RenderHud(FrameContextFor(0));
 
     TextureLoadingQueue::GetInstance().ProcessQueue();
+    PumpUploads();
     if (!_capture.active) {
         _renderer.RenderTextureLoadingProgress(FrameContextFor(0));
     }
@@ -151,6 +155,48 @@ void Application::RunOneFrame() {
     glfwSwapBuffers(_mainWindow);
     glfwPollEvents();
     EndFrame();
+}
+
+#ifdef __EMSCRIPTEN__
+namespace {
+// `?uploadkb=N` on the page, or -1. (EM_JS is JavaScript: keep clang-format out.)
+// clang-format off
+EM_JS(int, UploadBudgetQueryKb, (), {
+    try {
+        const value = new URLSearchParams(location.search).get('uploadkb');
+        const parsed = value ? parseInt(value, 10) : NaN;
+        return isNaN(parsed) ? -1 : parsed;
+    } catch (e) {
+        return -1;
+    }
+});
+// clang-format on
+} // namespace
+#endif
+
+std::size_t Application::UploadBudgetBytes() const {
+    // A phone's WebGL texImage2D runs a few hundred MB/s once ANGLE's copies are counted, so
+    // 2 MB is a few ms of a 33 ms frame; desktop WebGL and native GL move far more per ms.
+    static const long overrideKb = [] {
+#ifdef __EMSCRIPTEN__
+        return static_cast<long>(UploadBudgetQueryKb());
+#else
+        const char* value = std::getenv("SOLARSYSTEM_UPLOAD_BUDGET_KB");
+        return value ? std::atol(value) : -1L;
+#endif
+    }();
+    if (overrideKb > 0) {
+        return static_cast<std::size_t>(overrideKb) * 1024;
+    }
+#ifdef __EMSCRIPTEN__
+    return std::size_t{_simState.isMobileWeb ? 2u : 8u} * 1024 * 1024;
+#else
+    return std::size_t{32} * 1024 * 1024;
+#endif
+}
+
+void Application::PumpUploads() {
+    UploadQueue::Get().Pump(UploadBudgetBytes());
 }
 
 void Application::EndFrame() {

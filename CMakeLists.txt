@@ -75,6 +75,7 @@ set(SOLARSYSTEM_SOURCES_AUX
     src/core/Camera.cpp
     src/core/CameraNavigation.cpp
     src/core/FrameTimer.cpp
+    src/core/JobSystem.cpp
     # gfx/: GL objects and programs
     src/gfx/Shader.cpp
     src/gfx/ShaderLibrary.cpp
@@ -112,6 +113,8 @@ set(SOLARSYSTEM_SOURCES_AUX
     src/assets/PlanetManifestLoader.cpp
     src/assets/TextureFormatSupport.cpp
     src/assets/BlockCompression.cpp
+    src/assets/TextureDecode.cpp
+    src/assets/UploadQueue.cpp
     # astro/: ephemerides, sky events, catalogs, field models (GL-free)
     src/astro/Ephemeris.cpp
     src/astro/SkyEvents.cpp
@@ -328,6 +331,7 @@ else()
     find_package(SDL2_mixer REQUIRED)
     find_package(Freetype REQUIRED)
     find_package(assimp REQUIRED)
+    find_package(Threads REQUIRED)
 
     target_compile_definitions(${PROJECT_NAME} PRIVATE SOLARSYSTEM_USE_SDL_MIXER)
 
@@ -340,6 +344,7 @@ else()
         SDL2_mixer::SDL2_mixer
         Freetype::Freetype
         assimp::assimp
+        Threads::Threads
     )
 endif()
 

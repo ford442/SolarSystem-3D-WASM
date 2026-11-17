@@ -62,8 +62,7 @@ void Application::ApplyOrbitScaleMode(int mode) {
 }
 
 void Application::UpdateLOD() {
-#ifdef __EMSCRIPTEN__
-    if (_renderableSceneComponents.empty()) return;
+    if (_renderableSceneComponents.empty() || !TextureLodStreamingEnabled()) return;
 
     const glm::vec3 camPos = CameraRenderPosition();
     const TextureLodPolicy policy = GetTextureLodPolicy(_simState.qualityPreset, _simState.isMobileWeb);
@@ -96,5 +95,4 @@ void Application::UpdateLOD() {
             rc.clouds->LoadHighResIfClose(camPos, policy);
         }
     }
-#endif
 }

@@ -29,9 +29,13 @@ set(SOLARSYSTEM_TEST_SOURCES
     ${CMAKE_SOURCE_DIR}/src/assets/WebResourceFetcher.cpp
     ${CMAKE_SOURCE_DIR}/src/assets/TextureFormatSupport.cpp
     ${CMAKE_SOURCE_DIR}/src/assets/BlockCompression.cpp
+    ${CMAKE_SOURCE_DIR}/src/assets/TextureDecode.cpp
+    ${CMAKE_SOURCE_DIR}/src/assets/UploadQueue.cpp
     ${CMAKE_SOURCE_DIR}/src/3rdparty/ktx2_reader.cpp
+    ${CMAKE_SOURCE_DIR}/src/3rdparty/nv_dds.cpp
     ${CMAKE_SOURCE_DIR}/src/gfx/ShaderSource.cpp
     ${CMAKE_SOURCE_DIR}/src/core/Log.cpp
+    ${CMAKE_SOURCE_DIR}/src/core/JobSystem.cpp
     ${CMAKE_SOURCE_DIR}/src/core/Camera.cpp
     ${CMAKE_SOURCE_DIR}/src/core/CameraNavigation.cpp
     ${CMAKE_SOURCE_DIR}/src/gfx/SurfacePatch.cpp
@@ -77,6 +81,9 @@ add_executable(SolarSystemTests
     test_frustum.cpp
     test_shadow_fit.cpp
     test_log.cpp
+    test_job_system.cpp
+    test_texture_decode.cpp
+    test_upload_queue.cpp
     stub_texture_image2d.cpp
     ${SOLARSYSTEM_TEST_SOURCES}
 )
@@ -94,7 +101,8 @@ endif()
 # create a context: a default-constructed handle is empty and deletes nothing.
 find_package(OpenGL REQUIRED)
 find_package(GLEW REQUIRED)
-target_link_libraries(SolarSystemTests PRIVATE GTest::gtest_main OpenGL::GL GLEW::GLEW)
+find_package(Threads REQUIRED)
+target_link_libraries(SolarSystemTests PRIVATE GTest::gtest_main OpenGL::GL GLEW::GLEW Threads::Threads)
 
 include(GoogleTest)
 gtest_discover_tests(SolarSystemTests)
@@ -106,6 +114,7 @@ find_package(glfw3 REQUIRED)
 add_executable(SolarSystemGlTests
     gl/test_gl.cpp
     ${CMAKE_SOURCE_DIR}/src/core/Log.cpp
+    ${CMAKE_SOURCE_DIR}/src/core/JobSystem.cpp
     ${CMAKE_SOURCE_DIR}/src/gfx/Shader.cpp
     ${CMAKE_SOURCE_DIR}/src/gfx/ShaderSource.cpp
     ${CMAKE_SOURCE_DIR}/src/gfx/GlCapabilities.cpp
@@ -117,6 +126,8 @@ add_executable(SolarSystemGlTests
     ${CMAKE_SOURCE_DIR}/src/assets/WebResourceFetcher.cpp
     ${CMAKE_SOURCE_DIR}/src/assets/TextureFormatSupport.cpp
     ${CMAKE_SOURCE_DIR}/src/assets/BlockCompression.cpp
+    ${CMAKE_SOURCE_DIR}/src/assets/TextureDecode.cpp
+    ${CMAKE_SOURCE_DIR}/src/assets/UploadQueue.cpp
     ${CMAKE_SOURCE_DIR}/src/3rdparty/nv_dds.cpp
     ${CMAKE_SOURCE_DIR}/src/3rdparty/ktx2_reader.cpp
     ${CMAKE_SOURCE_DIR}/src/Solar_System/CatalogMaterialVariants.cpp

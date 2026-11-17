@@ -1,14 +1,9 @@
 #include "TextureLODController.h"
+#include "../QualitySettings.h"
 #include "../gfx/TextureImage2D.h"
 #include "../core/Log.h"
 #include <glm/geometric.hpp>
 #include <utility>
-
-#if defined(__EMSCRIPTEN__) || defined(SOLARSYSTEM_BUILD_TESTS)
-#define SOLARSYSTEM_TEXTURE_LOD_ENABLED 1
-#else
-#define SOLARSYSTEM_TEXTURE_LOD_ENABLED 0
-#endif
 
 void TextureLODController::Configure(TextureImage2D& texture,
                                      std::string lowPath,
@@ -76,7 +71,14 @@ void TextureLODController::ApplyTier(TextureLodTier tier) {
     if (!_texture || !HasPath(tier)) {
         return;
     }
-    _texture->ReloadTexture(PathForTier(tier));
+    // A downgrade decodes off the main thread too (a CPU-decoded Mid map is tens of ms on a
+    // phone). The tier counts as resident now; the higher one stays drawn until it swaps.
+    _texture->ReloadTextureAsync(PathForTier(tier), [label = _label, tier](TextureImage2D::AsyncResult result) {
+        if (result == TextureImage2D::AsyncResult::Failed) {
+            LOG_WARN("LOD", "[%s] Could not apply %s (keeping the texture drawn now)", label.c_str(),
+                     TextureLodTierName(tier));
+        }
+    });
     _residentTier = tier;
 }
 
@@ -127,8 +129,7 @@ void TextureLODController::QueueTier(TextureLodTier tier) {
 
 void TextureLODController::Update(const glm::vec3& cameraPosition, const glm::vec3& objectPosition, float threshold,
                                   TextureLodTier allowedMax) {
-#if SOLARSYSTEM_TEXTURE_LOD_ENABLED
-    if (!_texture) {
+    if (!_texture || !TextureLodStreamingEnabled()) {
         return;
     }
 
@@ -196,12 +197,6 @@ void TextureLODController::Update(const glm::vec3& cameraPosition, const glm::ve
     if (next == TextureLodTier::High && distance < threshold * 0.5f) {
         QueueTier(TextureLodTier::High);
     }
-#else
-    (void)cameraPosition;
-    (void)objectPosition;
-    (void)threshold;
-    (void)allowedMax;
-#endif
 }
 
 #ifdef SOLARSYSTEM_BUILD_TESTS

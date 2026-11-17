@@ -1,4 +1,5 @@
 #include "Application.h"
+#include "core/JobSystem.h"
 #include "core/Log.h"
 #include <clocale>
 #include <exception>
@@ -18,6 +19,9 @@ int main(int, char**) {
     // but usually fine. If text encoding is weird, try commenting this out.
     setlocale(LC_ALL, "RUS");
     Log::InitFromEnvironment();
+    // Before anything submits work: texture decodes, model parses and catalogue loads run on
+    // the pool (SOLARSYSTEM_JOBS / ?jobs= sets its size; 0 runs them inline).
+    Jobs::Start();
 
 #ifdef __EMSCRIPTEN__
     // Heap-allocate so a returning Exec() (possible with -fwasm-exceptions +

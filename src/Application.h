@@ -21,6 +21,7 @@
 #include "gfx/ShadowFit.h"
 #include <array>
 #include <atomic>
+#include <cstddef>
 #include <functional>
 #include <optional>
 #include <string>
@@ -399,6 +400,10 @@ private:
     void BuildFrameSnapshot(int viewCount);
     /** The passes' view of frame state for view `view`; valid until the next BuildFrameSnapshot. */
     FrameContext FrameContextFor(int view) const;
+    /** Run this frame's share of the job-fed GPU uploads (assets/UploadQueue.h, UploadBudgetBytes()). */
+    void PumpUploads();
+    /** Bytes PumpUploads may put on the GPU per frame: ?uploadkb= / SOLARSYSTEM_UPLOAD_BUDGET_KB, else by platform. */
+    std::size_t UploadBudgetBytes() const;
     void EndFrame();           // Count the frame for the FPS HUD; native: apply the frame limiter
 #ifdef __EMSCRIPTEN__
     void RenderXrStereoFrame();

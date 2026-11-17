@@ -5,6 +5,7 @@
 #include <algorithm>
 #include <chrono>
 #include <cmath>
+#include <utility>
 
 #ifdef __EMSCRIPTEN__
 #include <emscripten/heap.h>
@@ -94,14 +95,6 @@ void TextureLoadingQueue::SetMaxConcurrentLoads(int maxConcurrentLoads) {
     ProcessQueue();
 }
 
-void TextureLoadingQueue::FinishJob(TextureLoadJob job, bool success, bool didRetry) {
-    if (!didRetry) {
-        if (success) {
-            _pendingPaths.erase(job.path);
-        }
-    }
-}
-
 void TextureLoadingQueue::HandleDownloadResult(TextureLoadJob job, bool success) {
     if (_cancelledPaths.erase(job.path)) {
         _pendingPaths.erase(job.path);
@@ -110,41 +103,65 @@ void TextureLoadingQueue::HandleDownloadResult(TextureLoadJob job, bool success)
         return;
     }
 
-    if (success) {
-        try {
-            if (job.targetTexture) {
-                job.targetTexture->ReloadTexture(job.path);
-                LOG_DEBUG("TextureLoadingQueue", "Successfully loaded: %s", job.textureId.c_str());
-                _totalCompleted++;
-                _categoryCompleted.at(static_cast<size_t>(job.category))++;
-                if (job.callback) job.callback(true);
-                FinishJob(job, true, false);
-                return;
-            }
-        } catch (const std::exception& e) {
-            LOG_WARN("TextureLoadingQueue", "Failed to load texture %s: %s", job.textureId.c_str(), e.what());
-            success = false;
-        }
+    if (success && job.targetTexture) {
+        // Decode in a job, upload under the frame budget (TextureImage2D::ReloadTextureAsync);
+        // the load stays "active" until the texture is swapped in, so the concurrency limit
+        // also bounds how many decoded payloads wait in memory.
+        ++_activeLoads;
+        TextureImage2D* target = job.targetTexture;
+        const std::string path = job.path;
+        target->ReloadTextureAsync(
+            path,
+            [this, job](TextureImage2D::AsyncResult result) mutable {
+                --_activeLoads;
+                HandleTextureApplied(std::move(job), result);
+                ProcessQueue();
+            },
+            [this, path] { return _cancelledPaths.count(path) == 0; });
+        return;
     }
 
+    RetryOrFail(std::move(job));
+}
+
+void TextureLoadingQueue::HandleTextureApplied(TextureLoadJob job, TextureImage2D::AsyncResult result) {
+    switch (result) {
+        case TextureImage2D::AsyncResult::Uploaded:
+            LOG_DEBUG("TextureLoadingQueue", "Successfully loaded: %s", job.textureId.c_str());
+            _totalCompleted++;
+            _categoryCompleted.at(static_cast<size_t>(job.category))++;
+            _pendingPaths.erase(job.path);
+            if (job.callback) job.callback(true);
+            return;
+        case TextureImage2D::AsyncResult::Superseded:
+            // Cancelled while it decoded, or a newer reload of the same texture won.
+            _cancelledPaths.erase(job.path);
+            _pendingPaths.erase(job.path);
+            _totalCancelled++;
+            if (job.callback) job.callback(false);
+            return;
+        case TextureImage2D::AsyncResult::Failed:
+            LOG_WARN("TextureLoadingQueue", "Failed to load texture %s", job.textureId.c_str());
+            RetryOrFail(std::move(job));
+            return;
+    }
+}
+
+void TextureLoadingQueue::RetryOrFail(TextureLoadJob job) {
     LOG_WARN("TextureLoadingQueue", "Failed to download %s (will keep previous texture)", job.textureId.c_str());
 
-    bool didRetry = false;
     if (job.retries < job.maxRetries) {
         job.retries++;
         const auto delay = std::chrono::milliseconds(250 * (1 << std::min(job.retries - 1, 3)));
         job.nextAttemptTime = std::chrono::steady_clock::now() + delay;
-        _queue.push(job);
         LOG_INFO("TextureLoadingQueue", "Queued retry %d/%d for %s", job.retries, job.maxRetries,
                  job.textureId.c_str());
-        didRetry = true;
-    } else {
-        _totalFailed++;
-        if (job.callback) job.callback(false);
-        _pendingPaths.erase(job.path);
+        _queue.push(std::move(job));
+        return;
     }
-
-    FinishJob(job, false, didRetry);
+    _totalFailed++;
+    if (job.callback) job.callback(false);
+    _pendingPaths.erase(job.path);
 }
 
 void TextureLoadingQueue::ProcessQueue() {
