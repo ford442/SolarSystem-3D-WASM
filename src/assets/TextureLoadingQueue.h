@@ -9,7 +9,7 @@
 #include <chrono>
 #include <array>
 
-class TextureImage2D;
+#include "../gfx/TextureImage2D.h"
 
 enum class TextureLoadCategory {
     Planet,
@@ -76,8 +76,9 @@ private:
     std::string _currentPath;
 
     int GetEffectiveMaxConcurrentLoads();
-    void FinishJob(TextureLoadJob job, bool success, bool didRetry);
     void HandleDownloadResult(TextureLoadJob job, bool success);
+    void HandleTextureApplied(TextureLoadJob job, TextureImage2D::AsyncResult result);
+    void RetryOrFail(TextureLoadJob job);
 
     // Dedup + cancel support for resilience against repeated LOD checks and camera movement.
     std::unordered_set<std::string> _pendingPaths;

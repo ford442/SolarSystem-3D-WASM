@@ -32,6 +32,10 @@ struct GlCapabilities {
     // and GL_COMPLETION_STATUS_KHR says when one is done (Shader::IsReady).
     bool parallelShaderCompile = false;
     int maxTextureSize = 2048;
+    // GL_TIME_ELAPSED queries (gfx/GpuTimer.h): core GL 3.3 natively, and on the web
+    // EXT_disjoint_timer_query_webgl2, which the probe enables. Browsers that hide it (it
+    // is a timing side channel) leave the perf HUD's GPU column empty.
+    bool gpuTimerQuery = false;
 
     TextureFormats::FormatCapabilities ToFormatCapabilities() const {
         return {s3tcCompressedTextures, bptcCompressedTextures,

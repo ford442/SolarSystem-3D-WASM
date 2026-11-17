@@ -66,6 +66,14 @@ AntialiasPath ResolveAntialiasPath(bool hdrEnabled, int contextSamples);
 const char* AntialiasPathName(AntialiasPath path);
 
 std::string GetTexturePath(const std::string& lowRes, const std::string& highRes);
+/**
+ * Whether LOD-managed textures start at their low tier and stream up through
+ * TextureLODController (decode in a job, upload under the frame budget). Always on the web;
+ * native opts in with SOLARSYSTEM_TEXTURE_LOD=1 and otherwise loads the high tier at start-up.
+ */
+bool TextureLodStreamingEnabled();
+/** The path an LOD-managed texture is first built from: the low tier when streaming, else GetTexturePath. */
+std::string GetLodStartTexturePath(const std::string& lowRes, const std::string& highRes);
 QualityTierSettings GetQualitySettings(int preset, bool mobile);
 /**
  * What the quality tier allows the texture LOD controllers: the highest tier they may

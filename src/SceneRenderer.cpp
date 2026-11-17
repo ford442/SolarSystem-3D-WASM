@@ -3,6 +3,7 @@
 // camera and the scene comes in through its FrameContext (FrameContext.h).
 #include "Solar_System/TexturePaths.h"
 #include "Renderer.h"
+#include "render/MagneticFieldTraceJobs.h" // IWYU pragma: keep (~Renderer destroys the unique_ptr)
 #include "gfx/TextureUnits.h"
 #include "JsBridge.h"
 #include "QualitySettings.h"

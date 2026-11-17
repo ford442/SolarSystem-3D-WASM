@@ -24,7 +24,7 @@ TextureImage2D LoadLodTexture(const char* textureId) {
         return TextureImage2D();
     }
     const TexturePaths::Paths paths = TexturePaths::ForTextureId(textureId);
-    return TextureImage2D(GetTexturePath(paths.low, paths.high));
+    return TextureImage2D(GetLodStartTexturePath(paths.low, paths.high));
 }
 
 PlanetInfo MakePlanetInfo(const MeshHolder& sphereModel, const BodyCatalog::Entry& entry) {
@@ -181,8 +181,8 @@ void Application::InitCatalogSystem(const MeshHolder& sphereModel, const std::st
         const TexturePaths::Paths cloudNormal = TexturePaths::ForTextureId(
             primary->cloudLayer.normal ? primary->cloudLayer.normal : primary->cloudLayer.diffuse);
         CloudsInfo cloudsInfo(sphereModel, primary->cloudLayer.scaleFactor,
-                              TextureImage2D(GetTexturePath(cloudDiffuse.low, cloudDiffuse.high)),
-                              TextureImage2D(GetTexturePath(cloudNormal.low, cloudNormal.high)));
+                              TextureImage2D(GetLodStartTexturePath(cloudDiffuse.low, cloudDiffuse.high)),
+                              TextureImage2D(GetLodStartTexturePath(cloudNormal.low, cloudNormal.high)));
         component.clouds = std::make_unique<CatalogClouds>(std::move(cloudsInfo), planet, *primary);
     }
 
@@ -191,7 +191,7 @@ void Application::InitCatalogSystem(const MeshHolder& sphereModel, const std::st
             MeshHolder ringModel(ringSpec->modelPath);
             const TexturePaths::Paths ringTex = TexturePaths::ForTextureId(ringSpec->textureId);
             PlanetaryRingInfo ringInfo(ringModel, ringSpec->innerRadius, ringSpec->outerRadius,
-                                       TextureImage2D(GetTexturePath(ringTex.low, ringTex.high)));
+                                       TextureImage2D(GetLodStartTexturePath(ringTex.low, ringTex.high)));
             if (BodyCatalog::StrEq(primary->id, "saturn")) {
                 component.planetaryRing = std::make_unique<SaturnRing>(std::move(ringInfo), planet);
             } else if (BodyCatalog::StrEq(primary->id, "uranus")) {

@@ -262,6 +262,15 @@ After a planet is `READY`, it renders with **low-res** textures (`GetTexturePath
 
 Loads are deduplicated, cancellable on camera retreat, concurrency-capped by quality preset, and reported through `window.updateStreamingProgress(completed, total, active, tierCode)` (`tierCode`: 0 generic, 1 mid, 2 high).
 
+**Off the main thread (§7.7).** A tier swap reads the file's bytes on the main thread,
+decodes it in a job (`assets/TextureDecode`: DDS/KTX2 parse, CPU DXT decode, WebGL RGB
+widening) and uploads it through `assets/UploadQueue` under the per-frame byte budget,
+in row bands across frames when it is bigger than one frame's budget. The old texture is
+drawn until the new one is complete, and a load counts against the concurrency cap until
+it is swapped in, so the cap also bounds decoded payloads held in memory. Natively the same
+streaming is opt-in (`SOLARSYSTEM_TEXTURE_LOD=1`); by default native loads the high tier at
+start-up, as it always has.
+
 **Mipmap safety:** every upload path — `nv_dds`, the KTX2 reader, and the software BC decoder — sets `GL_TEXTURE_BASE_LEVEL=0` and `GL_TEXTURE_MAX_LEVEL` to the last uploaded mip level. Incomplete mip chains cause black textures on WebGL 2.
 
 ### 4.4 Texture formats and packs
@@ -560,7 +569,28 @@ units from the Sun — Uranus and beyond on realistic scale.)
 
 At debug level (§7.6) the `[FrameStats]` line logs, every N frames (`SOLARSYSTEM_FRAME_STATS=N`,
 120 by default), the previous frame's simulate count, view binds, shadow passes, component and
-body draws, culled components and `glUniform*` calls.
+body draws, culled components and `glUniform*` calls, and a second line with the frame's
+profile (`core/FrameProfile.h`): wall time, CPU and GPU milliseconds per stage, job-pool
+counters, upload bytes and the slow-frame count.
+
+**Stages.** `update` (simulate, snapshot, terrain, cull), `background`, `shadow`, `scene`
+(colour passes), `foreground` (corona, belts, field lines, lens flare, HDR), `hud` and
+`uploads` (texture queue and the upload pump). `Application::TimeStage` brackets each hook:
+CPU with `steady_clock`, GPU with `gfx/GpuTimer` (`GL_TIME_ELAPSED`; on the web
+`EXT_disjoint_timer_query_webgl2`, probed and enabled in `GlCapabilities::gpuTimerQuery`).
+A stage that runs many times a frame (shadow and scene alternate per component) is the sum
+of its brackets, one query each. Time queries cannot nest, so a bracket opened inside
+another is ignored. The query sets are double-buffered and read back a frame or more late:
+a set whose results are not ready yet costs that frame its GPU sample rather than stalling
+it, and a WebGL disjoint event throws away the frames it overlapped. The GPU timers are off
+unless something reads them: natively at debug log level (or `SOLARSYSTEM_GPU_TIMERS=1`), on
+the web from the perf HUD.
+
+**Perf HUD.** `?perf=1` turns on the GPU timers and shows `web/src/perfHud.ts`'s overlay:
+frame time and the worst frame since the last refresh (4 Hz), CPU/GPU per stage, the job
+pool and the upload pump. It reads `GetFrameStatsJson()` (`WasmExports.cpp`), whose JSON
+is `FrameProfile::ToJson`; `window.__solarSystemPerf.latest()` returns the parsed stats for
+scripts. "Slow" is over 33.4 ms (30 fps).
 
 ### 7.6 Logging
 
@@ -581,6 +611,70 @@ and only a broken invariant (a required asset that is missing, an incomplete fra
 shader that fails to compile) is `error`. That keeps `console.error` meaningful for the smoke
 test's error filter. Use `LOG_*` rather than `std::cout`/`std::cerr`. The parsers that used to
 `catch (...)` around `std::stod` now use `strtod` and report a malformed number as a parse error.
+
+### 7.7 Job system and the upload budget
+
+`core/JobSystem.h` is a fixed pool of `hardware_concurrency() - 1` workers (capped at 64):
+`Jobs::Submit(fn)` returns a `Jobs::Future<T>` whose `Get()` hands back the value or
+rethrows the job's exception, and `Jobs::Drain()` waits for everything submitted. Jobs run
+FIFO. A main thread that waits on a future runs queued jobs meanwhile, so a wait never
+deadlocks the pool. With no workers (`SOLARSYSTEM_JOBS=0` natively, `?jobs=0` on the web,
+or a web page that cannot start workers) `Submit` runs the job inline and returns a ready
+future, so every caller works the same without threads.
+
+**What runs in jobs:**
+
+| Work | Job | Main thread |
+|---|---|---|
+| Textures (tier swaps, staged loads) | DDS/KTX2 parse, CPU DXT decode → `TexturePayload` | read bytes, budgeted upload (`TextureImage2D::ReloadTextureAsync`) |
+| Models | Assimp parse from memory → `MeshPayload` (`assets/ModelCache`), started as each core download lands | read bytes, VAO/VBO upload in `MeshHolder` |
+| Mission catalogue | JSON parse, started in the `Application` constructor | take the result in `LoadMissionCatalog` |
+| Star catalogue, constellations | JSON parse, started by `ObserveSky`'s constructor | build the sprite and line VBOs on the first Observe frame |
+| Magnetic field lines | `MagneticFieldTracer::Trace`, one job per body | upload the ribbons once the whole set is in (a frame or so later) |
+
+The nearest-planet search, `WebResourceFetcher` and every GL call stay on the main thread.
+The asteroid instance tables (0.7 ms) are not worth a job.
+
+**GL stays main-thread.** A job produces CPU payloads only. `scripts/check-gl-handles.sh`
+rejects a `gl*` call or a `Gl*::Create` written inside a `Jobs::Submit(...)` argument, and
+`GlHandle` asserts `Jobs::IsMainThread()` in debug builds. MEMFS is not shared with workers
+either, so file bytes are read on the main thread and moved into the job.
+
+**Upload budget.** `assets/UploadQueue` holds main-thread upload tasks; a task is skipped
+until its job has finished. `Application::PumpUploads` runs it every frame (during loading
+too) under `UploadBudgetBytes()`: 2 MB on mobile web, 8 MB on desktop web, 32 MB natively,
+overridden by `?uploadkb=` / `SOLARSYSTEM_UPLOAD_BUDGET_KB`. The first step of a frame always
+runs, so an item larger than the budget still makes progress. A texture that fits uploads
+level by level, as the synchronous loader does. A larger one gets immutable storage
+(`glTexStorage2D`) and is filled in row bands with `glTex[Compressed]SubImage2D` over
+several frames. The `TextureImage2D` being reloaded keeps drawing its old texture until the
+new one is complete. A move, a later reload or the object's destruction supersedes a pending
+one (an `AsyncSlot` holds the owner and a generation instead of `this`).
+
+**Web threads.** Workers need shared Wasm memory, and a browser posts shared memory to a
+worker only from a cross-origin isolated page (verified in Chromium: without isolation,
+creating the memory works but the post throws "SharedArrayBuffer transfer requires
+self.crossOriginIsolated"). One pthread binary therefore cannot serve both kinds of page.
+The build makes two: `SolarSystem.wasm` (no pthreads, jobs inline) and `SolarSystem-mt.wasm`
+(`-DSOLARSYSTEM_WEB_THREADS=ON`, preset `web-release-mt`: `-pthread`,
+`PTHREAD_POOL_SIZE` = cores − 1 on an isolated page and 0 otherwise, `PROXY_TO_PTHREAD=0`,
+`ENVIRONMENT=web,worker`, linked against Assimp's own `-pthread` build in
+`external/assimp/build-wasm-mt`). `web/src/wasmVariant.ts` picks the threaded one when
+`crossOriginIsolated` is true and the URL has no `?jobs=0`. Its glue lives in `public/`
+because its workers import the same file again by URL, so Vite must not bundle it. Both
+variants preload the same files and share `SolarSystem.data`: `build-web.sh` refuses to
+deploy if the two packages differ. If `SolarSystem-mt.js` is missing (`build-web.sh
+--no-threads`), the page falls back to the single-threaded build after one failed import.
+The headers are in [CROSS_ORIGIN_HEADERS.md](CROSS_ORIGIN_HEADERS.md) (Option B).
+
+**Smoke runs.** `playwright.config.ts` runs every spec twice against the same build. The
+`threaded` project uses the isolated preview (port 4173), and `e2e/jobs.spec.ts` asserts
+that workers started. The `single` project uses a preview without isolation headers
+(`SOLARSYSTEM_NO_ISOLATION=1`, port 4174), where the page loads the single-threaded build
+and runs every job inline.
+
+**Tracy** is not wired in. A build that wants it adds `-DSOLARSYSTEM_TRACY=ON` with
+FetchContent and `ZoneScoped` in `TimeStage` (one place covers every stage).
 
 ## 8. Web frontend (`web/`)
 
@@ -843,6 +937,8 @@ the `XRWebGLLayer`'s framebuffer.
 |------|--------|-----|
 | Background music | `std::thread` | `UpdateBackgroundMusic()` per frame |
 | Nearest-planet search | `UpdateSearchNearestPlanet()` every frame, main thread | same |
+| Job pool (§7.7) | `std::thread` × (cores − 1); `SOLARSYSTEM_JOBS=N` | Web Workers in `SolarSystem-mt.wasm` on a cross-origin isolated page; inline otherwise or with `?jobs=0` |
+| GL, MEMFS, downloads | main thread only | same |
 
 ### 9.4 Texture path helper
 
@@ -893,7 +989,9 @@ float render targets) the path becomes `none`: the context was created without s
 Release: `-O3 -flto --closure 1 --emit-symbol-map` (minified stacks map back through
 `SolarSystem.js.symbols`); Debug: `-O0 -g -gsource-map`. Both: `-msimd128`, `-sENVIRONMENT=web`,
 `-sSTACK_SIZE=1MB`, `-fwasm-exceptions`. `GROWABLE_ARRAYBUFFERS=0` (Chrome's WebGL/DOM APIs reject
-views over a resizable `ArrayBuffer`) and no pthread / `SHARED_MEMORY` flags. `--preload-file`
+views over a resizable `ArrayBuffer`). `SolarSystem.wasm` has no pthread flags; the
+`SolarSystem-mt` variant adds `-pthread`, `PTHREAD_POOL_SIZE`, `PROXY_TO_PTHREAD=0` and
+`ENVIRONMENT=web,worker` (§7.7). `--preload-file`
 directories and `scripts/wasm-exports.json` are `LINK_DEPENDS` in `CMakeLists.txt`.
 `SDL2`/`SDL2_image` are native-only.
 

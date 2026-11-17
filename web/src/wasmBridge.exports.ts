@@ -22,6 +22,8 @@ export interface CachedCwrapExports {
     getFocusedMissionIndex: () => number;
     getMissionCount: () => number;
     getMissionCatalogJson: () => string;
+    getFrameStatsJson: () => string;
+    setGpuTimersEnabled: (enabled: number) => void;
     getFocusedMissionJson: () => string;
     setOrbitScaleMode: (mode: number) => void;
     getOrbitScaleMode: () => number;
@@ -104,6 +106,8 @@ export function createCachedCwrapExports(cwrap: SolarSystemCwrap): CachedCwrapEx
     getFocusedMissionIndex: cwrap('GetFocusedMissionIndex', 'number', []),
     getMissionCount: cwrap('GetMissionCount', 'number', []),
     getMissionCatalogJson: cwrap('GetMissionCatalogJson', 'string', []),
+    getFrameStatsJson: cwrap('GetFrameStatsJson', 'string', []),
+    setGpuTimersEnabled: cwrap('SetGpuTimersEnabled', null, ['number']),
     getFocusedMissionJson: cwrap('GetFocusedMissionJson', 'string', []),
     setOrbitScaleMode: cwrap('SetOrbitScaleMode', null, ['number']),
     getOrbitScaleMode: cwrap('GetOrbitScaleMode', 'number', []),
@@ -165,4 +169,4 @@ export function createCachedCwrapExports(cwrap: SolarSystemCwrap): CachedCwrapEx
     };
 }
 
-export const EXPORT_COUNT = 78;
+export const EXPORT_COUNT = 80;

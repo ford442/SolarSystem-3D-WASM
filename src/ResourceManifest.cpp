@@ -1,5 +1,6 @@
 #include "Application.h"
 #include "ResourceManifest.h"
+#include "assets/ModelCache.h"
 #include "QualitySettings.h"
 #include "assets/WebResourceFetcher.h"
 #include "Solar_System/TexturePaths.h"
@@ -113,6 +114,9 @@ void Application::LoadCoreResources() {
                 if (outcome == WebResourceFetcher::FetchOutcome::Failed) {
                     _resourcesFailed++;
                     LOG_ERROR("Loading", "Failed to download required core resource: %s", virtualPath.c_str());
+                } else if (virtualPath.size() > 4 && virtualPath.compare(virtualPath.size() - 4, 4, ".obj") == 0) {
+                    // Parse it in a job now, while the rest downloads; MeshHolder picks it up.
+                    ModelCache::Prefetch(virtualPath);
                 }
                 UpdateLoadingProgress();
             });

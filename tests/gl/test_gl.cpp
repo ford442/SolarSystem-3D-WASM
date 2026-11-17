@@ -6,6 +6,7 @@
 #include <GLFW/glfw3.h>
 
 #include "Solar_System/CatalogMaterial.h"
+#include "assets/UploadQueue.h"
 #include "core/Log.h"
 #include "gfx/FrameUniforms.h"
 #include "gfx/GlCapabilities.h"
@@ -17,15 +18,19 @@
 #include "gfx/TextureImage2D.h"
 #include "gfx/TextureUnits.h"
 #include "render/terrain/TerrainRenderer.h"
+#include "../dds_test_writer.h"
 
 #include <glm/gtc/matrix_transform.hpp>
 
+#include <algorithm>
 #include <array>
 #include <cmath>
 #include <cstdlib>
 #include <filesystem>
 #include <memory>
 #include <string>
+#include <tuple>
+#include <optional>
 #include <vector>
 
 namespace {
@@ -316,6 +321,108 @@ TEST(TextureImage2D, UploadsAPlaceholderDds) {
     EXPECT_EQ(texture.GetWidth(), 4u);
     EXPECT_EQ(texture.GetHeight(), 4u);
     EXPECT_EQ(glGetError(), static_cast<GLenum>(GL_NO_ERROR));
+}
+
+namespace {
+
+/** Level `level` of `texture`: its compressed blocks if it is compressed, else RGBA8 texels. */
+std::vector<std::uint8_t> ReadBack(GLuint texture, GLint level) {
+    glBindTexture(GL_TEXTURE_2D, texture);
+    GLint compressed = 0;
+    glGetTexLevelParameteriv(GL_TEXTURE_2D, level, GL_TEXTURE_COMPRESSED, &compressed);
+    if (compressed) {
+        GLint size = 0;
+        glGetTexLevelParameteriv(GL_TEXTURE_2D, level, GL_TEXTURE_COMPRESSED_IMAGE_SIZE, &size);
+        std::vector<std::uint8_t> blocks(static_cast<std::size_t>(size));
+        glGetCompressedTexImage(GL_TEXTURE_2D, level, blocks.data());
+        return blocks;
+    }
+    GLint width = 0, height = 0;
+    glGetTexLevelParameteriv(GL_TEXTURE_2D, level, GL_TEXTURE_WIDTH, &width);
+    glGetTexLevelParameteriv(GL_TEXTURE_2D, level, GL_TEXTURE_HEIGHT, &height);
+    std::vector<std::uint8_t> pixels(static_cast<std::size_t>(width) * static_cast<std::size_t>(height) * 4);
+    glPixelStorei(GL_PACK_ALIGNMENT, 1);
+    glGetTexImage(GL_TEXTURE_2D, level, GL_RGBA, GL_UNSIGNED_BYTE, pixels.data());
+    return pixels;
+}
+
+std::string WriteTempDds(const std::string& name, const std::vector<std::uint8_t>& bytes) {
+    const std::string path = (std::filesystem::temp_directory_path() / name).string();
+    DdsTestWriter::Write(path, bytes);
+    return path;
+}
+
+} // namespace
+
+TEST(TextureImage2D, ABandedAsyncReloadMatchesASynchronousLoad) {
+    REQUIRE_GL_CONTEXT();
+    UploadQueue::Get().Clear();
+    // DXT1 with a full chain (compressed bands where S3TC is exposed, CPU-decoded RGBA8 bands
+    // where it is not) and a single-level RGBA (bands, then glGenerateMipmap).
+    for (const auto& [name, format, mips] : {std::tuple{"banded_dxt1.dds", DdsTestWriter::Format::Dxt1, 9u},
+                                             std::tuple{"banded_rgba.dds", DdsTestWriter::Format::Rgba32, 1u}}) {
+        SCOPED_TRACE(name);
+        const std::string path = WriteTempDds(name, DdsTestWriter::Make(format, 256, 256, mips, 3));
+        const TextureImage2D reference(path);
+
+        TextureImage2D texture(path);
+        const GLuint before = texture.GetTexture();
+        std::optional<TextureImage2D::AsyncResult> result;
+        texture.ReloadTextureAsync(path, [&result](TextureImage2D::AsyncResult r) { result = r; });
+        int pumps = 0;
+        while (!result && pumps < 10000) {
+            UploadQueue::Get().Pump(4096); // far below one level: forces the band path
+            ++pumps;
+        }
+        ASSERT_EQ(result, TextureImage2D::AsyncResult::Uploaded)
+            << "pumps " << pumps << " pending " << UploadQueue::Get().Pending();
+        EXPECT_GT(pumps, 8) << "expected the upload to take several budgeted frames";
+        EXPECT_NE(texture.GetTexture(), before);
+        EXPECT_EQ(texture.GetWidth(), 256u);
+        for (const GLint level : {0, 3}) {
+            const std::vector<std::uint8_t> got = ReadBack(texture.GetTexture(), level);
+            const std::vector<std::uint8_t> want = ReadBack(reference.GetTexture(), level);
+            ASSERT_EQ(got.size(), want.size()) << "level " << level;
+            const auto mismatch = std::mismatch(got.begin(), got.end(), want.begin());
+            EXPECT_TRUE(mismatch.first == got.end())
+                << "level " << level << " differs from byte " << (mismatch.first - got.begin()) << " of " << got.size();
+        }
+        GLint maxLevel = 0;
+        glBindTexture(GL_TEXTURE_2D, texture.GetTexture());
+        glGetTexParameteriv(GL_TEXTURE_2D, GL_TEXTURE_MAX_LEVEL, &maxLevel);
+        EXPECT_EQ(maxLevel, 8); // the whole chain, embedded or generated
+        EXPECT_EQ(glGetError(), static_cast<GLenum>(GL_NO_ERROR));
+        std::filesystem::remove(path);
+    }
+}
+
+TEST(TextureImage2D, AnAsyncReloadIsSupersededByDestructionOrALaterReload) {
+    REQUIRE_GL_CONTEXT();
+    UploadQueue::Get().Clear();
+    const std::string path =
+        WriteTempDds("superseded.dds", DdsTestWriter::Make(DdsTestWriter::Format::Rgba32, 16, 16, 1));
+    std::vector<TextureImage2D::AsyncResult> results;
+    const auto record = [&results](TextureImage2D::AsyncResult r) { results.push_back(r); };
+    {
+        auto texture = std::make_unique<TextureImage2D>(path);
+        texture->ReloadTextureAsync(path, record);
+        TextureImage2D moved = std::move(*texture); // the pending reload follows the move
+        texture.reset();
+        moved.ReloadTextureAsync(path, record); // supersedes the first
+        while (UploadQueue::Get().Pending() > 0) {
+            UploadQueue::Get().Pump(1 << 20);
+        }
+        EXPECT_NE(moved.GetTexture(), 0u);
+        auto doomed = std::make_unique<TextureImage2D>(path);
+        doomed->ReloadTextureAsync(path, record);
+        doomed.reset();
+        while (UploadQueue::Get().Pending() > 0) {
+            UploadQueue::Get().Pump(1 << 20);
+        }
+    }
+    using R = TextureImage2D::AsyncResult;
+    EXPECT_EQ(results, (std::vector<R>{R::Superseded, R::Uploaded, R::Superseded}));
+    std::filesystem::remove(path);
 }
 
 TEST(Terrain, EveryProgramLinksWithItsSamplerUnits) {

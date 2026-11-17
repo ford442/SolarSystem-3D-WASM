@@ -278,6 +278,10 @@ export interface SolarSystemRuntime {
     beginCapture(width: number, height: number): boolean;
     stepCaptureFrame(deltaSeconds: number): void;
     endCapture(): void;
+    /** The last frame's profile as JSON (core/FrameProfile.h); perfHud.ts parses it. */
+    getFrameStatsJson(): string;
+    /** GPU stage timers, when the context has EXT_disjoint_timer_query_webgl2. */
+    setGpuTimersEnabled(enabled: boolean): void;
     /** Files the live shader programs were built from (MEMFS paths); dev reload only. */
     getShaderSourceFiles(): string[];
     /** Rebuild the programs whose files changed in MEMFS; returns how many. Dev reload only. */
@@ -359,6 +363,10 @@ export function createSolarSystemRuntime(instance: SolarSystemModule): SolarSyst
         getFocusedMissionIndex: exports.getFocusedMissionIndex,
         getMissionCount: exports.getMissionCount,
         getMissionCatalog: () => parseMissionCatalogJson(exports.getMissionCatalogJson()),
+        getFrameStatsJson: () => exports.getFrameStatsJson(),
+        setGpuTimersEnabled: (enabled) => {
+            exports.setGpuTimersEnabled(enabled ? 1 : 0);
+        },
         getFocusedMission: () => parseFocusedMissionJson(exports.getFocusedMissionJson()),
         setOrbitLines: (enabled) => exports.setOrbitLines(enabled ? 1 : 0),
         getOrbitLines: () => exports.getOrbitLines() !== 0,

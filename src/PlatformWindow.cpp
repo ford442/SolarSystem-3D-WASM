@@ -8,6 +8,10 @@
 #include "gfx/GlCapabilities.h"
 #include "assets/TextureFormatSupport.h"
 #include "Solar_System/OrbitLayout.h"
+#include "assets/ModelCache.h"
+#include "gfx/GpuTimer.h" // IWYU pragma: keep (ReleaseGpuResources destroys the unique_ptr)
+#include "assets/UploadQueue.h"
+#include "core/JobSystem.h"
 #include "core/Log.h"
 #ifndef __EMSCRIPTEN__
 #include <SDL_image.h> // native window icon only; the web build links neither SDL nor SDL_image
@@ -326,7 +330,11 @@ void Application::InitSystems() {
 void Application::Dispose() {
     // Order matters: every destructor below issues glDelete*, so the scene and renderer go
     // while the context is still current; then the worker threads; only then the window
-    // system and the context with it.
+    // system and the context with it. Jobs first: a decode in flight finishes into a payload
+    // nobody uploads, and the uploads queued for the scene's textures are dropped with it.
+    Jobs::Stop();
+    UploadQueue::Get().Clear();
+    ModelCache::Clear();
     ReleaseGpuResources();
     StopPlayBackgroundMusic();
 
@@ -345,6 +353,7 @@ void Application::Dispose() {
 }
 
 void Application::ReleaseGpuResources() {
+    _gpuTimer.reset();
     _renderableSceneComponents.clear();
     _planetSystemManifests.clear();
     _sun.reset();

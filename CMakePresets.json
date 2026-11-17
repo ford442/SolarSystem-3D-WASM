@@ -73,6 +73,16 @@
       "cacheVariables": {
         "CMAKE_BUILD_TYPE": "Debug"
       }
+    },
+    {
+      "name": "web-release-mt",
+      "displayName": "Web, Release (-O3 -flto --closure 1) (pthreads)",
+      "inherits": "web",
+      "binaryDir": "${sourceDir}/build-web-mt",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Release",
+        "SOLARSYSTEM_WEB_THREADS": "ON"
+      }
     }
   ],
   "buildPresets": [
@@ -96,6 +106,10 @@
     {
       "name": "web-release",
       "configurePreset": "web-release"
+    },
+    {
+      "name": "web-release-mt",
+      "configurePreset": "web-release-mt"
     },
     {
       "name": "web-debug",

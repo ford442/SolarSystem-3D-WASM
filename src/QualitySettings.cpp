@@ -20,6 +20,22 @@ std::string GetTexturePath(const std::string& lowRes, const std::string& highRes
 #endif
 }
 
+bool TextureLodStreamingEnabled() {
+#if defined(__EMSCRIPTEN__) || defined(SOLARSYSTEM_BUILD_TESTS)
+    return true;
+#else
+    static const bool enabled = [] {
+        const char* value = std::getenv("SOLARSYSTEM_TEXTURE_LOD");
+        return value != nullptr && std::strcmp(value, "1") == 0;
+    }();
+    return enabled;
+#endif
+}
+
+std::string GetLodStartTexturePath(const std::string& lowRes, const std::string& highRes) {
+    return TextureLodStreamingEnabled() ? lowRes : GetTexturePath(lowRes, highRes);
+}
+
 int ContextMsaaSamples(const QualityTierSettings& settings) {
     return settings.enableHdr ? 0 : settings.requestedMsaaSamples;
 }

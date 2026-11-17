@@ -5,10 +5,12 @@
 #include "../gfx/Shader.h"
 #include "../gfx/GlHandle.h"
 #include "../astro/StarCatalog.h"
+#include "../core/JobSystem.h"
 #include "AtmosphereModel.h"
 #include <glm/glm.hpp>
 #include <algorithm>
 #include <memory>
+#include <string>
 #include <vector>
 
 /**
@@ -118,12 +120,21 @@ private:
     SpriteBatch _additiveBatch; // planets plus the Sun
     SpriteBatch _moonBatch;
     SpriteBatch _starBatch;      // static: every catalog star, uploaded once
+    /** Both sky files parsed in a job started by the constructor (core/JobSystem.h). */
+    struct ParsedSky {
+        StarCatalog::Catalog stars;
+        std::string starError; // empty when the catalog parsed
+        std::vector<StarCatalog::Constellation> constellations;
+        std::string constellationError;
+    };
+    Jobs::Future<ParsedSky> _parsedSky;
     StarCatalog::Catalog _stars;
     bool _starsLoaded = false;
     bool _starsTried = false;
     int _starLimit = 5000;
     std::vector<StarCatalog::Constellation> _constellations;
     bool _constellationsTried = false;
+    std::string _constellationError; // from the parse job; empty when the figures parsed
     bool _constellationsVisible = true;
     bool _coreConstellationsOnly = false;
     GlVertexArray _lineVao;

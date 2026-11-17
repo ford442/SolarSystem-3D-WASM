@@ -1,7 +1,12 @@
 #ifndef SOLARSYSTEM_GFX_GLHANDLE_H
 #define SOLARSYSTEM_GFX_GLHANDLE_H
 #include "GlPlatform.h"
+#include <cassert>
 #include <utility>
+
+namespace Jobs {
+bool IsMainThread(); // core/JobSystem.h; declared here so every GL file need not include <future>
+}
 
 /**
  * Move-only owners for GL object names. This header is the only place in src/ allowed to
@@ -14,6 +19,9 @@
  * resize) and GL-free unit tests simple. `reset()` deletes early; assigning a fresh
  * `Create()` replaces. Deleting while the context is gone is the caller's ordering bug
  * (Application::Dispose releases the scene before terminating the window).
+ *
+ * GL belongs to the main thread: a job (core/JobSystem.h) builds CPU payloads and the main
+ * thread uploads them, so Create/reset assert they are not running on a worker.
  *
  * The traits are structs of static functions rather than `template <auto Gen, auto Del>`:
  * under GLEW `glGenBuffers` is a runtime function pointer, not a constant expression.
@@ -37,6 +45,7 @@ public:
 
     template <class... Args>
     static GlHandle Create(Args... args) {
+        assert(Jobs::IsMainThread() && "GL object created inside a job");
         GlHandle handle;
         handle._id = Traits::Gen(args...);
         return handle;
@@ -47,6 +56,7 @@ public:
 
     void reset() noexcept {
         if (_id != 0) {
+            assert(Jobs::IsMainThread() && "GL object deleted inside a job");
             Traits::Del(_id);
             _id = 0;
         }

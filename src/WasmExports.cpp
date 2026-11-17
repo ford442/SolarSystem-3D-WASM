@@ -149,6 +149,18 @@ extern "C" {
         json = activeApplication ? activeApplication->GetMissionCatalogJson() : "[]";
         return json.c_str();
     }
+    // The last frame's profile (core/FrameProfile.h) for ?perf=1's HUD; each read also
+    // restarts the "worst frame since the last read" window.
+    EMSCRIPTEN_KEEPALIVE const char* GetFrameStatsJson() {
+        static std::string json = "{}";
+        json = activeApplication ? activeApplication->GetFrameStatsJson() : "{}";
+        return json.c_str();
+    }
+    EMSCRIPTEN_KEEPALIVE void SetGpuTimersEnabled(int enabled) {
+        if (activeApplication) {
+            activeApplication->SetGpuTimersEnabled(enabled != 0);
+        }
+    }
     EMSCRIPTEN_KEEPALIVE const char* GetFocusedMissionJson() {
         static std::string json = R"({"valid":false})";
         json = activeApplication ? activeApplication->GetFocusedMissionJson() : R"({"valid":false})";

@@ -14,10 +14,12 @@ import { initSettingsPanel } from './settingsPanel';
 import { initTimelineEditor } from './timelineEditor';
 import { initTouchControls, isMobileLikeDevice } from './touchControls';
 import { initWebXr } from './webxr';
+import { installPerfHud, perfHudRequested } from './perfHud';
 import { createSolarSystemRuntime, exposeConsoleHelpers, type SolarSystemRuntime } from './wasmBridge';
 import { installWasmCallbacksOnConfig, setModuleInstance } from './wasmCallbacks';
 import { assetCacheEnabled, createAssetFetcher } from './assetCache';
 import { computeWebGlSizing } from './webglContext';
+import { chooseWasmVariant, locateWasmFile, THREADED_GLUE } from './wasmVariant';
 
 const canvas = queryRequired('canvas', HTMLCanvasElement);
 const loadingContainer = queryRequired('loading-container');
@@ -225,12 +227,7 @@ const moduleConfig: SolarSystemModuleConfig = installWasmCallbacksOnConfig(
     {
         canvas,
         ...(preinitializedWebGLContext ? { preinitializedWebGLContext } : {}),
-        locateFile: (path: string, prefix: string) => {
-            if (path.endsWith('.wasm') || path.endsWith('.data')) {
-                return new URL(path, deployedBaseUrl).toString();
-            }
-            return prefix + path;
-        },
+        locateFile: (path: string, prefix: string) => locateWasmFile(path, prefix, deployedBaseUrl),
         print: (text: string) => console.log(text),
         printErr: (text: string) => console.error(text),
         onRuntimeInitialized: () => {
@@ -240,12 +237,38 @@ const moduleConfig: SolarSystemModuleConfig = installWasmCallbacksOnConfig(
     { ...progressCallbacks, onMusicDuck: (duck: number) => music.setDuck(duck) },
 );
 
-function startModule(): Promise<SolarSystemModule> {
+type ModuleFactory = typeof Module;
+
+/**
+ * The pthread build when this page can run its workers (wasmVariant.ts), else the bundled
+ * single-threaded one. A deployment without SolarSystem-mt.js (built with --no-threads)
+ * falls back to the single-threaded build after one failed import.
+ */
+async function loadModuleFactory(): Promise<ModuleFactory> {
+    if (
+        chooseWasmVariant({ crossOriginIsolated: window.crossOriginIsolated, search: window.location.search }) !==
+        'threaded'
+    ) {
+        return Module;
+    }
+    const url = new URL(THREADED_GLUE, deployedBaseUrl).toString();
+    try {
+        const threaded = (await import(/* @vite-ignore */ url)) as { default: ModuleFactory };
+        console.log('[Jobs] page is cross-origin isolated: loading the threaded build');
+        return threaded.default;
+    } catch (error: unknown) {
+        console.warn('[Jobs] threaded build unavailable, using the single-threaded one:', error);
+        return Module;
+    }
+}
+
+async function startModule(): Promise<SolarSystemModule> {
     if (!preinitializedWebGLContext) {
         // GLFW would try the same context creation and fail inside main(); say so up front.
-        return Promise.reject(new Error('WebGL 2 is not available'));
+        throw new Error('WebGL 2 is not available');
     }
-    return Module(moduleConfig);
+    const factory = await loadModuleFactory();
+    return factory(moduleConfig);
 }
 
 void startModule()
@@ -261,6 +284,9 @@ void startModule()
             const runtime = createSolarSystemRuntime(instance);
             runtimeForReload = runtime;
             exposeConsoleHelpers(runtime);
+            if (perfHudRequested(window.location.search)) {
+                installPerfHud(runtime);
+            }
             if (import.meta.env.DEV) {
                 void import('./shaderReload').then(({ installShaderReload }) =>
                     installShaderReload(instance, runtime, deployedBaseUrl),

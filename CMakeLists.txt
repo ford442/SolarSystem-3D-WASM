@@ -10,6 +10,12 @@ set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 # compiler's new warning should not stop you building. Applied to the game target below.
 option(SOLARSYSTEM_WERROR "Treat compiler warnings as errors (CI)" OFF)
 
+# Web only: the pthread variant (SolarSystem-mt.js/.wasm), whose job pool runs on Web Workers.
+# It needs a cross-origin isolated page (COEP require-corp + COOP same-origin) to start any
+# worker, so it is a second binary next to the single-threaded one, and web/src/bootstrap.ts
+# loads it only when `crossOriginIsolated` is true (core/JobSystem.h, docs/CROSS_ORIGIN_HEADERS.md).
+option(SOLARSYSTEM_WEB_THREADS "Emscripten: build the pthread variant SolarSystem-mt" OFF)
+
 # ccache when it is installed. Emscripten is left out on purpose: emcc is a wrapper script,
 # so build-web.sh hands ccache to it through EM_COMPILER_WRAPPER instead.
 if(NOT EMSCRIPTEN)
@@ -25,8 +31,15 @@ if(EXISTS "${CMAKE_SOURCE_DIR}/external/glm")
 endif()
 
 if(EMSCRIPTEN)
+    # Every object in a shared-memory link must be built with atomics, Assimp included, so
+    # the pthread variant links its own build of it (setup_web_dependencies.sh makes both).
+    if(SOLARSYSTEM_WEB_THREADS)
+        set(SOLAR_EM_ASSIMP_BUILD_DIR ${CMAKE_SOURCE_DIR}/external/assimp/build-wasm-mt)
+    else()
+        set(SOLAR_EM_ASSIMP_BUILD_DIR ${CMAKE_SOURCE_DIR}/external/assimp/build-wasm)
+    endif()
     include_directories(${CMAKE_SOURCE_DIR}/external/assimp/include)
-    include_directories(${CMAKE_SOURCE_DIR}/external/assimp/build-wasm/include)
+    include_directories(${SOLAR_EM_ASSIMP_BUILD_DIR}/include)
 endif()
 
 # [PORTING NOTE]
@@ -75,6 +88,7 @@ set(SOLARSYSTEM_SOURCES_AUX
     src/core/Camera.cpp
     src/core/CameraNavigation.cpp
     src/core/FrameTimer.cpp
+    src/core/JobSystem.cpp
     # gfx/: GL objects and programs
     src/gfx/Shader.cpp
     src/gfx/ShaderLibrary.cpp
@@ -112,6 +126,11 @@ set(SOLARSYSTEM_SOURCES_AUX
     src/assets/PlanetManifestLoader.cpp
     src/assets/TextureFormatSupport.cpp
     src/assets/BlockCompression.cpp
+    src/assets/TextureDecode.cpp
+    src/assets/UploadQueue.cpp
+    src/assets/ModelCache.cpp
+    src/core/FrameProfile.cpp
+    src/gfx/GpuTimer.cpp
     # astro/: ephemerides, sky events, catalogs, field models (GL-free)
     src/astro/Ephemeris.cpp
     src/astro/SkyEvents.cpp
@@ -274,6 +293,29 @@ if(EMSCRIPTEN)
         set(SOLAR_EM_LINK_OPT_FLAGS -O3 -flto "SHELL:--closure 1" "SHELL:--emit-symbol-map")
     endif()
 
+    if(SOLARSYSTEM_WEB_THREADS)
+        # Compile and link: -pthread turns on atomics/bulk memory and shared memory.
+        list(APPEND SOLAR_EM_PORT_FLAGS -pthread)
+        list(APPEND SOLAR_EM_LINK_FLAGS
+            # One worker per job thread, created before main() so Jobs::Start's threads begin
+            # at once (JobSystem uses hardware_concurrency - 1, capped at 64). A page that is
+            # not cross-origin isolated cannot post shared memory to a worker at all; it gets
+            # no pool, and JobSystem runs inline there (bootstrap.ts never loads this binary
+            # on such a page, so that is belt and braces).
+            "SHELL:-sPTHREAD_POOL_SIZE=(globalThis.crossOriginIsolated?Math.min(Math.max((navigator.hardwareConcurrency||2)-1,0),64):0)"
+            # The page renders: no proxying main() to a worker, the GL context stays on the
+            # main thread (only it ever calls gl*, see scripts/check-gl-handles.sh).
+            "SHELL:-sPROXY_TO_PTHREAD=0"
+            # Workers load this same glue, so it needs the worker branches too.
+            "SHELL:-sENVIRONMENT=web,worker"
+            # Growth is fine here: nothing outside Wasm holds long-lived heap views while
+            # workers run (the decode jobs touch only Wasm memory).
+            "SHELL:-Wno-pthreads-mem-growth"
+        )
+        list(REMOVE_ITEM SOLAR_EM_LINK_FLAGS "SHELL:-sENVIRONMENT=web")
+        set_target_properties(${PROJECT_NAME} PROPERTIES OUTPUT_NAME "SolarSystem-mt")
+    endif()
+
     target_compile_options(${PROJECT_NAME} PRIVATE
         ${SOLAR_EM_PORT_FLAGS}
         ${SOLAR_EM_CODEGEN_FLAGS}
@@ -304,7 +346,7 @@ if(EMSCRIPTEN)
 
     # Emscripten provides GLFW and FreeType via ports
     target_link_libraries(${PROJECT_NAME}
-        ${CMAKE_SOURCE_DIR}/external/assimp/build-wasm/lib/libassimp.a
+        ${SOLAR_EM_ASSIMP_BUILD_DIR}/lib/libassimp.a
         z
     )
 elseif(WIN32)
@@ -328,6 +370,7 @@ else()
     find_package(SDL2_mixer REQUIRED)
     find_package(Freetype REQUIRED)
     find_package(assimp REQUIRED)
+    find_package(Threads REQUIRED)
 
     target_compile_definitions(${PROJECT_NAME} PRIVATE SOLARSYSTEM_USE_SDL_MIXER)
 
@@ -340,6 +383,7 @@ else()
         SDL2_mixer::SDL2_mixer
         Freetype::Freetype
         assimp::assimp
+        Threads::Threads
     )
 endif()
 

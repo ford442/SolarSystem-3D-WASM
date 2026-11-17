@@ -8,30 +8,33 @@ How HTTP response headers interact with the WASM host page, a separate asset CDN
 
 ## 1. Does this app need COEP?
 
-**No — not with the current build.** There is no `-sPTHREAD` / `-sSHARED_MEMORY` and
-**no `ASYNCIFY`**. The runtime does not require `SharedArrayBuffer` or `crossOriginIsolated`.
+**For worker threads, yes.** The web build ships two binaries (ARCHITECTURE §7.7):
 
-| Build flag | Present? | Needs COEP+COOP? |
-|------------|----------|------------------|
-| `ASYNCIFY` / `JSPI` | No | No |
-| `PTHREAD` / `SHARED_MEMORY` | No | Yes (for `SharedArrayBuffer`) |
+| Binary | Threads | Needs COEP+COOP? |
+|--------|---------|------------------|
+| `SolarSystem.wasm` | none: every job runs inline on the main thread | No |
+| `SolarSystem-mt.wasm` (`-pthread`) | job pool on Web Workers (texture decode, model parse, field tracing, catalogue parsing) | **Yes**: a page posts shared Wasm memory to a worker only when `crossOriginIsolated` |
 
-**Policy (pick one and keep it consistent):**
+`web/src/bootstrap.ts` loads the threaded binary when the page is cross-origin isolated and
+falls back to the single-threaded one otherwise, so a host without the headers still works.
+It only loses the workers. There is still no `ASYNCIFY`/`JSPI`.
+
+**Policy:**
 
 | Environment | Isolation | Why |
 |-------------|-----------|-----|
-| **Production** | **Option A** (no COEP/COOP) | Simpler ops; no pthreads yet; COEP would force CORP on every cross-origin asset |
-| **Vite `dev` / `preview`** | **Option B** (COEP+COOP on the app origin) | Rehearsal for a future pthread build and for `npm run verify:cross-origin` |
+| **Production** | **Option B** (COEP `require-corp` + COOP `same-origin` on the app document) | Turns on the threaded build; cross-origin assets need CORP, which the CDN already sends (§2) |
+| **Vite `dev` / `preview`** | **Option B** | Same as production; `SOLARSYSTEM_NO_ISOLATION=1` serves Option A, for the single-threaded smoke run |
+| Hosts that cannot set headers (embeds, some static hosts) | Option A | Works, single-threaded |
 
-Do not copy Vite’s isolation headers into production until pthreads ship. Then switch production to Option B.
-
-If you add pthreads later, switch production to **Option B**.
+An iframe embed is only isolated if the embedding page is too, so an embed usually runs the
+single-threaded build.
 
 ---
 
 ## 2. Header matrix
 
-### Option A — Recommended today (no cross-origin isolation)
+### Option A — No isolation (single-threaded build)
 
 | Response | Origin | COEP | COOP | CORP | `Access-Control-Allow-Origin` |
 |----------|--------|------|------|------|-------------------------------|
@@ -41,7 +44,7 @@ If you add pthreads later, switch production to **Option B**.
 
 Cross-origin XHR (`emscripten_async_wget2`) needs **CORS only** (`Access-Control-Allow-Origin`). CORP is optional without COEP but harmless as `cross-origin`.
 
-### Option B — Cross-origin isolated (future pthread / SharedArrayBuffer)
+### Option B — Cross-origin isolated (production: the threaded build)
 
 | Response | Origin | COEP | COOP | CORP | `Access-Control-Allow-Origin` |
 |----------|--------|------|------|------|-------------------------------|
@@ -99,7 +102,7 @@ cross-origin-resource-policy: cross-origin
 | COEP on DDS responses | **Misconfiguration** — COEP is for documents, not textures. Harmless for XHR but misleading. Remove from asset vhost. |
 | CORP + ACAO on DDS | **Correct** for cross-origin fetches under COEP |
 | App + assets same host | CORS/CORP are redundant but present |
-| `crossOriginIsolated === true` | Achieved, but unused without pthreads |
+| `crossOriginIsolated === true` | Achieved: the page loads the threaded build |
 
 Fetches work because CORP and CORS are set. The problematic pattern is **COEP on the CDN**, not CORP itself.
 
@@ -109,15 +112,7 @@ Fetches work because CORP and CORS are set. The problematic pattern is **COEP on
 
 ### App origin (`app.example.com`)
 
-**Preferred (Option A):**
-
-```apache
-# Apache — app vhost only
-Header always set Cross-Origin-Resource-Policy "same-origin"
-# No COEP/COOP
-```
-
-**If adding pthreads later (Option B):**
+**Preferred (Option B, threaded build):**
 
 ```apache
 Header always set Cross-Origin-Embedder-Policy "require-corp"
@@ -125,7 +120,10 @@ Header always set Cross-Origin-Opener-Policy "same-origin"
 Header always set Cross-Origin-Resource-Policy "same-origin"
 ```
 
-Also ensure `.wasm` is served as `Content-Type: application/wasm`.
+Also ensure `.wasm` is served as `Content-Type: application/wasm`, and `SolarSystem-mt.js` as
+JavaScript (its workers import it as a module).
+
+**Without isolation (Option A):** omit COEP/COOP. The page then runs `SolarSystem.wasm`.
 
 ### Asset CDN (`cdn.example.com`)
 
@@ -166,16 +164,17 @@ add_header Cross-Origin-Resource-Policy "cross-origin" always;
 
 ## 6. Local testing
 
-### Vite dev / preview (Option B rehearsal)
+### Vite dev / preview (Option B, as production)
 
-`web/vite.config.ts` sets COEP+COOP on the **app server** so agents and
-`verify:cross-origin` can reproduce Option B locally. This is **not** the
-production header set (Option A) until pthreads ship.
+`web/vite.config.ts` sets COEP+COOP on the **app server**, as production does, so the
+page loads the threaded build. `SOLARSYSTEM_NO_ISOLATION=1` drops them (Option A, the
+single-threaded build). `npm run test:smoke` runs the suite against both.
 
 ```bash
 ./build-web.sh
 cd web
-npm run preview   # http://127.0.0.1:4173/solar-system/ — COEP+COOP on HTML/JS
+npm run preview   # http://127.0.0.1:4173/solar-system/ — COEP+COOP on HTML/JS, threaded build
+SOLARSYSTEM_NO_ISOLATION=1 npm run preview -- --port 4174   # no isolation, single-threaded
 ```
 
 ### Mock asset CDN (cross-origin)
@@ -242,7 +241,8 @@ npm run verify:textures           # full WASM load + skybox path
 
 ```text
 Same-origin assets     → no CORS/CORP/COEP needed
-Subdomain CDN          → ACAO + CORP:cross-origin on assets; COEP only on app (if pthreads)
+Subdomain CDN          → ACAO + CORP:cross-origin on assets; COEP only on the app document
 test.1ink.us pattern   → works but COEP on DDS should be removed from CDN config
-This build (no ASYNCIFY, no pthreads)  → production: Option A (omit COEP); Vite: Option B rehearsal
+This build (threaded + single-threaded)  → production and Vite: Option B (threaded build);
+                                           no isolation still works, single-threaded
 ```

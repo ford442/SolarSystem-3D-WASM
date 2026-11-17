@@ -20,6 +20,8 @@
   "_GetFocusedMissionIndex",
   "_GetMissionCount",
   "_GetMissionCatalogJson",
+  "_GetFrameStatsJson",
+  "_SetGpuTimersEnabled",
   "_GetFocusedMissionJson",
   "_SetOrbitScaleMode",
   "_GetOrbitScaleMode",
