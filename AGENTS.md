@@ -13,7 +13,7 @@ This file only records environment-specific facts for automated agents (e.g. Cur
 
 ## Emscripten toolchain
 
-- SDK path: `/content/build_space/emsdk` (v6.0.0). `build-web.sh` and `setup_web_dependencies.sh` auto-source it.
+- SDK path: `/content/build_space/emsdk` (v6.0.0, same version CI pins). `build-web.sh` uses `emcc` if already on PATH, else auto-sources that path or `/root/emsdk`.
 - Prebuilt deps persist in the snapshot: `external/glm/`, `external/assimp/build-wasm/lib/libassimp.a`.
 - Rebuild WASM after C++ changes: `./build-web.sh` (copies artifacts to `web/src/` and `web/public/`).
 - Skip emsdk sourcing if `emcc` is already on PATH: `./build-web.sh --no-emsdk`.
@@ -32,7 +32,24 @@ cd web && npm run preview                   # http://localhost:4173/solar-system
 - TypeScript hot-reloads in dev; C++ requires `./build-web.sh` + browser refresh.
 - Wipe `build-web/` when switching Debug↔Release or changing LTO/exception flags.
 - Emscripten flag model / Wasm exceptions fallback: [docs/plans/PORTING_GUIDE.md](docs/plans/PORTING_GUIDE.md) §3b.
-- No automated test suite; verification is manual (see [docs/plans/TESTING_GUIDE.md](docs/plans/TESTING_GUIDE.md)).
+- Shaders, fonts, `resource/sky`, and atmosphere LUTs are `--preload-file`d into `SolarSystem.data`, so shader edits also need `./build-web.sh` on web.
+- After changing `EMSCRIPTEN_KEEPALIVE` exports in `src/WasmExports.cpp`, run `cd web && npm run generate:wasm-exports` (regenerates `SolarSystem.d.ts` / `wasmBridge.exports.ts`). After editing `resource/planets.catalog.json`, run `npm run generate:planet-metadata` (also runs as `prebuild`). CI runs both with `:check`.
+
+## Tests
+
+```bash
+# Native GoogleTest suite (tests/), incl. the AtmosphereLutsFresh check
+cmake -G Ninja -DCMAKE_BUILD_TYPE=Release -DSOLARSYSTEM_BUILD_TESTS=ON -B build-test
+cmake --build build-test --target SolarSystemTests atmosphere_lut_baker
+ctest --test-dir build-test --output-on-failure
+
+# Web smoke (Playwright, web/e2e/) against a production preview
+cd web && npx tsc && npx vite build
+npm run preview -- --host 127.0.0.1 &
+SMOKE_TEST_URL=http://127.0.0.1:4173/solar-system/ npm run test:smoke
+```
+
+Details and manual checklists: [docs/plans/TESTING_GUIDE.md](docs/plans/TESTING_GUIDE.md).
 
 ## Runtime assets in this environment
 
@@ -52,7 +69,11 @@ window.setQualityPreset(0);                 // 0=low, 1=medium, 2=full; no LOD u
 window.getQualityPreset();                  // read the active preset
 window.focusMission(0);                     // follow Voyager 1
 window.startTour('inner-system');           // 60s guided tour
+window.setObserveMode(true);                // Observe: ground-level sky view from Earth
+window.setObserverSite(lat, lon);           // degrees; getObserveState() reads it back
 ```
+
+Deep link straight into Observe: `?mode=observe&lat=..&lon=..` (also `az`, `el`, `fov`, `rate`; see `web/src/deepLink.ts`).
 
 Planets load when the camera enters each manifest's activation radius (800–1500 units). Use teleport to trigger staged loading without flying across orbital distances.
 
@@ -66,4 +87,4 @@ Planets load when the camera enters each manifest's activation radius (800–150
 6. Never open HTML via `file://`.
 7. Do not commit credentials; `web/deploy.py` reads from environment variables.
 
-*Last updated: 2026-07-14*
+*Last updated: 2026-10-17*

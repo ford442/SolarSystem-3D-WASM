@@ -7,7 +7,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 ## Project Overview
 
 SolarSystem-3D-WASM is a dual-target 3D Solar System visualization:
-- **Native**: C++17 with OpenGL 4.6 graphics (Windows native)
+- **Native**: C++17 with OpenGL 4.6 graphics (Windows and Linux)
 - **Web**: WebAssembly (via Emscripten) with WebGL 2, served with Vite + TypeScript
 
 The project showcases advanced graphics techniques: atmospheric scattering, PCF shadows, ray-traced shadows, cloud layer shadows, lens flare, HDR rendering, and normal mapping.
@@ -20,8 +20,8 @@ The project showcases advanced graphics techniques: atmospheric scattering, PCF 
 # From project root
 cd web
 npm install
-npm run dev          # Start dev server at http://localhost:5173
-npm run build        # Production build
+npm run dev          # Dev server at http://localhost:5173/solar-system/ (base path; `/` alone 404s)
+npm run build        # build-web.sh (WASM) + tsc + vite build; prebuild regenerates planet metadata
 ```
 
 The Vite dev server hot-reloads TypeScript changes. For C++ changes, rebuild the WASM module separately.
@@ -44,13 +44,27 @@ The build script:
 
 The CMakeLists.txt has separate configurations for EMSCRIPTEN vs native builds, using Emscripten ports for GLFW and FreeType only (no SDL, SDL_image or SDL_mixer on web — `SDL_image.h`, `IMG_Init` and `LoadWindowIcon` are native-only).
 
-### Native Build (Windows)
+### Native Build (Windows / Linux)
 
 ```bash
 ./build.sh
-# Executable appears in build/ with required DLLs
+# CMake + Ninja Release into build/; run ./build/SolarSystem from repo root
+# (Windows copies required DLLs; Linux uses system packages, see README apt list)
 ```
 
+### Tests
+
+```bash
+# Native GoogleTest suite (tests/); also builds the LUT baker for the AtmosphereLutsFresh ctest
+cmake -G Ninja -DCMAKE_BUILD_TYPE=Release -DSOLARSYSTEM_BUILD_TESTS=ON -B build-test
+cmake --build build-test --target SolarSystemTests atmosphere_lut_baker
+ctest --test-dir build-test --output-on-failure
+
+# Web: Playwright smoke (web/e2e/) against `npm run preview`; see docs/plans/TESTING_GUIDE.md
+cd web && SMOKE_TEST_URL=http://127.0.0.1:4173/solar-system/ npm run test:smoke
+```
+
+CI also runs `npm run generate:planet-metadata:check` and `npm run generate:wasm-exports:check` (in `web/`). After adding/changing an `EMSCRIPTEN_KEEPALIVE` export in `src/WasmExports.cpp`, run `npm run generate:wasm-exports` to regenerate `web/src/SolarSystem.d.ts` and `wasmBridge.exports.ts`.
 ### Presets, checks and formatting
 
 `CMakePresets.json` has `native-release` (what `build.sh` runs), `native-debug`, `native-tests`, `web-release`
@@ -84,6 +98,8 @@ and `web-debug`; `build-web.sh` wraps the web ones. All write `compile_commands.
   - `RenderSettings.cpp` — quality/shadow presets, orbit scale mode, texture LOD manager
   - `StarSystemFactory.cpp` / `PlanetSystemLoader.cpp` — scene construction and staged web loading
   - `XrSession.cpp` — WebXR eye state and the stereo render pass (web only)
+  - `ObserveMode.cpp` / `ObserveRenderer.cpp` (+ `ObserveState.h`) — Observe mode: ground-level sky from a lat/lon and UTC instant, drawn in a separate true-angular-size pass (ARCHITECTURE §7.4)
+- `WasmExports.cpp` / `JsBridge.cpp` — exported C API (cwrap) and C++→JS callbacks
   - `TerrainController.cpp` — terrain fetch hook, per-frame tile selection into the frame snapshot, the `[Terrain]` log line
   - `Cinematics.cpp` — what web timelines and capture call: body catalog / scene state JSON, surface queries, system preload, HUD mask, `BeginCapture`/`StepCaptureFrame`/`EndCapture` (ARCHITECTURE §11.2)
   - `SpaceWeatherController.cpp` — evaluates `astro/SpaceWeather` each frame into `SpaceWeatherFrame` (snapshot), the solar-wind/Kp/CME controls and `GetSpaceWeatherJson` (ARCHITECTURE §13)
@@ -98,6 +114,14 @@ and `web-debug`; `build-web.sh` wraps the web ones. All write `compile_commands.
   - Scene objects hold no shader: a pass calls `SpaceObject::Draw(shader)` with the program it bound
   - `SceneRenderer.cpp` — shadow/color passes for planets, atmospheres, rings, clouds, text overlays
   - `SceneOverlayRenderer.cpp` — magnetic field ribbons, orbit paths, mission paths, asteroid belt
+- `SystemModules.h` — Convenience headers bundling system includes
+
+**Auxiliary Modules** (`Auxiliary_Modules/`)
+- Graphics: `Shader`, `Mesh`, `MeshHolder`, `TextureImage2D`
+- Camera system: `Camera` with acceleration/zoom, `FPS_Handler`
+- Rendering: `ShadowMapFBO` (PCF/ray-traced shadows), `LensFlare`, `HDR`, `TextRenderer`
+- Astronomy: `Ephemeris`, `LunarTheory` (Meeus ch. 47 Moon), `Observer` (GL-free horizon-frame maths), `StarCatalog` (BSC5 stars in `resource/sky/`), `SkyEvents`
+- Async loading: `WebResourceFetcher` (Emscripten-specific async file loading via callback-based `emscripten_async_wget2`; the blocking `emscripten_wget_data` path is gone — see "No blocking fetches" below)
   - `SpaceWeatherRenderer.cpp` — `MagnetosphereUBO`, solar-wind particles (transform feedback), auroral shells and their bloom, the photosphere permutation per tier
 - `SystemModules.h` — Convenience headers bundling system includes (GL itself comes from `gfx/GlPlatform.h`)
 
@@ -121,10 +145,11 @@ and `web-debug`; `build-web.sh` wraps the web ones. All write `compile_commands.
 - Specific celestial bodies that still have dedicated classes:
   - `Sun/Sun.h/cpp` — Star with corona and lens flare
   - `Saturn_System/SaturnRing`, `Uranus_System/UranusRing` — ring meshes
-  - Atmosphere/ring *numbers* live in `SystemVisuals.h`; everything else is a catalog row
+  - Ring *numbers* live in `SystemVisuals.h`; atmosphere numbers are catalog data (`render.atmosphere`); everything else is a catalog row
   
 - Atmosphere/rings:
-  - `Atmosphere.h/cpp` — Atmospheric scattering shader
+  - `Atmosphere.h/cpp` — Atmospheric scattering (O'Neil shell, plus LUT path on Medium/Full); `AtmosphereModel.h/cpp` — physical model shared with the LUT baker
+  - `ObserveSky.h/cpp` — Observe-mode sky (Sun, Moon, planets, stars, eclipse effects)
   - `PlanetaryRing.h/cpp`, `SaturnRing.h/cpp`, `UranusRing.h/cpp` — Ring rendering
   - `Clouds.h/cpp`, `OuterShell.h/cpp` — Cloud layer and outer atmospheric shells
   
@@ -136,7 +161,7 @@ and `web-debug`; `build-web.sh` wraps the web ones. All write `compile_commands.
 ### Web Frontend (`web/`)
 
 - `index.html` — Canvas and loading UI
-- `src/main.ts` — TypeScript entry point that:
+- `src/main.ts` — just imports `src/bootstrap.ts`, the real entry point, which:
   1. Imports the Emscripten-generated `SolarSystem.js` module
   2. Sets up canvas and loading progress bar
   3. Exposes `updateLoadingProgress()` for C++ to call
@@ -204,6 +229,7 @@ Ceres, Vesta, Eris/Haumea/Makemake, 1P/Halley (kind `comet`), Mercury–Pluto, t
 
 ### Modifying Shaders
 - Shaders are in `resource/shaders/`
+- On web they are `--preload-file`d into `SolarSystem.data`, so shader edits need `./build-web.sh` + refresh (Vite HMR does not pick them up)
 - Every shader is authored once as `#version 300 es`; native `Shader.cpp` rewrites the directive to `#version 460 core` at load (ARCHITECTURE §9.1)
 - Shared helpers live in `resource/shaders/common/` and are pulled in with `#include "common/x.glsl"` (expanded once per stage by `ShaderSource`, with `#line` so errors name the right file); `common/preamble.glsl` supplies the precision defaults. Don't paste a helper into a shader that can include it — `test_shader_source.cpp` fails on duplicate definitions
 - Samplers name their unit: `layout(binding = TU_SHADOW_MAP) uniform sampler2D shadowMap;`. The `TU_*` names come from `src/gfx/TextureUnits.h` via the generated `common/texture_units.glsl` (`npm run generate:texture-units`, checked in CI). ShaderSource strips the qualifier and Shader sets the unit once at link, so C++ never `SetInt`s a sampler; bind with `glBindTextureUnit(Unit(TextureUnit::X), tex)`
