@@ -1,0 +1,811 @@
+{
+  "schemaVersion": 1,
+  "system": {
+    "id": "trappist-1",
+    "name": {
+      "en": "TRAPPIST-1",
+      "ru": "TRAPPIST-1"
+    },
+    "distancePc": 12.43,
+    "spectralType": "M8.0 V",
+    "starColor": "#ffa74e",
+    "habitableZoneAu": {
+      "innerAu": 0.02242,
+      "outerAu": 0.0323
+    },
+    "source": {
+      "table": "NASA Exoplanet Archive, Planetary Systems Composite Parameters (pscomppars)",
+      "url": "https://exoplanetarchive.ipac.caltech.edu/",
+      "archiveHostname": "TRAPPIST-1",
+      "referencePlaneInclinationDeg": 89.778
+    }
+  },
+  "sceneNote": {
+    "en": "Measured orbits and sizes; surfaces are procedural (no exoplanet has been imaged). Values marked fit are estimates.",
+    "ru": "Орбиты и размеры измерены; поверхности процедурные (ни одна экзопланета не сфотографирована). Значения с пометкой fit — оценки."
+  },
+  "initTagAllowlist": [
+    "trappist_1_b",
+    "trappist_1_c",
+    "trappist_1_d",
+    "trappist_1_e",
+    "trappist_1_f",
+    "trappist_1_g",
+    "trappist_1_h"
+  ],
+  "bodies": [
+    {
+      "id": "trappist_1",
+      "index": 0,
+      "kind": "star",
+      "parent": null,
+      "displayName": {
+        "en": "TRAPPIST-1",
+        "ru": "TRAPPIST-1"
+      },
+      "type": "star",
+      "facts": {
+        "diameterKm": 165855,
+        "massEarths": 29899,
+        "siderealRotationDays": null,
+        "orbitalPeriodDays": null,
+        "distanceAu": 0,
+        "moons": 0,
+        "distancePc": 12.43,
+        "spectralType": "M8.0 V",
+        "effectiveTemperatureK": 2566,
+        "luminositySolar": 0.000553,
+        "summary": {
+          "en": "M8.0 V star 40.5 light-years away; 7 known planets in the archive's composite table.",
+          "ru": "Звезда класса M8.0 V на расстоянии 40.5 св. лет; известных планет: 7."
+        }
+      },
+      "orbit": {
+        "compressedOffset": [
+          0,
+          0,
+          0
+        ],
+        "inclinationDeg": 0,
+        "siderealRotationDays": null,
+        "orbitalPeriodDays": null,
+        "distanceAu": 0,
+        "axialTiltDegrees": 0,
+        "earthRadiusScale": 1,
+        "rotationRate": 0
+      },
+      "render": {
+        "star": {
+          "effectiveTemperatureK": 2566,
+          "radiusSolar": 0.1192,
+          "luminositySolar": 0.000553,
+          "massSolar": 0.0898,
+          "spectralType": "M8.0 V",
+          "activity": 1
+        }
+      },
+      "includeInCompanion": false
+    },
+    {
+      "id": "trappist_1_b",
+      "index": 1,
+      "kind": "planet",
+      "parent": "trappist_1",
+      "displayName": {
+        "en": "TRAPPIST-1 b",
+        "ru": "TRAPPIST-1 b"
+      },
+      "type": "terrestrial",
+      "facts": {
+        "diameterKm": 14220,
+        "massEarths": 1.374,
+        "siderealRotationDays": 1.510826,
+        "orbitalPeriodDays": 1.510826,
+        "distanceAu": 0.01154,
+        "moons": 0,
+        "equilibriumTemperatureK": 397.6,
+        "irradianceEarth": 4.1526,
+        "discoveryYear": 2016,
+        "discoveryMethod": "Transit",
+        "summary": {
+          "en": "Terrestrial discovered in 2016 (transit); 4.15× Earth's insolation, equilibrium temperature ≈ 398 K.",
+          "ru": "Планета земного типа, открыта в 2016 г. транзитным методом; освещённость 4.15 от земной, равновесная температура ≈ 398 K."
+        }
+      },
+      "orbit": {
+        "compressedOffset": [
+          1500,
+          0,
+          0
+        ],
+        "inclinationDeg": -0.05,
+        "siderealRotationDays": 1.510826,
+        "orbitalPeriodDays": 1.510826,
+        "distanceAu": 0.01154,
+        "axialTiltDegrees": 0,
+        "earthRadiusScale": 1.116,
+        "rotationRate": 0,
+        "primeMeridianDegJ2000": 241.8056,
+        "primeMeridianRateDegPerDay": 238.280251995,
+        "keplerian": {
+          "aKm": 1726359.4,
+          "e": 0.00622,
+          "iDeg": -0.05,
+          "OmegaDeg": 0,
+          "omegaDeg": 336.86,
+          "M0Deg": 84.9456,
+          "nDegPerDay": 238.280251995,
+          "OmegaDotDegPerDay": 0,
+          "omegaDotDegPerDay": 0
+        },
+        "placeFromElements": true
+      },
+      "system": {
+        "name": "TRAPPIST-1 b",
+        "initTag": "trappist_1_b",
+        "activationRadius": 800,
+        "lodThreshold": 20
+      },
+      "render": {
+        "shaderFlags": {
+          "hasNightTexture": false,
+          "hasSpecularMap": false,
+          "hasClouds": false
+        },
+        "ambientFactor": 0,
+        "procedural": {
+          "seed": 1,
+          "equilibriumTemperatureK": 397.6,
+          "style": "scorched",
+          "mode": 0,
+          "colors": [
+            [
+              0.32,
+              0.22,
+              0.15
+            ],
+            [
+              0.55,
+              0.42,
+              0.3
+            ],
+            [
+              0.72,
+              0.62,
+              0.5
+            ]
+          ],
+          "seaLevel": 0,
+          "polarCap": 0,
+          "emissive": 0
+        }
+      },
+      "fit": {
+        "rotation": "tidally-locked"
+      },
+      "archive": {
+        "plName": "TRAPPIST-1 b",
+        "observedInclinationDeg": 89.728
+      },
+      "includeInCompanion": false
+    },
+    {
+      "id": "trappist_1_c",
+      "index": 2,
+      "kind": "planet",
+      "parent": "trappist_1",
+      "displayName": {
+        "en": "TRAPPIST-1 c",
+        "ru": "TRAPPIST-1 c"
+      },
+      "type": "terrestrial",
+      "facts": {
+        "diameterKm": 13978,
+        "massEarths": 1.308,
+        "siderealRotationDays": 2.421937,
+        "orbitalPeriodDays": 2.421937,
+        "distanceAu": 0.0158,
+        "moons": 0,
+        "equilibriumTemperatureK": 339.7,
+        "irradianceEarth": 2.2152,
+        "discoveryYear": 2016,
+        "discoveryMethod": "Transit",
+        "summary": {
+          "en": "Terrestrial discovered in 2016 (transit); 2.22× Earth's insolation, equilibrium temperature ≈ 340 K.",
+          "ru": "Планета земного типа, открыта в 2016 г. транзитным методом; освещённость 2.22 от земной, равновесная температура ≈ 340 K."
+        }
+      },
+      "orbit": {
+        "compressedOffset": [
+          -1290.4,
+          0,
+          1182.11
+        ],
+        "inclinationDeg": 0,
+        "siderealRotationDays": 2.421937,
+        "orbitalPeriodDays": 2.421937,
+        "distanceAu": 0.0158,
+        "axialTiltDegrees": 0,
+        "earthRadiusScale": 1.097,
+        "rotationRate": 0,
+        "primeMeridianDegJ2000": 233.7722,
+        "primeMeridianRateDegPerDay": 148.641356072,
+        "keplerian": {
+          "aKm": 2363646.4,
+          "e": 0.00654,
+          "iDeg": 0,
+          "OmegaDeg": 0,
+          "omegaDeg": 282.45,
+          "M0Deg": 131.3222,
+          "nDegPerDay": 148.641356072,
+          "OmegaDotDegPerDay": 0,
+          "omegaDotDegPerDay": 0
+        },
+        "placeFromElements": true
+      },
+      "system": {
+        "name": "TRAPPIST-1 c",
+        "initTag": "trappist_1_c",
+        "activationRadius": 800,
+        "lodThreshold": 20
+      },
+      "render": {
+        "shaderFlags": {
+          "hasNightTexture": false,
+          "hasSpecularMap": false,
+          "hasClouds": false
+        },
+        "ambientFactor": 0,
+        "procedural": {
+          "seed": 2,
+          "equilibriumTemperatureK": 339.7,
+          "style": "scorched",
+          "mode": 0,
+          "colors": [
+            [
+              0.32,
+              0.22,
+              0.15
+            ],
+            [
+              0.55,
+              0.42,
+              0.3
+            ],
+            [
+              0.72,
+              0.62,
+              0.5
+            ]
+          ],
+          "seaLevel": 0,
+          "polarCap": 0,
+          "emissive": 0
+        }
+      },
+      "fit": {
+        "rotation": "tidally-locked"
+      },
+      "archive": {
+        "plName": "TRAPPIST-1 c",
+        "observedInclinationDeg": 89.778
+      },
+      "includeInCompanion": false
+    },
+    {
+      "id": "trappist_1_d",
+      "index": 3,
+      "kind": "planet",
+      "parent": "trappist_1",
+      "displayName": {
+        "en": "TRAPPIST-1 d",
+        "ru": "TRAPPIST-1 d"
+      },
+      "type": "terrestrial",
+      "facts": {
+        "diameterKm": 10041,
+        "massEarths": 0.388,
+        "siderealRotationDays": 4.049219,
+        "orbitalPeriodDays": 4.049219,
+        "distanceAu": 0.02227,
+        "moons": 0,
+        "equilibriumTemperatureK": 286.2,
+        "irradianceEarth": 1.115,
+        "discoveryYear": 2016,
+        "discoveryMethod": "Transit",
+        "summary": {
+          "en": "Terrestrial discovered in 2016 (transit); 1.12× Earth's insolation, equilibrium temperature ≈ 286 K.",
+          "ru": "Планета земного типа, открыта в 2016 г. транзитным методом; освещённость 1.12 от земной, равновесная температура ≈ 286 K."
+        }
+      },
+      "orbit": {
+        "compressedOffset": [
+          174.85,
+          0,
+          -1992.34
+        ],
+        "inclinationDeg": 0.118,
+        "siderealRotationDays": 4.049219,
+        "orbitalPeriodDays": 4.049219,
+        "distanceAu": 0.02227,
+        "axialTiltDegrees": 0,
+        "earthRadiusScale": 0.788,
+        "rotationRate": 0,
+        "primeMeridianDegJ2000": 26.5889,
+        "primeMeridianRateDegPerDay": 88.906033484,
+        "keplerian": {
+          "aKm": 3331544.6,
+          "e": 0.00837,
+          "iDeg": 0.118,
+          "OmegaDeg": 0,
+          "omegaDeg": 351.27,
+          "M0Deg": 215.3189,
+          "nDegPerDay": 88.906033484,
+          "OmegaDotDegPerDay": 0,
+          "omegaDotDegPerDay": 0
+        },
+        "placeFromElements": true
+      },
+      "system": {
+        "name": "TRAPPIST-1 d",
+        "initTag": "trappist_1_d",
+        "activationRadius": 800,
+        "lodThreshold": 20
+      },
+      "render": {
+        "shaderFlags": {
+          "hasNightTexture": false,
+          "hasSpecularMap": false,
+          "hasClouds": false
+        },
+        "ambientFactor": 0,
+        "procedural": {
+          "seed": 3,
+          "equilibriumTemperatureK": 286.2,
+          "style": "ocean",
+          "mode": 0,
+          "colors": [
+            [
+              0.07,
+              0.22,
+              0.45
+            ],
+            [
+              0.42,
+              0.45,
+              0.28
+            ],
+            [
+              0.92,
+              0.94,
+              0.97
+            ]
+          ],
+          "seaLevel": 0.55,
+          "polarCap": 0.75,
+          "emissive": 0
+        }
+      },
+      "fit": {
+        "rotation": "tidally-locked"
+      },
+      "archive": {
+        "plName": "TRAPPIST-1 d",
+        "observedInclinationDeg": 89.896
+      },
+      "includeInCompanion": false
+    },
+    {
+      "id": "trappist_1_e",
+      "index": 4,
+      "kind": "planet",
+      "parent": "trappist_1",
+      "displayName": {
+        "en": "TRAPPIST-1 e",
+        "ru": "TRAPPIST-1 e"
+      },
+      "type": "terrestrial",
+      "facts": {
+        "diameterKm": 11723,
+        "massEarths": 0.692,
+        "siderealRotationDays": 6.101013,
+        "orbitalPeriodDays": 6.101013,
+        "distanceAu": 0.02925,
+        "moons": 0,
+        "equilibriumTemperatureK": 249.7,
+        "irradianceEarth": 0.6464,
+        "discoveryYear": 2017,
+        "discoveryMethod": "Transit",
+        "summary": {
+          "en": "Terrestrial discovered in 2017 (transit); 0.65× Earth's insolation, equilibrium temperature ≈ 250 K.",
+          "ru": "Планета земного типа, открыта в 2017 г. транзитным методом; освещённость 0.65 от земной, равновесная температура ≈ 250 K."
+        }
+      },
+      "orbit": {
+        "compressedOffset": [
+          1368.99,
+          0,
+          1785.6
+        ],
+        "inclinationDeg": 0.015,
+        "siderealRotationDays": 6.101013,
+        "orbitalPeriodDays": 6.101013,
+        "distanceAu": 0.02925,
+        "axialTiltDegrees": 0,
+        "earthRadiusScale": 0.92,
+        "rotationRate": 0,
+        "primeMeridianDegJ2000": 143.1638,
+        "primeMeridianRateDegPerDay": 59.006594479,
+        "keplerian": {
+          "aKm": 4375737.7,
+          "e": 0.0051,
+          "iDeg": 0.015,
+          "OmegaDeg": 0,
+          "omegaDeg": 108.37,
+          "M0Deg": 214.7938,
+          "nDegPerDay": 59.006594479,
+          "OmegaDotDegPerDay": 0,
+          "omegaDotDegPerDay": 0
+        },
+        "placeFromElements": true
+      },
+      "system": {
+        "name": "TRAPPIST-1 e",
+        "initTag": "trappist_1_e",
+        "activationRadius": 800,
+        "lodThreshold": 20
+      },
+      "render": {
+        "shaderFlags": {
+          "hasNightTexture": false,
+          "hasSpecularMap": false,
+          "hasClouds": false
+        },
+        "ambientFactor": 0,
+        "procedural": {
+          "seed": 4,
+          "equilibriumTemperatureK": 249.7,
+          "style": "ocean",
+          "mode": 0,
+          "colors": [
+            [
+              0.07,
+              0.22,
+              0.45
+            ],
+            [
+              0.42,
+              0.45,
+              0.28
+            ],
+            [
+              0.92,
+              0.94,
+              0.97
+            ]
+          ],
+          "seaLevel": 0.55,
+          "polarCap": 0.75,
+          "emissive": 0
+        }
+      },
+      "fit": {
+        "rotation": "tidally-locked"
+      },
+      "archive": {
+        "plName": "TRAPPIST-1 e",
+        "observedInclinationDeg": 89.793
+      },
+      "includeInCompanion": false
+    },
+    {
+      "id": "trappist_1_f",
+      "index": 5,
+      "kind": "planet",
+      "parent": "trappist_1",
+      "displayName": {
+        "en": "TRAPPIST-1 f",
+        "ru": "TRAPPIST-1 f"
+      },
+      "type": "terrestrial",
+      "facts": {
+        "diameterKm": 13315,
+        "massEarths": 1.039,
+        "siderealRotationDays": 9.20754,
+        "orbitalPeriodDays": 9.20754,
+        "distanceAu": 0.03849,
+        "moons": 0,
+        "equilibriumTemperatureK": 217.7,
+        "irradianceEarth": 0.3733,
+        "discoveryYear": 2017,
+        "discoveryMethod": "Transit",
+        "summary": {
+          "en": "Terrestrial discovered in 2017 (transit); 0.37× Earth's insolation, equilibrium temperature ≈ 218 K.",
+          "ru": "Планета земного типа, открыта в 2017 г. транзитным методом; освещённость 0.37 от земной, равновесная температура ≈ 218 K."
+        }
+      },
+      "orbit": {
+        "compressedOffset": [
+          -2461.78,
+          0,
+          -435.45
+        ],
+        "inclinationDeg": -0.038,
+        "siderealRotationDays": 9.20754,
+        "orbitalPeriodDays": 9.20754,
+        "distanceAu": 0.03849,
+        "axialTiltDegrees": 0,
+        "earthRadiusScale": 1.045,
+        "rotationRate": 0,
+        "primeMeridianDegJ2000": 137.5049,
+        "primeMeridianRateDegPerDay": 39.098391101,
+        "keplerian": {
+          "aKm": 5758022,
+          "e": 0.01007,
+          "iDeg": -0.038,
+          "OmegaDeg": 0,
+          "omegaDeg": 8.81,
+          "M0Deg": 308.6949,
+          "nDegPerDay": 39.098391101,
+          "OmegaDotDegPerDay": 0,
+          "omegaDotDegPerDay": 0
+        },
+        "placeFromElements": true
+      },
+      "system": {
+        "name": "TRAPPIST-1 f",
+        "initTag": "trappist_1_f",
+        "activationRadius": 800,
+        "lodThreshold": 20
+      },
+      "render": {
+        "shaderFlags": {
+          "hasNightTexture": false,
+          "hasSpecularMap": false,
+          "hasClouds": false
+        },
+        "ambientFactor": 0,
+        "procedural": {
+          "seed": 5,
+          "equilibriumTemperatureK": 217.7,
+          "style": "tundra",
+          "mode": 3,
+          "colors": [
+            [
+              0.45,
+              0.47,
+              0.5
+            ],
+            [
+              0.7,
+              0.74,
+              0.78
+            ],
+            [
+              0.95,
+              0.96,
+              0.98
+            ]
+          ],
+          "seaLevel": 0.35,
+          "polarCap": 0.45,
+          "emissive": 0
+        }
+      },
+      "fit": {
+        "rotation": "tidally-locked"
+      },
+      "archive": {
+        "plName": "TRAPPIST-1 f",
+        "observedInclinationDeg": 89.74
+      },
+      "includeInCompanion": false
+    },
+    {
+      "id": "trappist_1_g",
+      "index": 6,
+      "kind": "planet",
+      "parent": "trappist_1",
+      "displayName": {
+        "en": "TRAPPIST-1 g",
+        "ru": "TRAPPIST-1 g"
+      },
+      "type": "terrestrial",
+      "facts": {
+        "diameterKm": 14386,
+        "massEarths": 1.321,
+        "siderealRotationDays": 12.352446,
+        "orbitalPeriodDays": 12.352446,
+        "distanceAu": 0.04683,
+        "moons": 0,
+        "equilibriumTemperatureK": 197.3,
+        "irradianceEarth": 0.2522,
+        "discoveryYear": 2017,
+        "discoveryMethod": "Transit",
+        "summary": {
+          "en": "Terrestrial discovered in 2017 (transit); 0.25× Earth's insolation, equilibrium temperature ≈ 197 K.",
+          "ru": "Планета земного типа, открыта в 2017 г. транзитным методом; освещённость 0.25 от земной, равновесная температура ≈ 197 K."
+        }
+      },
+      "orbit": {
+        "compressedOffset": [
+          2320.33,
+          0,
+          -1476
+        ],
+        "inclinationDeg": -0.036,
+        "siderealRotationDays": 12.352446,
+        "orbitalPeriodDays": 12.352446,
+        "distanceAu": 0.04683,
+        "axialTiltDegrees": 0,
+        "earthRadiusScale": 1.129,
+        "rotationRate": 0,
+        "primeMeridianDegJ2000": 98.2236,
+        "primeMeridianRateDegPerDay": 29.144025402,
+        "keplerian": {
+          "aKm": 7005668.3,
+          "e": 0.00208,
+          "iDeg": -0.036,
+          "OmegaDeg": 0,
+          "omegaDeg": 191.34,
+          "M0Deg": 86.8836,
+          "nDegPerDay": 29.144025402,
+          "OmegaDotDegPerDay": 0,
+          "omegaDotDegPerDay": 0
+        },
+        "placeFromElements": true
+      },
+      "system": {
+        "name": "TRAPPIST-1 g",
+        "initTag": "trappist_1_g",
+        "activationRadius": 800,
+        "lodThreshold": 20
+      },
+      "render": {
+        "shaderFlags": {
+          "hasNightTexture": false,
+          "hasSpecularMap": false,
+          "hasClouds": false
+        },
+        "ambientFactor": 0,
+        "procedural": {
+          "seed": 6,
+          "equilibriumTemperatureK": 197.3,
+          "style": "tundra",
+          "mode": 3,
+          "colors": [
+            [
+              0.45,
+              0.47,
+              0.5
+            ],
+            [
+              0.7,
+              0.74,
+              0.78
+            ],
+            [
+              0.95,
+              0.96,
+              0.98
+            ]
+          ],
+          "seaLevel": 0.35,
+          "polarCap": 0.45,
+          "emissive": 0
+        }
+      },
+      "fit": {
+        "rotation": "tidally-locked"
+      },
+      "archive": {
+        "plName": "TRAPPIST-1 g",
+        "observedInclinationDeg": 89.742
+      },
+      "includeInCompanion": false
+    },
+    {
+      "id": "trappist_1_h",
+      "index": 7,
+      "kind": "planet",
+      "parent": "trappist_1",
+      "displayName": {
+        "en": "TRAPPIST-1 h",
+        "ru": "TRAPPIST-1 h"
+      },
+      "type": "terrestrial",
+      "facts": {
+        "diameterKm": 9620,
+        "massEarths": 0.326,
+        "siderealRotationDays": 18.772866,
+        "orbitalPeriodDays": 18.772866,
+        "distanceAu": 0.06189,
+        "moons": 0,
+        "equilibriumTemperatureK": 171.7,
+        "irradianceEarth": 0.1444,
+        "discoveryYear": 2017,
+        "discoveryMethod": "Transit",
+        "summary": {
+          "en": "Terrestrial discovered in 2017 (transit); 0.14× Earth's insolation, equilibrium temperature ≈ 172 K.",
+          "ru": "Планета земного типа, открыта в 2017 г. транзитным методом; освещённость 0.14 от земной, равновесная температура ≈ 172 K."
+        }
+      },
+      "orbit": {
+        "compressedOffset": [
+          -778.81,
+          0,
+          2897.15
+        ],
+        "inclinationDeg": 0.027,
+        "siderealRotationDays": 18.772866,
+        "orbitalPeriodDays": 18.772866,
+        "distanceAu": 0.06189,
+        "axialTiltDegrees": 0,
+        "earthRadiusScale": 0.755,
+        "rotationRate": 0,
+        "primeMeridianDegJ2000": 315.0364,
+        "primeMeridianRateDegPerDay": 19.176613736,
+        "keplerian": {
+          "aKm": 9258612.2,
+          "e": 0.00567,
+          "iDeg": 0.027,
+          "OmegaDeg": 0,
+          "omegaDeg": 338.92,
+          "M0Deg": 156.1164,
+          "nDegPerDay": 19.176613736,
+          "OmegaDotDegPerDay": 0,
+          "omegaDotDegPerDay": 0
+        },
+        "placeFromElements": true
+      },
+      "system": {
+        "name": "TRAPPIST-1 h",
+        "initTag": "trappist_1_h",
+        "activationRadius": 800,
+        "lodThreshold": 20
+      },
+      "render": {
+        "shaderFlags": {
+          "hasNightTexture": false,
+          "hasSpecularMap": false,
+          "hasClouds": false
+        },
+        "ambientFactor": 0,
+        "procedural": {
+          "seed": 7,
+          "equilibriumTemperatureK": 171.7,
+          "style": "ice",
+          "mode": 3,
+          "colors": [
+            [
+              0.55,
+              0.6,
+              0.66
+            ],
+            [
+              0.82,
+              0.86,
+              0.9
+            ],
+            [
+              0.97,
+              0.98,
+              1
+            ]
+          ],
+          "seaLevel": 0.2,
+          "polarCap": 0.2,
+          "emissive": 0
+        }
+      },
+      "fit": {
+        "rotation": "tidally-locked"
+      },
+      "archive": {
+        "plName": "TRAPPIST-1 h",
+        "observedInclinationDeg": 89.805
+      },
+      "includeInCompanion": false
+    }
+  ]
+}

@@ -1,0 +1,27 @@
+# Captures the style the code already has: 4 spaces, attached braces, `public:` flush with
+# `class`, pointers/references bind to the type, ~120 columns. It is not applied to the whole
+# tree (the older code is partly hand-aligned); CI checks only the lines a change touches:
+#   git clang-format --diff origin/main        # what would change
+#   git clang-format origin/main               # apply it to your diff
+# Vendored code in src/3rdparty/ is excluded (see the .clang-format there).
+BasedOnStyle: LLVM
+Language: Cpp
+Standard: c++17
+IndentWidth: 4
+TabWidth: 4
+UseTab: Never
+ColumnLimit: 120
+AccessModifierOffset: -4
+IndentCaseLabels: true
+PointerAlignment: Left
+AllowShortFunctionsOnASingleLine: Inline
+AllowShortIfStatementsOnASingleLine: WithoutElse
+AllowShortLambdasOnASingleLine: All
+AllowShortCaseLabelsOnASingleLine: true
+AlignEscapedNewlines: Left
+AlwaysBreakTemplateDeclarations: Yes
+FixNamespaceComments: true
+# Include order carries meaning here (a project header before system ones in places), and
+# comments were wrapped by hand.
+SortIncludes: Never
+ReflowComments: false

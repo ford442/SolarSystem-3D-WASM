@@ -6,7 +6,7 @@
 #include <string>
 #include <vector>
 
-#include "Solar_System/BodyCatalog.generated.h"
+#include "Solar_System/BodyCatalog.h"
 #include "Solar_System/CatalogMaterial.h"
 #include "Solar_System/OrbitLayout.h"
 
@@ -16,7 +16,7 @@ TEST(BodyCatalogTest, FocusIndicesUnchanged) {
     EXPECT_EQ(static_cast<int>(OrbitLayout::Body::Pluto), 9);
     EXPECT_EQ(static_cast<int>(OrbitLayout::Body::Ceres), 10);
     EXPECT_EQ(static_cast<int>(OrbitLayout::Body::Vesta), 11);
-    EXPECT_EQ(OrbitLayout::kBodyCount, 12);
+    EXPECT_EQ(OrbitLayout::kBodyCount, 16);
 }
 
 TEST(BodyCatalogTest, MercuryThroughPlutoHaveCatalogRows) {
@@ -47,7 +47,7 @@ TEST(BodyCatalogTest, MoonAndIoAreCatalogSatellites) {
     EXPECT_STREQ(moon->initTag, "EarthSystem");
     EXPECT_FLOAT_EQ(moon->sceneOrbitRadius, 25.0f);
     EXPECT_GT(moon->keplerian.aKm, 0.0f);
-    EXPECT_EQ(moon->index, 12);
+    EXPECT_EQ(moon->index, 16);
 
     const BodyCatalog::Entry* io = BodyCatalog::FindById("io");
     ASSERT_NE(io, nullptr);
@@ -79,7 +79,7 @@ TEST(BodyCatalogTest, EarthKeepsNightAndCloudMaps) {
 TEST(BodyCatalogTest, MaterialFollowsShaderFlagsAndLodIds) {
     // CatalogMaterial reads shaderFlags only; the generator guarantees they match the lod ids
     // that decide which textures get loaded. Moons never carry night or cloud maps.
-    for (const BodyCatalog::Entry& entry : BodyCatalog::kEntries) {
+    for (const BodyCatalog::Entry& entry : BodyCatalog::Entries()) {
         const CatalogMaterial::Material material = CatalogMaterial::Material::FromEntry(entry);
         EXPECT_EQ(material.hasSpecular, entry.lod.specular != nullptr) << entry.id;
         EXPECT_EQ(material.hasNight, entry.lod.night != nullptr) << entry.id;
@@ -93,7 +93,7 @@ TEST(BodyCatalogTest, MaterialFollowsShaderFlagsAndLodIds) {
     }
 }
 
-// render.atmosphere replaced the hand-maintained SystemVisuals::kAtmospheres table. The
+// render.atmosphere replaced the hand-maintained SystemVisuals::kAtmospheres table (now BodyCatalog::kSolAtmospheres). The
 // O'Neil numbers must have moved across unchanged, or the Low preset would look different.
 TEST(BodyCatalogTest, OneilAtmosphereNumbersMovedFromSystemVisualsUnchanged) {
     struct Expected {
@@ -119,7 +119,7 @@ TEST(BodyCatalogTest, OneilAtmosphereNumbersMovedFromSystemVisualsUnchanged) {
         {"titan", 0.504136f, 40.0f / 255.0f, 33.0f / 255.0f, 72.0f / 255.0f, true, 0.8429210f,
          0.36862745f, 0.0666667f, 0.0196078f, 4.8f, false},
     };
-    EXPECT_EQ(std::size(BodyCatalog::kAtmospheres), std::size(expected));
+    EXPECT_EQ(BodyCatalog::Atmospheres().size(), std::size(expected));
     for (const Expected& e : expected) {
         const BodyCatalog::AtmosphereRow* row = BodyCatalog::FindAtmosphere(e.id);
         ASSERT_NE(row, nullptr) << e.id;
@@ -138,9 +138,9 @@ TEST(BodyCatalogTest, OneilAtmosphereNumbersMovedFromSystemVisualsUnchanged) {
     }
 }
 
-TEST(BodyCatalogTest, PhysicalAtmospheresAreEarthVenusMarsTitan) {
+TEST(BodyCatalogTest, PhysicalAtmospheresAreTerrestrialsTitanAndGiants) {
     std::vector<std::string> physical;
-    for (const BodyCatalog::AtmosphereRow& row : BodyCatalog::kAtmospheres) {
+    for (const BodyCatalog::AtmosphereRow& row : BodyCatalog::Atmospheres()) {
         if (!row.physical.enabled) {
             continue;
         }
@@ -154,7 +154,8 @@ TEST(BodyCatalogTest, PhysicalAtmospheresAreEarthVenusMarsTitan) {
         EXPECT_LE(p.mieScattering.b, p.mieExtinction.b) << row.bodyId;
     }
     std::sort(physical.begin(), physical.end());
-    EXPECT_EQ(physical, (std::vector<std::string>{"earth", "mars", "titan", "venus"}));
+    EXPECT_EQ(physical, (std::vector<std::string>{"earth", "jupiter", "mars", "neptune", "saturn", "titan", "uranus",
+                                                  "venus"}));
 }
 
 TEST(BodyCatalogTest, TitanAtmosphereIsAnOrdinaryCatalogRow) {

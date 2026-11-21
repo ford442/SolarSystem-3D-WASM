@@ -1,3 +1,4 @@
+import { required } from './dom';
 import { isoDateFromJulianDate, julianDateFromIsoDate, julianDateUtcNow } from './ephemeris';
 import type { SolarSystemRuntime } from './wasmBridge';
 
@@ -7,7 +8,8 @@ import type { SolarSystemRuntime } from './wasmBridge';
  * ObserveSky in C++. Everything here is UI around the typed runtime façade.
  *
  * Positions are a visualization, not an almanac: Standish planet series (~arcminute), a mean-
- * element Moon, UTC fed straight into sidereal time, and no refraction or nutation.
+ * element Moon, UTC fed straight into sidereal time, no nutation, and refraction for a standard
+ * atmosphere (1010 hPa, 10 °C) rather than the weather.
  */
 export interface ObserveState {
     active: boolean;
@@ -31,6 +33,9 @@ export interface ObserveState {
     /** Fraction (0–1) of the Sun's disc the Moon covers from this site; 1 is totality. */
     sunCoverage: number;
     starCount: number;
+    /** Whether the constellation stick figures are on, and how many segments the tier draws. */
+    constellations: boolean;
+    constellationSegments: number;
     /** Selenographic longitude/latitude of the sub-Earth point (the Moon's libration), degrees. */
     moonLibLonDeg: number;
     moonLibLatDeg: number;
@@ -77,12 +82,51 @@ export const OBSERVE_RATES: readonly { value: number; label: string }[] = [
  */
 export const ECLIPSE_2017 = {
     siteId: 'casper',
-    julianDate: julianDateFromIsoDate('2017-08-21')! + (17 + 43 / 60 + 45 / 3600) / 24,
+    julianDate:
+        required(julianDateFromIsoDate('2017-08-21'), 'the 2017-08-21 Julian date') + (17 + 43 / 60 + 45 / 3600) / 24,
     fovDeg: 10,
 } as const;
 
+/** At or below this vertical field of view Observe is "through a telescope": the eyepiece shows. */
+export const TELESCOPE_MAX_FOV_DEG = 2;
+
+/** Field Observe opens with, and what "Naked eye" returns to (ObserveState::kDefaultFovDeg). */
+export const NAKED_EYE_FOV_DEG = 60;
+
+/**
+ * Eyepiece choices, as the vertical field of view in degrees (0 = naked eye). No optics are
+ * simulated: a narrower field is just a narrower camera, so what changes is what fits in it.
+ */
+export const TELESCOPE_EYEPIECES: readonly { fovDeg: number; label: string }[] = [
+    { fovDeg: 0, label: 'Naked eye' },
+    { fovDeg: 2, label: '2° finder' },
+    { fovDeg: 1, label: '1° (twice the Moon)' },
+    { fovDeg: 0.5, label: '0.5° (the Moon fills it)' },
+    { fovDeg: 0.25, label: '0.25° (planets show discs)' },
+];
+
+const CUSTOM_EYEPIECE = 'custom';
+
+/** "0.25", "1.50", "45": two decimals below 10°, where they mean something. */
+export function formatFov(fovDeg: number): string {
+    return fovDeg < 10 ? fovDeg.toFixed(2) : String(Math.round(fovDeg));
+}
+
+export function isTelescopeFov(fovDeg: number): boolean {
+    return fovDeg <= TELESCOPE_MAX_FOV_DEG + 1e-3;
+}
+
+/**
+ * Field across the eyepiece circle: the circle spans the viewport's short side, and the camera FOV
+ * is vertical, so a landscape window sees the vertical field and a portrait one a share of it.
+ */
+export function eyepieceFieldDeg(fovDeg: number, viewportWidth: number, viewportHeight: number): number {
+    if (viewportHeight <= 0) return fovDeg;
+    return fovDeg * Math.min(1, viewportWidth / viewportHeight);
+}
+
 export const OBSERVE_DISCLAIMER =
-    'Visualization, not an almanac: planets ~arcminute, Sun and Moon a few arcseconds, no refraction, times are UTC.';
+    'Visualization, not an almanac: planets ~arcminute, Sun and Moon a few arcseconds, standard-atmosphere refraction, times are UTC.';
 
 const INACTIVE_STATE: ObserveState = {
     active: false,
@@ -104,6 +148,8 @@ const INACTIVE_STATE: ObserveState = {
     moonIllum: 0,
     sunCoverage: 0,
     starCount: 0,
+    constellations: true,
+    constellationSegments: 0,
     moonLibLonDeg: 0,
     moonLibLatDeg: 0,
     eventVisibility: 'none',
@@ -115,10 +161,11 @@ function finite(value: unknown, fallback: number): number {
 
 export function parseObserveStateJson(json: string): ObserveState {
     try {
-        const raw = JSON.parse(json) as Record<string, unknown>;
-        if (typeof raw !== 'object' || raw === null) {
+        const parsed: unknown = JSON.parse(json);
+        if (typeof parsed !== 'object' || parsed === null) {
             return INACTIVE_STATE;
         }
+        const raw = parsed as Record<string, unknown>;
         return {
             active: raw.active === true,
             latDeg: finite(raw.latDeg, INACTIVE_STATE.latDeg),
@@ -139,10 +186,14 @@ export function parseObserveStateJson(json: string): ObserveState {
             moonIllum: finite(raw.moonIllum, 0),
             sunCoverage: finite(raw.sunCoverage, 0),
             starCount: finite(raw.starCount, 0),
+            constellations: raw.constellations !== false,
+            constellationSegments: finite(raw.constellationSegments, 0),
             moonLibLonDeg: finite(raw.moonLibLonDeg, 0),
             moonLibLatDeg: finite(raw.moonLibLatDeg, 0),
-            eventVisibility: raw.eventVisibility === 'above' || raw.eventVisibility === 'below'
-                || raw.eventVisibility === 'unknown' ? raw.eventVisibility : 'none',
+            eventVisibility:
+                raw.eventVisibility === 'above' || raw.eventVisibility === 'below' || raw.eventVisibility === 'unknown'
+                    ? raw.eventVisibility
+                    : 'none',
         };
     } catch {
         return INACTIVE_STATE;
@@ -185,7 +236,8 @@ export function parseTimeOfDayDays(value: string): number | undefined {
     }
     const hours = Number(match[1]);
     const minutes = Number(match[2]);
-    const seconds = Number(match[3] ?? 0);
+    // Group 3 (:SS) is optional, so it is undefined when absent although the array type says string.
+    const seconds = Number((match[3] as string | undefined) ?? 0);
     if (hours > 23 || minutes > 59 || seconds > 59) {
         return undefined;
     }
@@ -217,6 +269,10 @@ export interface ObservePanelElements {
     lookSunButton: HTMLButtonElement;
     lookMoonButton: HTMLButtonElement;
     eclipseButton: HTMLButtonElement;
+    eyepieceSelect: HTMLSelectElement;
+    constellationsToggle: HTMLInputElement;
+    telescopeOverlay: HTMLElement;
+    telescopeLabel: HTMLElement;
     readout: HTMLElement;
     dateInput: HTMLInputElement;
     status: HTMLElement;
@@ -248,6 +304,11 @@ export interface ObservePanelController {
     /** Fraction of a day for the UTC time field; 0 when it is empty. */
     timeOfDayDays(): number;
     isActive(): boolean;
+    /**
+     * Observe stands on Earth, so it exists only in Sol (systems/index.json `observe`). Outside
+     * it the button is greyed out with `reason` as its tooltip; C++ refuses the mode as well.
+     */
+    setAvailable(available: boolean, reason?: string): void;
 }
 
 const STORAGE_KEY = 'solar-system.observe.v1';
@@ -257,6 +318,7 @@ interface PersistedObserve {
     latDeg?: number;
     lonDeg?: number;
     rate?: number;
+    constellations?: boolean;
 }
 
 function readPersisted(): PersistedObserve {
@@ -269,6 +331,7 @@ function readPersisted(): PersistedObserve {
             latDeg: typeof parsed.latDeg === 'number' && Number.isFinite(parsed.latDeg) ? parsed.latDeg : undefined,
             lonDeg: typeof parsed.lonDeg === 'number' && Number.isFinite(parsed.lonDeg) ? parsed.lonDeg : undefined,
             rate: typeof parsed.rate === 'number' && Number.isFinite(parsed.rate) ? parsed.rate : undefined,
+            constellations: typeof parsed.constellations === 'boolean' ? parsed.constellations : undefined,
         };
     } catch {
         return {};
@@ -302,6 +365,10 @@ export function initObservePanel(options: ObservePanelOptions): ObservePanelCont
         lookSunButton,
         lookMoonButton,
         eclipseButton,
+        eyepieceSelect,
+        constellationsToggle,
+        telescopeOverlay,
+        telescopeLabel,
         readout,
         dateInput,
         status,
@@ -314,10 +381,17 @@ export function initObservePanel(options: ObservePanelOptions): ObservePanelCont
     for (const rate of OBSERVE_RATES) {
         rateSelect.add(new Option(rate.label, String(rate.value)));
     }
+    for (const eyepiece of TELESCOPE_EYEPIECES) {
+        eyepieceSelect.add(new Option(eyepiece.label, String(eyepiece.fovDeg)));
+    }
+    // Shown only when scroll/pinch leaves the field between two eyepieces.
+    const customEyepiece = new Option('', CUSTOM_EYEPIECE);
+    customEyepiece.hidden = true;
+    eyepieceSelect.add(customEyepiece);
 
     const saved = readPersisted();
     const link = options.deepLink ?? {};
-    let activeSiteId = OBSERVER_SITES.some((site) => site.id === saved.siteId) ? saved.siteId! : DEFAULT_OBSERVER_SITE.id;
+    let activeSiteId = OBSERVER_SITES.find((site) => site.id === saved.siteId)?.id ?? DEFAULT_OBSERVER_SITE.id;
     let latDeg = link.lat ?? saved.latDeg ?? DEFAULT_OBSERVER_SITE.latDeg;
     let lonDeg = link.lon ?? saved.lonDeg ?? DEFAULT_OBSERVER_SITE.lonDeg;
     if (link.lat !== undefined || link.lon !== undefined) {
@@ -325,13 +399,14 @@ export function initObservePanel(options: ObservePanelOptions): ObservePanelCont
     } else if (saved.siteId === CUSTOM_SITE_ID) {
         activeSiteId = CUSTOM_SITE_ID;
     } else {
-        const site = OBSERVER_SITES.find((s) => s.id === activeSiteId)!;
+        const site = OBSERVER_SITES.find((s) => s.id === activeSiteId) ?? DEFAULT_OBSERVER_SITE;
         latDeg = site.latDeg;
         lonDeg = site.lonDeg;
     }
     latDeg = clampLatitude(latDeg);
     lonDeg = normalizeLongitude(lonDeg);
     let rate = link.rate ?? saved.rate ?? 1;
+    let constellations = saved.constellations ?? true;
 
     function matchingSiteId(lat: number, lon: number): string {
         const match = OBSERVER_SITES.find(
@@ -345,7 +420,7 @@ export function initObservePanel(options: ObservePanelOptions): ObservePanelCont
     }
 
     function persist(): void {
-        writePersisted({ siteId: activeSiteId, latDeg, lonDeg, rate });
+        writePersisted({ siteId: activeSiteId, latDeg, lonDeg, rate, constellations });
     }
 
     function showSiteFields(): void {
@@ -407,6 +482,35 @@ export function initObservePanel(options: ObservePanelOptions): ObservePanelCont
         runtime.setObserveView(azDeg, Math.max(-10, elDeg));
     }
 
+    // The wide field to go back to from the eyepiece: whatever it was when the telescope came out.
+    let nakedEyeFov = NAKED_EYE_FOV_DEG;
+
+    function showEyepiece(state: ObserveState): void {
+        const telescope = state.active && isTelescopeFov(state.fovDeg);
+        telescopeOverlay.hidden = !telescope;
+        if (state.active && !isTelescopeFov(state.fovDeg)) {
+            nakedEyeFov = state.fovDeg;
+        }
+        if (telescope) {
+            const field = eyepieceFieldDeg(state.fovDeg, window.innerWidth, window.innerHeight);
+            telescopeLabel.textContent = `Telescope · ${formatFov(field)}° field (the Moon is ~0.5°) · no optics simulated`;
+        }
+        if (document.activeElement === eyepieceSelect) {
+            return;
+        }
+        const match = TELESCOPE_EYEPIECES.find(
+            (eyepiece) => eyepiece.fovDeg > 0 && Math.abs(eyepiece.fovDeg - state.fovDeg) < 0.005,
+        );
+        if (match) {
+            eyepieceSelect.value = String(match.fovDeg);
+        } else if (!isTelescopeFov(state.fovDeg)) {
+            eyepieceSelect.value = '0';
+        } else {
+            customEyepiece.text = `${formatFov(state.fovDeg)}°`;
+            eyepieceSelect.value = CUSTOM_EYEPIECE;
+        }
+    }
+
     let lastActive = false;
 
     function renderMode(active: boolean): void {
@@ -423,6 +527,7 @@ export function initObservePanel(options: ObservePanelOptions): ObservePanelCont
     function refresh(): void {
         const state = runtime.getObserveState();
         renderMode(state.active);
+        showEyepiece(state);
         if (!state.active) {
             return;
         }
@@ -432,17 +537,32 @@ export function initObservePanel(options: ObservePanelOptions): ObservePanelCont
         if (document.activeElement !== dateInput) {
             dateInput.value = isoDateFromJulianDate(state.julianDate);
         }
-        const sunState = state.sunAltDeg > 0 ? 'day' : state.sunAltDeg > -6 ? 'civil twilight' : state.sunAltDeg > -18 ? 'twilight' : 'night';
+        const sunState =
+            state.sunAltDeg > 0
+                ? 'day'
+                : state.sunAltDeg > -6
+                  ? 'civil twilight'
+                  : state.sunAltDeg > -18
+                    ? 'twilight'
+                    : 'night';
         readout.textContent =
-            `Az ${Math.round(state.azDeg)}° Alt ${Math.round(state.elDeg)}° FOV ${Math.round(state.fovDeg)}° · ` +
+            `Az ${Math.round(state.azDeg)}° Alt ${Math.round(state.elDeg)}° FOV ${formatFov(state.fovDeg)}° · ` +
             `Sun ${state.sunAltDeg.toFixed(1)}° (${sunState}) · ` +
             `Moon ${state.moonAltDeg.toFixed(1)}°, ${Math.round(state.moonIllum * 100)}% lit · ` +
             `${state.starCount} stars` +
+            (state.constellations && state.constellationSegments > 0
+                ? `, ${state.constellationSegments} figure lines`
+                : '') +
             (state.sunCoverage > 0.001 ? ` · ${eclipseLabel(state.sunCoverage)}` : '');
     }
 
     // A shared link pins the epoch; the first entry from it holds still instead of jumping to now.
     let pinnedEpochPending = options.startInObserve && options.epochFromLink;
+
+    function applyConstellations(): void {
+        constellationsToggle.checked = constellations;
+        runtime.setObserveConstellations(constellations);
+    }
 
     function enterObserve(): void {
         applySite();
@@ -462,7 +582,12 @@ export function initObservePanel(options: ObservePanelOptions): ObservePanelCont
         status.textContent = 'Observe: look around with the mouse or touch; scroll to zoom';
     }
 
+    const observeTitle = observeButton.title;
+
     observeButton.addEventListener('click', () => {
+        if (observeButton.disabled) {
+            return;
+        }
         if (!runtime.getObserveMode()) {
             enterObserve();
         }
@@ -488,7 +613,7 @@ export function initObservePanel(options: ObservePanelOptions): ObservePanelCont
         }
         showSiteFields();
         applySite();
-        status.textContent = `Site: ${siteSelect.selectedOptions[0]?.text ?? ''}`;
+        status.textContent = `Site: ${siteSelect.selectedOptions.item(0)?.text ?? ''}`;
     });
 
     function onLatLonEdited(): void {
@@ -507,12 +632,14 @@ export function initObservePanel(options: ObservePanelOptions): ObservePanelCont
     lonInput.addEventListener('change', onLatLonEdited);
 
     locateButton.addEventListener('click', () => {
-        if (!navigator.geolocation) {
+        // Undefined in insecure contexts and some webviews, which lib.dom does not admit.
+        const geolocation = (navigator as { geolocation?: Geolocation }).geolocation;
+        if (!geolocation) {
             status.textContent = 'Geolocation is not available in this browser';
             return;
         }
         status.textContent = 'Asking the browser for your location…';
-        navigator.geolocation.getCurrentPosition(
+        geolocation.getCurrentPosition(
             (position) => {
                 latDeg = clampLatitude(position.coords.latitude);
                 lonDeg = normalizeLongitude(position.coords.longitude);
@@ -553,6 +680,26 @@ export function initObservePanel(options: ObservePanelOptions): ObservePanelCont
 
     rateSelect.addEventListener('change', () => applyRate(Number(rateSelect.value)));
 
+    eyepieceSelect.addEventListener('change', () => {
+        const fov = Number(eyepieceSelect.value);
+        if (!Number.isFinite(fov)) {
+            return; // the "custom" placeholder
+        }
+        runtime.setObserveFov(fov > 0 ? fov : nakedEyeFov);
+        refresh();
+        status.textContent =
+            fov > 0
+                ? `Telescope: ${formatFov(fov)}° field — scroll or pinch to zoom between eyepieces`
+                : `Naked eye: ${formatFov(nakedEyeFov)}° field`;
+    });
+
+    constellationsToggle.addEventListener('change', () => {
+        constellations = constellationsToggle.checked;
+        applyConstellations();
+        persist();
+        refresh();
+    });
+
     lookSunButton.addEventListener('click', () => {
         const state = runtime.getObserveState();
         lookAt(state.sunAzDeg, state.sunAltDeg);
@@ -563,7 +710,10 @@ export function initObservePanel(options: ObservePanelOptions): ObservePanelCont
     });
 
     eclipseButton.addEventListener('click', () => {
-        const site = OBSERVER_SITES.find((candidate) => candidate.id === ECLIPSE_2017.siteId)!;
+        const site = required(
+            OBSERVER_SITES.find((candidate) => candidate.id === ECLIPSE_2017.siteId),
+            `observer site '${ECLIPSE_2017.siteId}'`,
+        );
         activeSiteId = site.id;
         latDeg = site.latDeg;
         lonDeg = site.lonDeg;
@@ -577,7 +727,8 @@ export function initObservePanel(options: ObservePanelOptions): ObservePanelCont
         const state = runtime.getObserveState();
         lookAt(state.sunAzDeg, state.sunAltDeg);
         refresh();
-        status.textContent = '2017-08-21 17:43:45 UTC, Casper WY — mid-totality (visualization; Moon and Sun positions to a few arcseconds)';
+        status.textContent =
+            '2017-08-21 17:43:45 UTC, Casper WY — mid-totality (visualization; Moon and Sun positions to a few arcseconds)';
     });
 
     // Keep the buttons honest when C++ flips the mode itself (the native O key), and keep the
@@ -586,6 +737,7 @@ export function initObservePanel(options: ObservePanelOptions): ObservePanelCont
 
     showSiteFields();
     showRate();
+    applyConstellations();
     renderMode(false);
 
     if (options.startInObserve) {
@@ -608,5 +760,11 @@ export function initObservePanel(options: ObservePanelOptions): ObservePanelCont
     return {
         timeOfDayDays: () => parseTimeOfDayDays(timeInput.value) ?? 0,
         isActive: () => runtime.getObserveMode(),
+        setAvailable: (available, reason) => {
+            observeButton.disabled = !available;
+            observeButton.title = available ? observeTitle : (reason ?? observeTitle);
+            observeButton.setAttribute('aria-disabled', String(!available));
+            refresh();
+        },
     };
 }

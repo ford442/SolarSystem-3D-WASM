@@ -37,6 +37,12 @@ for arg in "$@"; do
             BUILD_TYPE=Debug
             shift
             ;;
+        --no-threads)
+            # Skip the pthread variant (SolarSystem-mt); the page then always runs the
+            # single-threaded build, with every job inline.
+            export SOLARSYSTEM_WEB_THREADS=0
+            shift
+            ;;
     esac
 done
 echo "CMake build type: $BUILD_TYPE"
@@ -71,21 +77,70 @@ fi
 
 # 4. Configure & Build
 echo "------------------------------------------------"
-# Create build directory in the Project Root
+# The web-release / web-debug presets in CMakePresets.json hold the configuration; this script
+# adds the environment (emsdk, ccache) and the deploy step. Debug builds get their own
+# directory so switching Debug<->Release no longer reconfigures one tree back and forth.
+PRESET=web-release
 BUILD_DIR="$PROJECT_ROOT/build-web"
-mkdir -p "$BUILD_DIR"
+if [ "$BUILD_TYPE" = "Debug" ]; then
+    PRESET=web-debug
+    BUILD_DIR="$PROJECT_ROOT/build-web-debug"
+fi
 
-# Run CMake (reconfigure when switching Debug↔Release; wipe build-web/ if flags look stale)
-echo "Running CMake configuration..."
-emcmake cmake \
-    -DCMAKE_BUILD_TYPE="$BUILD_TYPE" \
-    -B "$BUILD_DIR" \
-    "$PROJECT_ROOT"
+CMAKE_ARGS=(-DCMAKE_BUILD_TYPE="$BUILD_TYPE")
+# CI sets SOLARSYSTEM_WERROR=ON so a new warning fails the build; locally it is off.
+if [ -n "${SOLARSYSTEM_WERROR:-}" ]; then
+    CMAKE_ARGS+=(-DSOLARSYSTEM_WERROR="$SOLARSYSTEM_WERROR")
+fi
 
-# Build
-echo "Building project..."
+# emcc is a wrapper script, so ccache goes in through its own hook rather than CMake's launcher.
+if [ -z "${EM_COMPILER_WRAPPER:-}" ] && command -v ccache >/dev/null 2>&1; then
+    export EM_COMPILER_WRAPPER=ccache
+    echo "Using ccache for emcc."
+fi
+
+# The presets find the toolchain file through $EMSDK. emsdk_env.sh and setup-emsdk set it; when
+# only emcc is on PATH, derive it from emcc's location (<emsdk>/upstream/emscripten/emcc).
+if [ -z "${EMSDK:-}" ] && command -v emcc >/dev/null 2>&1; then
+    EMCC_DIR="$(dirname "$(readlink -f "$(command -v emcc)")")"
+    if [ -f "$EMCC_DIR/cmake/Modules/Platform/Emscripten.cmake" ] && [ "$(basename "$(dirname "$EMCC_DIR")")" = "upstream" ]; then
+        export EMSDK="$(cd "$EMCC_DIR/../.." && pwd)"
+    fi
+fi
+
+if [ -n "${EMSDK:-}" ] && [ -f "$EMSDK/upstream/emscripten/cmake/Modules/Platform/Emscripten.cmake" ]; then
+    echo "Running CMake preset $PRESET..."
+    (cd "$PROJECT_ROOT" && cmake --preset "$PRESET" "${CMAKE_ARGS[@]}")
+    echo "Building project..."
+    (cd "$PROJECT_ROOT" && cmake --build --preset "$PRESET" -j"$BUILD_JOBS")
+else
+    # A distro-packaged emscripten has no emsdk layout, so the preset's toolchain path does not
+    # resolve. emcmake supplies the toolchain itself.
+    echo "No emsdk layout found; configuring with emcmake instead of the $PRESET preset."
+    mkdir -p "$BUILD_DIR"
+    emcmake cmake "${CMAKE_ARGS[@]}" -DCMAKE_EXPORT_COMPILE_COMMANDS=ON -B "$BUILD_DIR" "$PROJECT_ROOT"
+    echo "Building project..."
+    cmake --build "$BUILD_DIR" -j"$BUILD_JOBS"
+fi
+
+# The pthread variant (Release only): same sources with -pthread, output SolarSystem-mt.*.
+# bootstrap.ts loads it on a cross-origin isolated page (docs/CROSS_ORIGIN_HEADERS.md).
+BUILD_THREADS=false
+MT_BUILD_DIR="$PROJECT_ROOT/build-web-mt"
+if [ "${SOLARSYSTEM_WEB_THREADS:-1}" != "0" ] && [ "$BUILD_TYPE" = "Release" ]; then
+    BUILD_THREADS=true
+    if [ -n "${EMSDK:-}" ] && [ -f "$EMSDK/upstream/emscripten/cmake/Modules/Platform/Emscripten.cmake" ]; then
+        echo "Running CMake preset web-release-mt..."
+        (cd "$PROJECT_ROOT" && cmake --preset web-release-mt "${CMAKE_ARGS[@]}")
+        (cd "$PROJECT_ROOT" && cmake --build --preset web-release-mt -j"$BUILD_JOBS")
+    else
+        mkdir -p "$MT_BUILD_DIR"
+        emcmake cmake "${CMAKE_ARGS[@]}" -DSOLARSYSTEM_WEB_THREADS=ON -DCMAKE_EXPORT_COMPILE_COMMANDS=ON \
+            -B "$MT_BUILD_DIR" "$PROJECT_ROOT"
+        cmake --build "$MT_BUILD_DIR" -j"$BUILD_JOBS"
+    fi
+fi
 cd "$BUILD_DIR"
-emmake make -j"$BUILD_JOBS"
 
 # 5. Deploy to Web Frontend
 echo "------------------------------------------------"
@@ -137,10 +192,30 @@ if [ -f "SolarSystem.data" ]; then
     echo "Copied SolarSystem.data to web/public/"
 fi
 
+# The threaded glue goes to public/, not src/: Vite must not bundle it, because its workers
+# import the same file again by URL. Both variants preload the same files, so they share
+# SolarSystem.data (bootstrap.ts's locateFile maps SolarSystem-mt.data to it); refuse to
+# deploy if the two packages ever differ.
+rm -f "$PROJECT_ROOT/web/public/SolarSystem-mt.js" "$PROJECT_ROOT/web/public/SolarSystem-mt.wasm"
+if [ "$BUILD_THREADS" = true ]; then
+    if ! cmp -s "$MT_BUILD_DIR/SolarSystem-mt.data" "SolarSystem.data"; then
+        echo "Error: SolarSystem-mt.data differs from SolarSystem.data; the variants must share one package."
+        exit 1
+    fi
+    cp "$MT_BUILD_DIR/SolarSystem-mt.js" "$MT_BUILD_DIR/SolarSystem-mt.wasm" "$PROJECT_ROOT/web/public/"
+    echo "Copied SolarSystem-mt.js and SolarSystem-mt.wasm to web/public/"
+fi
+
 echo ""
 echo "Artifact sizes ($BUILD_TYPE):"
 if [ -f "$PROJECT_ROOT/web/public/SolarSystem.wasm" ]; then
-    wc -c "$PROJECT_ROOT/web/public/SolarSystem.wasm" "$PROJECT_ROOT/web/src/SolarSystem.js" 2>/dev/null || true
+    wc -c "$PROJECT_ROOT/web/public/SolarSystem.wasm" "$PROJECT_ROOT/web/public/SolarSystem.data" \
+        "$PROJECT_ROOT/web/src/SolarSystem.js" "$PROJECT_ROOT/web/public/SolarSystem-mt.wasm" \
+        "$PROJECT_ROOT/web/public/SolarSystem-mt.js" 2>/dev/null || true
+fi
+# Release only: minified name -> original name, for reading Closure-renamed stacks.
+if [ -f "SolarSystem.js.symbols" ]; then
+    echo "Symbol map kept at $BUILD_DIR/SolarSystem.js.symbols (not deployed)"
 fi
 echo ""
 echo "Build & Deployment Complete!"

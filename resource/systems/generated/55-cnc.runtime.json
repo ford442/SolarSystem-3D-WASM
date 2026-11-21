@@ -1,0 +1,616 @@
+{
+  "format": "solarsystem-runtime-catalog",
+  "version": 1,
+  "generatedFrom": "resource/systems/55-cnc.catalog.json",
+  "id": "55-cnc",
+  "name": {
+    "en": "55 Cancri",
+    "ru": "55 Рака"
+  },
+  "distancePc": 12.586,
+  "spectralType": "G8 V",
+  "habitableZoneAu": {
+    "innerAu": 0.76003,
+    "outerAu": 1.09493
+  },
+  "star": {
+    "id": "55_cnc",
+    "displayNameEn": "55 Cancri",
+    "displayNameRu": "55 Рака",
+    "spectralType": "G8 V",
+    "effectiveTemperatureK": 5172,
+    "glowTemperatureK": 5778,
+    "radiusKm": 656045.1,
+    "radiusSolar": 0.943,
+    "luminositySolar": 0.6354041,
+    "massSolar": 0.905,
+    "activity": 0,
+    "cyclePeriodYears": 0,
+    "cycleMinimumYear": 0,
+    "cycleAtMinimum": 0,
+    "cycleMeanPeakSunspots": 0
+  },
+  "layout": [
+    {
+      "index": 0,
+      "id": "55_cnc",
+      "compressedOffset": [
+        0,
+        0,
+        0
+      ],
+      "auDistance": 0,
+      "orbitalPeriodDays": 0,
+      "inclinationDeg": 0,
+      "siderealRotationDays": 0,
+      "primeMeridianDegJ2000": 0,
+      "primeMeridianRateDegPerDay": 0,
+      "trueRadius": false,
+      "kepler": null
+    },
+    {
+      "index": 1,
+      "id": "55_cnc_e",
+      "compressedOffset": [
+        1500,
+        0,
+        0
+      ],
+      "auDistance": 0.01544,
+      "orbitalPeriodDays": 0.7365474,
+      "inclinationDeg": -6.14,
+      "siderealRotationDays": 0.736547,
+      "primeMeridianDegJ2000": 271.3357,
+      "primeMeridianRateDegPerDay": 488.76691439,
+      "trueRadius": false,
+      "kepler": {
+        "aAu": 0.015439999842190268,
+        "e": 0.05,
+        "iDeg": -6.14,
+        "OmegaDeg": 0,
+        "omegaDeg": 86,
+        "M0Deg": 5.3357,
+        "nDegPerDay": 488.76691439
+      }
+    },
+    {
+      "index": 2,
+      "id": "55_cnc_b",
+      "compressedOffset": [
+        -1290.4,
+        0,
+        1182.11
+      ],
+      "auDistance": 0.118,
+      "orbitalPeriodDays": 14.651552,
+      "inclinationDeg": 0,
+      "siderealRotationDays": 14.651552,
+      "primeMeridianDegJ2000": 40.5102,
+      "primeMeridianRateDegPerDay": 24.570775847,
+      "trueRadius": false,
+      "kepler": {
+        "aAu": 0.11799999971523659,
+        "e": 0.0029,
+        "iDeg": 0,
+        "OmegaDeg": 0,
+        "omegaDeg": 23,
+        "M0Deg": 197.5102,
+        "nDegPerDay": 24.570775847
+      }
+    },
+    {
+      "index": 3,
+      "id": "55_cnc_c",
+      "compressedOffset": [
+        174.85,
+        0,
+        -1992.34
+      ],
+      "auDistance": 0.247,
+      "orbitalPeriodDays": 44.3936,
+      "inclinationDeg": 0,
+      "siderealRotationDays": 1,
+      "primeMeridianDegJ2000": 0,
+      "primeMeridianRateDegPerDay": 360,
+      "trueRadius": false,
+      "kepler": {
+        "aAu": 0.2470000002479982,
+        "e": 0.088,
+        "iDeg": 0,
+        "OmegaDeg": 0,
+        "omegaDeg": 31,
+        "M0Deg": 89.5771,
+        "nDegPerDay": 8.109277013
+      }
+    },
+    {
+      "index": 4,
+      "id": "55_cnc_f",
+      "compressedOffset": [
+        1368.99,
+        0,
+        1785.6
+      ],
+      "auDistance": 0.802,
+      "orbitalPeriodDays": 260.58,
+      "inclinationDeg": 0,
+      "siderealRotationDays": 1,
+      "primeMeridianDegJ2000": 0,
+      "primeMeridianRateDegPerDay": 360,
+      "trueRadius": false,
+      "kepler": {
+        "aAu": 0.8019999999906416,
+        "e": 0.063,
+        "iDeg": 0,
+        "OmegaDeg": 0,
+        "omegaDeg": 100,
+        "M0Deg": 291.4048,
+        "nDegPerDay": 1.381533502
+      }
+    },
+    {
+      "index": 5,
+      "id": "55_cnc_d",
+      "compressedOffset": [
+        -2461.78,
+        0,
+        -435.45
+      ],
+      "auDistance": 5.6,
+      "orbitalPeriodDays": 4799,
+      "inclinationDeg": 0,
+      "siderealRotationDays": 1,
+      "primeMeridianDegJ2000": 0,
+      "primeMeridianRateDegPerDay": 360,
+      "trueRadius": false,
+      "kepler": {
+        "aAu": 5.599999999866308,
+        "e": 0.0913,
+        "iDeg": 0,
+        "OmegaDeg": 0,
+        "omegaDeg": 270,
+        "M0Deg": 182.0404,
+        "nDegPerDay": 0.075015628
+      }
+    }
+  ],
+  "entries": [
+    {
+      "index": 1,
+      "id": "55_cnc_e",
+      "parentId": "55_cnc",
+      "initTag": "55_cnc_e",
+      "kind": "planet",
+      "displayNameEn": "55 Cancri e",
+      "displayNameRu": "55 Рака e",
+      "auDistance": 0.01544,
+      "orbitalPeriodDays": 0.7365474,
+      "earthRadiusScale": 1.875,
+      "radiusKm": 11945.5,
+      "axialTiltDegrees": 0,
+      "artTiltXDegrees": 0,
+      "oblateness": 0,
+      "yawOffsetDegrees": 0,
+      "artRollDegrees": 0,
+      "shaderFlags": {
+        "hasNightTexture": false,
+        "hasSpecularMap": false,
+        "hasClouds": false
+      },
+      "useSphereIntersect": false,
+      "ambientFactor": 0,
+      "lod": {
+        "diffuse": "",
+        "normal": "",
+        "specular": null,
+        "night": null,
+        "clouds": null
+      },
+      "meshPath": null,
+      "sceneOrbitRadius": 0,
+      "orbitPlane": "xz",
+      "initialAnomalyRad": 0,
+      "spinDegPerSimSecond": 0,
+      "keplerian": {
+        "aKm": 2309791.1,
+        "e": 0.05,
+        "iDeg": -6.14,
+        "OmegaDeg": 0,
+        "omegaDeg": 86,
+        "M0Deg": 5.3357,
+        "nDegPerDay": 488.76691439,
+        "OmegaDotDegPerDay": 0,
+        "omegaDotDegPerDay": 0
+      },
+      "cloudLayer": {
+        "diffuse": null,
+        "normal": null,
+        "scaleFactor": 0,
+        "spinDegPerSimSecond": 0,
+        "ambientFactor": 0
+      },
+      "hasCloudLayer": false,
+      "hasRings": false,
+      "hasTerrain": false,
+      "terrainAttribution": null,
+      "procedural": {
+        "enabled": true,
+        "mode": 2,
+        "seed": 1,
+        "colors": [
+          [
+            0.05,
+            0.04,
+            0.04
+          ],
+          [
+            0.2,
+            0.12,
+            0.09
+          ],
+          [
+            1,
+            0.38,
+            0.06
+          ]
+        ],
+        "bands": 0,
+        "seaLevel": 0.55,
+        "polarCap": 0,
+        "emissive": 1.4,
+        "equilibriumTemperatureK": 1958
+      },
+      "placeFromElements": true
+    },
+    {
+      "index": 2,
+      "id": "55_cnc_b",
+      "parentId": "55_cnc",
+      "initTag": "55_cnc_b",
+      "kind": "planet",
+      "displayNameEn": "55 Cancri b",
+      "displayNameRu": "55 Рака b",
+      "auDistance": 0.118,
+      "orbitalPeriodDays": 14.651552,
+      "earthRadiusScale": 13.9,
+      "radiusKm": 88557,
+      "axialTiltDegrees": 0,
+      "artTiltXDegrees": 0,
+      "oblateness": 0,
+      "yawOffsetDegrees": 0,
+      "artRollDegrees": 0,
+      "shaderFlags": {
+        "hasNightTexture": false,
+        "hasSpecularMap": false,
+        "hasClouds": false
+      },
+      "useSphereIntersect": false,
+      "ambientFactor": 0,
+      "lod": {
+        "diffuse": "",
+        "normal": "",
+        "specular": null,
+        "night": null,
+        "clouds": null
+      },
+      "meshPath": null,
+      "sceneOrbitRadius": 0,
+      "orbitPlane": "xz",
+      "initialAnomalyRad": 0,
+      "spinDegPerSimSecond": 0,
+      "keplerian": {
+        "aKm": 17652548.7,
+        "e": 0.0029,
+        "iDeg": 0,
+        "OmegaDeg": 0,
+        "omegaDeg": 23,
+        "M0Deg": 197.5102,
+        "nDegPerDay": 24.570775847,
+        "OmegaDotDegPerDay": 0,
+        "omegaDotDegPerDay": 0
+      },
+      "cloudLayer": {
+        "diffuse": null,
+        "normal": null,
+        "scaleFactor": 0,
+        "spinDegPerSimSecond": 0,
+        "ambientFactor": 0
+      },
+      "hasCloudLayer": false,
+      "hasRings": false,
+      "hasTerrain": false,
+      "terrainAttribution": null,
+      "procedural": {
+        "enabled": true,
+        "mode": 1,
+        "seed": 2,
+        "colors": [
+          [
+            0.5,
+            0.38,
+            0.25
+          ],
+          [
+            0.82,
+            0.7,
+            0.52
+          ],
+          [
+            0.95,
+            0.9,
+            0.8
+          ]
+        ],
+        "bands": 12,
+        "seaLevel": 0,
+        "polarCap": 0,
+        "emissive": 0,
+        "equilibriumTemperatureK": 700
+      },
+      "placeFromElements": true
+    },
+    {
+      "index": 3,
+      "id": "55_cnc_c",
+      "parentId": "55_cnc",
+      "initTag": "55_cnc_c",
+      "kind": "planet",
+      "displayNameEn": "55 Cancri c",
+      "displayNameRu": "55 Рака c",
+      "auDistance": 0.247,
+      "orbitalPeriodDays": 44.3936,
+      "earthRadiusScale": 8.51,
+      "radiusKm": 54217,
+      "axialTiltDegrees": 0,
+      "artTiltXDegrees": 0,
+      "oblateness": 0,
+      "yawOffsetDegrees": 0,
+      "artRollDegrees": 0,
+      "shaderFlags": {
+        "hasNightTexture": false,
+        "hasSpecularMap": false,
+        "hasClouds": false
+      },
+      "useSphereIntersect": false,
+      "ambientFactor": 0,
+      "lod": {
+        "diffuse": "",
+        "normal": "",
+        "specular": null,
+        "night": null,
+        "clouds": null
+      },
+      "meshPath": null,
+      "sceneOrbitRadius": 0,
+      "orbitPlane": "xz",
+      "initialAnomalyRad": 0,
+      "spinDegPerSimSecond": 0,
+      "keplerian": {
+        "aKm": 36950674.1,
+        "e": 0.088,
+        "iDeg": 0,
+        "OmegaDeg": 0,
+        "omegaDeg": 31,
+        "M0Deg": 89.5771,
+        "nDegPerDay": 8.109277013,
+        "OmegaDotDegPerDay": 0,
+        "omegaDotDegPerDay": 0
+      },
+      "cloudLayer": {
+        "diffuse": null,
+        "normal": null,
+        "scaleFactor": 0,
+        "spinDegPerSimSecond": 0,
+        "ambientFactor": 0
+      },
+      "hasCloudLayer": false,
+      "hasRings": false,
+      "hasTerrain": false,
+      "terrainAttribution": null,
+      "procedural": {
+        "enabled": true,
+        "mode": 1,
+        "seed": 3,
+        "colors": [
+          [
+            0.5,
+            0.38,
+            0.25
+          ],
+          [
+            0.82,
+            0.7,
+            0.52
+          ],
+          [
+            0.95,
+            0.9,
+            0.8
+          ]
+        ],
+        "bands": 12,
+        "seaLevel": 0,
+        "polarCap": 0,
+        "emissive": 0,
+        "equilibriumTemperatureK": 499.3
+      },
+      "placeFromElements": true
+    },
+    {
+      "index": 4,
+      "id": "55_cnc_f",
+      "parentId": "55_cnc",
+      "initTag": "55_cnc_f",
+      "kind": "planet",
+      "displayNameEn": "55 Cancri f",
+      "displayNameRu": "55 Рака f",
+      "auDistance": 0.802,
+      "orbitalPeriodDays": 260.58,
+      "earthRadiusScale": 7.59,
+      "radiusKm": 48356,
+      "axialTiltDegrees": 0,
+      "artTiltXDegrees": 0,
+      "oblateness": 0,
+      "yawOffsetDegrees": 0,
+      "artRollDegrees": 0,
+      "shaderFlags": {
+        "hasNightTexture": false,
+        "hasSpecularMap": false,
+        "hasClouds": false
+      },
+      "useSphereIntersect": false,
+      "ambientFactor": 0,
+      "lod": {
+        "diffuse": "",
+        "normal": "",
+        "specular": null,
+        "night": null,
+        "clouds": null
+      },
+      "meshPath": null,
+      "sceneOrbitRadius": 0,
+      "orbitPlane": "xz",
+      "initialAnomalyRad": 0,
+      "spinDegPerSimSecond": 0,
+      "keplerian": {
+        "aKm": 119977492.3,
+        "e": 0.063,
+        "iDeg": 0,
+        "OmegaDeg": 0,
+        "omegaDeg": 100,
+        "M0Deg": 291.4048,
+        "nDegPerDay": 1.381533502,
+        "OmegaDotDegPerDay": 0,
+        "omegaDotDegPerDay": 0
+      },
+      "cloudLayer": {
+        "diffuse": null,
+        "normal": null,
+        "scaleFactor": 0,
+        "spinDegPerSimSecond": 0,
+        "ambientFactor": 0
+      },
+      "hasCloudLayer": false,
+      "hasRings": false,
+      "hasTerrain": false,
+      "terrainAttribution": null,
+      "procedural": {
+        "enabled": true,
+        "mode": 1,
+        "seed": 4,
+        "colors": [
+          [
+            0.55,
+            0.58,
+            0.6
+          ],
+          [
+            0.78,
+            0.76,
+            0.68
+          ],
+          [
+            0.92,
+            0.9,
+            0.85
+          ]
+        ],
+        "bands": 10,
+        "seaLevel": 0,
+        "polarCap": 0,
+        "emissive": 0,
+        "equilibriumTemperatureK": 277.1
+      },
+      "placeFromElements": true
+    },
+    {
+      "index": 5,
+      "id": "55_cnc_d",
+      "parentId": "55_cnc",
+      "initTag": "55_cnc_d",
+      "kind": "planet",
+      "displayNameEn": "55 Cancri d",
+      "displayNameRu": "55 Рака d",
+      "auDistance": 5.6,
+      "orbitalPeriodDays": 4799,
+      "earthRadiusScale": 13,
+      "radiusKm": 82823,
+      "axialTiltDegrees": 0,
+      "artTiltXDegrees": 0,
+      "oblateness": 0,
+      "yawOffsetDegrees": 0,
+      "artRollDegrees": 0,
+      "shaderFlags": {
+        "hasNightTexture": false,
+        "hasSpecularMap": false,
+        "hasClouds": false
+      },
+      "useSphereIntersect": false,
+      "ambientFactor": 0,
+      "lod": {
+        "diffuse": "",
+        "normal": "",
+        "specular": null,
+        "night": null,
+        "clouds": null
+      },
+      "meshPath": null,
+      "sceneOrbitRadius": 0,
+      "orbitPlane": "xz",
+      "initialAnomalyRad": 0,
+      "spinDegPerSimSecond": 0,
+      "keplerian": {
+        "aKm": 837748075.9,
+        "e": 0.0913,
+        "iDeg": 0,
+        "OmegaDeg": 0,
+        "omegaDeg": 270,
+        "M0Deg": 182.0404,
+        "nDegPerDay": 0.075015628,
+        "OmegaDotDegPerDay": 0,
+        "omegaDotDegPerDay": 0
+      },
+      "cloudLayer": {
+        "diffuse": null,
+        "normal": null,
+        "scaleFactor": 0,
+        "spinDegPerSimSecond": 0,
+        "ambientFactor": 0
+      },
+      "hasCloudLayer": false,
+      "hasRings": false,
+      "hasTerrain": false,
+      "terrainAttribution": null,
+      "procedural": {
+        "enabled": true,
+        "mode": 1,
+        "seed": 5,
+        "colors": [
+          [
+            0.55,
+            0.58,
+            0.6
+          ],
+          [
+            0.78,
+            0.76,
+            0.68
+          ],
+          [
+            0.92,
+            0.9,
+            0.85
+          ]
+        ],
+        "bands": 10,
+        "seaLevel": 0,
+        "polarCap": 0,
+        "emissive": 0,
+        "equilibriumTemperatureK": 104.9
+      },
+      "placeFromElements": true
+    }
+  ],
+  "atmospheres": [],
+  "auroras": []
+}

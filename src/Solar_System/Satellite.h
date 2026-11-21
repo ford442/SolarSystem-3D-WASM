@@ -3,25 +3,24 @@
 #include "SpaceObject.h"
 #include "Star.h"
 #include "TexturePaths.h"
-#include "../Auxiliary_Modules/TextureImage2D.h"
-#include "../Auxiliary_Modules/TextureLODController.h"
+#include "../gfx/TextureImage2D.h"
+#include "../assets/TextureLODController.h"
 #include <vector>
 #include <memory>
 
 struct SatelliteInfo {
     MeshHolder satelliteModel;
     float earthSizeCoefficient;
-    const Shader* satelliteShader;
     std::vector<TextureImage2D> diffuseTextures;
     TextureImage2D normalMap;
     TextureImage2D specularTexture;
     std::wstring engName;
     std::wstring otherLangName;
 
-    explicit SatelliteInfo(MeshHolder model, float earthSizeCoefficient, const Shader& shader, std::vector<TextureImage2D> diffuses, const TextureImage2D& normalMap,
-                       std::wstring engName = L"", std::wstring otherLangName = L"", const TextureImage2D& specular = TextureImage2D()) :
-                       satelliteModel(std::move(model)), earthSizeCoefficient(earthSizeCoefficient), satelliteShader(&shader),
-                       diffuseTextures(std::move(diffuses)), normalMap(normalMap), specularTexture(specular), engName(std::move(engName)),
+    explicit SatelliteInfo(MeshHolder model, float earthSizeCoefficient, std::vector<TextureImage2D> diffuses, TextureImage2D normalMap,
+                       std::wstring engName = L"", std::wstring otherLangName = L"", TextureImage2D specular = TextureImage2D()) :
+                       satelliteModel(std::move(model)), earthSizeCoefficient(earthSizeCoefficient),
+                       diffuseTextures(std::move(diffuses)), normalMap(std::move(normalMap)), specularTexture(std::move(specular)), engName(std::move(engName)),
                        otherLangName(std::move(otherLangName)) {}
 };
 
@@ -31,8 +30,8 @@ public:
     std::shared_ptr<SpaceObject> GetParent() const;
     float GetRadius() const;
     float GetEarthSizeCoefficient() const;
-    void LoadHighResIfClose(const glm::vec3& cameraPosition);
-    virtual void AdjustToParent(float timeScale) = 0;
+    void LoadHighResIfClose(const glm::vec3& cameraPosition, const TextureLodPolicy& policy);
+    virtual void AdjustToParent() = 0;
 
     /**
      * Whether this moon is currently placed from the ephemeris rather than from a circular

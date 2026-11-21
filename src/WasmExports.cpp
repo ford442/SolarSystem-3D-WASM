@@ -4,15 +4,29 @@
 #include "QualitySettings.h"
 #include "SimState.h"
 #include "Solar_System/OrbitLayout.h"
+#include "gfx/Shader.h"
 #include <algorithm>
 #include <cmath>
 #include <cstdio>
 #include <glm/glm.hpp>
 #include <string>
 
+#ifdef __EMSCRIPTEN__
+#include "Solar_System/StarSystemCatalog.h"
+#endif
+
 namespace {
     Application* activeApplication = nullptr;
 
+#ifdef __EMSCRIPTEN__
+    // Settings written before the Application exists (or after it is gone) land here and
+    // are dropped, as they were with the old global fallback.
+    SimState& Sim() {
+        static SimState fallback;
+        return activeApplication ? activeApplication->GetSimState() : fallback;
+    }
+
+    // Used by the extern "C" exports below only; native builds have no JS to call them.
     float g_touchForward = 0.0f;
     float g_touchRight = 0.0f;
     float g_touchVertical = 0.0f;
@@ -24,6 +38,7 @@ namespace {
         NotifySettingsChanged("magneticFields");
         NotifySettingsChanged("magneticFieldMode");
     }
+#endif
 }
 
 Application* GetActiveApplication() {
@@ -48,36 +63,36 @@ extern "C" {
     // If the web API grows to return planet lists or settings snapshots,
     // migrate those structured values to embind then; keep these scalars as
     // cwrap. See docs/plans/PORTING_GUIDE.md § JS control surface.
-    EMSCRIPTEN_KEEPALIVE void SetCameraPose(float x, float y, float z, float yaw, float pitch) {
+    // Heliocentric scene position, in double: on realistic scale a pose at Neptune needs
+    // more digits than a float carries (see OrbitLayout's render origin).
+    EMSCRIPTEN_KEEPALIVE void SetCameraPose(double x, double y, double z, float yaw, float pitch) {
         if (!activeApplication) return;
         if (activeApplication->IsObserveActive()) return; // Observe keeps the viewer on the ground
-        Camera& cam = activeApplication->GetCamera();
-        cam.SetPosition(glm::vec3(x, y, z));
-        cam.SetYawPitch(yaw, pitch);
+        activeApplication->SetCameraHeliocentricPose(glm::dvec3(x, y, z), yaw, pitch);
     }
     EMSCRIPTEN_KEEPALIVE void SetQualityPreset(int preset) {
-        gSimState->qualityPreset = (preset < 0 ? 0 : preset > 2 ? 2 : preset);
+        Sim().qualityPreset = (preset < 0 ? 0 : preset > 2 ? 2 : preset);
         if (activeApplication) {
-            activeApplication->ApplyQualityPreset(gSimState->qualityPreset);
+            activeApplication->ApplyQualityPreset(Sim().qualityPreset);
         }
         NotifySettingsChanged("quality");
     }
     EMSCRIPTEN_KEEPALIVE int GetQualityPreset() {
-        return gSimState->qualityPreset;
+        return Sim().qualityPreset;
     }
     EMSCRIPTEN_KEEPALIVE void SetTimeScale(float scale) {
-        gSimState->timeScale = glm::clamp(scale, 0.01f, 10000.0f);
+        Sim().timeScale = glm::clamp(scale, 0.01f, 10000.0f);
         NotifySettingsChanged("timeScale");
     }
     EMSCRIPTEN_KEEPALIVE float GetTimeScale() {
-        return gSimState->timeScale;
+        return Sim().timeScale;
     }
     EMSCRIPTEN_KEEPALIVE void SetPaused(bool paused) {
-        gSimState->timePaused = paused;
+        Sim().timePaused = paused;
         NotifySettingsChanged("paused");
     }
     EMSCRIPTEN_KEEPALIVE int GetPaused() {
-        return gSimState->timePaused ? 1 : 0;
+        return Sim().timePaused ? 1 : 0;
     }
     EMSCRIPTEN_KEEPALIVE void SetSimulationEpoch(double julianDate) {
         OrbitLayout::SetJulianDate(julianDate);
@@ -90,12 +105,12 @@ extern "C" {
         if (activeApplication) {
             activeApplication->ApplyShadowQuality(quality);
         } else {
-            gSimState->shadowQuality = std::clamp(quality, 0, 3);
+            Sim().shadowQuality = std::clamp(quality, 0, 3);
         }
         NotifySettingsChanged("shadowQuality");
     }
     EMSCRIPTEN_KEEPALIVE int GetShadowQuality() {
-        return gSimState->shadowQuality;
+        return Sim().shadowQuality;
     }
     EMSCRIPTEN_KEEPALIVE void SetTouchMovement(float forward, float right, float vertical) {
         g_touchForward = glm::clamp(forward, -1.0f, 1.0f);
@@ -113,25 +128,7 @@ extern "C" {
         }
     }
     EMSCRIPTEN_KEEPALIVE int IsMobileWeb() {
-        return gSimState->isMobileWeb ? 1 : 0;
-    }
-    EMSCRIPTEN_KEEPALIVE void SetMusicVolume(float volume) {
-        if (activeApplication) {
-            activeApplication->SetMusicVolume(volume);
-        }
-        NotifySettingsChanged("musicVolume");
-    }
-    EMSCRIPTEN_KEEPALIVE float GetMusicVolume() {
-        return activeApplication ? activeApplication->GetMusicVolume() : 0.3f;
-    }
-    EMSCRIPTEN_KEEPALIVE void SetMusicMuted(int muted) {
-        if (activeApplication) {
-            activeApplication->SetMusicMuted(muted != 0);
-        }
-        NotifySettingsChanged("musicMuted");
-    }
-    EMSCRIPTEN_KEEPALIVE int GetMusicMuted() {
-        return activeApplication && activeApplication->GetMusicMuted() ? 1 : 0;
+        return Sim().isMobileWeb ? 1 : 0;
     }
     EMSCRIPTEN_KEEPALIVE void FocusPlanet(int idx) {
         if (activeApplication) {
@@ -156,10 +153,40 @@ extern "C" {
         json = activeApplication ? activeApplication->GetMissionCatalogJson() : "[]";
         return json.c_str();
     }
+    // The last frame's profile (core/FrameProfile.h) for ?perf=1's HUD; each read also
+    // restarts the "worst frame since the last read" window.
+    EMSCRIPTEN_KEEPALIVE const char* GetFrameStatsJson() {
+        static std::string json = "{}";
+        json = activeApplication ? activeApplication->GetFrameStatsJson() : "{}";
+        return json.c_str();
+    }
+    EMSCRIPTEN_KEEPALIVE void SetGpuTimersEnabled(int enabled) {
+        if (activeApplication) {
+            activeApplication->SetGpuTimersEnabled(enabled != 0);
+        }
+    }
     EMSCRIPTEN_KEEPALIVE const char* GetFocusedMissionJson() {
         static std::string json = R"({"valid":false})";
         json = activeApplication ? activeApplication->GetFocusedMissionJson() : R"({"valid":false})";
         return json.c_str();
+    }
+    // Star systems (docs/ARCHITECTURE.md §12). `id` is a resource/systems/index.json id;
+    // focusIndex picks the landing body (-1: the system's Earth-like planet). 1 if the jump
+    // started (Module['onSystemChanged'] reports its phases), 0 for an unknown id.
+    EMSCRIPTEN_KEEPALIVE int LoadStarSystem(const char* id, int focusIndex) {
+        if (!id) return 0;
+        if (!activeApplication) {
+            return 0;
+        }
+        return activeApplication->RequestSystemJump(id, focusIndex) ? 1 : 0;
+    }
+    EMSCRIPTEN_KEEPALIVE const char* GetActiveSystemId() {
+        static std::string id;
+        id = StarSystemCatalog::ActiveId();
+        return id.c_str();
+    }
+    EMSCRIPTEN_KEEPALIVE int IsSystemJumpActive() {
+        return activeApplication && activeApplication->IsSystemJumpActive() ? 1 : 0;
     }
     EMSCRIPTEN_KEEPALIVE void SetOrbitScaleMode(int mode) {
         if (activeApplication) {
@@ -178,7 +205,7 @@ extern "C" {
         return activeApplication ? activeApplication->GetFocusedPlanetIndex() : -1;
     }
     EMSCRIPTEN_KEEPALIVE float GetPlanetSceneDistance(int idx) {
-        idx = std::clamp(idx, 0, OrbitLayout::kBodyCount - 1);
+        idx = std::clamp(idx, 0, OrbitLayout::BodyCount() - 1);
         return OrbitLayout::GetSceneDistance(static_cast<OrbitLayout::Body>(idx));
     }
     // Next inner-planet conjunction at the current epoch, as four scalars.
@@ -237,7 +264,8 @@ extern "C" {
     }
     // Observe mode (camera on Earth at a lat/lon, sky from Observer::ComputeSky). The state is
     // one JSON string for the same reason as GetNextSkyEventJson; the setters stay scalar.
-    // Mode and site changes notify "observeMode" / "observeSite" / "observeTimeRate".
+    // Mode and site changes notify "observeMode" / "observeSite" / "observeTimeRate" /
+    // "observeConstellations".
     EMSCRIPTEN_KEEPALIVE void SetObserveMode(int enabled) {
         if (activeApplication) {
             activeApplication->SetObserveMode(enabled != 0);
@@ -266,6 +294,11 @@ extern "C" {
             activeApplication->SetObserveTimeRate(rate);
         }
     }
+    EMSCRIPTEN_KEEPALIVE void SetObserveConstellations(int visible) {
+        if (activeApplication) {
+            activeApplication->SetObserveConstellations(visible != 0);
+        }
+    }
     EMSCRIPTEN_KEEPALIVE const char* GetObserveStateJson() {
         static std::string json;
         json = activeApplication ? activeApplication->GetObserveStateJson() : R"({"active":false})";
@@ -291,6 +324,44 @@ extern "C" {
     }
     EMSCRIPTEN_KEEPALIVE int GetMagneticFieldMode() {
         return activeApplication && activeApplication->GetMagneticFieldsEnabled() ? 1 : 0;
+    }
+
+    // --- Space weather (SpaceWeatherController.cpp, docs/ARCHITECTURE.md §13) ---
+    // Application notifies "solarWind" / "kpOverride" / "timeScale" / "simulationEpoch" itself.
+    EMSCRIPTEN_KEEPALIVE void SetSolarWind(int enabled) {
+        if (activeApplication) {
+            activeApplication->SetSolarWindEnabled(enabled != 0);
+        }
+    }
+    EMSCRIPTEN_KEEPALIVE int GetSolarWind() {
+        return activeApplication && activeApplication->GetSolarWindEnabled() ? 1 : 0;
+    }
+    // Below 0: Kp from the wind; 0–9 holds every auroral oval there.
+    EMSCRIPTEN_KEEPALIVE void SetKpOverride(double kp) {
+        if (activeApplication) {
+            activeApplication->SetKpOverride(kp);
+        }
+    }
+    EMSCRIPTEN_KEEPALIVE double GetKpOverride() {
+        return activeApplication ? activeApplication->GetKpOverride() : -1.0;
+    }
+    EMSCRIPTEN_KEEPALIVE void LaunchCmeNow() {
+        if (activeApplication) {
+            activeApplication->LaunchCmeNow();
+        }
+    }
+    // A CME catalog index (GetSpaceWeatherJson's nextStorm / lastStorm .index); 1 if it played.
+    EMSCRIPTEN_KEEPALIVE int PlaySpaceWeatherEvent(int index) {
+        return activeApplication && activeApplication->PlaySpaceWeatherEvent(index) ? 1 : 0;
+    }
+    // `&cme=2003-10-29T06:00Z`: the date to that UTC instant with the wind on; 1 if it parsed.
+    EMSCRIPTEN_KEEPALIVE int JumpToSpaceWeatherDate(const char* isoUtc) {
+        return activeApplication && isoUtc && activeApplication->JumpToSpaceWeatherDate(isoUtc) ? 1 : 0;
+    }
+    EMSCRIPTEN_KEEPALIVE const char* GetSpaceWeatherJson() {
+        static std::string json;
+        json = activeApplication ? activeApplication->GetSpaceWeatherJson() : R"({"sol":false})";
+        return json.c_str();
     }
 
     // --- WebXR stereo control surface ---
@@ -339,20 +410,132 @@ extern "C" {
             activeApplication->SetXrControllerRay(hand, ox, oy, oz, dx, dy, dz, visible);
         }
     }
+    // Render-frame camera position (relative to the render origin, which follows the camera,
+    // so about zero between frames). webxr.ts composes the eye views from it, so it must be
+    // the frame the scene is drawn in; deep links and tours read GetCameraHeliocentric*.
     EMSCRIPTEN_KEEPALIVE float GetCameraPositionX() {
-        return activeApplication ? activeApplication->GetCamera().GetPosition().x : 0.0f;
+        return activeApplication ? activeApplication->CameraRenderPosition().x : 0.0f;
     }
     EMSCRIPTEN_KEEPALIVE float GetCameraPositionY() {
-        return activeApplication ? activeApplication->GetCamera().GetPosition().y : 0.0f;
+        return activeApplication ? activeApplication->CameraRenderPosition().y : 0.0f;
     }
     EMSCRIPTEN_KEEPALIVE float GetCameraPositionZ() {
-        return activeApplication ? activeApplication->GetCamera().GetPosition().z : 0.0f;
+        return activeApplication ? activeApplication->CameraRenderPosition().z : 0.0f;
+    }
+    EMSCRIPTEN_KEEPALIVE double GetCameraHeliocentricX() {
+        return activeApplication ? activeApplication->GetCameraHeliocentricPosition().x : 0.0;
+    }
+    EMSCRIPTEN_KEEPALIVE double GetCameraHeliocentricY() {
+        return activeApplication ? activeApplication->GetCameraHeliocentricPosition().y : 0.0;
+    }
+    EMSCRIPTEN_KEEPALIVE double GetCameraHeliocentricZ() {
+        return activeApplication ? activeApplication->GetCameraHeliocentricPosition().z : 0.0;
     }
     EMSCRIPTEN_KEEPALIVE float GetCameraYaw() {
         return activeApplication ? activeApplication->GetCamera().GetYaw() : -90.0f;
     }
     EMSCRIPTEN_KEEPALIVE float GetCameraPitch() {
         return activeApplication ? activeApplication->GetCamera().GetPitch() : 0.0f;
+    }
+    EMSCRIPTEN_KEEPALIVE void SetCameraRoll(float roll) {
+        if (activeApplication) {
+            activeApplication->GetCamera().SetRoll(roll);
+        }
+    }
+    EMSCRIPTEN_KEEPALIVE float GetCameraRoll() {
+        return activeApplication ? activeApplication->GetCamera().GetRoll() : 0.0f;
+    }
+    // Vertical field of view in degrees, within the fly camera's 1–45 zoom range.
+    EMSCRIPTEN_KEEPALIVE void SetCameraFov(float fovDeg) {
+        if (activeApplication) {
+            activeApplication->GetCamera().SetZoom(fovDeg);
+        }
+    }
+    EMSCRIPTEN_KEEPALIVE float GetCameraFov() {
+        return activeApplication ? activeApplication->GetCamera().GetZoom() : 45.0f;
+    }
+
+    // --- Timelines and capture (web/src/timeline.ts, web/src/capture.ts) ---
+    // A timeline drives the date with this rather than SetSimulationEpoch. Spins are
+    // functions of the date, so both land on the same pose; this one sends no settings
+    // notification: it runs every frame, and the timeline panel shows the date itself.
+    EMSCRIPTEN_KEEPALIVE void AdvanceSimulationTo(double julianDate) {
+        OrbitLayout::SetJulianDate(julianDate);
+    }
+    // Bodies and probes at the current date and scale, one JSON string for the same reason
+    // as GetNextSkyEventJson: {"jd","scale","bodies":[[x,y,z,radius]|null…],"missions":[…]}.
+    EMSCRIPTEN_KEEPALIVE const char* GetSceneStateJson() {
+        static std::string json;
+        json = activeApplication ? activeApplication->GetSceneStateJson() : R"({"jd":0,"scale":0,"bodies":[],"missions":[]})";
+        return json.c_str();
+    }
+    EMSCRIPTEN_KEEPALIVE const char* GetBodyCatalogJson() {
+        static std::string json;
+        json = activeApplication ? activeApplication->GetBodyCatalogJson() : "[]";
+        return json.c_str();
+    }
+    EMSCRIPTEN_KEEPALIVE const char* GetSurfaceJson(int bodyIndex, double dx, double dy, double dz) {
+        static char json[160];
+        const glm::dvec3 direction(dx, dy, dz);
+        const Application::SurfacePoint surface = activeApplication
+            ? activeApplication->SurfaceAlong(bodyIndex, direction)
+            : Application::SurfacePoint{0.0, direction};
+        std::snprintf(json, sizeof(json), R"({"radius":%.17g,"normal":[%.17g,%.17g,%.17g]})", surface.radius,
+                      surface.normal.x, surface.normal.y, surface.normal.z);
+        return json;
+    }
+    EMSCRIPTEN_KEEPALIVE void PreloadBodySystem(int bodyIndex) {
+        if (activeApplication) {
+            activeApplication->PreloadBodySystem(bodyIndex);
+        }
+    }
+    EMSCRIPTEN_KEEPALIVE int GetPendingAssetCount() {
+        return activeApplication ? activeApplication->PendingAssetCount() : 0;
+    }
+    EMSCRIPTEN_KEEPALIVE void SetHudOverlays(int mask) {
+        if (activeApplication) {
+            activeApplication->SetHudOverlays(mask);
+        }
+    }
+    EMSCRIPTEN_KEEPALIVE int GetHudOverlays() {
+        return activeApplication ? activeApplication->GetHudOverlays() : 15;
+    }
+    // Offline capture: the browser's main loop stops (as for WebXR) and JS draws each frame
+    // with StepCaptureFrame, a fixed step of the animation clock, at width × height (0 keeps
+    // the canvas size).
+    EMSCRIPTEN_KEEPALIVE int BeginCapture(int width, int height) {
+        if (!activeApplication || activeApplication->IsXrActive()) {
+            return 0;
+        }
+        activeApplication->BeginCapture(width, height);
+        emscripten_pause_main_loop();
+        return 1;
+    }
+    EMSCRIPTEN_KEEPALIVE void StepCaptureFrame(double deltaSeconds) {
+        if (activeApplication) {
+            activeApplication->StepCaptureFrame(deltaSeconds);
+        }
+    }
+    EMSCRIPTEN_KEEPALIVE void EndCapture() {
+        if (activeApplication && activeApplication->IsCaptureActive()) {
+            activeApplication->EndCapture();
+            emscripten_resume_main_loop();
+        }
+    }
+    // Dev-only shader hot reload (web/src/shaderReload.ts): the page lists the files every
+    // live program was built from, rewrites them in MEMFS, then asks for a rebuild of the
+    // programs whose files changed. Returns how many were replaced.
+    EMSCRIPTEN_KEEPALIVE const char* GetShaderSourceFiles() {
+        static std::string files;
+        files.clear();
+        for (const std::string& file : Shader::LiveSourceFiles()) {
+            files += file;
+            files += '\n';
+        }
+        return files.c_str();
+    }
+    EMSCRIPTEN_KEEPALIVE int ReloadShaders() {
+        return Shader::ReloadChanged();
     }
 }
 

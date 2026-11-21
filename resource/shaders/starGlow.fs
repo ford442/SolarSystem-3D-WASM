@@ -5,7 +5,7 @@ in vec2 fPosition;
 in vec3 ringTint;
 
 uniform vec3 colorMult;
-uniform sampler2D colorMap;
+layout(binding = TU_DIFFUSE) uniform sampler2D colorMap;
 uniform float noiseZ;
 uniform float uColorMap; // 'u' (same 'x') texture coordinate
 

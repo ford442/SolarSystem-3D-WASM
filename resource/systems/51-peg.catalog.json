@@ -1,0 +1,186 @@
+{
+  "schemaVersion": 1,
+  "system": {
+    "id": "51-peg",
+    "name": {
+      "en": "51 Pegasi",
+      "ru": "51 Пегаса"
+    },
+    "distancePc": 15.461,
+    "spectralType": "G5V",
+    "starColor": "#fff0e9",
+    "habitableZoneAu": {
+      "innerAu": 1.11547,
+      "outerAu": 1.607
+    },
+    "source": {
+      "table": "NASA Exoplanet Archive, Planetary Systems Composite Parameters (pscomppars)",
+      "url": "https://exoplanetarchive.ipac.caltech.edu/",
+      "archiveHostname": "51 Peg",
+      "referencePlaneInclinationDeg": 49.8
+    }
+  },
+  "sceneNote": {
+    "en": "Measured orbits and sizes; surfaces are procedural (no exoplanet has been imaged). Values marked fit are estimates.",
+    "ru": "Орбиты и размеры измерены; поверхности процедурные (ни одна экзопланета не сфотографирована). Значения с пометкой fit — оценки."
+  },
+  "initTagAllowlist": [
+    "51_peg_b"
+  ],
+  "bodies": [
+    {
+      "id": "51_peg",
+      "index": 0,
+      "kind": "star",
+      "parent": null,
+      "displayName": {
+        "en": "51 Pegasi",
+        "ru": "51 Пегаса"
+      },
+      "type": "star",
+      "facts": {
+        "diameterKm": 1655766,
+        "massEarths": 356252,
+        "siderealRotationDays": null,
+        "orbitalPeriodDays": null,
+        "distanceAu": 0,
+        "moons": 0,
+        "distancePc": 15.461,
+        "spectralType": "G5V",
+        "effectiveTemperatureK": 5761,
+        "luminositySolar": 1.3687055,
+        "summary": {
+          "en": "G5V star 50.4 light-years away; 1 known planet in the archive's composite table.",
+          "ru": "Звезда класса G5V на расстоянии 50.4 св. лет; известных планет: 1."
+        }
+      },
+      "orbit": {
+        "compressedOffset": [
+          0,
+          0,
+          0
+        ],
+        "inclinationDeg": 0,
+        "siderealRotationDays": null,
+        "orbitalPeriodDays": null,
+        "distanceAu": 0,
+        "axialTiltDegrees": 0,
+        "earthRadiusScale": 1,
+        "rotationRate": 0
+      },
+      "render": {
+        "star": {
+          "effectiveTemperatureK": 5761,
+          "radiusSolar": 1.19,
+          "luminositySolar": 1.3687055,
+          "massSolar": 1.07,
+          "spectralType": "G5V",
+          "activity": 0
+        }
+      },
+      "includeInCompanion": false
+    },
+    {
+      "id": "51_peg_b",
+      "index": 1,
+      "kind": "planet",
+      "parent": "51_peg",
+      "displayName": {
+        "en": "51 Pegasi b",
+        "ru": "51 Пегаса b"
+      },
+      "type": "hot jupiter",
+      "facts": {
+        "diameterKm": 179662,
+        "massEarths": 193.875,
+        "siderealRotationDays": 4.230797,
+        "orbitalPeriodDays": 4.2307966,
+        "distanceAu": 0.052,
+        "moons": 0,
+        "equilibriumTemperatureK": 1328.9,
+        "irradianceEarth": 506.1781,
+        "discoveryYear": 1995,
+        "discoveryMethod": "Radial Velocity",
+        "summary": {
+          "en": "Hot jupiter discovered in 1995 (radial velocity); 506.18× Earth's insolation, equilibrium temperature ≈ 1329 K.",
+          "ru": "Горячий юпитер, открыта в 1995 г. методом лучевых скоростей; освещённость 506.18 от земной, равновесная температура ≈ 1329 K."
+        }
+      },
+      "orbit": {
+        "compressedOffset": [
+          1500,
+          0,
+          0
+        ],
+        "inclinationDeg": 0,
+        "siderealRotationDays": 4.230797,
+        "orbitalPeriodDays": 4.2307966,
+        "distanceAu": 0.052,
+        "axialTiltDegrees": 0,
+        "earthRadiusScale": 14.1,
+        "rotationRate": 0,
+        "primeMeridianDegJ2000": 172.9437,
+        "primeMeridianRateDegPerDay": 85.090358634,
+        "keplerian": {
+          "aKm": 7779089.3,
+          "e": 0.0063,
+          "iDeg": 0,
+          "OmegaDeg": 0,
+          "omegaDeg": 0,
+          "M0Deg": 352.9437,
+          "nDegPerDay": 85.090358634,
+          "OmegaDotDegPerDay": 0,
+          "omegaDotDegPerDay": 0
+        },
+        "placeFromElements": true
+      },
+      "system": {
+        "name": "51 Pegasi b",
+        "initTag": "51_peg_b",
+        "activationRadius": 800,
+        "lodThreshold": 20
+      },
+      "render": {
+        "shaderFlags": {
+          "hasNightTexture": false,
+          "hasSpecularMap": false,
+          "hasClouds": false
+        },
+        "ambientFactor": 0,
+        "procedural": {
+          "seed": 1,
+          "equilibriumTemperatureK": 1328.9,
+          "style": "hot-jupiter",
+          "mode": 1,
+          "colors": [
+            [
+              0.09,
+              0.05,
+              0.04
+            ],
+            [
+              0.42,
+              0.2,
+              0.09
+            ],
+            [
+              0.85,
+              0.45,
+              0.18
+            ]
+          ],
+          "bands": 9,
+          "emissive": 0.25
+        }
+      },
+      "fit": {
+        "rotation": "tidally-locked"
+      },
+      "archive": {
+        "plName": "51 Peg b",
+        "observedInclinationDeg": 49.8
+      },
+      "includeInCompanion": false
+    }
+  ]
+}

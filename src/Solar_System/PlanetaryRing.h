@@ -1,29 +1,28 @@
 #ifndef SOLARSYSTEM_PLANETARYRING_H
 #define SOLARSYSTEM_PLANETARYRING_H
 #include "Planet.h"
-#include "../Auxiliary_Modules/TextureLODController.h"
+#include "../assets/TextureLODController.h"
 
 struct PlanetaryRingInfo {
     MeshHolder ringModel;
     float ringInnerRadius, ringOuterRadius;
-    const Shader* ringShader;
     TextureImage2D ringDiffuse;
 
-    explicit PlanetaryRingInfo(MeshHolder model, float innerRadius, float outerRadius, const Shader& shader, const TextureImage2D& diffuse) :
-                               ringModel(std::move(model)), ringInnerRadius(innerRadius), ringOuterRadius(outerRadius), ringShader(&shader),
-                               ringDiffuse(diffuse) {}
+    explicit PlanetaryRingInfo(MeshHolder model, float innerRadius, float outerRadius, TextureImage2D diffuse) :
+                               ringModel(std::move(model)), ringInnerRadius(innerRadius), ringOuterRadius(outerRadius),
+                               ringDiffuse(std::move(diffuse)) {}
 };
 
 class PlanetaryRing : public SpaceObject {
 public:
-    explicit PlanetaryRing(const PlanetaryRingInfo& planetaryRingInfo, std::shared_ptr<Planet> parent);
+    explicit PlanetaryRing(PlanetaryRingInfo&& planetaryRingInfo, std::shared_ptr<Planet> parent);
     virtual void AdjustToParent() = 0;
     std::shared_ptr<Planet> GetParent() const;
     float GetInnerRadius() const;
     float GetOuterRadius() const;
     glm::vec3 GetRingNormal() const;
     GLuint GetRingTexture() const;
-    void LoadHighResIfClose(const glm::vec3& cameraPosition);
+    void LoadHighResIfClose(const glm::vec3& cameraPosition, const TextureLodPolicy& policy);
 
 protected:
     TextureImage2D _ringTexture;

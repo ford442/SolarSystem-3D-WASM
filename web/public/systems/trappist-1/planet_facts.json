@@ -1,0 +1,206 @@
+{
+  "version": 2,
+  "generatedFrom": "resource/systems/trappist-1.catalog.json",
+  "indexConvention": "Star=0, planets 1… by semi-major axis; matches the active system's OrbitLayout table",
+  "sceneNote": "Measured orbits and sizes; surfaces are procedural (no exoplanet has been imaged). Values marked fit are estimates.",
+  "bodies": [
+    {
+      "index": 0,
+      "id": "trappist_1",
+      "name": "TRAPPIST-1",
+      "nameRu": "TRAPPIST-1",
+      "type": "star",
+      "diameterKm": 165855,
+      "massEarths": 29899,
+      "siderealRotationDays": null,
+      "orbitalPeriodDays": null,
+      "distanceAu": 0,
+      "moons": 0,
+      "summary": "M8.0 V star 40.5 light-years away; 7 known planets in the archive's composite table.",
+      "summaryRu": "Звезда класса M8.0 V на расстоянии 40.5 св. лет; известных планет: 7.",
+      "spectralType": "M8.0 V",
+      "effectiveTemperatureK": 2566,
+      "luminositySolar": 0.000553,
+      "distancePc": 12.43
+    },
+    {
+      "index": 1,
+      "id": "trappist_1_b",
+      "name": "TRAPPIST-1 b",
+      "nameRu": "TRAPPIST-1 b",
+      "type": "terrestrial",
+      "diameterKm": 14220,
+      "massEarths": 1.374,
+      "siderealRotationDays": 1.510826,
+      "orbitalPeriodDays": 1.510826,
+      "distanceAu": 0.01154,
+      "moons": 0,
+      "summary": "Terrestrial discovered in 2016 (transit); 4.15× Earth's insolation, equilibrium temperature ≈ 398 K.",
+      "summaryRu": "Планета земного типа, открыта в 2016 г. транзитным методом; освещённость 4.15 от земной, равновесная температура ≈ 398 K.",
+      "equilibriumTemperatureK": 397.6,
+      "irradianceEarth": 4.1526,
+      "discoveryYear": 2016,
+      "discoveryMethod": "Transit",
+      "fit": {
+        "rotation": "tidally-locked"
+      },
+      "surface": "scorched"
+    },
+    {
+      "index": 2,
+      "id": "trappist_1_c",
+      "name": "TRAPPIST-1 c",
+      "nameRu": "TRAPPIST-1 c",
+      "type": "terrestrial",
+      "diameterKm": 13978,
+      "massEarths": 1.308,
+      "siderealRotationDays": 2.421937,
+      "orbitalPeriodDays": 2.421937,
+      "distanceAu": 0.0158,
+      "moons": 0,
+      "summary": "Terrestrial discovered in 2016 (transit); 2.22× Earth's insolation, equilibrium temperature ≈ 340 K.",
+      "summaryRu": "Планета земного типа, открыта в 2016 г. транзитным методом; освещённость 2.22 от земной, равновесная температура ≈ 340 K.",
+      "equilibriumTemperatureK": 339.7,
+      "irradianceEarth": 2.2152,
+      "discoveryYear": 2016,
+      "discoveryMethod": "Transit",
+      "fit": {
+        "rotation": "tidally-locked"
+      },
+      "surface": "scorched"
+    },
+    {
+      "index": 3,
+      "id": "trappist_1_d",
+      "name": "TRAPPIST-1 d",
+      "nameRu": "TRAPPIST-1 d",
+      "type": "terrestrial",
+      "diameterKm": 10041,
+      "massEarths": 0.388,
+      "siderealRotationDays": 4.049219,
+      "orbitalPeriodDays": 4.049219,
+      "distanceAu": 0.02227,
+      "moons": 0,
+      "summary": "Terrestrial discovered in 2016 (transit); 1.12× Earth's insolation, equilibrium temperature ≈ 286 K.",
+      "summaryRu": "Планета земного типа, открыта в 2016 г. транзитным методом; освещённость 1.12 от земной, равновесная температура ≈ 286 K.",
+      "equilibriumTemperatureK": 286.2,
+      "irradianceEarth": 1.115,
+      "discoveryYear": 2016,
+      "discoveryMethod": "Transit",
+      "fit": {
+        "rotation": "tidally-locked"
+      },
+      "surface": "ocean"
+    },
+    {
+      "index": 4,
+      "id": "trappist_1_e",
+      "name": "TRAPPIST-1 e",
+      "nameRu": "TRAPPIST-1 e",
+      "type": "terrestrial",
+      "diameterKm": 11723,
+      "massEarths": 0.692,
+      "siderealRotationDays": 6.101013,
+      "orbitalPeriodDays": 6.101013,
+      "distanceAu": 0.02925,
+      "moons": 0,
+      "summary": "Terrestrial discovered in 2017 (transit); 0.65× Earth's insolation, equilibrium temperature ≈ 250 K.",
+      "summaryRu": "Планета земного типа, открыта в 2017 г. транзитным методом; освещённость 0.65 от земной, равновесная температура ≈ 250 K.",
+      "equilibriumTemperatureK": 249.7,
+      "irradianceEarth": 0.6464,
+      "discoveryYear": 2017,
+      "discoveryMethod": "Transit",
+      "fit": {
+        "rotation": "tidally-locked"
+      },
+      "surface": "ocean"
+    },
+    {
+      "index": 5,
+      "id": "trappist_1_f",
+      "name": "TRAPPIST-1 f",
+      "nameRu": "TRAPPIST-1 f",
+      "type": "terrestrial",
+      "diameterKm": 13315,
+      "massEarths": 1.039,
+      "siderealRotationDays": 9.20754,
+      "orbitalPeriodDays": 9.20754,
+      "distanceAu": 0.03849,
+      "moons": 0,
+      "summary": "Terrestrial discovered in 2017 (transit); 0.37× Earth's insolation, equilibrium temperature ≈ 218 K.",
+      "summaryRu": "Планета земного типа, открыта в 2017 г. транзитным методом; освещённость 0.37 от земной, равновесная температура ≈ 218 K.",
+      "equilibriumTemperatureK": 217.7,
+      "irradianceEarth": 0.3733,
+      "discoveryYear": 2017,
+      "discoveryMethod": "Transit",
+      "fit": {
+        "rotation": "tidally-locked"
+      },
+      "surface": "tundra"
+    },
+    {
+      "index": 6,
+      "id": "trappist_1_g",
+      "name": "TRAPPIST-1 g",
+      "nameRu": "TRAPPIST-1 g",
+      "type": "terrestrial",
+      "diameterKm": 14386,
+      "massEarths": 1.321,
+      "siderealRotationDays": 12.352446,
+      "orbitalPeriodDays": 12.352446,
+      "distanceAu": 0.04683,
+      "moons": 0,
+      "summary": "Terrestrial discovered in 2017 (transit); 0.25× Earth's insolation, equilibrium temperature ≈ 197 K.",
+      "summaryRu": "Планета земного типа, открыта в 2017 г. транзитным методом; освещённость 0.25 от земной, равновесная температура ≈ 197 K.",
+      "equilibriumTemperatureK": 197.3,
+      "irradianceEarth": 0.2522,
+      "discoveryYear": 2017,
+      "discoveryMethod": "Transit",
+      "fit": {
+        "rotation": "tidally-locked"
+      },
+      "surface": "tundra"
+    },
+    {
+      "index": 7,
+      "id": "trappist_1_h",
+      "name": "TRAPPIST-1 h",
+      "nameRu": "TRAPPIST-1 h",
+      "type": "terrestrial",
+      "diameterKm": 9620,
+      "massEarths": 0.326,
+      "siderealRotationDays": 18.772866,
+      "orbitalPeriodDays": 18.772866,
+      "distanceAu": 0.06189,
+      "moons": 0,
+      "summary": "Terrestrial discovered in 2017 (transit); 0.14× Earth's insolation, equilibrium temperature ≈ 172 K.",
+      "summaryRu": "Планета земного типа, открыта в 2017 г. транзитным методом; освещённость 0.14 от земной, равновесная температура ≈ 172 K.",
+      "equilibriumTemperatureK": 171.7,
+      "irradianceEarth": 0.1444,
+      "discoveryYear": 2017,
+      "discoveryMethod": "Transit",
+      "fit": {
+        "rotation": "tidally-locked"
+      },
+      "surface": "ice"
+    }
+  ],
+  "scaleModes": {},
+  "system": {
+    "id": "trappist-1",
+    "name": "TRAPPIST-1",
+    "nameRu": "TRAPPIST-1",
+    "distancePc": 12.43,
+    "habitableZoneAu": {
+      "innerAu": 0.02242,
+      "outerAu": 0.0323
+    },
+    "source": {
+      "table": "NASA Exoplanet Archive, Planetary Systems Composite Parameters (pscomppars)",
+      "url": "https://exoplanetarchive.ipac.caltech.edu/",
+      "archiveHostname": "TRAPPIST-1",
+      "referencePlaneInclinationDeg": 89.778
+    },
+    "sceneNoteRu": "Орбиты и размеры измерены; поверхности процедурные (ни одна экзопланета не сфотографирована). Значения с пометкой fit — оценки."
+  }
+}

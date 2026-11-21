@@ -4,7 +4,7 @@
 #include <glm/glm.hpp>
 #include <glm/gtc/matrix_transform.hpp>
 
-#include "Auxiliary_Modules/SeatedView.h"
+#include "astro/SeatedView.h"
 
 namespace {
 

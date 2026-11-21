@@ -1,14 +1,29 @@
 #include "Application.h"
 #include "QualitySettings.h"
+#include "Solar_System/AuroraShell.h"
 #include "Solar_System/CatalogClouds.h"
 #include "Solar_System/CatalogSatellite.h"
+#include "Solar_System/SceneScale.h"
+#include "Solar_System/BodyCatalog.h"
+#include "Solar_System/OrbitLayout.h"
+#include "Solar_System/Star.h"
+#include "Solar_System/StarSystemCatalog.h"
+#include "Solar_System/TexturePaths.h"
+#include "astro/MagneticFieldParams.h"
+#include "astro/StarPhysics.h"
 #include "Solar_System/SystemVisuals.h"
 #include "Solar_System/AtmosphereModel.h"
-#include "Auxiliary_Modules/FloatLutTexture.h"
-#include <iostream>
+#include "gfx/FloatLutTexture.h"
+#include "core/Log.h"
+#include "Solar_System/CatalogBody.h"
+#include "Solar_System/Planet.h"
+#include "Solar_System/Satellite.h"
+#include "Solar_System/Saturn_System/SaturnRing.h"
+#include "Solar_System/Uranus_System/UranusRing.h"
+#include "Solar_System/Sun/Sun.h"
 #include <unordered_set>
-
-using namespace std;
+#include <memory>
+#include <utility>
 
 namespace {
 
@@ -17,10 +32,10 @@ TextureImage2D LoadLodTexture(const char* textureId) {
         return TextureImage2D();
     }
     const TexturePaths::Paths paths = TexturePaths::ForTextureId(textureId);
-    return TextureImage2D(GetTexturePath(paths.low, paths.high));
+    return TextureImage2D(GetLodStartTexturePath(paths.low, paths.high));
 }
 
-PlanetInfo MakePlanetInfo(const MeshHolder& sphereModel, const BodyCatalog::Entry& entry, Shader& shader) {
+PlanetInfo MakePlanetInfo(const MeshHolder& sphereModel, const BodyCatalog::Entry& entry) {
     std::vector<TextureImage2D> diffuses;
     diffuses.push_back(LoadLodTexture(entry.lod.diffuse));
     if (entry.lod.clouds) {
@@ -29,13 +44,15 @@ PlanetInfo MakePlanetInfo(const MeshHolder& sphereModel, const BodyCatalog::Entr
     if (entry.lod.night) {
         diffuses.push_back(LoadLodTexture(entry.lod.night));
     }
-    return PlanetInfo(sphereModel, entry.earthRadiusScale, shader, std::move(diffuses),
+    return PlanetInfo(sphereModel, entry.earthRadiusScale, std::move(diffuses),
                       LoadLodTexture(entry.lod.normal), entry.displayNameEn, entry.displayNameRu,
                       LoadLodTexture(entry.lod.specular));
 }
 
-SatelliteInfo MakeSatelliteInfo(const MeshHolder& model, const BodyCatalog::Entry& entry, Shader& shader) {
-    return SatelliteInfo(model, entry.earthRadiusScale, shader, {LoadLodTexture(entry.lod.diffuse)},
+SatelliteInfo MakeSatelliteInfo(const MeshHolder& model, const BodyCatalog::Entry& entry) {
+    std::vector<TextureImage2D> diffuses;
+    diffuses.push_back(LoadLodTexture(entry.lod.diffuse));
+    return SatelliteInfo(model, entry.earthRadiusScale, std::move(diffuses),
                          LoadLodTexture(entry.lod.normal), entry.displayNameEn, entry.displayNameRu,
                          LoadLodTexture(entry.lod.specular));
 }
@@ -51,41 +68,32 @@ void LoadAtmosphereLuts(Atmosphere& atmosphere) {
                                         AtmosphereModel::kTransmittanceWidth, AtmosphereModel::kTransmittanceHeight);
     auto multiScattering = LoadRgba16fLut(AtmosphereModel::MultiScatteringLutPath(row.bodyId),
                                           AtmosphereModel::kMultiScatteringSize, AtmosphereModel::kMultiScatteringSize);
-    const auto release = [](std::optional<FloatLut>& lut) {
-        if (lut) {
-            glDeleteTextures(1, &lut->texture);
-            lut.reset();
-        }
-    };
     for (auto* lut : {&transmittance, &multiScattering}) {
         if (*lut && (*lut)->mappingVersion != AtmosphereModel::kLutMappingVersion) {
-            std::cout << "[Atmosphere] " << row.bodyId << ": LUT mapping version " << (*lut)->mappingVersion
-                      << " != " << AtmosphereModel::kLutMappingVersion << " (rebake); using the O'Neil shell" << std::endl;
-            release(*lut);
+            LOG_WARN("Atmosphere", "%s: LUT mapping version %d != %d (rebake); using the O'Neil shell", row.bodyId,
+                     (*lut)->mappingVersion, AtmosphereModel::kLutMappingVersion);
+            lut->reset();
         }
     }
     if (!transmittance || !multiScattering) {
-        release(transmittance);
-        release(multiScattering);
         return;
     }
     const std::string expected = AtmosphereModel::ParamsHashHex(row.physical);
     if (transmittance->paramsHash != expected) {
         // Still usable (same mapping), just baked from other numbers; CI's
         // AtmosphereLutsFresh test is what keeps this from shipping.
-        std::cout << "[Atmosphere] " << row.bodyId << ": LUTs were baked from parameters "
-                  << transmittance->paramsHash << ", the catalog is " << expected
-                  << " — rerun atmosphere_lut_baker" << std::endl;
+        LOG_WARN("Atmosphere", "%s: LUTs were baked from parameters %s, the catalog is %s — rerun atmosphere_lut_baker",
+                 row.bodyId, transmittance->paramsHash.c_str(), expected.c_str());
     }
-    atmosphere.SetLuts(transmittance->texture, multiScattering->texture);
+    atmosphere.SetLuts(std::move(transmittance->texture), std::move(multiScattering->texture));
 }
 
-RenderableAtmosphere MakeAtmosphere(const MeshHolder& sphereModel, Shader& atmosphereShader,
-                                    const BodyCatalog::AtmosphereRow& row,
-                                    const std::shared_ptr<SpaceObject>& parent,
-                                    float parentRadius, float parentEarthSize) {
+RenderableAtmosphere MakeAtmosphere(const MeshHolder& sphereModel, const BodyCatalog::AtmosphereRow& row,
+                                    const std::shared_ptr<SpaceObject>& parent, float parentEarthSize) {
     RenderableAtmosphere renderable;
-    renderable.atmosphere = std::make_unique<Atmosphere>(sphereModel, atmosphereShader, row, parent, parentRadius);
+    // The art (compressed-scale) radius: Atmosphere scales it with the parent's SizeFactor.
+    renderable.atmosphere =
+        std::make_unique<Atmosphere>(sphereModel, row, parent, SceneScale::kMeshRadius * parentEarthSize);
     renderable.parentEarthSizeCoefficient = parentEarthSize;
     LoadAtmosphereLuts(*renderable.atmosphere);
     return renderable;
@@ -96,17 +104,31 @@ RenderableAtmosphere MakeAtmosphere(const MeshHolder& sphereModel, Shader& atmos
 void Application::InitStarSystem() {
     _sphereModel = std::make_unique<MeshHolder>("resource/models/sphere.obj");
 
-    _renderer.starGlowShader = make_unique<Shader>("resource/shaders/starGlow.vs", "resource/shaders/starGlow.fs");
-    StarInfo sunInfo(*_sphereModel, *_renderer.mainStarShader, *_renderer.starGlowShader, TextureImage2D(TexturePaths::Resolve("resource/textures_low/Star_Spectrum_Low.dds")),
-                     _renderer.starTemperatureInKelvin, 696342.0, glm::vec3(0.99607843, 0.890196078, 0.725490196), L"Sun", L"Солнце");
-    _sun = make_shared<Sun>(sunInfo);
-    _sun->SetMagneticField(MagneticFieldCatalog::IntrinsicParamsForBody(OrbitLayout::Body::Sun));
+    // The active system's star (render.star). For the Sun every derived number is the one it
+    // always had: 696 342 x 1, the 5778 K glow calibration, and a light tint of exactly 1.
+    const BodyCatalog::StarRow& star = BodyCatalog::Star();
+    _renderer.GetStarTuning().temperatureKelvin = star.glowTemperatureK;
+    StarInfo sunInfo(*_sphereModel,
+                     TextureImage2D(TexturePaths::Resolve("resource/textures_low/Star_Spectrum_Low.dds")),
+                     star.glowTemperatureK, static_cast<float>(696342.0 * star.radiusSolar),
+                     glm::vec3(0.99607843, 0.890196078, 0.725490196), star.displayNameEn, star.displayNameRu);
+    sunInfo.lightTint = StarPhysics::RelativeTint(star.effectiveTemperatureK);
+    sunInfo.activity = star.activity;
+    _sun = std::make_shared<Sun>(std::move(sunInfo));
+    if (StarSystemCatalog::IsSol()) {
+        _sun->SetMagneticField(MagneticFieldCatalog::IntrinsicParamsForBody(OrbitLayout::Body::Sun));
+    }
 
 #ifdef __EMSCRIPTEN__
-    LoadPlanetSystemManifests();
-#else
+    if (StarSystemCatalog::IsSol()) {
+        LoadPlanetSystemManifests();
+        return;
+    }
+    // Another system has no planet manifests (no textures to stage: its planets are
+    // PROCEDURAL_SURFACE), so it is built at once, like native.
+#endif
     std::unordered_set<std::string> initialized;
-    for (const BodyCatalog::Entry& entry : BodyCatalog::kEntries) {
+    for (const BodyCatalog::Entry& entry : BodyCatalog::Entries()) {
         if (entry.kind == BodyCatalog::Kind::Satellite) {
             continue;
         }
@@ -116,14 +138,13 @@ void Application::InitStarSystem() {
         initialized.insert(entry.initTag);
         InitCatalogSystem(*_sphereModel, entry.initTag);
     }
-#endif
 }
 
 void Application::InitCatalogBody(const MeshHolder& sphereModel, OrbitLayout::Body body) {
     const BodyCatalog::Entry* entry = BodyCatalog::FindByIndex(static_cast<int>(body));
     if (!entry) {
-        std::cerr << "[CatalogBody] No render descriptor for focus index "
-                  << static_cast<int>(body) << " — check planets.catalog.json" << std::endl;
+        LOG_ERROR("CatalogBody", "No render descriptor for focus index %d — check resource/systems/<id>.catalog.json",
+                  static_cast<int>(body));
         return;
     }
     InitCatalogSystem(sphereModel, entry->initTag);
@@ -132,36 +153,38 @@ void Application::InitCatalogBody(const MeshHolder& sphereModel, OrbitLayout::Bo
 void Application::InitCatalogSystem(const MeshHolder& sphereModel, const std::string& initTag) {
     const BodyCatalog::Entry* primary = BodyCatalog::FindPrimaryByInitTag(initTag.c_str());
     if (!primary) {
-        std::cerr << "[CatalogBody] No primary body for initTag \"" << initTag
-                  << "\" — check planets.catalog.json" << std::endl;
+        LOG_ERROR("CatalogBody", "No primary body for initTag \"%s\" — check resource/systems/<id>.catalog.json",
+                  initTag.c_str());
         return;
     }
 
-    PlanetInfo info = MakePlanetInfo(sphereModel, *primary, *_renderer.mainPlanetShader);
-    shared_ptr<Planet> planet = make_shared<CatalogBody>(info, _sun, *primary);
-    planet->SetMagneticField(
-        MagneticFieldCatalog::IntrinsicParamsForBody(static_cast<OrbitLayout::Body>(primary->index)));
+    PlanetInfo info = MakePlanetInfo(sphereModel, *primary);
+    std::shared_ptr<Planet> planet = std::make_shared<CatalogBody>(std::move(info), _sun, *primary);
+    if (StarSystemCatalog::IsSol()) { // the field models are Sol's bodies, by focus index
+        planet->SetMagneticField(
+            MagneticFieldCatalog::IntrinsicParamsForBody(static_cast<OrbitLayout::Body>(primary->index)));
+    }
 
-    vector<shared_ptr<Satellite>> satellites;
+    std::vector<std::shared_ptr<Satellite>> satellites;
     // Moons whose catalog row carries render.atmosphere (Titan). Their shells render with
     // this component, after the primary's.
-    vector<pair<shared_ptr<Satellite>, const BodyCatalog::AtmosphereRow*>> satelliteAtmospheres;
-    for (const BodyCatalog::Entry& entry : BodyCatalog::kEntries) {
+    std::vector<std::pair<std::shared_ptr<Satellite>, const BodyCatalog::AtmosphereRow*>> satelliteAtmospheres;
+    for (const BodyCatalog::Entry& entry : BodyCatalog::Entries()) {
         if (entry.kind != BodyCatalog::Kind::Satellite || !entry.parentId ||
             !BodyCatalog::StrEq(entry.parentId, primary->id)) {
             continue;
         }
         if (entry.meshPath) {
             MeshHolder mesh(entry.meshPath);
-            SatelliteInfo satInfo = MakeSatelliteInfo(mesh, entry, *_renderer.mainPlanetShader);
-            auto sat = make_shared<CatalogSatellite>(satInfo, planet, entry);
+            SatelliteInfo satInfo = MakeSatelliteInfo(mesh, entry);
+            auto sat = std::make_shared<CatalogSatellite>(std::move(satInfo), planet, entry);
             if (const auto* row = BodyCatalog::FindAtmosphere(entry.id)) {
                 satelliteAtmospheres.emplace_back(sat, row);
             }
             satellites.push_back(std::move(sat));
         } else {
-            SatelliteInfo satInfo = MakeSatelliteInfo(sphereModel, entry, *_renderer.mainPlanetShader);
-            auto sat = make_shared<CatalogSatellite>(satInfo, planet, entry);
+            SatelliteInfo satInfo = MakeSatelliteInfo(sphereModel, entry);
+            auto sat = std::make_shared<CatalogSatellite>(std::move(satInfo), planet, entry);
             if (const auto* row = BodyCatalog::FindAtmosphere(entry.id)) {
                 satelliteAtmospheres.emplace_back(sat, row);
             }
@@ -171,22 +194,26 @@ void Application::InitCatalogSystem(const MeshHolder& sphereModel, const std::st
 
     RenderableSceneComponent component;
     if (const auto* row = BodyCatalog::FindAtmosphere(primary->id)) {
-        component.atmospheres.push_back(MakeAtmosphere(sphereModel, *_renderer.mainAtmosphereShader, *row, planet,
-                                                       planet->GetRadius(), planet->GetEarthSizeCoefficient()));
+        component.atmospheres.push_back(MakeAtmosphere(sphereModel, *row, planet, planet->GetEarthSizeCoefficient()));
     }
     for (const auto& [satellite, row] : satelliteAtmospheres) {
-        component.atmospheres.push_back(MakeAtmosphere(sphereModel, *_renderer.mainAtmosphereShader, *row, satellite,
-                                                       satellite->GetRadius(), satellite->GetEarthSizeCoefficient()));
+        component.atmospheres.push_back(
+            MakeAtmosphere(sphereModel, *row, satellite, satellite->GetEarthSizeCoefficient()));
     }
 
     if (primary->hasCloudLayer && primary->cloudLayer.diffuse) {
         const TexturePaths::Paths cloudDiffuse = TexturePaths::ForTextureId(primary->cloudLayer.diffuse);
         const TexturePaths::Paths cloudNormal = TexturePaths::ForTextureId(
             primary->cloudLayer.normal ? primary->cloudLayer.normal : primary->cloudLayer.diffuse);
-        CloudsInfo cloudsInfo(sphereModel, *_renderer.mainCloudsShader, primary->cloudLayer.scaleFactor,
-                              TextureImage2D(GetTexturePath(cloudDiffuse.low, cloudDiffuse.high)),
-                              TextureImage2D(GetTexturePath(cloudNormal.low, cloudNormal.high)));
-        component.clouds = make_unique<CatalogClouds>(cloudsInfo, planet, *primary);
+        CloudsInfo cloudsInfo(sphereModel, primary->cloudLayer.scaleFactor,
+                              TextureImage2D(GetLodStartTexturePath(cloudDiffuse.low, cloudDiffuse.high)),
+                              TextureImage2D(GetLodStartTexturePath(cloudNormal.low, cloudNormal.high)));
+        component.clouds = std::make_unique<CatalogClouds>(std::move(cloudsInfo), planet, *primary);
+    }
+
+    // render.aurora: the oval is drawn from SpaceWeather's magnetospheres, which are Sol's.
+    if (const auto* auroraRow = BodyCatalog::FindAurora(primary->id); auroraRow && StarSystemCatalog::IsSol()) {
+        component.aurora = std::make_unique<AuroraShell>(sphereModel, planet, *primary, *auroraRow);
     }
 
     if (primary->hasRings) {
@@ -194,26 +221,16 @@ void Application::InitCatalogSystem(const MeshHolder& sphereModel, const std::st
             MeshHolder ringModel(ringSpec->modelPath);
             const TexturePaths::Paths ringTex = TexturePaths::ForTextureId(ringSpec->textureId);
             PlanetaryRingInfo ringInfo(ringModel, ringSpec->innerRadius, ringSpec->outerRadius,
-                                       *_renderer.mainPlanetShader,
-                                       TextureImage2D(GetTexturePath(ringTex.low, ringTex.high)));
+                                       TextureImage2D(GetLodStartTexturePath(ringTex.low, ringTex.high)));
             if (BodyCatalog::StrEq(primary->id, "saturn")) {
-                component.planetaryRing = make_unique<SaturnRing>(ringInfo, planet);
+                component.planetaryRing = std::make_unique<SaturnRing>(std::move(ringInfo), planet);
             } else if (BodyCatalog::StrEq(primary->id, "uranus")) {
-                component.planetaryRing = make_unique<UranusRing>(ringInfo, planet);
+                component.planetaryRing = std::make_unique<UranusRing>(std::move(ringInfo), planet);
             }
         }
     }
 
-    const float lightFar = primary->lightFarUsesPlanetDistance
-                               ? glm::length(_sun->GetPosition() - planet->GetPosition()) + 50.0f
-                               : _camera.GetFar();
-    const glm::mat4 lightProjection =
-        glm::ortho(-planet->GetRadius() * 3.0f, planet->GetRadius() * 3.0f,
-                   -planet->GetRadius() * 3.0f, planet->GetRadius() * 3.0f, _camera.GetNear(), lightFar);
-    const glm::mat4 lightView =
-        glm::lookAt(_sun->GetPosition(), planet->GetPosition() - _sun->GetPosition(), glm::vec3(0.0, 1.0, 0.0));
-
-    component.lightSpaceMatrix = lightProjection * lightView;
+    // The light frustum is fitted per frame in UpdateScene, before the first shadow pass.
     component.planet = std::move(planet);
     component.satellites = std::move(satellites);
     _renderableSceneComponents.push_back(std::move(component));

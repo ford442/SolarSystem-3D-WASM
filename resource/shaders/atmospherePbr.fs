@@ -1,4 +1,9 @@
 #version 300 es
+// NEAR_SURFACE (atmosphere.vs) writes depth per fragment.
+// permutations: NEAR_SURFACE
+#ifdef NEAR_SURFACE
+in float vLogDepth;
+#endif
 
 //
 // Physically based atmosphere from baked lookup tables (Medium/Full presets).
@@ -22,6 +27,7 @@ in vec4 fragPosLightSpace;
 
 out vec4 fragColor;
 
+#include "common/log_depth.glsl"
 #include "common/raytrace.glsl"
 #include "common/ring.glsl"
 #include "common/eclipse.glsl"
@@ -29,8 +35,8 @@ out vec4 fragColor;
 #include "common/atmosphere_lut.glsl"
 
 uniform AtmosphereParams uAtmosphere;  // km, thicknessScale already applied
-uniform sampler2D transmittanceLut;
-uniform sampler2D multiScatteringLut;
+layout(binding = TU_TRANSMITTANCE_LUT) uniform sampler2D transmittanceLut;
+layout(binding = TU_MULTI_SCATTERING_LUT) uniform sampler2D multiScatteringLut;
 
 uniform vec3 camPosition;      // camera relative to the atmosphere centre, scene units
 uniform vec3 lightPos;         // Sun relative to the atmosphere centre, scene units
@@ -40,52 +46,85 @@ uniform int uSteps;            // view-ray samples (quality tier)
 uniform float uExposure;
 uniform float uSurfaceDim;
 
+// Offsets from the atmosphere centre (scene units) to the frame in which an oblate body's
+// cloud deck is a sphere of its equatorial radius, and back (BodyShape.h). The shell mesh
+// is flattened with the body; the ray is traced in the sphere frame, where the LUTs apply.
+// Identity for a spherical body.
+uniform mat3 bodyToSphere;
+uniform mat3 sphereToBody;
+
 // Other bodies' shadows. The planet's own shadow is exact per sample (a sun ray that hits
 // the ground gets no direct light), so the shared shadow map is not used here: it also
 // contains this planet, and would black out the lit half of every limb ray.
 uniform bool isNearbyPlanetaryRing;
 uniform bool isUseSphereIntersect;
+uniform bool isRingShadowPerSample;    // this atmosphere's own planet carries the ring
 uniform vec3 ringParentPlanetCenter;   // world space
 uniform float ringParentPlanetRadiusSquared;
 uniform vec3 ringCenter;               // world space
 uniform vec3 ringNormal;
 uniform vec2 ringInnerOuterRadiuses;
-uniform sampler2D ringDiffuse;
+layout(binding = TU_RING) uniform sampler2D ringDiffuse;
 
 uniform bool hasEclipseCaster;
 uniform vec3 eclipseCasterCenter;      // relative to the atmosphere centre, scene units
 uniform float eclipseCasterRadius;
 uniform float eclipseStarRadius;
 
-const int MAX_STEPS = 32;
+#include "common/atmosphere_march.glsl"
 
-// Direct sunlight reaching the shell fragment past the ring and (for a moon) its ringed
-// parent. Evaluated once per fragment: rings are far larger than an atmosphere's depth.
-float RingVisibility() {
-    if (!isNearbyPlanetaryRing)
-        return 1.0;
-    vec3 atmosphereCenter = fWorldPosition - modelMat3 * fPosition;
-    vec3 sunWorld = atmosphereCenter + lightPos;
-    vec3 toSun = normalize(sunWorld - fWorldPosition);
-    if (isUseSphereIntersect && intersectSphereAhead(fWorldPosition, toSun, ringParentPlanetCenter, ringParentPlanetRadiusSquared))
+// Ring shadow state for this fragment, set in main() before the march calls back into
+// AtmosphereSunVisibility. On a moon's air (Titan) the ring is far larger than the
+// atmosphere, so one test at the shell fragment serves the whole ray. On the ringed planet
+// itself the shadow is a band across the disc, and a ray entering the shell above it can
+// reach the cloud deck inside it, so each sample is tested where it is.
+vec3 gAtmosphereCenter;   // world space
+vec3 gSunWorld;           // world space
+bool gRingPerSample;
+float gRingVisibility;
+
+// Direct sunlight reaching `worldPoint` past the ring and (for a moon) its ringed parent.
+// The sun direction is taken from the point itself, so the ring's opening angle toward the
+// Sun follows the date through the planet's orbital position. Called inside the view-ray
+// loop under non-uniform control flow, so the ring texture is read at an explicit LOD.
+float RingVisibilityAt(vec3 worldPoint, vec3 sunWorld) {
+    vec3 toSun = normalize(sunWorld - worldPoint);
+    if (isUseSphereIntersect && intersectSphereAhead(worldPoint, toSun, ringParentPlanetCenter, ringParentPlanetRadiusSquared))
         return 0.0;
     float u;
-    if (RingCrossing(fWorldPosition, toSun, toSun, ringCenter, ringNormal, ringInnerOuterRadiuses, u))
-        return clamp(1.0 - RingOpacity(texture(ringDiffuse, vec2(u, 0.0))), 0.0, 1.0);
+    if (RingCrossing(worldPoint, toSun, toSun, ringCenter, ringNormal, ringInnerOuterRadiuses, u))
+        return clamp(1.0 - RingOpacity(textureLod(ringDiffuse, vec2(u, 0.0), 0.0)), 0.0, 1.0);
     return 1.0;
 }
 
+float AtmosphereSunVisibility(vec3 positionKm) {
+    vec3 sampleOffset = sphereToBody * (positionKm / kmPerSceneUnit);  // back to scene units
+    float sunVisibility = gRingVisibility;
+    if (gRingPerSample)
+        sunVisibility *= RingVisibilityAt(gAtmosphereCenter + sampleOffset, gSunWorld);
+    if (hasEclipseCaster)
+        sunVisibility *= EclipseVisibilityAt(sampleOffset, lightPos, eclipseCasterCenter,
+                                             eclipseCasterRadius, eclipseStarRadius);
+    return sunVisibility;
+}
+
 void main() {
+#ifdef NEAR_SURFACE
+    gl_FragDepth = LogFragDepth(vLogDepth); // first: every path that is not discarded writes it
+#endif
     float bottom = uAtmosphere.bottomRadius;
     float top = uAtmosphere.topRadius;
 
-    // Planet-centred km. From outside, start at the shell fragment rather than the camera:
-    // both lie on the ray, and the fragment is close to the sphere, which keeps the
-    // intersection precise when the camera is thousands of radii away.
-    vec3 fragmentOffset = modelMat3 * fPosition;
-    vec3 viewDir = normalize(fragmentOffset - camPosition);
-    vec3 origin = (isCameraInsideShell ? camPosition : fragmentOffset) * kmPerSceneUnit;
-    vec3 sunDir = normalize(lightPos);
+    // Planet-centred km in the sphere frame. From outside, start at the shell fragment
+    // rather than the camera: both lie on the ray, and the fragment is close to the sphere,
+    // which keeps the intersection precise when the camera is thousands of radii away.
+    // The map is linear, so the mapped view ray is still a straight line.
+    vec3 worldOffset = modelMat3 * fPosition;
+    vec3 fragmentOffset = bodyToSphere * worldOffset;
+    vec3 camera = bodyToSphere * camPosition;
+    vec3 viewDir = normalize(fragmentOffset - camera);
+    vec3 origin = (isCameraInsideShell ? camera : fragmentOffset) * kmPerSceneUnit;
+    vec3 sunDir = normalize(bodyToSphere * lightPos);
 
     vec2 topHit = raySphere(origin, viewDir, top);
     if (topHit.x > topHit.y || topHit.y <= 0.0)
@@ -98,65 +137,14 @@ void main() {
     if (tEnd <= tStart)
         discard;
 
-    // Samples bunch up where the density peaks: at the ray's closest approach to the
-    // planet (the limb) or at the ground. Two halves around that point, each with a
-    // quadratic warp toward it, keep 8 samples usable on a 2000 km grazing ray.
-    float tPeak = clamp(-dot(origin, viewDir), tStart, tEnd);
-    int steps = clamp(uSteps, 2, MAX_STEPS);
-    int firstHalf = tPeak > tStart ? (tPeak < tEnd ? steps / 2 : steps) : 0;
-    int secondHalf = steps - firstHalf;
+    gAtmosphereCenter = fWorldPosition - worldOffset;
+    gSunWorld = gAtmosphereCenter + lightPos;
+    gRingPerSample = isNearbyPlanetaryRing && isRingShadowPerSample;
+    gRingVisibility = isNearbyPlanetaryRing && !gRingPerSample ? RingVisibilityAt(fWorldPosition, gSunWorld) : 1.0;
 
-    float nu = dot(viewDir, sunDir);
-    float rayleighPhase = RayleighPhaseNormalized(nu);
-    float miePhase = CornetteShanksPhase(uAtmosphere.miePhaseG, nu);
-    float ringVisibility = RingVisibility();
-
-    vec3 luminance = vec3(0.0);
-    vec3 throughput = vec3(1.0);
-    for (int i = 0; i < MAX_STEPS; ++i) {
-        if (i >= steps)
-            break;
-
-        // Midpoint of sample i in its half, warped quadratically toward tPeak.
-        float t;
-        float dt;
-        if (i < firstHalf) {
-            float u = (float(i) + 0.5) / float(firstHalf);
-            float span = tPeak - tStart;
-            t = tPeak - span * (1.0 - u) * (1.0 - u);
-            dt = 2.0 * span * (1.0 - u) / float(firstHalf);
-        } else {
-            float u = (float(i - firstHalf) + 0.5) / float(secondHalf);
-            float span = tEnd - tPeak;
-            t = tPeak + span * u * u;
-            dt = 2.0 * span * u / float(secondHalf);
-        }
-
-        vec3 position = origin + viewDir * t;
-        float r = length(position);
-        float muS = dot(position / r, sunDir);
-
-        vec3 rayleighScattering, mieScattering, extinction;
-        SampleAtmosphereMedium(uAtmosphere, r - bottom, rayleighScattering, mieScattering, extinction);
-
-        vec3 sunTransmittance = RayIntersectsGround(uAtmosphere, r, muS)
-            ? vec3(0.0)
-            : texture(transmittanceLut, TransmittanceLutUv(uAtmosphere, r, muS)).rgb;
-        float sunVisibility = ringVisibility;
-        if (hasEclipseCaster)
-            sunVisibility *= EclipseVisibilityAt(position / kmPerSceneUnit, lightPos, eclipseCasterCenter,
-                                                 eclipseCasterRadius, eclipseStarRadius);
-        vec3 multipleScattering = texture(multiScatteringLut, MultiScatteringLutUv(uAtmosphere, r, muS)).rgb;
-
-        vec3 direct = sunTransmittance * sunVisibility;
-        vec3 source = rayleighScattering * (rayleighPhase * direct + multipleScattering)
-                    + mieScattering * (miePhase * direct + multipleScattering);
-
-        // Exact integral of a constant source across the step (Hillaire 2015).
-        vec3 stepTransmittance = exp(-extinction * dt);
-        luminance += throughput * (source - source * stepTransmittance) / max(extinction, vec3(1e-7));
-        throughput *= stepTransmittance;
-    }
+    vec3 throughput;
+    vec3 luminance = IntegrateAtmosphereRay(uAtmosphere, transmittanceLut, multiScatteringLut, origin, viewDir,
+                                            sunDir, tStart, tEnd, uSteps, throughput);
 
     // The default framebuffer is LDR, and the planet shaders write texture colour times
     // lighting with no gamma step, so stay in that same space: expose and compress only.

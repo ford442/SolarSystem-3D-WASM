@@ -52,7 +52,7 @@ A full WebGPU port of the custom C++ renderer (Emdawnwebgpu / webgpu.h / WGSL) w
 
 ### Phase 2 — Solar System Subset (Session 3)
 
-- [x] Procedural or JSON-driven orbital parameters (reuse approximate distances from C++ scene / `planets.catalog.json` → `orbital-parameters.json`).
+- [x] Procedural or JSON-driven orbital parameters (reuse approximate distances from C++ scene / `resource/systems/sol.catalog.json` → `orbital-parameters.json`).
 - [x] Sun + Mercury through Jupiter with labels and focus presets.
 - [x] Galilean moons: Io/Europa/Ganymede as textured low-poly spheres; Callisto as proxy.
 - [x] Simple starfield + optional KTX2 skybox cube (`textures/ktx2/skybox/`, from `Main_SkyBox` DDS).

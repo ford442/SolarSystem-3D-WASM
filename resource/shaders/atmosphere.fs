@@ -1,4 +1,9 @@
 #version 300 es
+// NEAR_SURFACE (atmosphere.vs) writes depth per fragment.
+// permutations: NEAR_SURFACE
+#ifdef NEAR_SURFACE
+in float vLogDepth;
+#endif
 
 //
 // Atmospheric scattering fragment shader
@@ -12,10 +17,10 @@ in vec3 fPosition;
 in mat3 modelMat3;
 in vec4 fragPosLightSpace;
 
-uniform sampler2D ringDiffuse;
-uniform sampler2D shadowMap;
-uniform float farPlane;
-uniform float bias; // For shadows
+layout(binding = TU_RING) uniform sampler2D ringDiffuse;
+layout(binding = TU_SHADOW_MAP) uniform sampler2D shadowMap;
+uniform float bias; // For shadows, in shadow-map depth units
+uniform vec2 shadowDepthRange; // this component's light frustum: near, far - near (scene units)
 uniform float uSurfaceDim;
 uniform float earthSizeCoefficient;
 uniform bool isUseToneMapping;
@@ -35,6 +40,10 @@ uniform vec3 C_R; // Main atmosphere color from front side [Основной ц�
 uniform vec3 mieTint; // mie tint (backlit tint)
 uniform float innerRadius;
 uniform float outerRadius;
+// Offsets from the centre to the frame in which an oblate body is a sphere (BodyShape.h);
+// the shell mesh is flattened with the body and the scattering runs in the sphere frame.
+// Identity for a spherical body.
+uniform mat3 bodyToSphere;
 
 const float PI = 3.14159265359;
 const float MAX = 10000.;
@@ -56,13 +65,15 @@ uniform float SCALE_L_FACTOR;
 
 out vec4 fragColor;
 
+#include "common/frame.glsl"
+#include "common/log_depth.glsl"
 #include "common/raytrace.glsl"
 #include "common/ring.glsl"
 #include "common/phase.glsl"
 #include "common/tonemap.glsl"
 
 vec3 rayDirection(vec3 camPos) {
-    vec3 ray = normalize(modelMat3 * fPosition - camPos);
+    vec3 ray = normalize(bodyToSphere * (modelMat3 * fPosition) - camPos);
     return ray;
 }
 
@@ -148,7 +159,7 @@ float CalculateShadow(vec4 fragPosLightSpace) {
         float u;
         if (RingCrossing(fWorldPosition, lightDir, lightDir, ringCenter, ringNormal, ringInnerOuterRadiuses, u)) {
             // If some planet obscures the ring
-            if (shadow > 0.0 && length(lightPos - ringCenter) - (closestDepth - bias) * farPlane > ringInnerOuterRadiuses.y) {
+            if (shadow > 0.0 && length(lightPos - ringCenter) - (shadowDepthRange.x + (closestDepth - bias) * shadowDepthRange.y) > ringInnerOuterRadiuses.y) {
                 return shadow;
             }
 
@@ -171,12 +182,15 @@ float criticalLengthFactor() {
 }
 
 void main() {
+#ifdef NEAR_SURFACE
+    gl_FragDepth = LogFragDepth(vLogDepth); // first: every path that is not discarded writes it
+#endif
     float shadow = CalculateShadow(fragPosLightSpace);
 
     if (shadow > 0.0)
         discard;
 
-    vec3 eye = camPosition;
+    vec3 eye = bodyToSphere * camPosition;
     float eyeLength = length(eye);
     float eyeCriticalLengthFactor = criticalLengthFactor();
 
@@ -186,7 +200,7 @@ void main() {
     }
 
     vec3 dir = rayDirection(eye);
-    vec3 l = normalize(lightPos);
+    vec3 l = normalize(bodyToSphere * lightPos);
     vec2 e = rayIntersection(eye, dir, outerRadius);
 
     if (e.x > e.y)

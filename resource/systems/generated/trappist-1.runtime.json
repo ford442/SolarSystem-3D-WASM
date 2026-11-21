@@ -1,0 +1,840 @@
+{
+  "format": "solarsystem-runtime-catalog",
+  "version": 1,
+  "generatedFrom": "resource/systems/trappist-1.catalog.json",
+  "id": "trappist-1",
+  "name": {
+    "en": "TRAPPIST-1",
+    "ru": "TRAPPIST-1"
+  },
+  "distancePc": 12.43,
+  "spectralType": "M8.0 V",
+  "habitableZoneAu": {
+    "innerAu": 0.02242,
+    "outerAu": 0.0323
+  },
+  "star": {
+    "id": "trappist_1",
+    "displayNameEn": "TRAPPIST-1",
+    "displayNameRu": "TRAPPIST-1",
+    "spectralType": "M8.0 V",
+    "effectiveTemperatureK": 2566,
+    "glowTemperatureK": 5778,
+    "radiusKm": 82927.44,
+    "radiusSolar": 0.1192,
+    "luminositySolar": 0.000553,
+    "massSolar": 0.0898,
+    "activity": 1,
+    "cyclePeriodYears": 0,
+    "cycleMinimumYear": 0,
+    "cycleAtMinimum": 0,
+    "cycleMeanPeakSunspots": 0
+  },
+  "layout": [
+    {
+      "index": 0,
+      "id": "trappist_1",
+      "compressedOffset": [
+        0,
+        0,
+        0
+      ],
+      "auDistance": 0,
+      "orbitalPeriodDays": 0,
+      "inclinationDeg": 0,
+      "siderealRotationDays": 0,
+      "primeMeridianDegJ2000": 0,
+      "primeMeridianRateDegPerDay": 0,
+      "trueRadius": false,
+      "kepler": null
+    },
+    {
+      "index": 1,
+      "id": "trappist_1_b",
+      "compressedOffset": [
+        1500,
+        0,
+        0
+      ],
+      "auDistance": 0.01154,
+      "orbitalPeriodDays": 1.510826,
+      "inclinationDeg": -0.05,
+      "siderealRotationDays": 1.510826,
+      "primeMeridianDegJ2000": 241.8056,
+      "primeMeridianRateDegPerDay": 238.280251995,
+      "trueRadius": false,
+      "kepler": {
+        "aAu": 0.01153999981364708,
+        "e": 0.00622,
+        "iDeg": -0.05,
+        "OmegaDeg": 0,
+        "omegaDeg": 336.86,
+        "M0Deg": 84.9456,
+        "nDegPerDay": 238.280251995
+      }
+    },
+    {
+      "index": 2,
+      "id": "trappist_1_c",
+      "compressedOffset": [
+        -1290.4,
+        0,
+        1182.11
+      ],
+      "auDistance": 0.0158,
+      "orbitalPeriodDays": 2.421937,
+      "inclinationDeg": 0,
+      "siderealRotationDays": 2.421937,
+      "primeMeridianDegJ2000": 233.7722,
+      "primeMeridianRateDegPerDay": 148.641356072,
+      "trueRadius": false,
+      "kepler": {
+        "aAu": 0.01580000028703617,
+        "e": 0.00654,
+        "iDeg": 0,
+        "OmegaDeg": 0,
+        "omegaDeg": 282.45,
+        "M0Deg": 131.3222,
+        "nDegPerDay": 148.641356072
+      }
+    },
+    {
+      "index": 3,
+      "id": "trappist_1_d",
+      "compressedOffset": [
+        174.85,
+        0,
+        -1992.34
+      ],
+      "auDistance": 0.02227,
+      "orbitalPeriodDays": 4.049219,
+      "inclinationDeg": 0.118,
+      "siderealRotationDays": 4.049219,
+      "primeMeridianDegJ2000": 26.5889,
+      "primeMeridianRateDegPerDay": 88.906033484,
+      "trueRadius": false,
+      "kepler": {
+        "aAu": 0.022270000130422983,
+        "e": 0.00837,
+        "iDeg": 0.118,
+        "OmegaDeg": 0,
+        "omegaDeg": 351.27,
+        "M0Deg": 215.3189,
+        "nDegPerDay": 88.906033484
+      }
+    },
+    {
+      "index": 4,
+      "id": "trappist_1_e",
+      "compressedOffset": [
+        1368.99,
+        0,
+        1785.6
+      ],
+      "auDistance": 0.02925,
+      "orbitalPeriodDays": 6.101013,
+      "inclinationDeg": 0.015,
+      "siderealRotationDays": 6.101013,
+      "primeMeridianDegJ2000": 143.1638,
+      "primeMeridianRateDegPerDay": 59.006594479,
+      "trueRadius": false,
+      "kepler": {
+        "aAu": 0.02924999987984455,
+        "e": 0.0051,
+        "iDeg": 0.015,
+        "OmegaDeg": 0,
+        "omegaDeg": 108.37,
+        "M0Deg": 214.7938,
+        "nDegPerDay": 59.006594479
+      }
+    },
+    {
+      "index": 5,
+      "id": "trappist_1_f",
+      "compressedOffset": [
+        -2461.78,
+        0,
+        -435.45
+      ],
+      "auDistance": 0.03849,
+      "orbitalPeriodDays": 9.20754,
+      "inclinationDeg": -0.038,
+      "siderealRotationDays": 9.20754,
+      "primeMeridianDegJ2000": 137.5049,
+      "primeMeridianRateDegPerDay": 39.098391101,
+      "trueRadius": false,
+      "kepler": {
+        "aAu": 0.0384899997109384,
+        "e": 0.01007,
+        "iDeg": -0.038,
+        "OmegaDeg": 0,
+        "omegaDeg": 8.81,
+        "M0Deg": 308.6949,
+        "nDegPerDay": 39.098391101
+      }
+    },
+    {
+      "index": 6,
+      "id": "trappist_1_g",
+      "compressedOffset": [
+        2320.33,
+        0,
+        -1476
+      ],
+      "auDistance": 0.04683,
+      "orbitalPeriodDays": 12.352446,
+      "inclinationDeg": -0.036,
+      "siderealRotationDays": 12.352446,
+      "primeMeridianDegJ2000": 98.2236,
+      "primeMeridianRateDegPerDay": 29.144025402,
+      "trueRadius": false,
+      "kepler": {
+        "aAu": 0.04683000010106428,
+        "e": 0.00208,
+        "iDeg": -0.036,
+        "OmegaDeg": 0,
+        "omegaDeg": 191.34,
+        "M0Deg": 86.8836,
+        "nDegPerDay": 29.144025402
+      }
+    },
+    {
+      "index": 7,
+      "id": "trappist_1_h",
+      "compressedOffset": [
+        -778.81,
+        0,
+        2897.15
+      ],
+      "auDistance": 0.06189,
+      "orbitalPeriodDays": 18.772866,
+      "inclinationDeg": 0.027,
+      "siderealRotationDays": 18.772866,
+      "primeMeridianDegJ2000": 315.0364,
+      "primeMeridianRateDegPerDay": 19.176613736,
+      "trueRadius": false,
+      "kepler": {
+        "aAu": 0.061889999882197524,
+        "e": 0.00567,
+        "iDeg": 0.027,
+        "OmegaDeg": 0,
+        "omegaDeg": 338.92,
+        "M0Deg": 156.1164,
+        "nDegPerDay": 19.176613736
+      }
+    }
+  ],
+  "entries": [
+    {
+      "index": 1,
+      "id": "trappist_1_b",
+      "parentId": "trappist_1",
+      "initTag": "trappist_1_b",
+      "kind": "planet",
+      "displayNameEn": "TRAPPIST-1 b",
+      "displayNameRu": "TRAPPIST-1 b",
+      "auDistance": 0.01154,
+      "orbitalPeriodDays": 1.510826,
+      "earthRadiusScale": 1.116,
+      "radiusKm": 7110,
+      "axialTiltDegrees": 0,
+      "artTiltXDegrees": 0,
+      "oblateness": 0,
+      "yawOffsetDegrees": 0,
+      "artRollDegrees": 0,
+      "shaderFlags": {
+        "hasNightTexture": false,
+        "hasSpecularMap": false,
+        "hasClouds": false
+      },
+      "useSphereIntersect": false,
+      "ambientFactor": 0,
+      "lod": {
+        "diffuse": "",
+        "normal": "",
+        "specular": null,
+        "night": null,
+        "clouds": null
+      },
+      "meshPath": null,
+      "sceneOrbitRadius": 0,
+      "orbitPlane": "xz",
+      "initialAnomalyRad": 0,
+      "spinDegPerSimSecond": 0,
+      "keplerian": {
+        "aKm": 1726359.4,
+        "e": 0.00622,
+        "iDeg": -0.05,
+        "OmegaDeg": 0,
+        "omegaDeg": 336.86,
+        "M0Deg": 84.9456,
+        "nDegPerDay": 238.280251995,
+        "OmegaDotDegPerDay": 0,
+        "omegaDotDegPerDay": 0
+      },
+      "cloudLayer": {
+        "diffuse": null,
+        "normal": null,
+        "scaleFactor": 0,
+        "spinDegPerSimSecond": 0,
+        "ambientFactor": 0
+      },
+      "hasCloudLayer": false,
+      "hasRings": false,
+      "hasTerrain": false,
+      "terrainAttribution": null,
+      "procedural": {
+        "enabled": true,
+        "mode": 0,
+        "seed": 1,
+        "colors": [
+          [
+            0.32,
+            0.22,
+            0.15
+          ],
+          [
+            0.55,
+            0.42,
+            0.3
+          ],
+          [
+            0.72,
+            0.62,
+            0.5
+          ]
+        ],
+        "bands": 0,
+        "seaLevel": 0,
+        "polarCap": 0,
+        "emissive": 0,
+        "equilibriumTemperatureK": 397.6
+      },
+      "placeFromElements": true
+    },
+    {
+      "index": 2,
+      "id": "trappist_1_c",
+      "parentId": "trappist_1",
+      "initTag": "trappist_1_c",
+      "kind": "planet",
+      "displayNameEn": "TRAPPIST-1 c",
+      "displayNameRu": "TRAPPIST-1 c",
+      "auDistance": 0.0158,
+      "orbitalPeriodDays": 2.421937,
+      "earthRadiusScale": 1.097,
+      "radiusKm": 6989,
+      "axialTiltDegrees": 0,
+      "artTiltXDegrees": 0,
+      "oblateness": 0,
+      "yawOffsetDegrees": 0,
+      "artRollDegrees": 0,
+      "shaderFlags": {
+        "hasNightTexture": false,
+        "hasSpecularMap": false,
+        "hasClouds": false
+      },
+      "useSphereIntersect": false,
+      "ambientFactor": 0,
+      "lod": {
+        "diffuse": "",
+        "normal": "",
+        "specular": null,
+        "night": null,
+        "clouds": null
+      },
+      "meshPath": null,
+      "sceneOrbitRadius": 0,
+      "orbitPlane": "xz",
+      "initialAnomalyRad": 0,
+      "spinDegPerSimSecond": 0,
+      "keplerian": {
+        "aKm": 2363646.4,
+        "e": 0.00654,
+        "iDeg": 0,
+        "OmegaDeg": 0,
+        "omegaDeg": 282.45,
+        "M0Deg": 131.3222,
+        "nDegPerDay": 148.641356072,
+        "OmegaDotDegPerDay": 0,
+        "omegaDotDegPerDay": 0
+      },
+      "cloudLayer": {
+        "diffuse": null,
+        "normal": null,
+        "scaleFactor": 0,
+        "spinDegPerSimSecond": 0,
+        "ambientFactor": 0
+      },
+      "hasCloudLayer": false,
+      "hasRings": false,
+      "hasTerrain": false,
+      "terrainAttribution": null,
+      "procedural": {
+        "enabled": true,
+        "mode": 0,
+        "seed": 2,
+        "colors": [
+          [
+            0.32,
+            0.22,
+            0.15
+          ],
+          [
+            0.55,
+            0.42,
+            0.3
+          ],
+          [
+            0.72,
+            0.62,
+            0.5
+          ]
+        ],
+        "bands": 0,
+        "seaLevel": 0,
+        "polarCap": 0,
+        "emissive": 0,
+        "equilibriumTemperatureK": 339.7
+      },
+      "placeFromElements": true
+    },
+    {
+      "index": 3,
+      "id": "trappist_1_d",
+      "parentId": "trappist_1",
+      "initTag": "trappist_1_d",
+      "kind": "planet",
+      "displayNameEn": "TRAPPIST-1 d",
+      "displayNameRu": "TRAPPIST-1 d",
+      "auDistance": 0.02227,
+      "orbitalPeriodDays": 4.049219,
+      "earthRadiusScale": 0.788,
+      "radiusKm": 5020.5,
+      "axialTiltDegrees": 0,
+      "artTiltXDegrees": 0,
+      "oblateness": 0,
+      "yawOffsetDegrees": 0,
+      "artRollDegrees": 0,
+      "shaderFlags": {
+        "hasNightTexture": false,
+        "hasSpecularMap": false,
+        "hasClouds": false
+      },
+      "useSphereIntersect": false,
+      "ambientFactor": 0,
+      "lod": {
+        "diffuse": "",
+        "normal": "",
+        "specular": null,
+        "night": null,
+        "clouds": null
+      },
+      "meshPath": null,
+      "sceneOrbitRadius": 0,
+      "orbitPlane": "xz",
+      "initialAnomalyRad": 0,
+      "spinDegPerSimSecond": 0,
+      "keplerian": {
+        "aKm": 3331544.6,
+        "e": 0.00837,
+        "iDeg": 0.118,
+        "OmegaDeg": 0,
+        "omegaDeg": 351.27,
+        "M0Deg": 215.3189,
+        "nDegPerDay": 88.906033484,
+        "OmegaDotDegPerDay": 0,
+        "omegaDotDegPerDay": 0
+      },
+      "cloudLayer": {
+        "diffuse": null,
+        "normal": null,
+        "scaleFactor": 0,
+        "spinDegPerSimSecond": 0,
+        "ambientFactor": 0
+      },
+      "hasCloudLayer": false,
+      "hasRings": false,
+      "hasTerrain": false,
+      "terrainAttribution": null,
+      "procedural": {
+        "enabled": true,
+        "mode": 0,
+        "seed": 3,
+        "colors": [
+          [
+            0.07,
+            0.22,
+            0.45
+          ],
+          [
+            0.42,
+            0.45,
+            0.28
+          ],
+          [
+            0.92,
+            0.94,
+            0.97
+          ]
+        ],
+        "bands": 0,
+        "seaLevel": 0.55,
+        "polarCap": 0.75,
+        "emissive": 0,
+        "equilibriumTemperatureK": 286.2
+      },
+      "placeFromElements": true
+    },
+    {
+      "index": 4,
+      "id": "trappist_1_e",
+      "parentId": "trappist_1",
+      "initTag": "trappist_1_e",
+      "kind": "planet",
+      "displayNameEn": "TRAPPIST-1 e",
+      "displayNameRu": "TRAPPIST-1 e",
+      "auDistance": 0.02925,
+      "orbitalPeriodDays": 6.101013,
+      "earthRadiusScale": 0.92,
+      "radiusKm": 5861.5,
+      "axialTiltDegrees": 0,
+      "artTiltXDegrees": 0,
+      "oblateness": 0,
+      "yawOffsetDegrees": 0,
+      "artRollDegrees": 0,
+      "shaderFlags": {
+        "hasNightTexture": false,
+        "hasSpecularMap": false,
+        "hasClouds": false
+      },
+      "useSphereIntersect": false,
+      "ambientFactor": 0,
+      "lod": {
+        "diffuse": "",
+        "normal": "",
+        "specular": null,
+        "night": null,
+        "clouds": null
+      },
+      "meshPath": null,
+      "sceneOrbitRadius": 0,
+      "orbitPlane": "xz",
+      "initialAnomalyRad": 0,
+      "spinDegPerSimSecond": 0,
+      "keplerian": {
+        "aKm": 4375737.7,
+        "e": 0.0051,
+        "iDeg": 0.015,
+        "OmegaDeg": 0,
+        "omegaDeg": 108.37,
+        "M0Deg": 214.7938,
+        "nDegPerDay": 59.006594479,
+        "OmegaDotDegPerDay": 0,
+        "omegaDotDegPerDay": 0
+      },
+      "cloudLayer": {
+        "diffuse": null,
+        "normal": null,
+        "scaleFactor": 0,
+        "spinDegPerSimSecond": 0,
+        "ambientFactor": 0
+      },
+      "hasCloudLayer": false,
+      "hasRings": false,
+      "hasTerrain": false,
+      "terrainAttribution": null,
+      "procedural": {
+        "enabled": true,
+        "mode": 0,
+        "seed": 4,
+        "colors": [
+          [
+            0.07,
+            0.22,
+            0.45
+          ],
+          [
+            0.42,
+            0.45,
+            0.28
+          ],
+          [
+            0.92,
+            0.94,
+            0.97
+          ]
+        ],
+        "bands": 0,
+        "seaLevel": 0.55,
+        "polarCap": 0.75,
+        "emissive": 0,
+        "equilibriumTemperatureK": 249.7
+      },
+      "placeFromElements": true
+    },
+    {
+      "index": 5,
+      "id": "trappist_1_f",
+      "parentId": "trappist_1",
+      "initTag": "trappist_1_f",
+      "kind": "planet",
+      "displayNameEn": "TRAPPIST-1 f",
+      "displayNameRu": "TRAPPIST-1 f",
+      "auDistance": 0.03849,
+      "orbitalPeriodDays": 9.20754,
+      "earthRadiusScale": 1.045,
+      "radiusKm": 6657.5,
+      "axialTiltDegrees": 0,
+      "artTiltXDegrees": 0,
+      "oblateness": 0,
+      "yawOffsetDegrees": 0,
+      "artRollDegrees": 0,
+      "shaderFlags": {
+        "hasNightTexture": false,
+        "hasSpecularMap": false,
+        "hasClouds": false
+      },
+      "useSphereIntersect": false,
+      "ambientFactor": 0,
+      "lod": {
+        "diffuse": "",
+        "normal": "",
+        "specular": null,
+        "night": null,
+        "clouds": null
+      },
+      "meshPath": null,
+      "sceneOrbitRadius": 0,
+      "orbitPlane": "xz",
+      "initialAnomalyRad": 0,
+      "spinDegPerSimSecond": 0,
+      "keplerian": {
+        "aKm": 5758022,
+        "e": 0.01007,
+        "iDeg": -0.038,
+        "OmegaDeg": 0,
+        "omegaDeg": 8.81,
+        "M0Deg": 308.6949,
+        "nDegPerDay": 39.098391101,
+        "OmegaDotDegPerDay": 0,
+        "omegaDotDegPerDay": 0
+      },
+      "cloudLayer": {
+        "diffuse": null,
+        "normal": null,
+        "scaleFactor": 0,
+        "spinDegPerSimSecond": 0,
+        "ambientFactor": 0
+      },
+      "hasCloudLayer": false,
+      "hasRings": false,
+      "hasTerrain": false,
+      "terrainAttribution": null,
+      "procedural": {
+        "enabled": true,
+        "mode": 3,
+        "seed": 5,
+        "colors": [
+          [
+            0.45,
+            0.47,
+            0.5
+          ],
+          [
+            0.7,
+            0.74,
+            0.78
+          ],
+          [
+            0.95,
+            0.96,
+            0.98
+          ]
+        ],
+        "bands": 0,
+        "seaLevel": 0.35,
+        "polarCap": 0.45,
+        "emissive": 0,
+        "equilibriumTemperatureK": 217.7
+      },
+      "placeFromElements": true
+    },
+    {
+      "index": 6,
+      "id": "trappist_1_g",
+      "parentId": "trappist_1",
+      "initTag": "trappist_1_g",
+      "kind": "planet",
+      "displayNameEn": "TRAPPIST-1 g",
+      "displayNameRu": "TRAPPIST-1 g",
+      "auDistance": 0.04683,
+      "orbitalPeriodDays": 12.352446,
+      "earthRadiusScale": 1.129,
+      "radiusKm": 7193,
+      "axialTiltDegrees": 0,
+      "artTiltXDegrees": 0,
+      "oblateness": 0,
+      "yawOffsetDegrees": 0,
+      "artRollDegrees": 0,
+      "shaderFlags": {
+        "hasNightTexture": false,
+        "hasSpecularMap": false,
+        "hasClouds": false
+      },
+      "useSphereIntersect": false,
+      "ambientFactor": 0,
+      "lod": {
+        "diffuse": "",
+        "normal": "",
+        "specular": null,
+        "night": null,
+        "clouds": null
+      },
+      "meshPath": null,
+      "sceneOrbitRadius": 0,
+      "orbitPlane": "xz",
+      "initialAnomalyRad": 0,
+      "spinDegPerSimSecond": 0,
+      "keplerian": {
+        "aKm": 7005668.3,
+        "e": 0.00208,
+        "iDeg": -0.036,
+        "OmegaDeg": 0,
+        "omegaDeg": 191.34,
+        "M0Deg": 86.8836,
+        "nDegPerDay": 29.144025402,
+        "OmegaDotDegPerDay": 0,
+        "omegaDotDegPerDay": 0
+      },
+      "cloudLayer": {
+        "diffuse": null,
+        "normal": null,
+        "scaleFactor": 0,
+        "spinDegPerSimSecond": 0,
+        "ambientFactor": 0
+      },
+      "hasCloudLayer": false,
+      "hasRings": false,
+      "hasTerrain": false,
+      "terrainAttribution": null,
+      "procedural": {
+        "enabled": true,
+        "mode": 3,
+        "seed": 6,
+        "colors": [
+          [
+            0.45,
+            0.47,
+            0.5
+          ],
+          [
+            0.7,
+            0.74,
+            0.78
+          ],
+          [
+            0.95,
+            0.96,
+            0.98
+          ]
+        ],
+        "bands": 0,
+        "seaLevel": 0.35,
+        "polarCap": 0.45,
+        "emissive": 0,
+        "equilibriumTemperatureK": 197.3
+      },
+      "placeFromElements": true
+    },
+    {
+      "index": 7,
+      "id": "trappist_1_h",
+      "parentId": "trappist_1",
+      "initTag": "trappist_1_h",
+      "kind": "planet",
+      "displayNameEn": "TRAPPIST-1 h",
+      "displayNameRu": "TRAPPIST-1 h",
+      "auDistance": 0.06189,
+      "orbitalPeriodDays": 18.772866,
+      "earthRadiusScale": 0.755,
+      "radiusKm": 4810,
+      "axialTiltDegrees": 0,
+      "artTiltXDegrees": 0,
+      "oblateness": 0,
+      "yawOffsetDegrees": 0,
+      "artRollDegrees": 0,
+      "shaderFlags": {
+        "hasNightTexture": false,
+        "hasSpecularMap": false,
+        "hasClouds": false
+      },
+      "useSphereIntersect": false,
+      "ambientFactor": 0,
+      "lod": {
+        "diffuse": "",
+        "normal": "",
+        "specular": null,
+        "night": null,
+        "clouds": null
+      },
+      "meshPath": null,
+      "sceneOrbitRadius": 0,
+      "orbitPlane": "xz",
+      "initialAnomalyRad": 0,
+      "spinDegPerSimSecond": 0,
+      "keplerian": {
+        "aKm": 9258612.2,
+        "e": 0.00567,
+        "iDeg": 0.027,
+        "OmegaDeg": 0,
+        "omegaDeg": 338.92,
+        "M0Deg": 156.1164,
+        "nDegPerDay": 19.176613736,
+        "OmegaDotDegPerDay": 0,
+        "omegaDotDegPerDay": 0
+      },
+      "cloudLayer": {
+        "diffuse": null,
+        "normal": null,
+        "scaleFactor": 0,
+        "spinDegPerSimSecond": 0,
+        "ambientFactor": 0
+      },
+      "hasCloudLayer": false,
+      "hasRings": false,
+      "hasTerrain": false,
+      "terrainAttribution": null,
+      "procedural": {
+        "enabled": true,
+        "mode": 3,
+        "seed": 7,
+        "colors": [
+          [
+            0.55,
+            0.6,
+            0.66
+          ],
+          [
+            0.82,
+            0.86,
+            0.9
+          ],
+          [
+            0.97,
+            0.98,
+            1
+          ]
+        ],
+        "bands": 0,
+        "seaLevel": 0.2,
+        "polarCap": 0.2,
+        "emissive": 0,
+        "equilibriumTemperatureK": 171.7
+      },
+      "placeFromElements": true
+    }
+  ],
+  "atmospheres": [],
+  "auroras": []
+}

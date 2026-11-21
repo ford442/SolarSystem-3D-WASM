@@ -60,15 +60,19 @@ The project is an animated 3D scene with a model of the Solar System.
 - 🖼️ Photoshop-processed skybox with high resolution textures (6K)
 - 💡 High-quality shaders
 - 💡 Blinn–Fong reflection model with normal maps to visualise surface irregularities
-- 💡 Physically based atmospheres for Earth, Venus, Mars and Titan: transmittance and
+- 💡 Physically based atmospheres for Earth, Venus, Mars, Titan and the four giants: transmittance and
   multiple-scattering lookup tables baked offline from catalog parameters (Medium/Full), with a
-  cheap single-scattering shell on Low and for the gas giants. No float render target is
+  cheap single-scattering shell on Low. Jupiter, Saturn, Uranus and Neptune are oblate, and
+  Saturn's and Uranus's rings shadow their air as the opening angle changes with the date. No float render target is
   needed, so GPUs without `EXT_color_buffer_float` still get the LUT path
 - 💡 Mie scattering and accurate shadows for planetary rings
 - 💡 High-quality soft shadows using PCF and ray tracing
 - 💡 Omnidirectional shadow maps simulation when using a single unidirectional shadow map
 - 💡 Shadows from the clouds
-- 💡 Limb-darkened photosphere and a volumetric (instanced-slice) solar corona
+- 💡 Limb-darkened photosphere and a volumetric (instanced-slice) solar corona; on Medium/Full
+  animated granulation, and on Full sunspots that follow the 11-year cycle
+- 💡 Space weather: a GPU solar-wind particle stream, magnetopauses that compress under CMEs,
+  and auroral ovals on Earth and the giant planets
 - 💡 Lens flare
 - 🎵 Background music
 - ⚙️ FreeType status hints plus a browser settings panel for quality, time control, pause,
@@ -82,20 +86,23 @@ The web build is a small orrery you can send a URL into. None of this talks to l
 - **Date scrubber** — Simulation panel sets a Julian date; heliocentric positions come from the Standish/Keplerian ephemeris already in the WASM module.
 - **Orbit scale toggle** — Explorer **Orbit scale**: compressed (art spacing for navigation) vs realistic AU. Shareable as `?orbit=0` / `?orbit=1`.
 - **Magnetic fields** — Simulation toggle (also `M` on native) draws dipole/toroidal ribbons. Bloom on Medium/Full.
+- **Space weather** — Auroral ovals on Earth, Jupiter, Saturn, Uranus and Neptune that widen toward the equator as Kp rises. A **Solar wind** toggle streams particles (Medium and Full) past each magnetopause and down to the ovals. Curated CMEs (Carrington, Halloween 2003, May 2024, …) replay with **Play storm**, and an **Aurora Kp** slider and **Launch CME now** let you make your own. Share a storm with `?kp=7&cme=2003-10-29T06:00Z`. See [docs/ARCHITECTURE.md §13](docs/ARCHITECTURE.md).
 - **Sky-event overlays** — Next conjunction, eclipse, or transit chip plus documented landmarks (for example the 2017-08-21 total solar eclipse).
 - **Mission paths** — Sampled Voyager 1/2 polylines (`resource/missions/catalog.json`). Click a mission in Explorer to follow the probe; share with `?mission=voyager1&jd=…`. Low quality draws fewer samples.
 - **Guided tours** — **Play inner-system tour** runs a 60-second playlist (Sun → Earth scale modes → Saturn → 2017 eclipse). `?tour=inner-system&step=2` deep-links a beat; **Copy link to this tour step** reuses the share URL.
-- **Observe mode** — Simulation panel **Observe** (or `O`) puts the camera on Earth at a lat/lon and a UTC instant and shows the sky at true angular size: the Sun, Moon (with phase) and the five naked-eye planets over a day/twilight/night gradient and a flat horizon. Pick a site or enter lat/lon, scrub the date and time, change the rate (paused to ×86400), and share it with `?mode=observe&lat=42.87&lon=-106.31&jd=2457986.2375&az=150&el=50&fov=20`. **2017 total eclipse (Casper, WY)** jumps to mid-totality (17:43:45 UTC on 2017-08-21). A visualization, not an almanac — planets are good to ~an arcminute, the Moon and Sun to a few arcseconds (eclipse contacts to ~10 s), there is no refraction, and times are UTC. About 5000 catalog stars (Yale Bright Star Catalogue, V ≲ 6, with B−V colours) fade in through twilight; Low draws the brightest 500, Medium 2000. The Moon wears its diffuse texture once its system has loaded, oriented from the IAU lunar rotation model (so libration and the sky position angle of its pole come out right), and the next-sky-event chip says whether the bodies involved are above your horizon when it happens. In VR, Observe is a seated sky: look around with your head, the left stick scrubs time, the right stick snap-turns, and nothing flies. Native: `SOLARSYSTEM_OBSERVE=lat,lon[,jd[,az,el,fov]]` opens straight into Observe.
+- **Cinematic timelines** — **Cinematics and video…** (under the tour controls) opens a dock that plays keyframed camera-and-date shots: *Voyager 2 Grand Tour*, *2024-04-08 eclipse from the Moon*, and *Seamless descent to 1 m above Earth*. Scrub, add a keyframe at the current pose, export/import the JSON (`web/public/timelines/`), and share with `?timeline=voyager2-grand-tour&tt=13` (an id or an http(s) URL to a timeline file). **Record video** renders the timeline frame by frame at 720p/1080p/4K and 30/60 fps and downloads an `.mp4`. The video is identical however slow the GPU is (WebCodecs + mp4-muxer); browsers without WebCodecs record the canvas in real time instead (MediaRecorder).
+- **Other star systems** — Explorer's **Star system** list holds Sol plus eight exoplanet systems from the NASA Exoplanet Archive (TRAPPIST-1, Proxima Centauri, τ Ceti, TOI-700, Kepler-186, Kepler-90, 55 Cancri, 51 Pegasi), nearest first. Picking one fades out in the departing star's light, swaps the scene, and lands beside the planet closest to Earth's insolation. Orbits, sizes and periods are the archive's (gaps filled and flagged as fits). Each star's temperature sets its colour and the colour of the light on its planets, so TRAPPIST-1's 2,566 K dwarf is red. Surfaces are procedural, since no exoplanet has been imaged. **⌂ Sol** returns home. Share with `?system=trappist-1&planet=e`; native `SOLARSYSTEM_SYSTEM=trappist-1:e`. Observe, missions and sky events need Earth and stay in Sol. See [docs/ARCHITECTURE.md §12](docs/ARCHITECTURE.md).
+- **Observe mode** — Simulation panel **Observe** (or `O`) puts the camera on Earth at a lat/lon and a UTC instant and shows the sky at true angular size: the Sun, Moon (with phase) and the five naked-eye planets over a flat horizon, under Earth's physically based atmosphere seen from the ground on Medium/Full (blue toward the Sun by day, dark at totality) or a day/twilight/night gradient on Low. Pick a site or enter lat/lon, scrub the date and time, change the rate (paused to ×86400), and share it with `?mode=observe&lat=42.87&lon=-106.31&jd=2457986.2375&az=150&el=50&fov=20`. **2017 total eclipse (Casper, WY)** jumps to mid-totality (17:43:45 UTC on 2017-08-21). A visualization, not an almanac — planets are good to ~an arcminute, the Moon and Sun to a few arcseconds (eclipse contacts to ~10 s), refraction is for a standard atmosphere (a Sun on the geometric horizon shows ~0.5° up), and times are UTC. About 5000 catalog stars (Yale Bright Star Catalogue, V ≲ 6, with B−V colours) fade in through twilight and dim toward the horizon with air mass; Low draws the brightest 500, Medium 2000. **Constellation lines** (a panel switch) draw 39 stick figures over them — the 20 best-known on Low. The Moon wears its diffuse texture once its system has loaded, oriented from the IAU lunar rotation model (so libration and the sky position angle of its pole come out right), and the next-sky-event chip says whether the bodies involved are above your horizon when it happens. **Telescope**: pick a 2° / 1° / 0.5° / 0.25° eyepiece (or scroll/pinch below 2°) for a circular eyepiece view; at 0.25° Jupiter, Saturn (no rings yet) and Mars show their true discs and Venus its phase (`?mode=observe&lat=40.71&lon=-74&jd=2459848.667&az=160.56&el=47.6&fov=0.25` is Jupiter at its 2022 opposition). It narrows the field only — no optics are simulated. In VR, Observe is a seated sky: look around with your head, the left stick scrubs time, the right stick snap-turns, and nothing flies. Native: `SOLARSYSTEM_OBSERVE=lat,lon[,jd[,az,el,fov]]` opens straight into Observe, and `SOLARSYSTEM_CAMERA_POSE=x,y,z,yaw,pitch[,jd]` applies the web's `setCameraPose` pose (with an optional pinned date) for side-by-side captures.
 - **VR** — Enter VR when `navigator.xr` reports immersive-vr. Controller rays and a focus-planet tooltip show in-headset (HTML overlay and/or a tiny GL ribbon). Non-XR browsers never see the button.
 
-Console helpers: `window.focusMission(0)`, `window.startTour('inner-system')`, `window.setObserveMode(true)`, `window.getObserveState()`.
+Console helpers: `window.focusMission(0)`, `window.startTour('inner-system')`, `window.setObserveMode(true)`, `window.getObserveState()`, `window.solarSystemTimeline.load('eclipse-2024-from-the-moon')` / `.snapshot(t, w, h)`.
 
 <h2 id="documentation">Documentation</h2>
 
 | Document | Purpose |
 |----------|---------|
 | [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) | **Canonical** system design: loading layers, LOD, asset URLs, module map |
-| [resource/planets.catalog.json](resource/planets.catalog.json) | **Canonical** planet metadata (facts, staged load, companion); run `npm run generate:planet-metadata` |
+| [resource/systems/sol.catalog.json](resource/systems/sol.catalog.json) | **Canonical** planet metadata (facts, staged load, companion); run `npm run generate:planet-metadata` |
 | [docs/plans/PORTING_GUIDE.md](docs/plans/PORTING_GUIDE.md) | Emscripten port history and CMake/WebGL details |
 | [docs/CROSS_ORIGIN_HEADERS.md](docs/CROSS_ORIGIN_HEADERS.md) | COEP/CORS/CORP header matrix and CDN setup |
 | [docs/plans/TESTING_GUIDE.md](docs/plans/TESTING_GUIDE.md) | Manual verification (staged loading, LOD, teleport helpers) |
@@ -111,7 +118,7 @@ See [docs/plans/PORTING_GUIDE.md](docs/plans/PORTING_GUIDE.md) for Emscripten bu
 - [OpenGL 4.6](https://www.khronos.org/registry/OpenGL/specs/gl/glspec46.core.pdf)
 - [GLFW](https://github.com/glfw/glfw)
 - [GLEW](https://github.com/nigels-com/glew)
-- [SDL2](https://www.libsdl.org/download-2.0.php), [SDL2_image](https://www.libsdl.org/projects/SDL_image/), and [SDL2_mixer](https://www.libsdl.org/projects/SDL_mixer/) (Linux/macOS native and web)
+- [SDL2](https://www.libsdl.org/download-2.0.php), [SDL2_image](https://www.libsdl.org/projects/SDL_image/), and [SDL2_mixer](https://www.libsdl.org/projects/SDL_mixer/) (Linux/macOS native only; SDL2_mixer is not linked on web)
 - [Assimp](https://github.com/assimp/assimp)
 - [FreeType](https://gitlab.freedesktop.org/freetype/freetype)
 - [irrKlang](https://www.ambiera.com/irrklang/) (Windows native only)
@@ -142,7 +149,25 @@ working directory):
 ./build/SolarSystem
 ```
 
-On Linux, background music uses SDL_mixer (same as the web build) instead of irrKlang. MP3 tracks are
+`build.sh` is a thin wrapper over the CMake presets in `CMakePresets.json` (CMake 3.25+), which
+you can also use directly:
+
+| Preset | What it builds | Output |
+|---|---|---|
+| `native-release` | the game, Release | `build/` |
+| `native-debug` | the game, Debug | `cmake-build-debug/` |
+| `native-tests` | unit tests, GL tests, atmosphere LUT baker | `build-test/` |
+| `web-release` / `web-debug` | WebAssembly (needs `$EMSDK`; `build-web.sh` finds it) | `build-web/`, `build-web-debug/` |
+
+```bash
+cmake --preset native-debug && cmake --build --preset native-debug
+cmake --workflow --preset native-tests     # configure + build + ctest (not the GL tests)
+```
+
+Every preset writes `compile_commands.json` for clangd and clang-tidy, and a `ccache` on `PATH` is
+used automatically. Warnings are errors in CI only (`-DSOLARSYSTEM_WERROR=ON`).
+
+On Linux, background music uses SDL_mixer instead of irrKlang. The web build links no audio library; see below. MP3 tracks are
 optional: place them under `resource/sounds/` if you have the assets locally.
 
 High-resolution textures and the skybox (`resource/textures/`) are not in git; deploy or copy them
@@ -161,15 +186,13 @@ To build for the web using WebAssembly:
 
 1. Install the [Emscripten SDK](https://emscripten.org/docs/getting_started/downloads.html)
 2. Activate the Emscripten environment: `source /path/to/emsdk/emsdk_env.sh`
-3. Build the project:
+3. Build the project (this is what `build-web.sh` runs, then copies the output into `web/`):
 ```bash
-emcmake cmake -B build-web .
-cd build-web
-emmake make
+cmake --preset web-release && cmake --build --preset web-release
 ```
-4. Serve the generated HTML file (due to CORS restrictions):
+4. For a quick look without Vite, serve the build directory (due to CORS restrictions):
 ```bash
-python3 -m http.server 8000
+cd build-web && python3 -m http.server 8000
 # Then open http://localhost:8000/SolarSystem.html
 ```
 
@@ -179,7 +202,7 @@ See [docs/plans/PORTING_GUIDE.md](docs/plans/PORTING_GUIDE.md) for detailed info
 
 ```bash
 ./build-web.sh          # Release WASM (default: -O3 -flto)
-./build-web.sh --debug  # Debug WASM with symbols (-O0 -g)
+./build-web.sh --debug  # Debug WASM with symbols (-O0 -g -gsource-map)
 cd web
 npm run dev             # http://localhost:5173/solar-system/
 npm run preview         # http://localhost:4173/solar-system/ (production bundle)
@@ -213,6 +236,20 @@ dipole / toroidal ribbons. While the mode is on, planet surfaces dim so the line
 and orbit paths fade (they stay available via the Orbit lines checkbox). Medium and Full add
 a half-resolution plasma bloom; Low keeps the Sun’s field only and skips bloom. Values are
 visual, not SI magnetosphere physics. The toggle persists in `localStorage` like orbit lines.
+With space weather, the ribbons' day side compresses with the magnetopause standoff.
+
+**Space weather** (Solar System only):
+
+- **Aurora.** Auroral ovals always draw, sized from the modelled Kp.
+- **Solar wind** (off by default, `?wind=1`) adds the particle stream on Medium (50k) and
+  Full (200k).
+- **Aurora Kp** holds every oval at a Kp from 0 to 9 (`?kp=`), and far left follows the wind.
+- **Launch CME now** sends an Earth-directed CME from the current date.
+- **Storms.** The sky-event chip lists the next catalogued geomagnetic storm (past the end of the
+  list, the latest one) and plays it from its launch. While a storm is on, a card gives Kp, the oval latitude and the magnetopause
+  distance.
+
+Native: `SOLARSYSTEM_SOLAR_WIND=1`, `SOLARSYSTEM_KP=7`, `SOLARSYSTEM_CME=2003-10-29T06:00Z`.
 
 ### Educational mode
 
@@ -221,13 +258,16 @@ shared link reproduces exactly what you were looking at.
 
 | Feature | How to reach it | What it shows |
 |---------|-----------------|---------------|
-| **Date scrubber** | Simulation panel, or `P` / `+` / `-` / `.` keys; `?date=` in a deep link | Moves the simulation epoch. Planet positions come from JPL's Standish series; Pluto, Ceres, and Vesta from fixed Keplerian elements; the Moon, the four Galileans, Titan, and Triton from catalog Keplerian elements with secular node/periapsis rates. Earth's rotation follows GMST at the scrubbed date, so the night side is where it belongs for that UTC — and scrubbing back is exact. |
+| **Date scrubber** | Simulation panel, or `P` / `+` / `-` / `.` keys; `?date=` in a deep link | Moves the simulation epoch. Planet positions come from JPL's Standish series; Pluto, Ceres, Vesta, Eris, Haumea, Makemake, and 1P/Halley from fixed Keplerian elements; the Moon, the four Galileans, Titan, and Triton from catalog Keplerian elements with secular node/periapsis rates. Every body's rotation is a function of the scrubbed date (IAU prime-meridian elements; Earth's map is turned so the real sub-solar longitude is under the Sun), so a shared `?date=` link shows the same face of every planet — and scrubbing back is exact. |
 | **Scale toggle** | Simulation panel, or `?scale=realistic` | Switches between artistic compressed orbits and AU-proportional spacing. |
 | **Magnetic fields** | `M` key or `?fields=1` | Dipole / toroidal ribbons (visual, not SI values) — see the note above. |
+| **Geomagnetic storms** | Simulation panel's storm chip, or `?cme=2003-10-29T06:00Z` | The next catalogued CME to reach Earth, or the latest once the date is past the list. **Play storm** starts just before its launch with the clock slowed, so the pulse can be followed out to Earth, where the magnetopause is pushed in and the oval moves toward the equator (~50° in the Halloween 2003 storm). Earth's numbers come from a pressure-balance / drag-model simulation calibrated to each storm's observed arrival and peak Kp. |
 | **Next sky event** | Simulation panel chip, or text hints overlay (`TAB`) | The next conjunction, solar or lunar eclipse, Mercury/Venus transit, or Galilean shadow transit. All four searches read the live ephemeris — nothing is baked — so scrubbing the date re-runs them. **Jump to event** moves the epoch to what the search found; **Play &lt;date&gt;** jumps to a documented landmark instead (2017-08-21 by default). Both go through `SetSimulationEpoch` / `?jd=`, so the resulting view is shareable. |
 | **Next conjunction** | Explorer chip | The conjunction-only chip, kept for the explorer panel: the next date two of Mercury, Venus, and Mars share a geocentric ecliptic longitude, with their apparent separation. |
 | **Eclipse shadows** | Automatic — scrub to an eclipse date and watch Earth | The Moon's umbra on Earth, and a Galilean moon's shadow on Jupiter, projected in the lighting pass from the moon's real ephemeris position. Whether a shadow happens is decided in kilometres, not in scene units, so over 2017–2019 the umbra appears on the real eclipse dates rather than at every new moon. Low quality draws a hard-edged disc; Full adds the penumbra falloff. |
 | **Ceres and Vesta** | Focus index 10 and 11, or `?planet=ceres` / `?planet=vesta` | The two largest main-belt bodies, orbiting inside the existing asteroid field with the same staged LOD texture path as the planets. |
+| **Outer system** | Focus 12–14, or `?planet=eris` / `haumea` / `makemake` | Catalog-only trans-Neptunian dwarf planets on their real eccentric, inclined orbits (placeholder textures until real maps are deployed). In realistic scale a sparse instanced Kuiper disk (30–50 AU, off on Low) sits beyond Neptune. |
+| **1P/Halley** | Focus 15, or `?planet=halley&date=1986-02-09` (last perihelion; next is 2061-07-28) | Catalog nucleus on an unperturbed e = 0.967 retrograde ellipse with the anti-sunward comet tail attached; the tail fades away from perihelion. |
 
 Accuracy is deliberately "visualiser grade": positions are good to roughly an arcminute for the
 planets near the present day, and the belt bodies drift about half a degree per decade away from
@@ -371,19 +411,43 @@ aws s3 cp resource/asset-manifest.json "$ASSET_URI/asset-manifest.json" --cache-
 Background music uses the same origin and `VITE_ASSET_BASE` resolution as textures. The five
 Stellardrone MP3 files live under `resource/sounds/` and are **not** embedded in the WASM
 `.data` bundle (they are stored via Git LFS and may be absent in local checkouts). At runtime
-the web build downloads them asynchronously in parallel with core assets:
+the web build streams them with an `HTMLAudioElement` from `web/src/music.ts` (shuffled
+playlist, 5 s fades, loops); the WASM module opens no audio device:
 
-- `[Audio] Starting optional background music download (5 tracks)...`
-- `[Audio] Loaded track: resource/sounds/...` when a CDN/local file is present
+- `[Audio] Now playing: ...` when a track starts
 - `[Audio] Missing track (skipped): resource/sounds/...` on 404 or offline hosts
 
-Missing tracks do not block the loading screen or crash SDL_mixer; playback starts once at
-least one track is available. Use the settings panel **Music volume** slider or **Mute music**
+Missing tracks do not block the loading screen; playback starts on the first user gesture if
+the browser blocks autoplay. C++ only reports a 0–1 proximity duck via `Module.onMusicDuck`. Use the settings panel **Music volume** slider or **Mute music**
 toggle (persisted in `localStorage`) to control output. Page Up/Page Down still adjust volume
 from the keyboard.
 
 Configure CORS on the bucket and response-header/CORP injection on the CDN before switching
 `VITE_ASSET_BASE` to the new version. Keep the previous version prefix available for rollback.
+
+### Terrain tiles
+
+The Moon, Mars, Mercury and Earth (catalog `render.terrain`) draw height tiles instead of
+their sphere when the camera is low, on Medium and Full (docs/ARCHITECTURE.md §11.3). The
+tiles are not in git or in `SolarSystem.data`: bake them by hand from the public elevation
+models named in each row's attribution, then publish `terrain/` with the other runtime assets.
+Without them a body simply stays its sphere.
+
+```bash
+pip install numpy gdal          # GDAL for the source rasters (a global .npy works without it)
+python3 scripts/bake-terrain-tiles.py moon --source LDEM_118M.tif --datum-km 1737.4 \
+    --levels 6 --region -89.9 0 60 9 --out build/terrain
+cp -r build/terrain/moon resource/terrain/   # then: node scripts/generate-planet-metadata.mjs --write-checksums
+```
+
+`--levels` bakes the whole body to that depth, and each `--region LAT LON RADIUS_KM MAX_LEVEL`
+goes deeper around one place (Shackleton above, Olympus Mons with `18.65 -133.8 400 9` on
+Mars). Repeat `--source` in priority order (Earth: SRTM, then ETOPO 2022 for the sea floor and
+the rest); `--datum-km` is the radius the source's heights are measured from. Each
+`terrain/<body>/tileset.json` is listed (optional) in `resource/asset-manifest.json` and
+records the SHA-256 of every tile. Tiles are fetched through the same asset cache as
+textures, so a body visited once still draws its tiles offline. For `npm run dev`, put a
+baked set under `web/public/resource/terrain/`.
 
 ### Separate deployment
 
@@ -400,7 +464,7 @@ export SOLAR_DEPLOY_ASSET_REMOTE=public_html/solar-assets/2026.07.0/resource
 
 cd web
 python3 deploy.py app       # uploads dist/ only
-python3 deploy.py assets    # uploads resource/{textures,textures_low,textures_mid,sounds} + manifest
+python3 deploy.py assets    # uploads resource/{textures,textures_low,textures_mid,sounds,terrain} + manifest
 # Or publish both explicitly:
 python3 deploy.py all
 ```

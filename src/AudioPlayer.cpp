@@ -1,16 +1,17 @@
-// Background music playback and volume control. Two backends live behind the same
-// Application methods: SDL_mixer (web/Emscripten, pumped once per frame from the main
-// loop) and irrKlang (Windows native, driven by its own worker thread).
+// Background music playback and volume control for native builds. Two backends live behind
+// the same Application methods: SDL_mixer (Linux, pumped once per frame from the main loop)
+// and irrKlang (Windows, driven by its own worker thread). The web build opens no audio
+// device at all: web/src/music.ts plays the tracks and C++ only reports MusicDuckAmount().
 #include "Application.h"
+#include "JsBridge.h"
 #include <algorithm>
 #include <chrono>
 #include <cmath>
-#include <iostream>
+#include "core/Log.h"
 #include <string>
 #include <thread>
 
-using namespace std;
-
+#ifndef __EMSCRIPTEN__
 void Application::SetMusicVolume(float volume) {
 #ifdef SOLARSYSTEM_USE_SDL_MIXER
     _musicVolume = glm::clamp(volume, 0.0f, 1.0f);
@@ -55,6 +56,7 @@ bool Application::GetMusicMuted() const {
     return false;
 #endif
 }
+#endif // !__EMSCRIPTEN__
 
 void Application::StartPlayBackgroundMusic() {
     _isBackgroundMusicPlay = true;
@@ -64,14 +66,14 @@ void Application::StartPlayBackgroundMusic() {
     _musicStartTime = 0;
     _musicDuration = 0;
     _currentMusic = nullptr;
-#else
+#elif !defined(__EMSCRIPTEN__)
     auto mapRange = [](float value, float inMin, float inMax, float outMin, float outMax) {
         return outMin + (outMax - outMin) * (value - inMin) / (inMax - inMin);
     };
 
-    _backgroundMusicThread = make_unique<thread>([=]() {
-        for (ssize_t i = 0; i < _backgroundSongPaths.size() && _isBackgroundMusicPlay; i++) {
-            this_thread::sleep_for(1s);
+    _backgroundMusicThread = std::make_unique<std::thread>([=]() {
+        for (size_t i = 0; i < _backgroundSongPaths.size() && _isBackgroundMusicPlay; i++) {
+            std::this_thread::sleep_for(std::chrono::seconds(1));
 
             auto song = _soundEngine->play2D(_backgroundSongPaths[i].c_str(), false, true, true);
             song->setVolume(0);
@@ -82,15 +84,15 @@ void Application::StartPlayBackgroundMusic() {
                 if (song->getPlayPosition() < 5000) {
                     auto x = mapRange(song->getPlayPosition(), 0.0f, 5000.0f, 0.0f, 0.7f);
                     auto volume = exp(x) - 1;
-                    song->setVolume(clamp(volume, 0.0f, 1.0f));
+                    song->setVolume(std::clamp(volume, 0.0f, 1.0f));
                 }
                 else if (song->getPlayPosition() > song->getPlayLength() - 5000) {
                     auto x = mapRange(song->getPlayPosition(), song->getPlayLength() - 5000, song->getPlayLength(), 0.0f, 6.0f);
                     auto volume = exp(-x);
-                    song->setVolume(clamp(volume, 0.0f, 1.0f));
+                    song->setVolume(std::clamp(volume, 0.0f, 1.0f));
                 }
 
-                this_thread::sleep_for(25ms);
+                std::this_thread::sleep_for(std::chrono::milliseconds(25));
             }
 
             if (i == _backgroundSongPaths.size() - 1)
@@ -135,8 +137,7 @@ void Application::UpdateBackgroundMusic() {
 
             _currentMusic = Mix_LoadMUS(path.c_str());
             if (!_currentMusic) {
-                std::cerr << "[Audio] Failed to decode track (skipped): " << path
-                          << " (" << Mix_GetError() << ")" << std::endl;
+                LOG_WARN("Audio", "Failed to decode track (skipped): %s (%s)", path.c_str(), Mix_GetError());
                 _availableSongPaths.erase(path);
                 continue;
             }
@@ -146,11 +147,11 @@ void Application::UpdateBackgroundMusic() {
             applyMusicVolume(0.0f);
             _musicStartTime = SDL_GetTicks();
             _musicDuration = 180000;
-            std::cout << "[Audio] Now playing: " << _currentMusicTrack << std::endl;
+            LOG_INFO("Audio", "Now playing: %s", _currentMusicTrack.c_str());
             return;
         }
 
-        std::cerr << "[Audio] No playable tracks available yet; waiting for downloads" << std::endl;
+        LOG_INFO("Audio", "No playable tracks available yet; waiting for downloads");
         return;
     }
 
@@ -175,34 +176,44 @@ void Application::StopPlayBackgroundMusic() {
         Mix_FreeMusic(_currentMusic);
         _currentMusic = nullptr;
     }
-#else
+#elif !defined(__EMSCRIPTEN__)
     _soundEngine->stopAllSounds();
     if (_backgroundMusicThread)
         _backgroundMusicThread->join();
 #endif
 }
 
+float Application::MusicDuckAmount() const {
+    if (_nearestPlanetIndex < 0
+        || static_cast<size_t>(_nearestPlanetIndex) >= _renderableSceneComponents.size()) {
+        return 1.0f;
+    }
+    const Planet* planet = _renderableSceneComponents[static_cast<size_t>(_nearestPlanetIndex)].planet.get();
+    if (!planet) {
+        return 1.0f;
+    }
+    // In compressed-scale units: realistic divides out the planet's size factor.
+    const float dist = CalculateSpaceObjectDistance(planet) / planet->SizeFactor();
+    constexpr float kDuckStart = 90.0f;
+    constexpr float kDuckEnd = 18.0f;
+    if (dist >= kDuckStart) {
+        return 1.0f;
+    }
+    const float t = glm::clamp((dist - kDuckEnd) / (kDuckStart - kDuckEnd), 0.0f, 1.0f);
+    return glm::mix(0.32f, 1.0f, t);
+}
+
 void Application::UpdateMusicDucking() {
-#ifdef SOLARSYSTEM_USE_SDL_MIXER
+#ifdef __EMSCRIPTEN__
+    const float duck = MusicDuckAmount();
+    if (std::abs(duck - _reportedMusicDuck) > 0.005f) {
+        _reportedMusicDuck = duck;
+        NotifyMusicDuck(duck);
+    }
+#elif defined(SOLARSYSTEM_USE_SDL_MIXER)
     if (!_mixerInitialized || _musicMuted || !Mix_PlayingMusic()) {
         return;
     }
-    float duck = 1.0f;
-    if (_nearestPlanetIndex >= 0
-        && static_cast<size_t>(_nearestPlanetIndex) < _renderableSceneComponents.size()) {
-        const Planet* planet = _renderableSceneComponents[static_cast<size_t>(_nearestPlanetIndex)].planet.get();
-        if (planet) {
-            const float dist = CalculateSpaceObjectDistance(planet);
-            constexpr float kDuckStart = 90.0f;
-            constexpr float kDuckEnd = 18.0f;
-            if (dist < kDuckStart) {
-                const float t = glm::clamp((dist - kDuckEnd) / (kDuckStart - kDuckEnd), 0.0f, 1.0f);
-                duck = glm::mix(0.32f, 1.0f, t);
-            }
-        }
-    }
-    Mix_VolumeMusic(static_cast<int>(MIX_MAX_VOLUME * _musicVolume * duck));
-#else
-    (void)0;
+    Mix_VolumeMusic(static_cast<int>(MIX_MAX_VOLUME * _musicVolume * MusicDuckAmount()));
 #endif
 }

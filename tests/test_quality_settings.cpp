@@ -1,7 +1,6 @@
 #include <gtest/gtest.h>
 
 #include "QualitySettings.h"
-#include "SimState.h"
 
 namespace {
 
@@ -36,6 +35,14 @@ void ExpectEffects(const QualityTierSettings& settings, bool pbrAtmosphere, int 
 
 } // namespace
 
+TEST(QualitySettingsTest, OnlyLowDrawsTheCoreConstellationSubset) {
+    for (const bool mobile : {false, true}) {
+        EXPECT_TRUE(GetQualitySettings(0, mobile).observeCoreConstellationsOnly);
+        EXPECT_FALSE(GetQualitySettings(1, mobile).observeCoreConstellationsOnly);
+        EXPECT_FALSE(GetQualitySettings(2, mobile).observeCoreConstellationsOnly);
+    }
+}
+
 TEST(QualitySettingsTest, ObserveStarCountGrowsWithTier) {
     EXPECT_EQ(GetQualitySettings(0, false).observeStarCount, 500);
     EXPECT_EQ(GetQualitySettings(1, false).observeStarCount, 2000);
@@ -45,6 +52,35 @@ TEST(QualitySettingsTest, ObserveStarCountGrowsWithTier) {
     for (const bool mobile : {false, true}) {
         EXPECT_LT(GetQualitySettings(0, mobile).observeStarCount, GetQualitySettings(1, mobile).observeStarCount);
         EXPECT_LT(GetQualitySettings(1, mobile).observeStarCount, GetQualitySettings(2, mobile).observeStarCount);
+    }
+}
+
+TEST(QualitySettingsTest, EveryTierLoadsTheNearestThreeSystemsEagerly) {
+    for (const bool mobile : {false, true}) {
+        EXPECT_EQ(GetQualitySettings(0, mobile).eagerPlanetSystems, 3);
+        EXPECT_LE(GetQualitySettings(0, mobile).eagerPlanetSystems, GetQualitySettings(1, mobile).eagerPlanetSystems);
+        EXPECT_LE(GetQualitySettings(1, mobile).eagerPlanetSystems, GetQualitySettings(2, mobile).eagerPlanetSystems);
+    }
+}
+
+// Low never draws (or fetches) a terrain tile; the higher tiers get more budget and a finer
+// split, and mobile less of both than desktop.
+TEST(QualitySettingsTest, TerrainIsOffOnLowAndGrowsWithTier) {
+    for (const bool mobile : {false, true}) {
+        EXPECT_EQ(GetQualitySettings(0, mobile).terrainBudgetMiB, 0);
+        EXPECT_EQ(GetQualitySettings(0, mobile).terrainMaxInFlight, 0);
+        for (int preset = 1; preset <= 2; ++preset) {
+            const QualityTierSettings s = GetQualitySettings(preset, mobile);
+            EXPECT_GT(s.terrainBudgetMiB, 0) << s.name;
+            EXPECT_GT(s.terrainMaxInFlight, 0) << s.name;
+            EXPECT_GT(s.terrainPixelError, 0.0f) << s.name;
+        }
+        EXPECT_LT(GetQualitySettings(1, mobile).terrainBudgetMiB, GetQualitySettings(2, mobile).terrainBudgetMiB);
+        EXPECT_GT(GetQualitySettings(1, mobile).terrainPixelError, GetQualitySettings(2, mobile).terrainPixelError);
+    }
+    for (int preset = 1; preset <= 2; ++preset) {
+        EXPECT_LT(GetQualitySettings(preset, true).terrainBudgetMiB, GetQualitySettings(preset, false).terrainBudgetMiB);
+        EXPECT_GT(GetQualitySettings(preset, true).terrainPixelError, GetQualitySettings(preset, false).terrainPixelError);
     }
 }
 
@@ -63,18 +99,32 @@ TEST(QualitySettingsTest, MobileScalesAsteroidCountsDown) {
     ExpectTier(GetQualitySettings(1, true), 2048, 2, 0, true, true, 1, 900, TextureLodTier::Mid, "medium");
 }
 
+TEST(QualitySettingsTest, KuiperDiskIsOffOnLowAndSmallerThanTheBelt) {
+    for (const bool mobile : {false, true}) {
+        EXPECT_EQ(GetQualitySettings(0, mobile).kuiperInstanceCount, 0);
+        for (int preset = 1; preset <= 2; ++preset) {
+            const QualityTierSettings s = GetQualitySettings(preset, mobile);
+            EXPECT_GT(s.kuiperInstanceCount, 0) << s.name;
+            EXPECT_LT(s.kuiperInstanceCount, s.asteroidInstanceCount) << s.name;
+        }
+    }
+}
+
 TEST(QualitySettingsTest, OutOfRangePresetUsesFullTier) {
     ExpectTier(GetQualitySettings(99, false), 3000, 4, 4, true, true, 2, 4000, TextureLodTier::High, "full");
 }
 
-TEST(QualitySettingsTest, GetMaxTextureLodTierFollowsPreset) {
-    gSimState->qualityPreset = 0;
-    gSimState->isMobileWeb = false;
-    EXPECT_EQ(GetMaxTextureLodTier(), TextureLodTier::Low);
-    gSimState->qualityPreset = 1;
-    EXPECT_EQ(GetMaxTextureLodTier(), TextureLodTier::Mid);
-    gSimState->qualityPreset = 2;
-    EXPECT_EQ(GetMaxTextureLodTier(), TextureLodTier::High);
+TEST(QualitySettingsTest, TextureLodPolicyFollowsPreset) {
+    EXPECT_EQ(GetTextureLodPolicy(0, false).maxTier, TextureLodTier::Low);
+    EXPECT_EQ(GetTextureLodPolicy(1, false).maxTier, TextureLodTier::Mid);
+    EXPECT_EQ(GetTextureLodPolicy(2, false).maxTier, TextureLodTier::High);
+    // The distance multiplier is a web Medium rule; native and the other tiers keep 1.
+    EXPECT_FLOAT_EQ(GetTextureLodPolicy(2, false).planetThresholdScale, 1.0f);
+#ifdef __EMSCRIPTEN__
+    EXPECT_FLOAT_EQ(GetTextureLodPolicy(1, false).planetThresholdScale, 1.0f / 1.5f);
+#else
+    EXPECT_FLOAT_EQ(GetTextureLodPolicy(1, false).planetThresholdScale, 1.0f);
+#endif
 }
 
 #ifndef __EMSCRIPTEN__
@@ -92,4 +142,54 @@ TEST(QualitySettingsTest, AtmosphereAndCoronaEffectsPerTier) {
     ExpectEffects(GetQualitySettings(0, true), false, 0, false, 0);
     ExpectEffects(GetQualitySettings(1, true), true, 8, false, 0);
     ExpectEffects(GetQualitySettings(2, true), true, 12, true, 16);
+}
+
+TEST(QualitySettingsTest, TiersWithHdrAskTheContextForNoSamples) {
+    // Full's table row still says 4: the request is for the HDR path's benefit and the
+    // context must not honour it, because the colour pass never draws into that buffer.
+    EXPECT_EQ(GetQualitySettings(2, false).requestedMsaaSamples, 4);
+    for (const bool mobile : {false, true}) {
+        for (int preset = 0; preset <= 2; ++preset) {
+            const auto settings = GetQualitySettings(preset, mobile);
+            if (settings.enableHdr) {
+                EXPECT_EQ(ContextMsaaSamples(settings), 0) << settings.name << (mobile ? " (mobile)" : "");
+            } else {
+                EXPECT_EQ(ContextMsaaSamples(settings), settings.requestedMsaaSamples) << settings.name;
+            }
+        }
+    }
+}
+
+TEST(QualitySettingsTest, AntialiasPathFollowsWhatTheFrameDrawsInto) {
+    // HDR on: the tone-map pass resolves, whatever the context has.
+    EXPECT_EQ(ResolveAntialiasPath(true, 0), AntialiasPath::HdrResolve);
+    EXPECT_EQ(ResolveAntialiasPath(true, 4), AntialiasPath::HdrResolve);
+    // HDR off (low tier, or HDR::InitFBO refused): only a multisampled context antialiases.
+    EXPECT_EQ(ResolveAntialiasPath(false, 4), AntialiasPath::ContextMsaa);
+    EXPECT_EQ(ResolveAntialiasPath(false, 1), AntialiasPath::None);
+    EXPECT_EQ(ResolveAntialiasPath(false, 0), AntialiasPath::None);
+    EXPECT_STREQ(AntialiasPathName(AntialiasPath::HdrResolve), "FXAA in HDR tone-map");
+}
+
+TEST(QualitySettingsTest, SpaceWeatherTiersMatchTheTicket) {
+    // Low and every mobile tier: no particles, a static oval, the photosphere sprite.
+    for (int preset = 0; preset <= 2; ++preset) {
+        const QualityTierSettings mobile = GetQualitySettings(preset, true);
+        EXPECT_EQ(mobile.solarWindParticles, 0) << preset;
+        EXPECT_EQ(mobile.auroraMode, 0) << preset;
+        EXPECT_EQ(mobile.photosphereMode, 0) << preset;
+    }
+    const QualityTierSettings low = GetQualitySettings(0, false);
+    EXPECT_EQ(low.solarWindParticles, 0);
+    EXPECT_EQ(low.auroraMode, 0);
+    EXPECT_EQ(low.photosphereMode, 0);
+    const QualityTierSettings medium = GetQualitySettings(1, false);
+    EXPECT_EQ(medium.solarWindParticles, 50000);
+    EXPECT_EQ(medium.auroraMode, 1);
+    EXPECT_EQ(medium.photosphereMode, 1);
+    const QualityTierSettings full = GetQualitySettings(2, false);
+    EXPECT_EQ(full.solarWindParticles, 200000);
+    EXPECT_EQ(full.auroraMode, 2);
+    EXPECT_EQ(full.photosphereMode, 2);
+    EXPECT_TRUE(full.enableMagneticBloom); // the curtains bloom through MagneticFieldBloom
 }

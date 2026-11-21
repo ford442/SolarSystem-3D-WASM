@@ -160,10 +160,7 @@ export function initTouchControls(options: TouchControlsOptions): () => void {
                 const visualDx = Math.cos(angle) * clampedDistance;
                 const visualDy = Math.sin(angle) * clampedDistance;
                 updateJoystickVisual(visualDx, visualDy);
-                applyJoystickVector(
-                    visualDx / JOYSTICK_MAX_RADIUS,
-                    visualDy / JOYSTICK_MAX_RADIUS,
-                );
+                applyJoystickVector(visualDx / JOYSTICK_MAX_RADIUS, visualDy / JOYSTICK_MAX_RADIUS);
                 event.preventDefault();
                 continue;
             }
@@ -216,11 +213,15 @@ export function initTouchControls(options: TouchControlsOptions): () => void {
     canvas.addEventListener('touchend', onTouchEnd, touchOptions);
     canvas.addEventListener('touchcancel', onTouchCancel, touchOptions);
 
-    document.addEventListener('touchmove', (event) => {
-        if (event.target === canvas || root.contains(event.target as Node)) {
-            event.preventDefault();
-        }
-    }, touchOptions);
+    document.addEventListener(
+        'touchmove',
+        (event) => {
+            if (event.target === canvas || root.contains(event.target as Node)) {
+                event.preventDefault();
+            }
+        },
+        touchOptions,
+    );
 
     return () => {
         canvas.removeEventListener('touchstart', onTouchStart);

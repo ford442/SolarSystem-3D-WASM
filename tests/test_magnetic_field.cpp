@@ -1,8 +1,8 @@
 #include <gtest/gtest.h>
 
-#include "Auxiliary_Modules/MagneticFieldLineMesh.h"
-#include "Auxiliary_Modules/MagneticFieldModel.h"
-#include "Auxiliary_Modules/MagneticFieldTracer.h"
+#include "render/MagneticFieldLineMesh.h"
+#include "astro/MagneticFieldModel.h"
+#include "astro/MagneticFieldTracer.h"
 
 #include <cmath>
 #include <glm/geometric.hpp>
@@ -94,7 +94,8 @@ TEST(MagneticFieldCatalogTest, IntrinsicValuesAreEducationalDefaults) {
     EXPECT_GT(sun.flowSpeed, earth.flowSpeed);
 
     EXPECT_TRUE(earth.enabled);
-    EXPECT_NEAR(earth.dipoleTiltDeg, 11.0f, 1.0e-4f);
+    EXPECT_NEAR(earth.dipoleTiltDeg, 9.35f, 1.0e-4f);
+    EXPECT_NEAR(earth.poleAzimuthDeg, 17.32f, 1.0e-4f);
     EXPECT_NEAR(earth.toroidalStrength, 0.0f, 1.0e-4f);
 
     EXPECT_TRUE(jupiter.enabled);
@@ -299,4 +300,14 @@ TEST(MagneticFieldTracerTest, CapsRespectBudget) {
         // samplesPerLine is a per-direction RK4 cap (forward + backward + seed).
         EXPECT_LE(line.samples.size(), 256u * 2u + 1u);
     }
+}
+
+TEST(MagneticFieldTracerTest, EarthDipoleFramePointsAtTheGeomagneticPole) {
+    const MagneticFieldParams earth = MagneticFieldCatalog::IntrinsicParamsForBody(OrbitLayout::Body::Earth);
+    const glm::vec3 pole = MagneticFieldModel::DipoleFrame(earth) * glm::vec3(0.0f, 1.0f, 0.0f);
+    // Earth's model frame: geographic (lat, lon) → (cos lat cos lon, sin lat, -cos lat sin lon).
+    const float lat = 80.65f * 3.14159265f / 180.0f;
+    const float lon = -72.68f * 3.14159265f / 180.0f;
+    const glm::vec3 expected(std::cos(lat) * std::cos(lon), std::sin(lat), -std::cos(lat) * std::sin(lon));
+    EXPECT_GT(glm::dot(pole, expected), std::cos(0.2f * 3.14159265f / 180.0f));
 }

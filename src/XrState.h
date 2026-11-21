@@ -23,7 +23,6 @@ struct XrFrameState {
      */
     unsigned int baseLayerFramebuffer = 0;
     int eyeCount = 0;
-    int currentEye = 0;
     XrEyeState eyes[2]{};
     /** Scratch: [0..15]=view, [16..31]=proj for CommitXrEyeMatrices. */
     float matrixScratch[32]{};

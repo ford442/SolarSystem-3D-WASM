@@ -1,83 +1,103 @@
 import './style.css';
-import Module, { type SolarSystemModuleConfig } from './SolarSystem.js';
-import { parseDeepLinkFromUrl } from './deepLink';
-import { initEducationalLayer } from './educationalLayer';
+import Module, { type SolarSystemModule, type SolarSystemModuleConfig } from './SolarSystem.js';
+import { buildShareableUrl, parseDeepLinkFromUrl, runtimeLinkReaders } from './deepLink';
+import { queryRequired, queryRequiredIn } from './dom';
+import { showFatalPanel } from './fatalOverlay';
+import { initEducationalLayer, initStormCard } from './educationalLayer';
 import { initObservePanel, type ObservePanelController } from './observe';
 import { publishInitConfig, resolveInitConfig } from './initialSettings';
 import { PlanetExplorer } from './planetExplorer';
 import { createProgressCallbacks } from './progressOverlay';
+import { createMusicPlayer } from './music';
 import { initSettingsPanel } from './settingsPanel';
+import { initSystemPicker, loadSystemIndex, SOL_SYSTEM_ID, systemFactsUrl } from './systemPicker';
+import { initTimelineEditor } from './timelineEditor';
 import { initTouchControls, isMobileLikeDevice } from './touchControls';
 import { initWebXr } from './webxr';
-import {
-    createSolarSystemRuntime,
-    exposeConsoleHelpers,
-} from './wasmBridge';
-import { installWasmCallbacksOnConfig } from './wasmCallbacks';
+import { installPerfHud, perfHudRequested } from './perfHud';
+import { createSolarSystemRuntime, exposeConsoleHelpers, type SolarSystemRuntime } from './wasmBridge';
+import { installWasmCallbacksOnConfig, registerWasmCallbacks, setModuleInstance } from './wasmCallbacks';
+import { assetCacheEnabled, createAssetFetcher } from './assetCache';
 import { computeWebGlSizing } from './webglContext';
+import { chooseWasmVariant, locateWasmFile, THREADED_GLUE } from './wasmVariant';
 
-const canvas = document.getElementById('canvas') as HTMLCanvasElement;
-const loadingContainer = document.getElementById('loading-container') as HTMLElement;
-const progressBar = document.getElementById('progress-bar') as HTMLElement;
-const progressText = document.getElementById('progress-text') as HTMLElement;
-const streamingProgress = document.getElementById('streaming-progress') as HTMLElement;
-const streamingText = document.getElementById('streaming-text') as HTMLElement;
-const streamingBar = document.getElementById('streaming-progress-bar') as HTMLElement;
-const settingsPanel = document.getElementById('settings-panel') as HTMLElement;
-const settingsToggle = document.getElementById('settings-toggle') as HTMLButtonElement;
-const settingsToggleIcon = settingsToggle.querySelector('.settings-toggle-icon') as HTMLElement;
-const settingsFieldset = document.getElementById('settings-fieldset') as HTMLFieldSetElement;
-const qualitySelect = document.getElementById('quality-preset') as HTMLSelectElement;
-const timeScaleInput = document.getElementById('time-scale') as HTMLInputElement;
-const timeScaleValue = document.getElementById('time-scale-value') as HTMLOutputElement;
-const simulationDateInput = document.getElementById('simulation-date') as HTMLInputElement;
-const simulationDateSet = document.getElementById('simulation-date-set') as HTMLButtonElement;
-const simulationDateNow = document.getElementById('simulation-date-now') as HTMLButtonElement;
-const pausedInput = document.getElementById('simulation-paused') as HTMLInputElement;
-const shadowsInput = document.getElementById('shadows-enabled') as HTMLInputElement;
-const orbitLinesInput = document.getElementById('orbit-lines-enabled') as HTMLInputElement;
-const magneticFieldsInput = document.getElementById('magnetic-fields-enabled') as HTMLInputElement;
-const musicVolumeInput = document.getElementById('music-volume') as HTMLInputElement;
-const musicVolumeValue = document.getElementById('music-volume-value') as HTMLOutputElement;
-const musicMutedInput = document.getElementById('music-muted') as HTMLInputElement;
-const settingsReset = document.getElementById('settings-reset') as HTMLButtonElement;
-const copyViewLinkButton = document.getElementById('copy-view-link') as HTMLButtonElement;
-const settingsStatus = document.getElementById('settings-status') as HTMLElement;
-const skyEventChip = document.getElementById('next-sky-event') as HTMLElement;
-const skyEventText = document.getElementById('next-sky-event-text') as HTMLElement;
-const skyEventJump = document.getElementById('next-sky-event-jump') as HTMLButtonElement;
-const skyEventLandmark = document.getElementById('next-sky-event-landmark') as HTMLButtonElement;
+const canvas = queryRequired('canvas', HTMLCanvasElement);
+const loadingContainer = queryRequired('loading-container');
+const progressBar = queryRequired('progress-bar');
+const progressText = queryRequired('progress-text');
+const streamingProgress = queryRequired('streaming-progress');
+const streamingText = queryRequired('streaming-text');
+const streamingBar = queryRequired('streaming-progress-bar');
+const settingsPanel = queryRequired('settings-panel');
+const settingsToggle = queryRequired('settings-toggle', HTMLButtonElement);
+const settingsToggleIcon = queryRequiredIn(settingsToggle, '.settings-toggle-icon', HTMLElement);
+const settingsFieldset = queryRequired('settings-fieldset', HTMLFieldSetElement);
+const qualitySelect = queryRequired('quality-preset', HTMLSelectElement);
+const timeScaleInput = queryRequired('time-scale', HTMLInputElement);
+const timeScaleValue = queryRequired('time-scale-value', HTMLOutputElement);
+const simulationDateInput = queryRequired('simulation-date', HTMLInputElement);
+const simulationDateSet = queryRequired('simulation-date-set', HTMLButtonElement);
+const simulationDateNow = queryRequired('simulation-date-now', HTMLButtonElement);
+const pausedInput = queryRequired('simulation-paused', HTMLInputElement);
+const shadowsInput = queryRequired('shadows-enabled', HTMLInputElement);
+const orbitLinesInput = queryRequired('orbit-lines-enabled', HTMLInputElement);
+const magneticFieldsInput = queryRequired('magnetic-fields-enabled', HTMLInputElement);
+const solarWindInput = queryRequired('solar-wind-enabled', HTMLInputElement);
+const kpOverrideInput = queryRequired('kp-override', HTMLInputElement);
+const kpOverrideValue = queryRequired('kp-override-value', HTMLOutputElement);
+const launchCmeButton = queryRequired('launch-cme', HTMLButtonElement);
+const musicVolumeInput = queryRequired('music-volume', HTMLInputElement);
+const musicVolumeValue = queryRequired('music-volume-value', HTMLOutputElement);
+const musicMutedInput = queryRequired('music-muted', HTMLInputElement);
+const settingsReset = queryRequired('settings-reset', HTMLButtonElement);
+const copyViewLinkButton = queryRequired('copy-view-link', HTMLButtonElement);
+const settingsStatus = queryRequired('settings-status');
+const skyEventChip = queryRequired('next-sky-event');
+const skyEventText = queryRequired('next-sky-event-text');
+const skyEventJump = queryRequired('next-sky-event-jump', HTMLButtonElement);
+const skyEventLandmark = queryRequired('next-sky-event-landmark', HTMLButtonElement);
+const stormChip = queryRequired('next-storm');
+const stormText = queryRequired('next-storm-text');
+const stormPlay = queryRequired('next-storm-play', HTMLButtonElement);
+const stormCardElement = queryRequired('storm-card');
+const stormCardTitle = queryRequired('storm-card-title');
+const stormCardLines = queryRequired('storm-card-lines');
 const observeElements = {
-    exploreButton: document.getElementById('mode-explore') as HTMLButtonElement,
-    observeButton: document.getElementById('mode-observe') as HTMLButtonElement,
-    controls: document.getElementById('observe-controls') as HTMLElement,
-    siteSelect: document.getElementById('observe-site') as HTMLSelectElement,
-    latInput: document.getElementById('observe-lat') as HTMLInputElement,
-    lonInput: document.getElementById('observe-lon') as HTMLInputElement,
-    locateButton: document.getElementById('observe-locate') as HTMLButtonElement,
-    timeInput: document.getElementById('observe-time') as HTMLInputElement,
-    rateSelect: document.getElementById('observe-rate') as HTMLSelectElement,
+    exploreButton: queryRequired('mode-explore', HTMLButtonElement),
+    observeButton: queryRequired('mode-observe', HTMLButtonElement),
+    controls: queryRequired('observe-controls'),
+    siteSelect: queryRequired('observe-site', HTMLSelectElement),
+    latInput: queryRequired('observe-lat', HTMLInputElement),
+    lonInput: queryRequired('observe-lon', HTMLInputElement),
+    locateButton: queryRequired('observe-locate', HTMLButtonElement),
+    timeInput: queryRequired('observe-time', HTMLInputElement),
+    rateSelect: queryRequired('observe-rate', HTMLSelectElement),
     stepButtons: Array.from(document.querySelectorAll<HTMLButtonElement>('[data-step-days]')),
-    nowButton: document.getElementById('observe-now') as HTMLButtonElement,
-    lookSunButton: document.getElementById('observe-look-sun') as HTMLButtonElement,
-    lookMoonButton: document.getElementById('observe-look-moon') as HTMLButtonElement,
-    eclipseButton: document.getElementById('observe-eclipse') as HTMLButtonElement,
-    readout: document.getElementById('observe-readout') as HTMLElement,
+    nowButton: queryRequired('observe-now', HTMLButtonElement),
+    lookSunButton: queryRequired('observe-look-sun', HTMLButtonElement),
+    lookMoonButton: queryRequired('observe-look-moon', HTMLButtonElement),
+    eclipseButton: queryRequired('observe-eclipse', HTMLButtonElement),
+    eyepieceSelect: queryRequired('observe-eyepiece', HTMLSelectElement),
+    constellationsToggle: queryRequired('observe-constellations', HTMLInputElement),
+    telescopeOverlay: queryRequired('telescope-overlay'),
+    telescopeLabel: queryRequired('telescope-label'),
+    readout: queryRequired('observe-readout'),
     dateInput: simulationDateInput,
     status: settingsStatus,
 };
-const enterVrButton = document.getElementById('enter-vr') as HTMLButtonElement;
-const exitVrButton = document.getElementById('exit-vr') as HTMLButtonElement;
-const explorerPanel = document.getElementById('explorer-panel') as HTMLElement;
-const explorerMissions = document.getElementById('explorer-missions') as HTMLElement;
-const explorerMissionList = document.getElementById('explorer-mission-list') as HTMLElement;
-const tourPlay = document.getElementById('tour-play') as HTMLButtonElement;
-const tourStop = document.getElementById('tour-stop') as HTMLButtonElement;
-const tourCopyStep = document.getElementById('tour-copy-step') as HTMLButtonElement;
-const tourCaption = document.getElementById('tour-caption') as HTMLElement;
-const xrHud = document.getElementById('xr-hud') as HTMLElement;
-const xrTooltip = document.getElementById('xr-tooltip') as HTMLElement;
-const xrControllers = document.getElementById('xr-controllers') as HTMLElement;
+const enterVrButton = queryRequired('enter-vr', HTMLButtonElement);
+const exitVrButton = queryRequired('exit-vr', HTMLButtonElement);
+const explorerPanel = queryRequired('explorer-panel');
+const explorerMissions = queryRequired('explorer-missions');
+const explorerMissionList = queryRequired('explorer-mission-list');
+const systemPickerRoot = queryRequired('system-picker');
+const tourPlay = queryRequired('tour-play', HTMLButtonElement);
+const tourStop = queryRequired('tour-stop', HTMLButtonElement);
+const tourCopyStep = queryRequired('tour-copy-step', HTMLButtonElement);
+const tourCaption = queryRequired('tour-caption');
+const xrHud = queryRequired('xr-hud');
+const xrTooltip = queryRequired('xr-tooltip');
+const xrControllers = queryRequired('xr-controllers');
 
 const deployedBaseUrl = new URL(import.meta.env.BASE_URL, window.location.href);
 const isMobileDevice = isMobileLikeDevice();
@@ -88,7 +108,7 @@ const runtimeAssetBase = import.meta.env.VITE_ASSET_BASE?.trim() || deployedBase
 // picks its preferred pack (BC7 > BC3 > ASTC > ETC2) and uses it only if it appears
 // here; with none published it stays on .dds, and a GPU without S3TC falls back to the
 // software BC decoder. See scripts/convert_textures_ktx2.py and docs/ARCHITECTURE.md.
-const publishedTexturePacks: string[] = String(import.meta.env.VITE_TEXTURE_PACKS ?? '')
+const publishedTexturePacks: string[] = (import.meta.env.VITE_TEXTURE_PACKS ?? '')
     .split(',')
     .map((pack: string) => pack.trim())
     .filter((pack: string) => pack.length > 0);
@@ -103,6 +123,24 @@ const progressCallbacks = createProgressCallbacks({
 });
 
 window.__solarSystemAssetBase = runtimeAssetBase;
+
+// Runtime downloads (textures, planet manifests) go through the Cache API so a repeat visit
+// skips the network. Installed before Module() because the first downloads happen inside
+// main(). Core preloads are in SolarSystem.data and never come through here.
+if (assetCacheEnabled(window.location.search, import.meta.env.DEV)) {
+    window.__solarSystemFetchAsset = createAssetFetcher({
+        assetBase: runtimeAssetBase,
+        baseHref: window.location.href,
+        caches: typeof caches === 'undefined' ? undefined : caches,
+        fetch: window.fetch.bind(window),
+        log: (message) => console.debug(message),
+    });
+}
+
+// Music is a browser media concern: tracks stream straight from the asset base, outside the
+// WASM core-resource count, and a missing mp3 just logs and skips.
+const music = createMusicPlayer({ assetBase: runtimeAssetBase });
+music.start();
 window.__solarSystemTexturePacks = publishedTexturePacks;
 
 // Resolve quality/mobile before WASM main() creates the GLFW/WebGL context.
@@ -116,185 +154,366 @@ publishInitConfig(initConfig);
 // supported hook Emscripten actually honors: GLFW reuses this context as-is instead of
 // creating its own. See docs/plans/PORTING_GUIDE.md and web/src/webglContext.ts.
 const { contextOptions, tier } = computeWebGlSizing(initConfig);
-const preinitializedWebGLContext = canvas.getContext('webgl2', contextOptions) as WebGL2RenderingContext | null;
+const preinitializedWebGLContext = canvas.getContext('webgl2', contextOptions);
 if (preinitializedWebGLContext) {
     console.log(
-        `[WebGL] tier=${tier} requested`, contextOptions,
-        'actual', preinitializedWebGLContext.getContextAttributes(),
+        `[WebGL] tier=${tier} requested`,
+        contextOptions,
+        'actual',
+        preinitializedWebGLContext.getContextAttributes(),
     );
 } else {
     console.error('[WebGL] Failed to create a WebGL2 context with', contextOptions);
 }
+
+const BROWSER_HINTS = [
+    'Turn on hardware acceleration in your browser settings, then reload.',
+    'Update your graphics driver, or try a current Chrome, Edge, Firefox or Safari.',
+    'Close other tabs that use 3D graphics to free GPU memory.',
+];
+
+let moduleInstance: SolarSystemModule | null = null;
+let runtimeForReload: SolarSystemRuntime | null = null;
+let contextLost = false;
+
+// Reload into the view the user had, using the same deep-link encoding as "Copy view link".
+// The getters below only read simulation state, so they still work after the GL context is gone.
+function currentViewUrl(): string {
+    const runtime = runtimeForReload;
+    if (!runtime) {
+        return window.location.href;
+    }
+    return buildShareableUrl(runtimeLinkReaders(runtime));
+}
+
+function pauseMainLoop(): void {
+    // Emscripten's library_browser.js puts these on the module instance, which is built on the
+    // config object, so they are there during loading too, before the factory promise resolves.
+    const target = (moduleInstance ?? moduleConfig) as Pick<SolarSystemModule, 'pauseMainLoop'>;
+    target['pauseMainLoop']?.();
+}
+
+// A mobile GPU reset or a long-backgrounded tab can drop the context. preventDefault() is
+// what tells the browser we may want it back; v1 does not rebuild GL state in place, so it
+// stops the frame loop (every GL call would fail) and offers a reload into the same view.
+canvas.addEventListener(
+    'webglcontextlost',
+    (event) => {
+        event.preventDefault();
+        if (contextLost) return;
+        contextLost = true;
+        console.error('[WebGL] Context lost; pausing the main loop');
+        pauseMainLoop();
+        showFatalPanel({
+            title: 'Graphics context lost',
+            message:
+                'The browser reset the GPU context, so the scene can no longer be drawn. ' +
+                'Reload to pick up where you left off.',
+            reloadUrl: currentViewUrl,
+        });
+    },
+    false,
+);
 
 for (const eventName of ['pointerdown', 'pointerup', 'click', 'keydown', 'keyup']) {
     settingsPanel.addEventListener(eventName, (event) => event.stopPropagation());
     explorerPanel.addEventListener(eventName, (event) => event.stopPropagation());
 }
 
-const moduleConfig: SolarSystemModuleConfig = installWasmCallbacksOnConfig({
-    canvas,
-    ...(preinitializedWebGLContext ? { preinitializedWebGLContext } : {}),
-    locateFile: (path: string, prefix: string) => {
-        if (path.endsWith('.wasm') || path.endsWith('.data')) {
-            return new URL(path, deployedBaseUrl).toString();
-        }
-        return prefix + path;
-    },
-    print: (text: string) => console.log(text),
-    printErr: (text: string) => console.error(text),
-    onRuntimeInitialized: () => {
-        console.log('SolarSystem WASM initialized');
-    },
-}, progressCallbacks);
-
-void Module(moduleConfig).then((instance) => {
-    console.log('Module loaded successfully', instance);
-
-    const runtime = createSolarSystemRuntime(instance);
-    exposeConsoleHelpers(runtime);
-
-    const deepLink = parseDeepLinkFromUrl();
-    const explorer = new PlanetExplorer(explorerPanel);
-    void explorer.init({
-        focusPlanet: runtime.focusPlanet.bind(runtime),
-        getNearestPlanetIndex: runtime.getNearestPlanetIndex.bind(runtime),
-        getFocusedPlanetIndex: runtime.getFocusedPlanetIndex.bind(runtime),
-        getPlanetSceneDistance: runtime.getPlanetSceneDistance.bind(runtime),
-        getOrbitScaleMode: () => runtime.getOrbitScaleMode(),
-        setOrbitScaleMode: runtime.setOrbitScaleMode.bind(runtime),
-        getNextConjunction: () => runtime.getNextConjunction(),
-        setSimulationEpoch: runtime.setSimulationEpoch.bind(runtime),
-    }, {
-        skipPlanetRestore: deepLink.planet !== undefined || deepLink.camera !== undefined || deepLink.mission !== undefined,
-        initialOrbitScale: deepLink.orbitScale,
-    }).catch((error: unknown) => {
-        console.error('Failed to initialize planet explorer:', error);
-    });
-
-    if (isMobileDevice) {
-        explorerPanel.classList.add('is-collapsed');
-    }
-
-    initTouchControls({
+const moduleConfig: SolarSystemModuleConfig = installWasmCallbacksOnConfig(
+    {
         canvas,
-        settingsPanel,
-        explorerPanel,
-        loadingContainer,
-        bindings: {
-            setTouchMovement: runtime.setTouchMovement.bind(runtime),
-            addTouchLook: runtime.addTouchLook.bind(runtime),
-            addTouchZoom: runtime.addTouchZoom.bind(runtime),
+        ...(preinitializedWebGLContext ? { preinitializedWebGLContext } : {}),
+        locateFile: (path: string, prefix: string) => locateWasmFile(path, prefix, deployedBaseUrl),
+        print: (text: string) => console.log(text),
+        printErr: (text: string) => console.error(text),
+        onRuntimeInitialized: () => {
+            console.log('SolarSystem WASM initialized');
         },
-    });
+    },
+    { ...progressCallbacks, onMusicDuck: (duck: number) => music.setDuck(duck) },
+);
 
-    void initWebXr({
-        canvas,
-        enterVrButton,
-        exitVrButton,
-        overlayRoots: [settingsPanel, explorerPanel, tourCaption],
-        hudRoot: xrHud,
-        tooltip: xrTooltip,
-        controllersRoot: xrControllers,
-        bindings: {
-            setTouchMovement: runtime.setTouchMovement.bind(runtime),
-            addTouchLook: runtime.addTouchLook.bind(runtime),
-            setQualityPreset: runtime.setQualityPreset.bind(runtime),
-            getQualityPreset: runtime.getQualityPreset.bind(runtime),
-            getCameraPosition: () => runtime.getCameraPosition(),
-            getNearestPlanetIndex: () => runtime.getNearestPlanetIndex(),
-            getFocusedPlanetIndex: () => runtime.getFocusedPlanetIndex(),
-            setXrSessionActive: runtime.setXrSessionActive.bind(runtime),
-            setXrBaseLayerFramebuffer: runtime.setXrBaseLayerFramebuffer.bind(runtime),
-            registerXrFramebuffer: runtime.registerXrFramebuffer.bind(runtime),
-            setXrEyeCount: runtime.setXrEyeCount.bind(runtime),
-            setXrEyeViewport: runtime.setXrEyeViewport.bind(runtime),
-            commitXrEyeMatrices: runtime.commitXrEyeMatrices.bind(runtime),
-            getXrMatrixScratchPtr: runtime.getXrMatrixScratchPtr.bind(runtime),
-            runXrFrame: runtime.runXrFrame.bind(runtime),
-            getHeapF32: () => runtime.heapF32,
-            setXrControllerRay: runtime.setXrControllerRay.bind(runtime),
-            observe: {
-                isActive: () => runtime.getObserveMode(),
-                scrubTime: (seconds) => runtime.setSimulationEpoch(runtime.getSimulationEpoch() + seconds / 86400),
-                turn: (degrees) => {
-                    const state = runtime.getObserveState();
-                    runtime.setObserveView(state.azDeg + degrees, state.elDeg);
+type ModuleFactory = typeof Module;
+
+/**
+ * The pthread build when this page can run its workers (wasmVariant.ts), else the bundled
+ * single-threaded one. A deployment without SolarSystem-mt.js (built with --no-threads)
+ * falls back to the single-threaded build after one failed import.
+ */
+async function loadModuleFactory(): Promise<ModuleFactory> {
+    if (
+        chooseWasmVariant({ crossOriginIsolated: window.crossOriginIsolated, search: window.location.search }) !==
+        'threaded'
+    ) {
+        return Module;
+    }
+    const url = new URL(THREADED_GLUE, deployedBaseUrl).toString();
+    try {
+        const threaded = (await import(/* @vite-ignore */ url)) as { default: ModuleFactory };
+        console.log('[Jobs] page is cross-origin isolated: loading the threaded build');
+        return threaded.default;
+    } catch (error: unknown) {
+        console.warn('[Jobs] threaded build unavailable, using the single-threaded one:', error);
+        return Module;
+    }
+}
+
+async function startModule(): Promise<SolarSystemModule> {
+    if (!preinitializedWebGLContext) {
+        // GLFW would try the same context creation and fail inside main(); say so up front.
+        throw new Error('WebGL 2 is not available');
+    }
+    const factory = await loadModuleFactory();
+    return factory(moduleConfig);
+}
+
+void startModule()
+    .then(
+        (instance) => {
+            console.log('Module loaded successfully', instance);
+            moduleInstance = instance;
+            setModuleInstance(instance);
+            if (contextLost) {
+                pauseMainLoop();
+            }
+
+            const runtime = createSolarSystemRuntime(instance);
+            runtimeForReload = runtime;
+            exposeConsoleHelpers(runtime);
+            if (perfHudRequested(window.location.search)) {
+                installPerfHud(runtime);
+            }
+            if (import.meta.env.DEV) {
+                void import('./shaderReload').then(({ installShaderReload }) =>
+                    installShaderReload(instance, runtime, deployedBaseUrl),
+                );
+            }
+
+            const deepLink = parseDeepLinkFromUrl();
+            const systemIndexPromise = loadSystemIndex(deployedBaseUrl.toString()).catch((error: unknown) => {
+                console.warn('[Systems] index unavailable; the picker is hidden:', error);
+                return null;
+            });
+            const explorer = new PlanetExplorer(explorerPanel);
+            const explorerReady = explorer
+                .init(
+                    {
+                        focusPlanet: runtime.focusPlanet.bind(runtime),
+                        getNearestPlanetIndex: runtime.getNearestPlanetIndex.bind(runtime),
+                        getFocusedPlanetIndex: runtime.getFocusedPlanetIndex.bind(runtime),
+                        getPlanetSceneDistance: runtime.getPlanetSceneDistance.bind(runtime),
+                        getOrbitScaleMode: () => runtime.getOrbitScaleMode(),
+                        setOrbitScaleMode: runtime.setOrbitScaleMode.bind(runtime),
+                        getNextConjunction: () => runtime.getNextConjunction(),
+                        setSimulationEpoch: runtime.setSimulationEpoch.bind(runtime),
+                    },
+                    {
+                        skipPlanetRestore:
+                            deepLink.planet !== undefined ||
+                            deepLink.camera !== undefined ||
+                            deepLink.mission !== undefined,
+                        initialOrbitScale: deepLink.orbitScale,
+                    },
+                )
+                .catch((error: unknown) => {
+                    console.error('Failed to initialize planet explorer:', error);
+                });
+
+            if (isMobileDevice) {
+                explorerPanel.classList.add('is-collapsed');
+            }
+
+            initTouchControls({
+                canvas,
+                settingsPanel,
+                explorerPanel,
+                loadingContainer,
+                bindings: {
+                    setTouchMovement: runtime.setTouchMovement.bind(runtime),
+                    addTouchLook: runtime.addTouchLook.bind(runtime),
+                    addTouchZoom: runtime.addTouchZoom.bind(runtime),
                 },
-            },
+            });
+
+            void initWebXr({
+                canvas,
+                enterVrButton,
+                exitVrButton,
+                overlayRoots: [settingsPanel, explorerPanel, tourCaption],
+                hudRoot: xrHud,
+                tooltip: xrTooltip,
+                controllersRoot: xrControllers,
+                bindings: {
+                    setTouchMovement: runtime.setTouchMovement.bind(runtime),
+                    addTouchLook: runtime.addTouchLook.bind(runtime),
+                    setQualityPreset: runtime.setQualityPreset.bind(runtime),
+                    getQualityPreset: runtime.getQualityPreset.bind(runtime),
+                    getCameraPosition: () => runtime.getCameraPosition(),
+                    getNearestPlanetIndex: () => runtime.getNearestPlanetIndex(),
+                    getFocusedPlanetIndex: () => runtime.getFocusedPlanetIndex(),
+                    setXrSessionActive: runtime.setXrSessionActive.bind(runtime),
+                    setXrBaseLayerFramebuffer: runtime.setXrBaseLayerFramebuffer.bind(runtime),
+                    registerXrFramebuffer: runtime.registerXrFramebuffer.bind(runtime),
+                    setXrEyeCount: runtime.setXrEyeCount.bind(runtime),
+                    setXrEyeViewport: runtime.setXrEyeViewport.bind(runtime),
+                    commitXrEyeMatrices: runtime.commitXrEyeMatrices.bind(runtime),
+                    getXrMatrixScratchPtr: runtime.getXrMatrixScratchPtr.bind(runtime),
+                    runXrFrame: runtime.runXrFrame.bind(runtime),
+                    getHeapF32: () => runtime.heapF32,
+                    setXrControllerRay: runtime.setXrControllerRay.bind(runtime),
+                    observe: {
+                        isActive: () => runtime.getObserveMode(),
+                        scrubTime: (seconds) =>
+                            runtime.setSimulationEpoch(runtime.getSimulationEpoch() + seconds / 86400),
+                        turn: (degrees) => {
+                            const state = runtime.getObserveState();
+                            runtime.setObserveView(state.azDeg + degrees, state.elDeg);
+                        },
+                    },
+                },
+            })
+                .then((controller) => {
+                    if (controller) {
+                        console.log('[WebXR] Enter VR control ready');
+                    } else {
+                        console.log('[WebXR] immersive-vr unavailable — staying 2D');
+                    }
+                })
+                .catch((error: unknown) => {
+                    console.warn('[WebXR] init failed:', error);
+                    enterVrButton.hidden = true;
+                });
+
+            let observeController: ObservePanelController | null = null;
+
+            initSettingsPanel({
+                getObserveTimeOfDayDays: () => observeController?.timeOfDayDays() ?? 0,
+                elements: {
+                    settingsPanel,
+                    settingsToggle,
+                    settingsToggleIcon,
+                    settingsFieldset,
+                    qualitySelect,
+                    timeScaleInput,
+                    timeScaleValue,
+                    simulationDateInput,
+                    simulationDateSet,
+                    simulationDateNow,
+                    pausedInput,
+                    shadowsInput,
+                    orbitLinesInput,
+                    magneticFieldsInput,
+                    solarWindInput,
+                    kpOverrideInput,
+                    kpOverrideValue,
+                    launchCmeButton,
+                    musicVolumeInput,
+                    musicVolumeValue,
+                    musicMutedInput,
+                    settingsReset,
+                    copyViewLinkButton,
+                    settingsStatus,
+                    skyEventChip,
+                    skyEventText,
+                    skyEventJump,
+                    skyEventLandmark,
+                    stormChip,
+                    stormText,
+                    stormPlay,
+                },
+                runtime,
+                music,
+                deepLink,
+                isMobileDevice,
+            });
+
+            observeController = initObservePanel({
+                elements: observeElements,
+                runtime,
+                startInObserve: deepLink.mode === 'observe' && deepLink.system === undefined,
+                deepLink: { ...deepLink.observer, paused: deepLink.paused },
+                epochFromLink: deepLink.julianDate !== undefined || deepLink.simulationDate !== undefined,
+                onModeChanged: (active) => {
+                    explorerPanel.classList.toggle('is-observing', active);
+                },
+            });
+
+            // Star systems (ARCHITECTURE §12). C++ swaps the scene and reports it as phase 1 of
+            // onSystemChanged — after a jump, and once at start-up for a `?system=` link, which C++
+            // reads itself while building the scene (after this code has run with Sol's UI).
+            const observe = observeController;
+            const applySystem = (id: string): void => {
+                const inSol = id === SOL_SYSTEM_ID;
+                document.body.classList.toggle('in-other-system', !inSol);
+                observe.setAvailable(inSol, 'Observe stands on Earth, so it is only in the Solar System');
+                void explorerReady
+                    .then(() => explorer.showSystem(id, systemFactsUrl(id, deployedBaseUrl.toString())))
+                    .catch((error: unknown) => {
+                        console.error('[Systems] facts failed to load:', error);
+                    });
+            };
+            let linkSystemArrived = false;
+            registerWasmCallbacks({
+                onSystemChanged: (id: string, phase: number) => {
+                    if (phase !== 1) return;
+                    applySystem(id);
+                    if (!linkSystemArrived && id === deepLink.system) {
+                        // The landing replaced what the settings panel applied from the link.
+                        linkSystemArrived = true;
+                        if (deepLink.timeScale !== undefined) runtime.setTimeScale(deepLink.timeScale);
+                        if (deepLink.camera) {
+                            const { x, y, z, yaw, pitch } = deepLink.camera;
+                            runtime.setCameraPose(x, y, z, yaw, pitch);
+                        }
+                    }
+                },
+            });
+            if (runtime.getActiveSystemId() !== SOL_SYSTEM_ID) {
+                applySystem(runtime.getActiveSystemId());
+            }
+            void systemIndexPromise.then((index) => {
+                if (!index || index.systems.length < 2) {
+                    systemPickerRoot.hidden = true;
+                    return;
+                }
+                initSystemPicker({ root: systemPickerRoot, runtime, index, status: settingsStatus });
+            });
+
+            const tourPlayer = initEducationalLayer({
+                runtime,
+                deepLink,
+                missionList: explorerMissionList,
+                missionsRoot: explorerMissions,
+                tourPlay,
+                tourStop,
+                tourCopyStep,
+                tourCaption,
+                settingsStatus,
+            });
+
+            initStormCard({ runtime, card: stormCardElement, title: stormCardTitle, lines: stormCardLines });
+
+            initTimelineEditor({ runtime, canvas, deepLink, tourPlayer, caption: tourCaption });
+
+            if (deepLink.planet !== undefined && !deepLink.mission && !deepLink.tour && !deepLink.timeline) {
+                explorer.applyDeepLinkPlanet(deepLink.planet, { focusCamera: false });
+            }
         },
-    }).then((controller) => {
-        if (controller) {
-            console.log('[WebXR] Enter VR control ready');
-        } else {
-            console.log('[WebXR] immersive-vr unavailable — staying 2D');
-        }
-    }).catch((error: unknown) => {
-        console.warn('[WebXR] init failed:', error);
-        enterVrButton.hidden = true;
-    });
-
-    let observeController: ObservePanelController | null = null;
-
-    initSettingsPanel({
-        getObserveTimeOfDayDays: () => observeController?.timeOfDayDays() ?? 0,
-        elements: {
-            settingsPanel,
-            settingsToggle,
-            settingsToggleIcon,
-            settingsFieldset,
-            qualitySelect,
-            timeScaleInput,
-            timeScaleValue,
-            simulationDateInput,
-            simulationDateSet,
-            simulationDateNow,
-            pausedInput,
-            shadowsInput,
-            orbitLinesInput,
-            magneticFieldsInput,
-            musicVolumeInput,
-            musicVolumeValue,
-            musicMutedInput,
-            settingsReset,
-            copyViewLinkButton,
-            settingsStatus,
-            skyEventChip,
-            skyEventText,
-            skyEventJump,
-            skyEventLandmark,
+        (error: unknown) => {
+            settingsStatus.textContent = 'Controls unavailable';
+            console.error('Failed to initialize SolarSystem WASM:', error);
+            const noWebGl = !preinitializedWebGLContext;
+            showFatalPanel({
+                title: noWebGl ? 'WebGL 2 is not available' : 'The simulation failed to start',
+                message: noWebGl
+                    ? 'This browser could not create a WebGL 2 context, which the 3D scene needs.'
+                    : `Loading the simulation failed: ${error instanceof Error ? error.message : String(error)}`,
+                hints: noWebGl ? BROWSER_HINTS : ['Check your connection and reload.', ...BROWSER_HINTS],
+            });
         },
-        runtime,
-        deepLink,
-        isMobileDevice,
+    )
+    .catch((error: unknown) => {
+        settingsStatus.textContent = 'Controls unavailable';
+        console.error('Failed to initialize the SolarSystem UI:', error);
     });
-
-    observeController = initObservePanel({
-        elements: observeElements,
-        runtime,
-        startInObserve: deepLink.mode === 'observe',
-        deepLink: { ...deepLink.observer, paused: deepLink.paused },
-        epochFromLink: deepLink.julianDate !== undefined || deepLink.simulationDate !== undefined,
-        onModeChanged: (active) => {
-            explorerPanel.classList.toggle('is-observing', active);
-        },
-    });
-
-    initEducationalLayer({
-        runtime,
-        deepLink,
-        missionList: explorerMissionList,
-        missionsRoot: explorerMissions,
-        tourPlay,
-        tourStop,
-        tourCopyStep,
-        tourCaption,
-        settingsStatus,
-    });
-
-    if (deepLink.planet !== undefined && !deepLink.mission && !deepLink.tour) {
-        explorer.applyDeepLinkPlanet(deepLink.planet, { focusCamera: false });
-    }
-}).catch((error: unknown) => {
-    settingsStatus.textContent = 'Controls unavailable';
-    console.error('Failed to initialize SolarSystem WASM:', error);
-});

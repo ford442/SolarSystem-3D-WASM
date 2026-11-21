@@ -1,0 +1,105 @@
+#pragma once
+
+#include <string>
+#include <queue>
+#include <functional>
+#include <memory>
+#include <vector>
+#include <unordered_set>
+#include <chrono>
+#include <array>
+#include <cstdint>
+
+#include "../gfx/TextureImage2D.h"
+
+enum class TextureLoadCategory {
+    Planet,
+    Satellite,
+    Ring,
+    Clouds,
+    Count
+};
+
+struct TextureLoadJob {
+    std::string path;
+    std::string textureId;
+    TextureImage2D* targetTexture;
+    std::function<void(bool)> callback;
+    TextureLoadCategory category = TextureLoadCategory::Planet;
+    int retries = 0;
+    std::chrono::steady_clock::time_point nextAttemptTime{};
+    const int maxRetries = 3;
+    /** TextureLoadingQueue::CancelAll bumps the queue's epoch; a job from an older one is dropped unseen. */
+    std::uint64_t epoch = 0;
+};
+
+class TextureLoadingQueue {
+public:
+    static TextureLoadingQueue& GetInstance();
+
+    bool QueueTextureLoad(const std::string& path, const std::string& id, TextureImage2D* texture,
+                          std::function<void(bool)> callback,
+                          TextureLoadCategory category = TextureLoadCategory::Planet);
+    void ProcessQueue();
+    void SetMaxConcurrentLoads(int maxConcurrentLoads);
+    int GetMaxConcurrentLoads() const { return _maxConcurrentLoads; }
+    int GetActiveLoadCount() const { return _activeLoads; }
+    int GetQueuedCount() const { return static_cast<int>(_queue.size()) + _activeLoads; }
+    bool IsLoading() const { return _activeLoads > 0; }
+    bool IsMemoryBackpressureActive() const { return _memoryBackpressureActive; }
+    const std::string& GetCurrentLoadingPath() const { return _currentPath; }
+
+    // Cancel a pending or in-flight load (deprioritize when camera moves away).
+    // For in-flight async downloads, suppresses the texture reload on completion.
+    void CancelLoad(const std::string& path);
+
+    /**
+     * Forget every queued and in-flight load *without* running its callback or touching its
+     * texture: their owners are about to be destroyed (Application::LoadSystem tears the scene
+     * down). Downloads already on the wire finish and are dropped.
+     */
+    void CancelAll();
+
+    // Cumulative stats for JS progress reporting
+    int GetTotalQueued()    const { return _totalQueued; }
+    int GetTotalCompleted() const { return _totalCompleted; }
+    int GetTotalFailed()    const { return _totalFailed; }
+    int GetTotalCancelled() const { return _totalCancelled; }
+    int GetTotalProcessed() const { return _totalCompleted + _totalFailed + _totalCancelled; }
+    int GetCategoryQueued(TextureLoadCategory category) const;
+    int GetCategoryCompleted(TextureLoadCategory category) const;
+
+#ifdef SOLARSYSTEM_BUILD_TESTS
+    void ResetForTests();
+#endif
+
+private:
+    TextureLoadingQueue() = default;
+    ~TextureLoadingQueue() = default;
+    TextureLoadingQueue(const TextureLoadingQueue&) = delete;
+    TextureLoadingQueue& operator=(const TextureLoadingQueue&) = delete;
+
+    std::queue<TextureLoadJob> _queue;
+    int _activeLoads = 0;
+    int _maxConcurrentLoads = 2;
+    bool _memoryBackpressureActive = false;
+    std::string _currentPath;
+
+    int GetEffectiveMaxConcurrentLoads();
+    void HandleDownloadResult(TextureLoadJob job, bool success);
+    void HandleTextureApplied(TextureLoadJob job, TextureImage2D::AsyncResult result);
+    void RetryOrFail(TextureLoadJob job);
+
+    // Dedup + cancel support for resilience against repeated LOD checks and camera movement.
+    std::unordered_set<std::string> _pendingPaths;
+    std::unordered_set<std::string> _cancelledPaths;
+
+    std::uint64_t _epoch = 0;
+
+    int _totalQueued    = 0;
+    int _totalCompleted = 0;
+    int _totalFailed    = 0;
+    int _totalCancelled = 0;
+    std::array<int, static_cast<size_t>(TextureLoadCategory::Count)> _categoryQueued{};
+    std::array<int, static_cast<size_t>(TextureLoadCategory::Count)> _categoryCompleted{};
+};

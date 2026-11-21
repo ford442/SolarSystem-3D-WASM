@@ -6,19 +6,16 @@ layout (location = 1) in vec2 aUV;
 out vec2 vUV;
 out float vFade;
 
-uniform mat4 projection;
-uniform mat4 view;
 uniform vec3 nucleusPos;
-uniform vec3 lightPos;
 uniform vec3 cameraRight;
 uniform float tailLength;
 uniform float tailWidth;
-uniform float zCoef;
 
+#include "common/frame.glsl"
 #include "common/log_depth.glsl"
 
 void main() {
-    vec3 antiSun = nucleusPos - lightPos;
+    vec3 antiSun = nucleusPos - frame.sunPos.xyz;
     float antiLen = length(antiSun);
     antiSun = (antiLen > 1e-4) ? antiSun / antiLen : vec3(0.0, 0.0, 1.0);
 
@@ -34,6 +31,6 @@ void main() {
     vUV = aUV;
     vFade = 1.0 - aUV.y;
 
-    gl_Position = projection * view * vec4(world, 1.0);
-    gl_Position = ApplyLogDepth(gl_Position, zCoef);
+    gl_Position = frame.proj * frame.view * vec4(world, 1.0);
+    gl_Position = ApplyLogDepth(gl_Position);
 }

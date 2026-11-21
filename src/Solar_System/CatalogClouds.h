@@ -1,6 +1,6 @@
 #ifndef SOLARSYSTEM_CATALOGCLOUDS_H
 #define SOLARSYSTEM_CATALOGCLOUDS_H
-#include "BodyCatalog.generated.h"
+#include "BodyCatalog.h"
 #include "Clouds.h"
 
 /**
@@ -9,11 +9,11 @@
  */
 class CatalogClouds : public Clouds {
 public:
-    CatalogClouds(const CloudsInfo& cloudsInfo, std::shared_ptr<SpaceObject> parent,
+    CatalogClouds(CloudsInfo&& cloudsInfo, std::shared_ptr<SpaceObject> parent,
                   const BodyCatalog::Entry& parentEntry);
 
-    void AdjustToParent(float timeScale) override;
-    void Render() const override;
+    void AdjustToParent() override;
+    void Draw(const Shader& shader) const override;
 
 private:
     const BodyCatalog::Entry& _parentEntry;

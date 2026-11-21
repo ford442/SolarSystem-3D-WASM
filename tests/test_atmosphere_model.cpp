@@ -89,7 +89,7 @@ TEST(AtmosphereModel, TransmittanceFallsTowardTheHorizon) {
 }
 
 TEST(AtmosphereModel, BakedTablesStayInRange) {
-    for (const BodyCatalog::AtmosphereRow& row : BodyCatalog::kAtmospheres) {
+    for (const BodyCatalog::AtmosphereRow& row : BodyCatalog::Atmospheres()) {
         if (!row.physical.enabled) {
             continue;
         }
@@ -240,7 +240,7 @@ TEST(Ktx2Writer, RejectsMismatchedPixelCount) {
 // The committed LUTs parse, are the right shape, and were baked from the current catalog.
 // (The AtmosphereLutsFresh ctest re-bakes and compares values; this is the cheap check.)
 TEST(AtmosphereModel, CommittedLutsMatchTheCatalog) {
-    for (const BodyCatalog::AtmosphereRow& row : BodyCatalog::kAtmospheres) {
+    for (const BodyCatalog::AtmosphereRow& row : BodyCatalog::Atmospheres()) {
         if (!row.physical.enabled) {
             continue;
         }
@@ -261,11 +261,12 @@ TEST(AtmosphereModel, CommittedLutsMatchTheCatalog) {
     }
 }
 
-// Every committed LUT is preloaded into SolarSystem.data, so the set has a byte budget.
+// Every committed LUT is preloaded into SolarSystem.data, so the set has a byte budget:
+// eight bodies (four terrestrial, four giants) at ~140 KB a pair.
 TEST(AtmosphereModel, CommittedLutsFitSizeBudget) {
-    constexpr std::streamoff kBudgetBytes = 1'000'000;
+    constexpr std::streamoff kBudgetBytes = 1'200'000;
     std::streamoff total = 0;
-    for (const BodyCatalog::AtmosphereRow& row : BodyCatalog::kAtmospheres) {
+    for (const BodyCatalog::AtmosphereRow& row : BodyCatalog::Atmospheres()) {
         if (!row.physical.enabled) {
             continue;
         }
@@ -275,7 +276,7 @@ TEST(AtmosphereModel, CommittedLutsFitSizeBudget) {
             total += file.tellg();
         }
     }
-    EXPECT_LT(total, kBudgetBytes) << "baked atmosphere LUTs exceed the 1 MB .data budget";
+    EXPECT_LT(total, kBudgetBytes) << "baked atmosphere LUTs exceed the 1.2 MB .data budget";
 }
 #endif
 

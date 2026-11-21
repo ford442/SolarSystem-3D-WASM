@@ -3,7 +3,7 @@
 //
 // Volumetric corona: an instanced stack of camera-facing slices through the Sun.
 //
-// Slice i sits at depth d_i along sliceForward (the camera->Sun axis, or the view direction
+// Slice i sits at depth d_i along sliceForward (the camera->Sun axis, or the frame.view direction
 // while the camera is inside the corona), cut to the disc where that plane meets the
 // corona's bounding sphere. Depths span only the part of the sphere in front of the camera.
 // Each slice samples the 3D density at its own points (starCoronaVolume.fs), so the stack
@@ -14,9 +14,6 @@
 
 layout (location = 0) in vec2 aPos; // Star's unit glow quad, [-1, 1]^2
 
-uniform mat4 projection;
-uniform mat4 view;
-uniform float zCoef;
 
 uniform vec3 sunCenter;      // world
 uniform float sunRadius;     // scene units per solar radius
@@ -30,6 +27,7 @@ uniform float sliceDepthMax;
 
 out vec3 fLocal; // position relative to the Sun's centre, solar radii
 
+#include "common/frame.glsl"
 #include "common/log_depth.glsl"
 
 void main() {
@@ -38,5 +36,5 @@ void main() {
     fLocal = sliceForward * depth + (sliceRight * aPos.x + sliceUp * aPos.y) * halfSize;
 
     vec3 world = sunCenter + fLocal * sunRadius;
-    gl_Position = ApplyLogDepth(projection * view * vec4(world, 1.0), zCoef);
+    gl_Position = ApplyLogDepth(frame.proj * frame.view * vec4(world, 1.0));
 }

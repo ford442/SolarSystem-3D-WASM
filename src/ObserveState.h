@@ -1,7 +1,7 @@
 #ifndef SOLARSYSTEM_OBSERVESTATE_H
 #define SOLARSYSTEM_OBSERVESTATE_H
 
-#include "Auxiliary_Modules/Observer.h"
+#include "astro/Observer.h"
 #include <glm/glm.hpp>
 
 /**
@@ -15,9 +15,11 @@ struct ObserveState {
     bool active = false;
     Observer::Site site{51.4769, 0.0, 0.0}; // Greenwich, the default when nothing else is chosen
     double timeRate = 1.0;                  // simulated seconds per wall second; 1 = real time
+    bool constellations = true;             // stick figures over the star field
 
-    // Explore-mode camera, restored when Observe is left.
-    glm::vec3 savedPosition{0.0f};
+    // Explore-mode camera, restored when Observe is left. Heliocentric (double), not the
+    // render frame: the render origin follows the camera to Earth while Observe is active.
+    glm::dvec3 savedPosition{0.0};
     float savedYaw = -90.0f;
     float savedPitch = 0.0f;
     float savedZoom = 45.0f;
@@ -25,9 +27,10 @@ struct ObserveState {
     float savedZoomMax = 45.0f;
     bool savedMovementLocked = false;
 
-    // Where Observe looks on entry, and the FOV range while it is active.
+    // Where Observe looks on entry, and the FOV range while it is active. The floor is a
+    // telescope field (web: TELESCOPE_EYEPIECES); planets turn into discs once they span pixels.
     static constexpr float kDefaultFovDeg = 60.0f;
-    static constexpr float kMinFovDeg = 2.0f;
+    static constexpr float kMinFovDeg = 0.25f;
     static constexpr float kMaxFovDeg = 90.0f;
     static constexpr float kDefaultAzimuthDeg = 180.0f; // facing south from the northern hemisphere
     static constexpr float kDefaultElevationDeg = 25.0f;

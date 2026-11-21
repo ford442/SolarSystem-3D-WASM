@@ -1,8 +1,17 @@
 #include "ObserveSky.h"
+#include "../gfx/TextureUnits.h"
 
 #include <algorithm>
 #include <cmath>
-#include <iostream>
+#include <fstream>
+#include <ios>
+#include <optional>
+#include <sstream>
+#include <string>
+#include <utility>
+#include "../core/Log.h"
+#include "/root/SolarSystem-3D-WASM/src/core/JobSystem.h"
+#include "/root/SolarSystem-3D-WASM/src/astro/StarCatalog.h"
 
 namespace {
 
@@ -14,13 +23,24 @@ constexpr float kKindSun = 1.0f;
 constexpr float kKindMoon = 2.0f;
 constexpr float kKindStar = 3.0f;
 
-constexpr int kMoonTextureUnit = 1;
+constexpr unsigned int kMoonTextureUnit = Unit(TextureUnit::Moon);
+
+constexpr float kMoonRadiusKm = 1737.4f;
+constexpr float kSunRadiusKm = 695700.0f;
 
 constexpr const char* kStarCatalogPath = "resource/sky/bright_stars.json";
+constexpr const char* kConstellationPath = "resource/sky/constellation_lines.json";
+// Each segment is split so refraction (applied per vertex) bends it near the horizon the way it
+// bends the stars; gnomonic projection keeps the straight pieces on great circles otherwise.
+constexpr int kLineSubdivisions = 6;
 
 // The Sun's quad reaches this many solar radii so the halo has room to fade out.
 constexpr float kSunQuadRadii = 6.0f;
 constexpr float kMoonQuadMargin = 1.03f;
+constexpr float kPlanetQuadMargin = 1.03f;
+// A planet's true disc replaces its point sprite once it is this many pixels in radius (and at
+// least half the sprite): only a telescope field gets there (Jupiter needs FOV < ~10 deg).
+constexpr float kPlanetDiscMinPixels = 2.0f;
 
 glm::vec3 planetColor(int slot) {
     switch (slot) {
@@ -33,18 +53,74 @@ glm::vec3 planetColor(int slot) {
     }
 }
 
+glm::vec3 toVec3(const double v[3]) {
+    return glm::vec3(static_cast<float>(v[0]), static_cast<float>(v[1]), static_cast<float>(v[2]));
+}
+
+/** The tangent basis observeSprite.vs builds for a direction; keep the two in step. */
+void tangentBasis(const glm::vec3& d, glm::vec3& right, glm::vec3& up) {
+    const glm::vec3 helper = std::abs(d.y) > 0.99f ? glm::vec3(0.0f, 0.0f, -1.0f) : glm::vec3(0.0f, 1.0f, 0.0f);
+    right = glm::normalize(glm::cross(d, helper));
+    up = glm::cross(right, d);
+}
+
+} // namespace
+
+namespace {
+
+/** The file's text, or nullopt; read on the main thread (MEMFS), parsed in a job. */
+std::optional<std::string> ReadText(const char* path) {
+    std::ifstream in(path, std::ios::binary);
+    if (!in) {
+        return std::nullopt;
+    }
+    std::ostringstream text;
+    text << in.rdbuf();
+    return text.str();
+}
+
 } // namespace
 
 ObserveSky::ObserveSky() {
+    // Parse the star catalogue and constellation figures off the main thread now; the first
+    // Observe frame takes the result (long finished by then).
+    _parsedSky = Jobs::Submit([stars = ReadText(kStarCatalogPath), figures = ReadText(kConstellationPath)] {
+        ParsedSky parsed;
+        if (!stars) {
+            parsed.starError = std::string("Could not open ") + kStarCatalogPath;
+            return parsed;
+        }
+        if (!StarCatalog::Parse(*stars, parsed.stars, parsed.starError)) {
+            if (parsed.starError.empty()) {
+                parsed.starError = "malformed catalog";
+            }
+            return parsed;
+        }
+        parsed.starError.clear();
+        if (!figures) {
+            parsed.constellationError = std::string("Could not open ") + kConstellationPath;
+        } else if (!StarCatalog::ParseConstellations(*figures, static_cast<int>(parsed.stars.stars.size()),
+                                                     parsed.constellations, parsed.constellationError)) {
+            parsed.constellations.clear();
+            if (parsed.constellationError.empty()) {
+                parsed.constellationError = "malformed constellation lines";
+            }
+        } else {
+            parsed.constellationError.clear();
+        }
+        return parsed;
+    });
+
     _skyShader = std::make_unique<Shader>("resource/shaders/observeSky.vs", "resource/shaders/observeSky.fs");
     _spriteShader = std::make_unique<Shader>("resource/shaders/observeSprite.vs", "resource/shaders/observeSprite.fs");
+    _lineShader = std::make_unique<Shader>("resource/shaders/observeLines.vs", "resource/shaders/observeLines.fs");
 
     // A core-profile draw needs a bound VAO even when every vertex comes from gl_VertexID.
-    glGenVertexArrays(1, &_emptyVao);
+    _emptyVao = GlVertexArray::Create();
 
     const float quad[] = {-1.0f, -1.0f, 1.0f, -1.0f, -1.0f, 1.0f, 1.0f, 1.0f};
-    glGenBuffers(1, &_quadVbo);
-    glBindBuffer(GL_ARRAY_BUFFER, _quadVbo);
+    _quadVbo = GlBuffer::Create();
+    glBindBuffer(GL_ARRAY_BUFFER, _quadVbo.get());
     glBufferData(GL_ARRAY_BUFFER, sizeof(quad), quad, GL_STATIC_DRAW);
     glBindBuffer(GL_ARRAY_BUFFER, 0);
 
@@ -52,27 +128,18 @@ ObserveSky::ObserveSky() {
     InitBatch(_moonBatch, 1);
 }
 
-ObserveSky::~ObserveSky() {
-    for (SpriteBatch* batch : {&_additiveBatch, &_moonBatch, &_starBatch}) {
-        if (batch->vbo) glDeleteBuffers(1, &batch->vbo);
-        if (batch->vao) glDeleteVertexArrays(1, &batch->vao);
-    }
-    if (_quadVbo) glDeleteBuffers(1, &_quadVbo);
-    if (_emptyVao) glDeleteVertexArrays(1, &_emptyVao);
-}
-
 void ObserveSky::InitBatch(SpriteBatch& batch, int capacity) const {
     batch.capacity = capacity;
     batch.count = 0;
-    glGenVertexArrays(1, &batch.vao);
-    glGenBuffers(1, &batch.vbo);
-    glBindVertexArray(batch.vao);
+    batch.vao = GlVertexArray::Create();
+    batch.vbo = GlBuffer::Create();
+    glBindVertexArray(batch.vao.get());
 
-    glBindBuffer(GL_ARRAY_BUFFER, _quadVbo);
+    glBindBuffer(GL_ARRAY_BUFFER, _quadVbo.get());
     glEnableVertexAttribArray(0);
     glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, 2 * sizeof(float), nullptr);
 
-    glBindBuffer(GL_ARRAY_BUFFER, batch.vbo);
+    glBindBuffer(GL_ARRAY_BUFFER, batch.vbo.get());
     glBufferData(GL_ARRAY_BUFFER, static_cast<GLsizeiptr>(capacity * sizeof(SpriteInstance)), nullptr,
                  GL_DYNAMIC_DRAW);
     const GLsizei stride = static_cast<GLsizei>(sizeof(SpriteInstance));
@@ -91,7 +158,7 @@ void ObserveSky::UploadBatch(SpriteBatch& batch, const std::vector<SpriteInstanc
     if (batch.count == 0) {
         return;
     }
-    glBindBuffer(GL_ARRAY_BUFFER, batch.vbo);
+    glBindBuffer(GL_ARRAY_BUFFER, batch.vbo.get());
     glBufferSubData(GL_ARRAY_BUFFER, 0, static_cast<GLsizeiptr>(batch.count * sizeof(SpriteInstance)),
                     instances.data());
     glBindBuffer(GL_ARRAY_BUFFER, 0);
@@ -101,7 +168,7 @@ void ObserveSky::DrawBatch(const SpriteBatch& batch, int count) const {
     if (count <= 0) {
         return;
     }
-    glBindVertexArray(batch.vao);
+    glBindVertexArray(batch.vao.get());
     glDrawArraysInstanced(GL_TRIANGLE_STRIP, 0, 4, count);
     glBindVertexArray(0);
 }
@@ -112,12 +179,15 @@ void ObserveSky::EnsureStarsLoaded() {
     }
     _starsTried = true;
 
-    std::string error;
-    if (!StarCatalog::LoadFromFile(kStarCatalogPath, _stars, error)) {
+    ParsedSky parsed = _parsedSky.Get();
+    _constellations = std::move(parsed.constellations);
+    _constellationError = std::move(parsed.constellationError);
+    if (!parsed.starError.empty()) {
         // Observe still works without stars (planets, Sun and Moon), so this is not fatal.
-        std::cerr << "[Observe] star catalog unavailable (" << error << "); drawing no stars" << std::endl;
+        LOG_WARN("Observe", "star catalog unavailable (%s); drawing no stars", parsed.starError.c_str());
         return;
     }
+    _stars = std::move(parsed.stars);
 
     std::vector<SpriteInstance> instances;
     instances.reserve(_stars.stars.size());
@@ -135,7 +205,71 @@ void ObserveSky::EnsureStarsLoaded() {
     InitBatch(_starBatch, static_cast<int>(instances.size()));
     UploadBatch(_starBatch, instances);
     _starsLoaded = _starBatch.count > 0;
-    std::cout << "[Observe] Loaded " << _stars.stars.size() << " stars from " << kStarCatalogPath << std::endl;
+    LOG_INFO("Observe", "Loaded %zu stars from %s", _stars.stars.size(), kStarCatalogPath);
+}
+
+void ObserveSky::EnsureConstellationLines() {
+    if (!_starsLoaded) {
+        return;
+    }
+    if (!_constellationsTried) {
+        _constellationsTried = true;
+        if (!_constellationError.empty()) {
+            LOG_WARN("Observe", "constellation lines unavailable (%s)", _constellationError.c_str());
+            _constellations.clear();
+        }
+    }
+    const int limit = DrawnStarCount();
+    if (limit == _linesBuiltForLimit && _coreConstellationsOnly == _linesBuiltCoreOnly) {
+        return;
+    }
+    _linesBuiltForLimit = limit;
+    _linesBuiltCoreOnly = _coreConstellationsOnly;
+
+    const auto direction = [this](int index) {
+        const StarCatalog::Star& star = _stars.stars[static_cast<size_t>(index)];
+        const float ra = star.raDeg * kDegToRad;
+        const float dec = star.decDeg * kDegToRad;
+        return glm::vec3(std::cos(dec) * std::cos(ra), std::cos(dec) * std::sin(ra), std::sin(dec));
+    };
+    std::vector<glm::vec3> vertices;
+    _lineSegmentCount = 0;
+    for (const StarCatalog::Constellation& figure : _constellations) {
+        if (_coreConstellationsOnly && !figure.core) {
+            continue;
+        }
+        for (size_t i = 0; i + 1 < figure.lines.size(); i += 2) {
+            const int a = figure.lines[i];
+            const int b = figure.lines[i + 1];
+            if (a >= limit || b >= limit) {
+                continue; // a line to a star this tier does not draw would end in empty sky
+            }
+            const glm::vec3 from = direction(a);
+            const glm::vec3 to = direction(b);
+            for (int k = 0; k < kLineSubdivisions; ++k) {
+                const float t0 = static_cast<float>(k) / kLineSubdivisions;
+                const float t1 = static_cast<float>(k + 1) / kLineSubdivisions;
+                vertices.push_back(glm::normalize(glm::mix(from, to, t0)));
+                vertices.push_back(glm::normalize(glm::mix(from, to, t1)));
+            }
+            ++_lineSegmentCount;
+        }
+    }
+
+    if (!_lineVao) {
+        _lineVao = GlVertexArray::Create();
+        _lineVbo = GlBuffer::Create();
+        glBindVertexArray(_lineVao.get());
+        glBindBuffer(GL_ARRAY_BUFFER, _lineVbo.get());
+        glEnableVertexAttribArray(0);
+        glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, sizeof(glm::vec3), nullptr);
+        glBindVertexArray(0);
+    }
+    glBindBuffer(GL_ARRAY_BUFFER, _lineVbo.get());
+    glBufferData(GL_ARRAY_BUFFER, static_cast<GLsizeiptr>(vertices.size() * sizeof(glm::vec3)),
+                 vertices.empty() ? nullptr : vertices.data(), GL_STATIC_DRAW);
+    glBindBuffer(GL_ARRAY_BUFFER, 0);
+    _lineVertexCount = static_cast<int>(vertices.size());
 }
 
 float ObserveSky::LimitingMagnitude(double sunAltDeg) {
@@ -161,6 +295,25 @@ float ObserveSky::EffectiveLimitingMagnitude(const Observer::Sky& sky) {
     return glm::mix(limit, std::max(limit, 1.5f), totality);
 }
 
+glm::vec3 ObserveSky::DiscTint(const Air* air, double apparentAltDeg, double observerAltitudeM) {
+    if (!air || air->steps <= 0) {
+        return glm::vec3(1.0f);
+    }
+    const AtmosphereModel::Params& params = air->params;
+    const double r = params.bottomRadius + std::max(observerAltitudeM / 1000.0, 0.002);
+    // Whatever part of a disc shows is above the horizon, so a half-set Sun keeps the horizon's tint
+    // (below it the ray from 2 m up would already hit the ground and go black).
+    const double mu = std::sin(std::clamp(apparentAltDeg, 0.0, 90.0) * kDegToRad);
+    if (AtmosphereModel::RayIntersectsGround(params, r, mu)) {
+        return glm::vec3(0.0f);
+    }
+    const glm::dvec3 t = AtmosphereModel::IntegrateTransmittance(params, r, mu, 48);
+    const double peak = std::max({t.r, t.g, t.b, 1e-6});
+    const double luminance = 0.2126 * t.r + 0.7152 * t.g + 0.0722 * t.b;
+    const double strength = std::clamp(std::pow(luminance, 0.25), 0.3, 1.0);
+    return glm::vec3(t / peak * strength);
+}
+
 bool ObserveSky::ProjectToPixels(const glm::vec3& dir, const Frame& frame, glm::vec2& outPixels) {
     const glm::vec4 clip = frame.projection * glm::vec4(frame.viewRot * dir, 1.0f);
     if (clip.w <= 1e-6f) {
@@ -172,10 +325,29 @@ bool ObserveSky::ProjectToPixels(const glm::vec3& dir, const Frame& frame, glm::
     return true;
 }
 
-void ObserveSky::Render(const Observer::Sky& sky, const Frame& frame, unsigned int moonTexture) {
+glm::vec3 ObserveSky::GeomagneticPoleInHorizon(double latDeg, double lonDeg) {
+    constexpr double kDeg = 3.14159265358979323846 / 180.0;
+    // IGRF-2020 centred dipole: the same pole MagneticFieldModel::DipoleFrame gives Earth.
+    const double poleLat = 80.65 * kDeg;
+    const double poleLon = -72.68 * kDeg;
+    const glm::dvec3 pole(std::cos(poleLat) * std::cos(poleLon), std::cos(poleLat) * std::sin(poleLon),
+                          std::sin(poleLat));
+    const double lat = latDeg * kDeg;
+    const double lon = lonDeg * kDeg;
+    const glm::dvec3 east(-std::sin(lon), std::cos(lon), 0.0);
+    const glm::dvec3 north(-std::sin(lat) * std::cos(lon), -std::sin(lat) * std::sin(lon), std::cos(lat));
+    const glm::dvec3 up(std::cos(lat) * std::cos(lon), std::cos(lat) * std::sin(lon), std::sin(lat));
+    return glm::vec3(glm::normalize(glm::dvec3(glm::dot(pole, east), glm::dot(pole, up), -glm::dot(pole, north))));
+}
+
+void ObserveSky::Render(const Observer::Sky& sky, const Frame& frame, unsigned int moonTexture, const Air* air,
+                        const Aurora* aurora) {
     const Observer::SkyBody& sun = sky.bodies[Observer::kSkySun];
-    const glm::vec3 sunDir(static_cast<float>(sun.dir[0]), static_cast<float>(sun.dir[1]),
-                           static_cast<float>(sun.dir[2]));
+    const Observer::SkyBody& moon = sky.bodies[Observer::kSkyMoon];
+    // Light comes from where the Sun is; its disc is drawn where refraction shows it.
+    const glm::vec3 sunLightDir = toVec3(sun.dir);
+    const glm::vec3 sunDir = toVec3(sun.apparentDir);
+    const bool physical = air && air->steps > 0 && air->transmittanceLut != 0 && air->multiScatteringLut != 0;
 
     glDisable(GL_DEPTH_TEST);
     glDisable(GL_CULL_FACE);
@@ -183,12 +355,68 @@ void ObserveSky::Render(const Observer::Sky& sky, const Frame& frame, unsigned i
 
     // 1. Sky gradient and ground, one fullscreen triangle.
     glDisable(GL_BLEND);
-    _skyShader->Use();
-    _skyShader->SetMat3("invViewRot", glm::transpose(frame.viewRot)); // rotation: transpose = inverse
-    _skyShader->SetMat4("invProjection", glm::inverse(frame.projection));
-    _skyShader->SetVec3("sunDir", sunDir);
-    _skyShader->SetFloat("eclipse", static_cast<float>(sky.sunCoverage));
-    glBindVertexArray(_emptyVao);
+    Shader* skyShader = _skyShader.get();
+    if (aurora && aurora->mode == 1) {
+        if (!_skyAnimatedShader) {
+            _skyAnimatedShader =
+                std::make_unique<Shader>("resource/shaders/observeSky.vs", "resource/shaders/observeSky.fs",
+                                         std::vector<std::string>{"AURORA_ANIMATED"});
+        }
+        skyShader = _skyAnimatedShader.get();
+    } else if (aurora && aurora->mode >= 2) {
+        if (!_skyCurtainsShader) {
+            _skyCurtainsShader =
+                std::make_unique<Shader>("resource/shaders/observeSky.vs", "resource/shaders/observeSky.fs",
+                                         std::vector<std::string>{"AURORA_CURTAINS"});
+        }
+        skyShader = _skyCurtainsShader.get();
+    }
+    const Shader& skyProgram = *skyShader;
+    skyProgram.Use();
+    skyProgram.SetMat3("invViewRot", glm::transpose(frame.viewRot)); // rotation: transpose = inverse
+    skyProgram.SetMat4("invProjection", glm::inverse(frame.projection));
+    skyProgram.SetVec3("sunDir", sunLightDir);
+    skyProgram.SetFloat("eclipse", static_cast<float>(sky.sunCoverage));
+    skyProgram.SetInt("uSteps", physical ? air->steps : 0);
+    if (aurora) {
+        static constexpr int kAuroraSteps[] = {4, 8, 16};
+        skyProgram.SetInt("uAuroraSteps", kAuroraSteps[std::clamp(aurora->mode, 0, 2)]);
+        skyProgram.SetVec3("uAuroraPole", GeomagneticPoleInHorizon(sky.site.latDeg, sky.site.lonDeg));
+        skyProgram.SetVec4("uAuroraOval", aurora->ovalRad);
+        skyProgram.SetVec3("uAuroraShell",
+                           glm::vec3(aurora->bottom, aurora->top,
+                                     1.0f + static_cast<float>(std::max(sky.site.altM, 2.0) / 6371000.0)));
+        skyProgram.SetVec3("uAuroraActivity", glm::vec3(aurora->kp, aurora->brightness, aurora->time));
+        skyProgram.SetVec3("uAuroraColorLow", aurora->colorLow);
+        skyProgram.SetVec3("uAuroraColorHigh", aurora->colorHigh);
+        skyProgram.SetVec3("uAuroraColorEdge", aurora->colorEdge);
+    } else {
+        skyProgram.SetInt("uAuroraSteps", 0);
+    }
+    if (physical) {
+        const AtmosphereModel::Params& params = air->params;
+        skyProgram.SetFloat("uExposure", air->exposure);
+        skyProgram.SetFloat("uAtmosphere.bottomRadius", static_cast<float>(params.bottomRadius));
+        skyProgram.SetFloat("uAtmosphere.topRadius", static_cast<float>(params.topRadius));
+        skyProgram.SetVec3("uAtmosphere.rayleighScattering", glm::vec3(params.rayleighScattering));
+        skyProgram.SetFloat("uAtmosphere.rayleighScaleHeight", static_cast<float>(params.rayleighScaleHeight));
+        skyProgram.SetVec3("uAtmosphere.mieScattering", glm::vec3(params.mieScattering));
+        skyProgram.SetVec3("uAtmosphere.mieExtinction", glm::vec3(params.mieExtinction));
+        skyProgram.SetFloat("uAtmosphere.mieScaleHeight", static_cast<float>(params.mieScaleHeight));
+        skyProgram.SetFloat("uAtmosphere.miePhaseG", static_cast<float>(params.miePhaseG));
+        skyProgram.SetVec3("uAtmosphere.absorptionExtinction", glm::vec3(params.absorptionExtinction));
+        skyProgram.SetFloat("uAtmosphere.absorptionCenter", static_cast<float>(params.absorptionCenter));
+        skyProgram.SetFloat("uAtmosphere.absorptionHalfWidth", static_cast<float>(params.absorptionHalfWidth));
+        skyProgram.SetFloat("observerAltitudeKm", static_cast<float>(sky.site.altM / 1000.0));
+        skyProgram.SetVec3("moonOffsetKm", toVec3(moon.dir) * static_cast<float>(moon.distanceKm));
+        skyProgram.SetFloat("moonRadiusKm", kMoonRadiusKm);
+        skyProgram.SetFloat("sunDistanceKm", static_cast<float>(sun.distanceKm));
+        skyProgram.SetFloat("sunRadiusKm", kSunRadiusKm);
+        // Units come from the shader's `layout(binding = TU_*)` qualifiers (gfx/TextureUnits.h).
+        glBindTextureUnit(Unit(TextureUnit::TransmittanceLut), air->transmittanceLut);
+        glBindTextureUnit(Unit(TextureUnit::MultiScatteringLut), air->multiScatteringLut);
+    }
+    glBindVertexArray(_emptyVao.get());
     glDrawArrays(GL_TRIANGLES, 0, 3);
     glBindVertexArray(0);
 
@@ -197,26 +425,41 @@ void ObserveSky::Render(const Observer::Sky& sky, const Frame& frame, unsigned i
     const float limit = EffectiveLimitingMagnitude(sky);
     EnsureStarsLoaded();
     _scratch.clear();
+    // projection[1][1] is 1 / tan(half the vertical FOV), for an XR eye's off-axis frustum too.
+    const float pixelsPerTan = 0.5f * frame.projection[1][1] * static_cast<float>(frame.viewportHeight);
     for (int slot = Observer::kSkyMercury; slot < Observer::kSkyBodyCount; ++slot) {
         const Observer::SkyBody& body = sky.bodies[slot];
-        const float margin = limit - static_cast<float>(body.magnitude);
+        const float margin = limit - static_cast<float>(body.magnitude + body.extinctionMag);
         if (margin < -0.5f) {
             continue; // lost in the sky glow
         }
         const float brightness = glm::clamp(0.4f + 0.09f * margin, 0.0f, 1.0f);
         const float pixels = 2.4f + 0.45f * glm::clamp(margin, 0.0f, 10.0f);
+        const glm::vec3 dir = toVec3(body.apparentDir);
+        const float tanRadius = static_cast<float>(std::tan(body.angRadiusDeg * kDegToRad));
         SpriteInstance sprite;
-        sprite.posSize = glm::vec4(static_cast<float>(body.dir[0]), static_cast<float>(body.dir[1]),
-                                   static_cast<float>(body.dir[2]), pixels); // half-size in pixels: planets are points
         sprite.color = glm::vec4(planetColor(slot), brightness);
-        sprite.params = glm::vec4(kKindPoint, 1.0f, 0.0f, 0.0f);
+        if (tanRadius * pixelsPerTan >= std::max(kPlanetDiscMinPixels, 0.5f * pixels)) {
+            // Resolved: a tangent-plane disc lit from the Sun's side, so Venus shows its phase.
+            glm::vec3 right, up;
+            tangentBasis(dir, right, up);
+            const glm::vec3 limb(static_cast<float>(body.brightLimbDir[0]), static_cast<float>(body.brightLimbDir[1]),
+                                 static_cast<float>(body.brightLimbDir[2]));
+            sprite.posSize = glm::vec4(dir, tanRadius * kPlanetQuadMargin);
+            sprite.params = glm::vec4(kKindPoint, 1.0f / kPlanetQuadMargin,
+                                      static_cast<float>(body.phaseAngleDeg) * kDegToRad,
+                                      std::atan2(glm::dot(limb, up), glm::dot(limb, right)));
+        } else {
+            sprite.posSize = glm::vec4(dir, pixels); // half-size in pixels: an unresolved point
+            sprite.params = glm::vec4(kKindPoint, 0.0f, 0.0f, 0.0f);
+        }
         _scratch.push_back(sprite);
     }
     {
         const float radius = static_cast<float>(std::tan(sun.angRadiusDeg * kDegToRad));
         SpriteInstance sprite;
         sprite.posSize = glm::vec4(sunDir, radius * kSunQuadRadii);
-        sprite.color = glm::vec4(1.0f, 0.95f, 0.85f, 1.0f);
+        sprite.color = glm::vec4(DiscTint(air, sun.apparentAltDeg, sky.site.altM), 1.0f); // the shader adds the warm white
         sprite.params = glm::vec4(kKindSun, 1.0f / kSunQuadRadii, 0.0f, 0.0f);
         _scratch.push_back(sprite);
     }
@@ -238,6 +481,24 @@ void ObserveSky::Render(const Observer::Sky& sky, const Frame& frame, unsigned i
             }
         }
     }
+    // Constellation lines go under the stars, so a star sits on top of the line ending at it.
+    // They show once the sky is dark enough for their stars (limit ~3) and are full by ~5.
+    EnsureConstellationLines();
+    const float lineAlpha = 0.30f * glm::smoothstep(2.0f, 5.0f, limit);
+    if (_constellationsVisible && _lineVertexCount > 0 && lineAlpha > 0.003f) {
+        _lineShader->Use();
+        _lineShader->SetMat3("viewRot", frame.viewRot);
+        _lineShader->SetMat4("projection", frame.projection);
+        _lineShader->SetMat3("starRotation", starRotation);
+        _lineShader->SetVec4("lineColor", glm::vec4(0.45f, 0.62f, 0.95f, lineAlpha));
+        glEnable(GL_BLEND);
+        glBlendFunc(GL_SRC_ALPHA, GL_ONE);
+        glBindVertexArray(_lineVao.get());
+        glDrawArrays(GL_LINES, 0, _lineVertexCount);
+        glBindVertexArray(0);
+        _spriteShader->Use();
+    }
+
     _spriteShader->SetMat3("starRotation", starRotation);
     _spriteShader->SetFloat("limitMag", limit);
     _spriteShader->SetVec2("viewportPx", static_cast<float>(frame.viewportWidth), static_cast<float>(frame.viewportHeight));
@@ -248,13 +509,11 @@ void ObserveSky::Render(const Observer::Sky& sky, const Frame& frame, unsigned i
     DrawBatch(_additiveBatch, _additiveBatch.count);
 
     // 3. The Moon, an alpha-blended lit disc so it hides what is behind it.
-    const Observer::SkyBody& moon = sky.bodies[Observer::kSkyMoon];
     _scratch.clear();
     {
         const float radius = static_cast<float>(std::tan(moon.angRadiusDeg * kDegToRad));
         SpriteInstance sprite;
-        sprite.posSize = glm::vec4(static_cast<float>(moon.dir[0]), static_cast<float>(moon.dir[1]),
-                                   static_cast<float>(moon.dir[2]), radius * kMoonQuadMargin);
+        sprite.posSize = glm::vec4(toVec3(moon.apparentDir), radius * kMoonQuadMargin);
         sprite.color = glm::vec4(0.80f, 0.79f, 0.76f, 1.0f);
         sprite.params = glm::vec4(kKindMoon, 1.0f / kMoonQuadMargin, 0.0f, 0.0f);
         _scratch.push_back(sprite);
@@ -270,7 +529,7 @@ void ObserveSky::Render(const Observer::Sky& sky, const Frame& frame, unsigned i
     }
     _spriteShader->SetMat3("moonBodyFromHorizon", moonBodyFromHorizon);
     _spriteShader->SetBool("hasMoonTexture", moonTexture != 0);
-    _spriteShader->SetInt("moonTexture", kMoonTextureUnit);
+    _spriteShader->SetVec3("moonTint", DiscTint(air, moon.apparentAltDeg, sky.site.altM));
     if (moonTexture != 0) {
         glActiveTexture(GL_TEXTURE0 + kMoonTextureUnit);
         glBindTexture(GL_TEXTURE_2D, moonTexture);

@@ -1,10 +1,9 @@
 #ifndef SOLARSYSTEM_SKYBOX_H
 #define SOLARSYSTEM_SKYBOX_H
-#include "../Auxiliary_Modules/Shader.h"
-#include "../3rdparty/nv_dds.h"
+#include "../gfx/Shader.h"
+#include "../gfx/GlHandle.h"
+#include <string>
 #include <vector>
-
-using namespace nv_dds;
 
 class SkyBox {
 public:
@@ -12,8 +11,9 @@ public:
     void Render(const Shader& shader) const;
 
 private:
-    GLuint _textureID = 0;
-    GLuint _vao = 0, _vbo = 0;
+    GlTexture _texture;
+    GlVertexArray _vao;
+    GlBuffer _vbo;
 
     void InitBuffers();
     void LoadCubeMap(const std::vector<std::string>& faces);

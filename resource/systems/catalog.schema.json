@@ -1,0 +1,263 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://github.com/ford442/SolarSystem-3D-WASM/resource/systems/catalog.schema.json",
+  "title": "Solar System planet metadata catalog",
+  "type": "object",
+  "required": ["schemaVersion", "bodies", "scaleModes"],
+  "additionalProperties": true,
+  "properties": {
+    "schemaVersion": { "type": "integer", "minimum": 1 },
+    "sceneNote": {
+      "type": "object",
+      "required": ["en"],
+      "properties": {
+        "en": { "type": "string" },
+        "ru": { "type": "string" }
+      }
+    },
+    "scaleModes": { "type": "object" },
+    "initTagAllowlist": {
+      "type": "array",
+      "items": { "type": "string" }
+    },
+    "indexConvention": { "type": "object" },
+    "bodies": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "required": ["id", "index", "kind", "displayName", "type", "facts", "orbit"],
+        "properties": {
+          "id": { "type": "string", "pattern": "^[a-z][a-z0-9_]*$" },
+          "index": { "type": "integer", "minimum": 0 },
+          "kind": { "type": "string", "enum": ["star", "planet", "dwarf_planet", "comet", "satellite", "ring", "clouds"] },
+          "parent": { "type": ["string", "null"] },
+          "displayName": {
+            "type": "object",
+            "required": ["en"],
+            "properties": {
+              "en": { "type": "string" },
+              "ru": { "type": "string" }
+            }
+          },
+          "type": { "type": "string" },
+          "facts": { "type": "object" },
+          "orbit": {
+            "type": "object",
+            "properties": {
+              "axialTiltDegrees": {
+                "type": "number",
+                "description": "IAU-style tilt SSOT. CatalogBody applies Rotate(Z); the Three.js companion uses the same value."
+              },
+              "primeMeridianDegJ2000": {
+                "type": "number",
+                "minimum": 0,
+                "exclusiveMaximum": 360,
+                "description": "IAU WGCCRE prime-meridian angle W0 at J2000, degrees. OrbitLayout::GetAxialSpinDegrees turns the body from it; omitted (0) for bodies with no IAU frame."
+              },
+              "primeMeridianRateDegPerDay": {
+                "type": "number",
+                "description": "IAU Wdot, degrees per day (negative = retrograde). Omitted: 360 / siderealRotationDays."
+              },
+              "keplerian": {
+                "type": "object",
+                "description": "Osculating elements for satellites (stored for the eclipse follow-up; runtime still uses circular sceneOrbitRadius until then).",
+                "required": ["aKm", "e", "iDeg", "OmegaDeg", "omegaDeg", "M0Deg", "nDegPerDay"],
+                "properties": {
+                  "aKm": { "type": "number" },
+                  "e": { "type": "number" },
+                  "iDeg": { "type": "number" },
+                  "OmegaDeg": { "type": "number" },
+                  "omegaDeg": { "type": "number" },
+                  "M0Deg": { "type": "number" },
+                  "nDegPerDay": { "type": "number" }
+                }
+              },
+              "sceneOrbitRadius": { "type": "number" },
+              "orbitPlane": { "type": "string", "enum": ["xz", "xy"] },
+              "initialAnomalyRad": { "type": "number" },
+              "spinDegPerSimSecond": { "type": "number" },
+              "yawOffsetDegrees": { "type": "number" },
+              "artRollDegrees": { "type": "number" }
+            }
+          },
+          "system": { "type": "object" },
+          "assets": { "type": "object" },
+          "includeInCompanion": { "type": "boolean" },
+          "render": {
+            "type": "object",
+            "description": "Drives BodyCatalog.generated.h. Planets/dwarf planets/moons with a render block are built by CatalogBody/CatalogSatellite — no per-body C++ class. The Sun and ring geometry stay hand-maintained.",
+            "properties": {
+              "shaderFlags": {
+                "type": "object",
+                "properties": {
+                  "hasNightTexture": { "type": "boolean" },
+                  "hasSpecularMap": { "type": "boolean" },
+                  "hasClouds": { "type": "boolean" }
+                }
+              },
+              "ambientFactor": { "type": "number" },
+              "useSphereIntersect": { "type": "boolean" },
+              "artTiltXDegrees": { "type": "number", "description": "Optional extra Rotate(X) overlay (Saturn rings)." },
+              "terrain": {
+                "type": "object",
+                "description": "Cube-sphere height tiles replace the sphere close up (src/render/terrain/, docs/ARCHITECTURE.md §11.3). Tiles are baked offline by scripts/bake-terrain-tiles.py into resource/terrain/<id>/ and published with the runtime assets; without them the body stays its sphere.",
+                "required": ["attribution"],
+                "additionalProperties": false,
+                "properties": {
+                  "attribution": { "type": "string", "minLength": 1, "description": "Credit for the elevation data the tiles are baked from." }
+                }
+              },
+              "oblateness": { "type": "number", "minimum": 0, "exclusiveMaximum": 0.5, "description": "Flattening 1 - polar/equatorial. Squashes the surface, cloud and atmosphere meshes along the pole (BodyShape.h); the mesh radius stays equatorial, and physical.groundRadiusKm is the equatorial radius. Primaries only." },
+              "mesh": { "type": ["string", "null"], "description": "Optional non-sphere mesh path (Phobos/Deimos)." },
+              "lod": {
+                "type": "object",
+                "properties": {
+                  "diffuse": { "type": "string" },
+                  "normal": { "type": "string" },
+                  "specular": { "type": ["string", "null"] },
+                  "night": { "type": ["string", "null"] },
+                  "clouds": { "type": ["string", "null"] }
+                }
+              },
+              "cloudLayer": {
+                "type": "object",
+                "description": "Optional outer-shell cloud layer (Earth/Uranus/Neptune). Not the same as shaderFlags.hasClouds.",
+                "properties": {
+                  "scaleFactor": { "type": "number" },
+                  "diffuse": { "type": "string" },
+                  "normal": { "type": "string" },
+                  "spinDegPerSimSecond": { "type": "number" },
+                  "ambientFactor": { "type": "number" }
+                }
+              },
+              "aurora": {
+                "type": "object",
+                "description": "Auroral shell (AuroraShell + aurora.fs; BodyCatalog::Auroras(), Sol's compiled as kSolAuroras). The look only: where the oval sits and how it moves with Kp is physics in src/astro/SpaceWeather.cpp. Primaries with a dipole field (Earth, the giants). See docs/ARCHITECTURE.md §13.",
+                "required": ["altitudeKm", "colorLow", "colorHigh", "colorEdge", "brightness"],
+                "properties": {
+                  "altitudeKm": { "type": "array", "items": { "type": "number", "exclusiveMinimum": 0 }, "minItems": 2, "maxItems": 2, "description": "[bottom, top] of the emitting layer above the surface (giants: above 1 bar)." },
+                  "colorLow": { "type": "array", "items": { "type": "number" }, "minItems": 3, "maxItems": 3, "description": "Linear RGB of the lower curtain (Earth: O 557.7 nm green)." },
+                  "colorHigh": { "type": "array", "items": { "type": "number" }, "minItems": 3, "maxItems": 3, "description": "Linear RGB of the upper glow (Earth: O 630.0 nm red)." },
+                  "colorEdge": { "type": "array", "items": { "type": "number" }, "minItems": 3, "maxItems": 3, "description": "Linear RGB of the storm-time lower border (Earth: N2+ 427.8 nm)." },
+                  "brightness": { "type": "number", "exclusiveMinimum": 0 },
+                  "notes": { "type": "string" }
+                }
+              },
+              "star": {
+                "type": "object",
+                "description": "The index-0 star: StarPhysics derives light, corona and glow from it (docs/ARCHITECTURE.md §12.2).",
+                "properties": {
+                  "activity": {
+                    "description": "A 0–1 flare level, or {flare, cycle} for a star with a sunspot cycle (SpaceWeather::EvaluateCycle, §13).",
+                    "oneOf": [
+                      { "type": "number", "minimum": 0, "maximum": 1 },
+                      {
+                        "type": "object",
+                        "properties": {
+                          "flare": { "type": "number", "minimum": 0, "maximum": 1 },
+                          "cycle": {
+                            "type": "object",
+                            "required": ["periodYears", "minimumYear", "meanPeakSunspotNumber"],
+                            "properties": {
+                              "periodYears": { "type": "number", "exclusiveMinimum": 0 },
+                              "minimumYear": { "type": "number", "description": "Decimal year of a cycle minimum (Sun: 2008.9)." },
+                              "cycleAtMinimum": { "type": "integer", "minimum": 1, "description": "Number of the cycle that starts at minimumYear; set, the Sun's observed cycle maxima (SILSO) scale each cycle." },
+                              "meanPeakSunspotNumber": { "type": "number", "exclusiveMinimum": 0 }
+                            }
+                          }
+                        }
+                      }
+                    ]
+                  }
+                }
+              },
+              "atmosphere": {
+                "type": "object",
+                "description": "Atmosphere shell (BodyCatalog::Atmospheres(); Sol's compiled as kSolAtmospheres). `oneil` is the cheap single-scattering shell every quality preset can draw; optional `physical` is baked into transmittance/multi-scattering LUTs by tools/atmosphere_lut_baker (resource/atmosphere/<id>_*.ktx2) and drawn on Medium/Full. Rebake after editing `physical`. See docs/ARCHITECTURE.md §9.2.",
+                "required": ["oneil"],
+                "properties": {
+                  "oneil": {
+                    "type": "object",
+                    "required": ["shellScale", "color", "innerRadiusMinusEpsilon", "outerRadius", "mieTint", "hScaleFactor", "toneMapping"],
+                    "properties": {
+                      "shellScale": { "type": "number", "description": "Shell mesh scale (sphere.obj radius 2)." },
+                      "color": { "type": "array", "items": { "type": "number", "minimum": 0 }, "minItems": 3, "maxItems": 3 },
+                      "innerRadiusMinusEpsilon": { "type": "boolean" },
+                      "outerRadius": { "type": "number", "description": "Scene units." },
+                      "mieTint": { "type": "array", "items": { "type": "number", "minimum": 0 }, "minItems": 3, "maxItems": 3 },
+                      "hScaleFactor": { "type": "number" },
+                      "toneMapping": { "type": "boolean", "description": "ACES on the shell (gas giants)." }
+                    }
+                  },
+                  "physical": {
+                    "type": "object",
+                    "description": "Per-km coefficients at the ground; colour triples are ~680/550/440 nm.",
+                    "required": ["groundRadiusKm", "topRadiusKm", "thicknessScale", "rayleigh", "mie", "absorption", "groundAlbedo", "exposure"],
+                    "properties": {
+                      "groundRadiusKm": { "type": "number", "description": "The surface the view ray stops at: the ground, or for Venus and the giants the cloud deck (the giants' 1-bar equatorial radius)." },
+                      "topRadiusKm": { "type": "number" },
+                      "thicknessScale": { "type": "number", "description": "Art knob: widens the shell while preserving vertical optical depth." },
+                      "rayleigh": { "type": "object", "properties": { "scatteringPerKm": { "type": "array", "items": { "type": "number", "minimum": 0 }, "minItems": 3, "maxItems": 3 }, "scaleHeightKm": { "type": "number" } } },
+                      "mie": {
+                        "type": "object",
+                        "properties": {
+                          "scatteringPerKm": { "type": "array", "items": { "type": "number", "minimum": 0 }, "minItems": 3, "maxItems": 3 },
+                          "extinctionPerKm": { "type": "array", "items": { "type": "number", "minimum": 0 }, "minItems": 3, "maxItems": 3 },
+                          "scaleHeightKm": { "type": "number" },
+                          "phaseG": { "type": "number", "exclusiveMinimum": -1, "exclusiveMaximum": 1 }
+                        }
+                      },
+                      "absorption": {
+                        "type": "object",
+                        "description": "Tent-shaped absorbing layer (ozone, methane, Venus's UV absorber).",
+                        "properties": {
+                          "extinctionPerKm": { "type": "array", "items": { "type": "number", "minimum": 0 }, "minItems": 3, "maxItems": 3 },
+                          "layerCenterKm": { "type": "number" },
+                          "layerHalfWidthKm": { "type": "number" }
+                        }
+                      },
+                      "groundAlbedo": { "type": "array", "items": { "type": "number", "minimum": 0 }, "minItems": 3, "maxItems": 3 },
+                      "exposure": { "type": "number" }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "if": {
+          "properties": { "kind": { "const": "satellite" } },
+          "required": ["kind"]
+        },
+        "then": {
+          "required": ["parent"],
+          "properties": {
+            "parent": { "type": "string", "minLength": 1 },
+            "orbit": {
+              "type": "object",
+              "required": ["keplerian", "sceneOrbitRadius"],
+              "properties": {
+                "keplerian": {
+                  "type": "object",
+                  "required": [
+                    "aKm",
+                    "e",
+                    "iDeg",
+                    "OmegaDeg",
+                    "omegaDeg",
+                    "M0Deg",
+                    "nDegPerDay",
+                    "OmegaDotDegPerDay",
+                    "omegaDotDegPerDay"
+                  ]
+                },
+                "sceneOrbitRadius": { "type": "number", "exclusiveMinimum": 0 }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}

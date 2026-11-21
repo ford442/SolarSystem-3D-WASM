@@ -10,15 +10,40 @@ uniform mat4 view;
 uniform mat4 projection;
 uniform vec3 cameraPos;
 uniform float ribbonWidth;
-uniform float zCoef;
+// Space weather (docs/ARCHITECTURE.md §13): xyz the unit vector to the Sun, w the standoff
+// over its quiet value. Below 1 the wind has pushed the dayside in and drawn the nightside
+// out into a tail; 1 (or 0, unset) leaves the traced dipole as it is.
+uniform vec4 uCompression;
 
 out float vArcLength;
 out float vEdgeFade;
 
 #include "common/log_depth.glsl"
 
+vec3 Compress(vec3 worldPos, vec3 center, float radius) {
+    float ratio = uCompression.w > 0.0 ? uCompression.w : 1.0;
+    if (abs(ratio - 1.0) < 1e-3) {
+        return worldPos;
+    }
+    vec3 d = worldPos - center;
+    float r = length(d) / radius;
+    if (r < 1e-4) {
+        return worldPos;
+    }
+    vec3 sunward = uCompression.xyz;
+    float cosTheta = dot(d, sunward) / (r * radius);
+    // Dayside: squeezed toward the planet by the standoff ratio, more the farther out.
+    float day = smoothstep(-0.2, 0.6, cosTheta) * smoothstep(1.3, 3.0, r);
+    d *= mix(1.0, ratio, day);
+    // Nightside: stretched downwind into a tail.
+    float night = smoothstep(0.2, -0.6, cosTheta) * smoothstep(1.5, 3.5, r);
+    d -= sunward * (max(-dot(d, sunward), 0.0) * (1.0 / ratio - 1.0) * 1.5 * night);
+    return center + d;
+}
+
 void main() {
     vec3 worldPos = (model * vec4(aPosition, 1.0)).xyz;
+    worldPos = Compress(worldPos, (model * vec4(0.0, 0.0, 0.0, 1.0)).xyz, max(length(mat3(model)[0]), 1e-6));
     vec3 worldTangent = mat3(model) * aTangent;
     float tLen = length(worldTangent);
     worldTangent = (tLen > 1e-5) ? worldTangent / tLen : vec3(0.0, 1.0, 0.0);
@@ -51,5 +76,5 @@ void main() {
     vEdgeFade = 1.0 - abs(aLineUV);
 
     gl_Position = projection * view * vec4(worldPos, 1.0);
-    gl_Position = ApplyLogDepth(gl_Position, zCoef);
+    gl_Position = ApplyLogDepth(gl_Position);
 }

@@ -1,87 +1,20 @@
-/** Teleport the camera and update its yaw/pitch orientation, in degrees. */
-export type SetCameraPose = (
-  x: number,
-  y: number,
-  z: number,
-  yaw: number,
-  pitch: number,
-) => void;
+import type { PlanetIndex } from './generated/planetIds.js';
+
+/**
+ * Raw C export signatures are generated from WasmExports.cpp into the marked blocks below
+ * (scripts/generate-wasm-exports.mjs). What stays hand-written here is only the vocabulary
+ * the “branded” wasmBridge façade narrows those raw numbers to.
+ */
+
+/** Focus index of a Sol body (Sun … 1P/Halley); generated from resource/systems/sol.catalog.json. */
+export type { PlanetIndex };
 
 export type QualityPreset = 0 | 1 | 2;
 
-/** Apply a quality preset: 0=low, 1=medium, 2=full. */
-export type SetQualityPreset = (preset: QualityPreset) => void;
-/** Read the active quality preset from the C++ runtime. */
-export type GetQualityPreset = () => QualityPreset;
-
-/** Set the orbital animation multiplier, clamped by C++ to 0.01x-10000x. */
-export type SetTimeScale = (scale: number) => void;
-export type GetTimeScale = () => number;
-
-/** Pause or resume orbital animation. */
-export type SetPaused = (paused: boolean) => void;
-/** Raw C export returns 0/1; wasmBridge façade returns boolean. */
-export type GetPaused = () => boolean;
-
-/** Set the simulation epoch as a Julian Date (fractional day allowed). */
-export type SetSimulationEpoch = (julianDate: number) => void;
-/** Read the active simulation Julian Date from the C++ runtime. */
-export type GetSimulationEpoch = () => number;
-
 export type ShadowQuality = 0 | 1 | 2 | 3;
-/** Set shadow quality: 0=off, 1=low, 2=medium, 3=full. */
-export type SetShadowQuality = (quality: ShadowQuality) => void;
-export type GetShadowQuality = () => ShadowQuality;
-
-export type SetTouchMovement = (forward: number, right: number, vertical: number) => void;
-export type AddTouchLook = (deltaX: number, deltaY: number) => void;
-export type AddTouchZoom = (delta: number) => void;
-
-export type PlanetIndex = 0 | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10 | 11;
-
-export type OrbitScaleMode = 0 | 1;
-
-export type SetMusicVolume = (volume: number) => void;
-export type GetMusicVolume = () => number;
-export type SetMusicMuted = (muted: boolean) => void;
-export type GetMusicMuted = () => boolean;
-
-/** Planet index accepted by FocusPlanet: 0=sun, 1=Mercury, ..., 9=Pluto, 10=Ceres, 11=Vesta. */
-export type FocusPlanet = (index: PlanetIndex) => void;
 
 /** 0=compressed artistic orbits, 1=AU-proportional spacing. */
-export type SetOrbitScaleMode = (mode: OrbitScaleMode) => void;
-export type GetOrbitScaleMode = () => OrbitScaleMode;
-/** Returns 1–11 for nearest loaded planet, or -1 when unknown. */
-export type GetNearestPlanetIndex = () => number;
-export type GetFocusedPlanetIndex = () => number;
-export type GetPlanetSceneDistance = (index: PlanetIndex) => number;
-
-/** Toggle faint heliocentric orbit path lines. */
-export type SetOrbitLines = (enabled: boolean) => void;
-export type GetOrbitLines = () => boolean;
-/** Toggle magnetic field ribbon overlay. */
-export type SetMagneticFields = (enabled: boolean) => void;
-export type GetMagneticFields = () => boolean;
-/** Issue #107 aliases for Set/GetMagneticFields. */
-export type SetMagneticFieldMode = SetMagneticFields;
-export type GetMagneticFieldMode = GetMagneticFields;
-
-export type SetXrSessionActive = (active: boolean) => void;
-export type SetXrEyeCount = (count: number) => void;
-export type SetXrEyeViewport = (
-  eye: number,
-  x: number,
-  y: number,
-  width: number,
-  height: number,
-) => void;
-export type GetXrMatrixScratch = () => number;
-export type CommitXrEyeMatrices = (eye: number) => void;
-export type RunXrFrame = () => void;
-export type GetCameraPositionComponent = () => number;
-export type GetCameraYaw = () => number;
-export type GetCameraPitch = () => number;
+export type OrbitScaleMode = 0 | 1;
 
 export interface SolarSystemCwrap {
   // BEGIN GENERATED CWARP OVERLOADS
@@ -89,307 +22,457 @@ export interface SolarSystemCwrap {
     ident: 'SetCameraPose',
     returnType: null,
     argTypes: ['number', 'number', 'number', 'number', 'number'],
-  ): (...args: number[]) => void;
+  ): (x: number, y: number, z: number, yaw: number, pitch: number) => void;
   (
     ident: 'SetQualityPreset',
     returnType: null,
     argTypes: ['number'],
-  ): (...args: number[]) => void;
+  ): (preset: number) => void;
   (
     ident: 'GetQualityPreset',
     returnType: 'number',
     argTypes: [],
-  ): (...args: number[]) => number;
+  ): () => number;
   (
     ident: 'SetTimeScale',
     returnType: null,
     argTypes: ['number'],
-  ): (...args: number[]) => void;
+  ): (scale: number) => void;
   (
     ident: 'GetTimeScale',
     returnType: 'number',
     argTypes: [],
-  ): (...args: number[]) => number;
+  ): () => number;
   (
     ident: 'SetPaused',
     returnType: null,
     argTypes: ['number'],
-  ): (...args: number[]) => void;
+  ): (paused: number) => void;
   (
     ident: 'GetPaused',
     returnType: 'number',
     argTypes: [],
-  ): (...args: number[]) => number;
+  ): () => number;
   (
     ident: 'SetSimulationEpoch',
     returnType: null,
     argTypes: ['number'],
-  ): (...args: number[]) => void;
+  ): (julianDate: number) => void;
   (
     ident: 'GetSimulationEpoch',
     returnType: 'number',
     argTypes: [],
-  ): (...args: number[]) => number;
+  ): () => number;
   (
     ident: 'SetShadowQuality',
     returnType: null,
     argTypes: ['number'],
-  ): (...args: number[]) => void;
+  ): (quality: number) => void;
   (
     ident: 'GetShadowQuality',
     returnType: 'number',
     argTypes: [],
-  ): (...args: number[]) => number;
+  ): () => number;
   (
     ident: 'SetTouchMovement',
     returnType: null,
     argTypes: ['number', 'number', 'number'],
-  ): (...args: number[]) => void;
+  ): (forward: number, right: number, vertical: number) => void;
   (
     ident: 'AddTouchLook',
     returnType: null,
     argTypes: ['number', 'number'],
-  ): (...args: number[]) => void;
+  ): (deltaX: number, deltaY: number) => void;
   (
     ident: 'AddTouchZoom',
     returnType: null,
     argTypes: ['number'],
-  ): (...args: number[]) => void;
+  ): (delta: number) => void;
   (
     ident: 'IsMobileWeb',
     returnType: 'number',
     argTypes: [],
-  ): (...args: number[]) => number;
-  (
-    ident: 'SetMusicVolume',
-    returnType: null,
-    argTypes: ['number'],
-  ): (...args: number[]) => void;
-  (
-    ident: 'GetMusicVolume',
-    returnType: 'number',
-    argTypes: [],
-  ): (...args: number[]) => number;
-  (
-    ident: 'SetMusicMuted',
-    returnType: null,
-    argTypes: ['number'],
-  ): (...args: number[]) => void;
-  (
-    ident: 'GetMusicMuted',
-    returnType: 'number',
-    argTypes: [],
-  ): (...args: number[]) => number;
+  ): () => number;
   (
     ident: 'FocusPlanet',
     returnType: null,
     argTypes: ['number'],
-  ): (...args: number[]) => void;
+  ): (idx: number) => void;
   (
     ident: 'FocusMission',
     returnType: null,
     argTypes: ['number'],
-  ): (...args: number[]) => void;
+  ): (idx: number) => void;
   (
     ident: 'GetFocusedMissionIndex',
     returnType: 'number',
     argTypes: [],
-  ): (...args: number[]) => number;
+  ): () => number;
   (
     ident: 'GetMissionCount',
     returnType: 'number',
     argTypes: [],
-  ): (...args: number[]) => number;
+  ): () => number;
   (
     ident: 'GetMissionCatalogJson',
     returnType: 'string',
     argTypes: [],
-  ): (...args: number[]) => string;
+  ): () => string;
+  (
+    ident: 'GetFrameStatsJson',
+    returnType: 'string',
+    argTypes: [],
+  ): () => string;
+  (
+    ident: 'SetGpuTimersEnabled',
+    returnType: null,
+    argTypes: ['number'],
+  ): (enabled: number) => void;
   (
     ident: 'GetFocusedMissionJson',
     returnType: 'string',
     argTypes: [],
-  ): (...args: number[]) => string;
+  ): () => string;
+  (
+    ident: 'LoadStarSystem',
+    returnType: 'number',
+    argTypes: ['string', 'number'],
+  ): (id: string, focusIndex: number) => number;
+  (
+    ident: 'GetActiveSystemId',
+    returnType: 'string',
+    argTypes: [],
+  ): () => string;
+  (
+    ident: 'IsSystemJumpActive',
+    returnType: 'number',
+    argTypes: [],
+  ): () => number;
   (
     ident: 'SetOrbitScaleMode',
     returnType: null,
     argTypes: ['number'],
-  ): (...args: number[]) => void;
+  ): (mode: number) => void;
   (
     ident: 'GetOrbitScaleMode',
     returnType: 'number',
     argTypes: [],
-  ): (...args: number[]) => number;
+  ): () => number;
   (
     ident: 'GetNearestPlanetIndex',
     returnType: 'number',
     argTypes: [],
-  ): (...args: number[]) => number;
+  ): () => number;
   (
     ident: 'GetFocusedPlanetIndex',
     returnType: 'number',
     argTypes: [],
-  ): (...args: number[]) => number;
+  ): () => number;
   (
     ident: 'GetPlanetSceneDistance',
     returnType: 'number',
     argTypes: ['number'],
-  ): (...args: number[]) => number;
+  ): (idx: number) => number;
   (
     ident: 'GetNextConjunctionJulianDate',
     returnType: 'number',
     argTypes: [],
-  ): (...args: number[]) => number;
+  ): () => number;
   (
     ident: 'GetNextConjunctionBodyA',
     returnType: 'number',
     argTypes: [],
-  ): (...args: number[]) => number;
+  ): () => number;
   (
     ident: 'GetNextConjunctionBodyB',
     returnType: 'number',
     argTypes: [],
-  ): (...args: number[]) => number;
+  ): () => number;
   (
     ident: 'GetNextConjunctionSeparationDeg',
     returnType: 'number',
     argTypes: [],
-  ): (...args: number[]) => number;
+  ): () => number;
   (
     ident: 'GetNextSkyEventJson',
     returnType: 'string',
     argTypes: [],
-  ): (...args: number[]) => string;
+  ): () => string;
   (
     ident: 'SetObserveMode',
     returnType: null,
     argTypes: ['number'],
-  ): (...args: number[]) => void;
+  ): (enabled: number) => void;
   (
     ident: 'GetObserveMode',
     returnType: 'number',
     argTypes: [],
-  ): (...args: number[]) => number;
+  ): () => number;
   (
     ident: 'SetObserverSite',
     returnType: null,
     argTypes: ['number', 'number', 'number'],
-  ): (...args: number[]) => void;
+  ): (latDeg: number, lonDeg: number, altM: number) => void;
   (
     ident: 'SetObserveView',
     returnType: null,
     argTypes: ['number', 'number'],
-  ): (...args: number[]) => void;
+  ): (azimuthDeg: number, elevationDeg: number) => void;
   (
     ident: 'SetObserveFov',
     returnType: null,
     argTypes: ['number'],
-  ): (...args: number[]) => void;
+  ): (fovDeg: number) => void;
   (
     ident: 'SetObserveTimeRate',
     returnType: null,
     argTypes: ['number'],
-  ): (...args: number[]) => void;
+  ): (rate: number) => void;
+  (
+    ident: 'SetObserveConstellations',
+    returnType: null,
+    argTypes: ['number'],
+  ): (visible: number) => void;
   (
     ident: 'GetObserveStateJson',
     returnType: 'string',
     argTypes: [],
-  ): (...args: number[]) => string;
+  ): () => string;
   (
     ident: 'SetOrbitLines',
     returnType: null,
     argTypes: ['number'],
-  ): (...args: number[]) => void;
+  ): (enabled: number) => void;
   (
     ident: 'GetOrbitLines',
     returnType: 'number',
     argTypes: [],
-  ): (...args: number[]) => number;
+  ): () => number;
   (
     ident: 'SetMagneticFields',
     returnType: null,
     argTypes: ['number'],
-  ): (...args: number[]) => void;
+  ): (enabled: number) => void;
   (
     ident: 'GetMagneticFields',
     returnType: 'number',
     argTypes: [],
-  ): (...args: number[]) => number;
+  ): () => number;
   (
     ident: 'SetMagneticFieldMode',
     returnType: null,
     argTypes: ['number'],
-  ): (...args: number[]) => void;
+  ): (enabled: number) => void;
   (
     ident: 'GetMagneticFieldMode',
     returnType: 'number',
     argTypes: [],
-  ): (...args: number[]) => number;
+  ): () => number;
+  (
+    ident: 'SetSolarWind',
+    returnType: null,
+    argTypes: ['number'],
+  ): (enabled: number) => void;
+  (
+    ident: 'GetSolarWind',
+    returnType: 'number',
+    argTypes: [],
+  ): () => number;
+  (
+    ident: 'SetKpOverride',
+    returnType: null,
+    argTypes: ['number'],
+  ): (kp: number) => void;
+  (
+    ident: 'GetKpOverride',
+    returnType: 'number',
+    argTypes: [],
+  ): () => number;
+  (
+    ident: 'LaunchCmeNow',
+    returnType: null,
+    argTypes: [],
+  ): () => void;
+  (
+    ident: 'PlaySpaceWeatherEvent',
+    returnType: 'number',
+    argTypes: ['number'],
+  ): (index: number) => number;
+  (
+    ident: 'JumpToSpaceWeatherDate',
+    returnType: 'number',
+    argTypes: ['string'],
+  ): (isoUtc: string) => number;
+  (
+    ident: 'GetSpaceWeatherJson',
+    returnType: 'string',
+    argTypes: [],
+  ): () => string;
   (
     ident: 'SetXrSessionActive',
     returnType: null,
     argTypes: ['number'],
-  ): (...args: number[]) => void;
+  ): (active: number) => void;
   (
     ident: 'SetXrBaseLayerFramebuffer',
     returnType: null,
     argTypes: ['number'],
-  ): (...args: number[]) => void;
+  ): (framebuffer: number) => void;
   (
     ident: 'SetXrEyeCount',
     returnType: null,
     argTypes: ['number'],
-  ): (...args: number[]) => void;
+  ): (count: number) => void;
   (
     ident: 'SetXrEyeViewport',
     returnType: null,
     argTypes: ['number', 'number', 'number', 'number', 'number'],
-  ): (...args: number[]) => void;
+  ): (eye: number, x: number, y: number, width: number, height: number) => void;
   (
     ident: 'GetXrMatrixScratch',
     returnType: 'number',
     argTypes: [],
-  ): (...args: number[]) => number;
+  ): () => number;
   (
     ident: 'CommitXrEyeMatrices',
     returnType: null,
     argTypes: ['number'],
-  ): (...args: number[]) => void;
+  ): (eye: number) => void;
   (
     ident: 'RunXrFrame',
     returnType: null,
     argTypes: [],
-  ): (...args: number[]) => void;
+  ): () => void;
   (
     ident: 'SetXrControllerRay',
     returnType: null,
     argTypes: ['number', 'number', 'number', 'number', 'number', 'number', 'number', 'number'],
-  ): (...args: number[]) => void;
+  ): (hand: number, ox: number, oy: number, oz: number, dx: number, dy: number, dz: number, visible: number) => void;
   (
     ident: 'GetCameraPositionX',
     returnType: 'number',
     argTypes: [],
-  ): (...args: number[]) => number;
+  ): () => number;
   (
     ident: 'GetCameraPositionY',
     returnType: 'number',
     argTypes: [],
-  ): (...args: number[]) => number;
+  ): () => number;
   (
     ident: 'GetCameraPositionZ',
     returnType: 'number',
     argTypes: [],
-  ): (...args: number[]) => number;
+  ): () => number;
+  (
+    ident: 'GetCameraHeliocentricX',
+    returnType: 'number',
+    argTypes: [],
+  ): () => number;
+  (
+    ident: 'GetCameraHeliocentricY',
+    returnType: 'number',
+    argTypes: [],
+  ): () => number;
+  (
+    ident: 'GetCameraHeliocentricZ',
+    returnType: 'number',
+    argTypes: [],
+  ): () => number;
   (
     ident: 'GetCameraYaw',
     returnType: 'number',
     argTypes: [],
-  ): (...args: number[]) => number;
+  ): () => number;
   (
     ident: 'GetCameraPitch',
     returnType: 'number',
     argTypes: [],
-  ): (...args: number[]) => number;
+  ): () => number;
+  (
+    ident: 'SetCameraRoll',
+    returnType: null,
+    argTypes: ['number'],
+  ): (roll: number) => void;
+  (
+    ident: 'GetCameraRoll',
+    returnType: 'number',
+    argTypes: [],
+  ): () => number;
+  (
+    ident: 'SetCameraFov',
+    returnType: null,
+    argTypes: ['number'],
+  ): (fovDeg: number) => void;
+  (
+    ident: 'GetCameraFov',
+    returnType: 'number',
+    argTypes: [],
+  ): () => number;
+  (
+    ident: 'AdvanceSimulationTo',
+    returnType: null,
+    argTypes: ['number'],
+  ): (julianDate: number) => void;
+  (
+    ident: 'GetSceneStateJson',
+    returnType: 'string',
+    argTypes: [],
+  ): () => string;
+  (
+    ident: 'GetBodyCatalogJson',
+    returnType: 'string',
+    argTypes: [],
+  ): () => string;
+  (
+    ident: 'GetSurfaceJson',
+    returnType: 'string',
+    argTypes: ['number', 'number', 'number', 'number'],
+  ): (bodyIndex: number, dx: number, dy: number, dz: number) => string;
+  (
+    ident: 'PreloadBodySystem',
+    returnType: null,
+    argTypes: ['number'],
+  ): (bodyIndex: number) => void;
+  (
+    ident: 'GetPendingAssetCount',
+    returnType: 'number',
+    argTypes: [],
+  ): () => number;
+  (
+    ident: 'SetHudOverlays',
+    returnType: null,
+    argTypes: ['number'],
+  ): (mask: number) => void;
+  (
+    ident: 'GetHudOverlays',
+    returnType: 'number',
+    argTypes: [],
+  ): () => number;
+  (
+    ident: 'BeginCapture',
+    returnType: 'number',
+    argTypes: ['number', 'number'],
+  ): (width: number, height: number) => number;
+  (
+    ident: 'StepCaptureFrame',
+    returnType: null,
+    argTypes: ['number'],
+  ): (deltaSeconds: number) => void;
+  (
+    ident: 'EndCapture',
+    returnType: null,
+    argTypes: [],
+  ): () => void;
+  (
+    ident: 'GetShaderSourceFiles',
+    returnType: 'string',
+    argTypes: [],
+  ): () => string;
+  (
+    ident: 'ReloadShaders',
+    returnType: 'number',
+    argTypes: [],
+  ): () => number;
   // END GENERATED CWARP OVERLOADS
 }
 
@@ -398,15 +481,17 @@ export type SettingsChangeField =
   | 'timeScale'
   | 'paused'
   | 'shadowQuality'
-  | 'musicVolume'
-  | 'musicMuted'
   | 'simulationEpoch'
   | 'orbitLines'
   | 'magneticFields'
   | 'magneticFieldMode'
   | 'observeMode'
   | 'observeSite'
-  | 'observeTimeRate';
+  | 'observeTimeRate'
+  | 'observeConstellations'
+  | 'orbitScaleMode'
+  | 'solarWind'
+  | 'kpOverride';
 
 export interface SolarSystemModuleConfig {
   canvas: HTMLCanvasElement;
@@ -415,10 +500,15 @@ export interface SolarSystemModuleConfig {
   printErr?: (text: string) => void;
   onRuntimeInitialized?: () => void;
   /** C++ → JS callbacks registered on Module before runtime init. */
-  updateLoadingProgress?: (loaded: number, total: number) => void;
+  /** `failed` (core resources that failed, already counted in `loaded`) is omitted by streaming progress. */
+  updateLoadingProgress?: (loaded: number, total: number, failed?: number) => void;
   updateStreamingProgress?: (completed: number, total: number, active?: number, tierCode?: number) => void;
   onPlanetFocused?: (index: number) => void;
+  /** 0–1 music gain for scene proximity; web/src/music.ts applies it. */
+  onMusicDuck?: (duck: number) => void;
   onSettingsChanged?: (field: SettingsChangeField | string) => void;
+  onNearestPlanetChanged?: (index: number) => void;
+  onMissionFocused?: (index: number) => void;
   /**
    * A WebGL2 context created by the caller (see web/src/webglContext.ts), reused as-is by
    * Emscripten's GLFW port. This is the ONLY way to control powerPreference / xrCompatible /
@@ -437,79 +527,120 @@ export interface SolarSystemModuleConfig {
  * WASM side can bind, so they must be inserted into this table first.
  */
 export interface EmscriptenGL {
-  framebuffers: (WebGLFramebuffer | null)[];
-  getNewId: (table: unknown[]) => number;
+  // Emscripten-internal: optional because a future toolchain may stop exposing them.
+  framebuffers?: (WebGLFramebuffer | null)[];
+  getNewId?: (table: unknown[]) => number;
+}
+
+/** The slice of Emscripten's FS the dev shader reload uses (EXPORTED_RUNTIME_METHODS 'FS'). */
+export interface EmscriptenFS {
+  readFile(path: string, opts: { encoding: 'utf8' }): string;
+  writeFile(path: string, data: string | Uint8Array): void;
 }
 
 export interface SolarSystemModule {
   canvas: HTMLCanvasElement;
+  FS?: EmscriptenFS;
   cwrap: SolarSystemCwrap;
   HEAPF32: Float32Array;
   HEAP8: Int8Array;
   GL?: EmscriptenGL;
+  /** Emscripten main-loop controls (library_browser.js); used on WebGL context loss. */
+  pauseMainLoop?: () => void;
+  resumeMainLoop?: () => void;
   _main: (argc: number, argv: number) => number;
   // BEGIN GENERATED MODULE EXPORTS
-  _SetCameraPose: (...args: number[]) => void;
-  _SetQualityPreset: (...args: number[]) => void;
+  _SetCameraPose: (x: number, y: number, z: number, yaw: number, pitch: number) => void;
+  _SetQualityPreset: (preset: number) => void;
   _GetQualityPreset: () => number;
-  _SetTimeScale: (...args: number[]) => void;
+  _SetTimeScale: (scale: number) => void;
   _GetTimeScale: () => number;
-  _SetPaused: (...args: number[]) => void;
+  _SetPaused: (paused: number) => void;
   _GetPaused: () => number;
-  _SetSimulationEpoch: (...args: number[]) => void;
+  _SetSimulationEpoch: (julianDate: number) => void;
   _GetSimulationEpoch: () => number;
-  _SetShadowQuality: (...args: number[]) => void;
+  _SetShadowQuality: (quality: number) => void;
   _GetShadowQuality: () => number;
-  _SetTouchMovement: (...args: number[]) => void;
-  _AddTouchLook: (...args: number[]) => void;
-  _AddTouchZoom: (...args: number[]) => void;
+  _SetTouchMovement: (forward: number, right: number, vertical: number) => void;
+  _AddTouchLook: (deltaX: number, deltaY: number) => void;
+  _AddTouchZoom: (delta: number) => void;
   _IsMobileWeb: () => number;
-  _SetMusicVolume: (...args: number[]) => void;
-  _GetMusicVolume: () => number;
-  _SetMusicMuted: (...args: number[]) => void;
-  _GetMusicMuted: () => number;
-  _FocusPlanet: (...args: number[]) => void;
-  _FocusMission: (...args: number[]) => void;
+  _FocusPlanet: (idx: number) => void;
+  _FocusMission: (idx: number) => void;
   _GetFocusedMissionIndex: () => number;
   _GetMissionCount: () => number;
   _GetMissionCatalogJson: () => number;
+  _GetFrameStatsJson: () => number;
+  _SetGpuTimersEnabled: (enabled: number) => void;
   _GetFocusedMissionJson: () => number;
-  _SetOrbitScaleMode: (...args: number[]) => void;
+  _LoadStarSystem: (id: number, focusIndex: number) => number;
+  _GetActiveSystemId: () => number;
+  _IsSystemJumpActive: () => number;
+  _SetOrbitScaleMode: (mode: number) => void;
   _GetOrbitScaleMode: () => number;
   _GetNearestPlanetIndex: () => number;
   _GetFocusedPlanetIndex: () => number;
-  _GetPlanetSceneDistance: (...args: number[]) => number;
+  _GetPlanetSceneDistance: (idx: number) => number;
   _GetNextConjunctionJulianDate: () => number;
   _GetNextConjunctionBodyA: () => number;
   _GetNextConjunctionBodyB: () => number;
   _GetNextConjunctionSeparationDeg: () => number;
   _GetNextSkyEventJson: () => number;
-  _SetObserveMode: (...args: number[]) => void;
+  _SetObserveMode: (enabled: number) => void;
   _GetObserveMode: () => number;
-  _SetObserverSite: (...args: number[]) => void;
-  _SetObserveView: (...args: number[]) => void;
-  _SetObserveFov: (...args: number[]) => void;
-  _SetObserveTimeRate: (...args: number[]) => void;
+  _SetObserverSite: (latDeg: number, lonDeg: number, altM: number) => void;
+  _SetObserveView: (azimuthDeg: number, elevationDeg: number) => void;
+  _SetObserveFov: (fovDeg: number) => void;
+  _SetObserveTimeRate: (rate: number) => void;
+  _SetObserveConstellations: (visible: number) => void;
   _GetObserveStateJson: () => number;
-  _SetOrbitLines: (...args: number[]) => void;
+  _SetOrbitLines: (enabled: number) => void;
   _GetOrbitLines: () => number;
-  _SetMagneticFields: (...args: number[]) => void;
+  _SetMagneticFields: (enabled: number) => void;
   _GetMagneticFields: () => number;
-  _SetMagneticFieldMode: (...args: number[]) => void;
+  _SetMagneticFieldMode: (enabled: number) => void;
   _GetMagneticFieldMode: () => number;
-  _SetXrSessionActive: (...args: number[]) => void;
-  _SetXrBaseLayerFramebuffer: (...args: number[]) => void;
-  _SetXrEyeCount: (...args: number[]) => void;
-  _SetXrEyeViewport: (...args: number[]) => void;
+  _SetSolarWind: (enabled: number) => void;
+  _GetSolarWind: () => number;
+  _SetKpOverride: (kp: number) => void;
+  _GetKpOverride: () => number;
+  _LaunchCmeNow: () => void;
+  _PlaySpaceWeatherEvent: (index: number) => number;
+  _JumpToSpaceWeatherDate: (isoUtc: number) => number;
+  _GetSpaceWeatherJson: () => number;
+  _SetXrSessionActive: (active: number) => void;
+  _SetXrBaseLayerFramebuffer: (framebuffer: number) => void;
+  _SetXrEyeCount: (count: number) => void;
+  _SetXrEyeViewport: (eye: number, x: number, y: number, width: number, height: number) => void;
   _GetXrMatrixScratch: () => number;
-  _CommitXrEyeMatrices: (...args: number[]) => void;
+  _CommitXrEyeMatrices: (eye: number) => void;
   _RunXrFrame: () => void;
-  _SetXrControllerRay: (...args: number[]) => void;
+  _SetXrControllerRay: (hand: number, ox: number, oy: number, oz: number, dx: number, dy: number, dz: number, visible: number) => void;
   _GetCameraPositionX: () => number;
   _GetCameraPositionY: () => number;
   _GetCameraPositionZ: () => number;
+  _GetCameraHeliocentricX: () => number;
+  _GetCameraHeliocentricY: () => number;
+  _GetCameraHeliocentricZ: () => number;
   _GetCameraYaw: () => number;
   _GetCameraPitch: () => number;
+  _SetCameraRoll: (roll: number) => void;
+  _GetCameraRoll: () => number;
+  _SetCameraFov: (fovDeg: number) => void;
+  _GetCameraFov: () => number;
+  _AdvanceSimulationTo: (julianDate: number) => void;
+  _GetSceneStateJson: () => number;
+  _GetBodyCatalogJson: () => number;
+  _GetSurfaceJson: (bodyIndex: number, dx: number, dy: number, dz: number) => number;
+  _PreloadBodySystem: (bodyIndex: number) => void;
+  _GetPendingAssetCount: () => number;
+  _SetHudOverlays: (mask: number) => void;
+  _GetHudOverlays: () => number;
+  _BeginCapture: (width: number, height: number) => number;
+  _StepCaptureFrame: (deltaSeconds: number) => void;
+  _EndCapture: () => void;
+  _GetShaderSourceFiles: () => number;
+  _ReloadShaders: () => number;
   // END GENERATED MODULE EXPORTS
 }
 
@@ -522,9 +653,9 @@ export default SolarSystem;
 declare global {
   interface Window {
     /** Console helpers documented in AGENTS.md. */
-    setCameraPose?: SetCameraPose;
-    setQualityPreset?: SetQualityPreset;
-    getQualityPreset?: GetQualityPreset;
+    setCameraPose?: import('./wasmBridge').SolarSystemRuntime['setCameraPose'];
+    setQualityPreset?: import('./wasmBridge').SolarSystemRuntime['setQualityPreset'];
+    getQualityPreset?: import('./wasmBridge').SolarSystemRuntime['getQualityPreset'];
     getNextConjunction?: () => {
       valid: boolean;
       bodyA: number;
@@ -542,12 +673,28 @@ declare global {
       z: number;
     };
     startTour?: (id?: string) => void;
+    /** Cinematic timelines (timelineEditor.ts): the player, and load(id or URL) into the dock. */
+    solarSystemTimeline?: {
+      player: import('./timelinePlayer').TimelinePlayer;
+      load: (source: string) => Promise<import('./timeline').TimelineParseResult>;
+      snapshot: (t: number, width?: number, height?: number) => string | null;
+    };
     /** Observe mode console helpers (see observe.ts / ObserveState). */
     setObserveMode?: (enabled: boolean) => void;
     setObserverSite?: (latDeg: number, lonDeg: number, altM?: number) => void;
     getObserveState?: () => import('./observe').ObserveState;
+    /** Dev server only (shaderReload.ts): rebuild the programs whose shader files changed. */
+    __solarSystem?: {
+      reloadShaders?: () => Promise<number>;
+    };
     /** Runtime asset base URL for WebResourceFetcher. */
     __solarSystemAssetBase?: string;
+    /**
+     * Download hook for WebResourceFetcher: resolves the body, or the HTTP status of a
+     * failure (0 = network). Installed by bootstrap.ts (assetCache.ts); when absent C++
+     * falls back to emscripten_async_wget2 with no cache.
+     */
+    __solarSystemFetchAsset?: (url: string) => Promise<Uint8Array<ArrayBuffer> | number>;
     /** KTX2 texture packs published by this deployment — read by PlatformWindow.cpp. */
     __solarSystemTexturePacks?: string[];
     /** Init config published before Module() — read by QualitySettings.cpp. */
@@ -557,7 +704,4 @@ declare global {
       backingStoreScale: number;
     };
   }
-
-  /** Incoming Module config (callbacks live on SolarSystemModuleConfig). */
-  const Module: SolarSystemModuleConfig;
 }

@@ -1,0 +1,498 @@
+{
+  "schemaVersion": 1,
+  "system": {
+    "id": "toi-700",
+    "name": {
+      "en": "TOI-700",
+      "ru": "TOI-700"
+    },
+    "distancePc": 31.127,
+    "spectralType": "M2.5 V",
+    "starColor": "#ffc689",
+    "habitableZoneAu": {
+      "innerAu": 0.14554,
+      "outerAu": 0.20967
+    },
+    "source": {
+      "table": "NASA Exoplanet Archive, Planetary Systems Composite Parameters (pscomppars)",
+      "url": "https://exoplanetarchive.ipac.caltech.edu/",
+      "archiveHostname": "TOI-700",
+      "referencePlaneInclinationDeg": 89.73
+    }
+  },
+  "sceneNote": {
+    "en": "Measured orbits and sizes; surfaces are procedural (no exoplanet has been imaged). Values marked fit are estimates.",
+    "ru": "Орбиты и размеры измерены; поверхности процедурные (ни одна экзопланета не сфотографирована). Значения с пометкой fit — оценки."
+  },
+  "initTagAllowlist": [
+    "toi_700_b",
+    "toi_700_c",
+    "toi_700_e",
+    "toi_700_d"
+  ],
+  "bodies": [
+    {
+      "id": "toi_700",
+      "index": 0,
+      "kind": "star",
+      "parent": null,
+      "displayName": {
+        "en": "TOI-700",
+        "ru": "TOI-700"
+      },
+      "type": "star",
+      "facts": {
+        "diameterKm": 571031,
+        "massEarths": 138838,
+        "siderealRotationDays": null,
+        "orbitalPeriodDays": null,
+        "distanceAu": 0,
+        "moons": 0,
+        "distancePc": 31.127,
+        "spectralType": "M2.5 V",
+        "effectiveTemperatureK": 3459,
+        "luminositySolar": 0.0233002,
+        "summary": {
+          "en": "M2.5 V star 101.5 light-years away; 4 known planets in the archive's composite table.",
+          "ru": "Звезда класса M2.5 V на расстоянии 101.5 св. лет; известных планет: 4."
+        }
+      },
+      "orbit": {
+        "compressedOffset": [
+          0,
+          0,
+          0
+        ],
+        "inclinationDeg": 0,
+        "siderealRotationDays": null,
+        "orbitalPeriodDays": null,
+        "distanceAu": 0,
+        "axialTiltDegrees": 0,
+        "earthRadiusScale": 1,
+        "rotationRate": 0
+      },
+      "render": {
+        "star": {
+          "effectiveTemperatureK": 3459,
+          "radiusSolar": 0.4104,
+          "luminositySolar": 0.0233002,
+          "massSolar": 0.417,
+          "spectralType": "M2.5 V",
+          "activity": 0.34
+        }
+      },
+      "includeInCompanion": false
+    },
+    {
+      "id": "toi_700_b",
+      "index": 1,
+      "kind": "planet",
+      "parent": "toi_700",
+      "displayName": {
+        "en": "TOI-700 b",
+        "ru": "TOI-700 b"
+      },
+      "type": "terrestrial",
+      "facts": {
+        "diameterKm": 12271,
+        "massEarths": 0.849,
+        "siderealRotationDays": 9.97722,
+        "orbitalPeriodDays": 9.97722,
+        "distanceAu": 0.0678,
+        "moons": 0,
+        "equilibriumTemperatureK": 417,
+        "irradianceEarth": 5.0687,
+        "discoveryYear": 2020,
+        "discoveryMethod": "Transit",
+        "summary": {
+          "en": "Terrestrial discovered in 2020 (transit); 5.07× Earth's insolation, equilibrium temperature ≈ 417 K.",
+          "ru": "Планета земного типа, открыта в 2020 г. транзитным методом; освещённость 5.07 от земной, равновесная температура ≈ 417 K."
+        }
+      },
+      "orbit": {
+        "compressedOffset": [
+          1500,
+          0,
+          0
+        ],
+        "inclinationDeg": -0.1,
+        "siderealRotationDays": 9.97722,
+        "orbitalPeriodDays": 9.97722,
+        "distanceAu": 0.0678,
+        "axialTiltDegrees": 0,
+        "earthRadiusScale": 0.963,
+        "rotationRate": 0,
+        "primeMeridianDegJ2000": 202.5398,
+        "primeMeridianRateDegPerDay": 36.082195241,
+        "keplerian": {
+          "aKm": 10142735.6,
+          "e": 0.032,
+          "iDeg": -0.1,
+          "OmegaDeg": 0,
+          "omegaDeg": 285,
+          "M0Deg": 97.5398,
+          "nDegPerDay": 36.082195241,
+          "OmegaDotDegPerDay": 0,
+          "omegaDotDegPerDay": 0
+        },
+        "placeFromElements": true
+      },
+      "system": {
+        "name": "TOI-700 b",
+        "initTag": "toi_700_b",
+        "activationRadius": 800,
+        "lodThreshold": 20
+      },
+      "render": {
+        "shaderFlags": {
+          "hasNightTexture": false,
+          "hasSpecularMap": false,
+          "hasClouds": false
+        },
+        "ambientFactor": 0,
+        "procedural": {
+          "seed": 1,
+          "equilibriumTemperatureK": 417,
+          "style": "scorched",
+          "mode": 0,
+          "colors": [
+            [
+              0.32,
+              0.22,
+              0.15
+            ],
+            [
+              0.55,
+              0.42,
+              0.3
+            ],
+            [
+              0.72,
+              0.62,
+              0.5
+            ]
+          ],
+          "seaLevel": 0,
+          "polarCap": 0,
+          "emissive": 0
+        }
+      },
+      "fit": {
+        "rotation": "tidally-locked"
+      },
+      "archive": {
+        "plName": "TOI-700 b",
+        "observedInclinationDeg": 89.63
+      },
+      "includeInCompanion": false
+    },
+    {
+      "id": "toi_700_c",
+      "index": 2,
+      "kind": "planet",
+      "parent": "toi_700",
+      "displayName": {
+        "en": "TOI-700 c",
+        "ru": "TOI-700 c"
+      },
+      "type": "sub-neptune",
+      "facts": {
+        "diameterKm": 32301,
+        "massEarths": 6.96,
+        "siderealRotationDays": 16.051104,
+        "orbitalPeriodDays": 16.0511039,
+        "distanceAu": 0.0931,
+        "moons": 0,
+        "equilibriumTemperatureK": 356,
+        "irradianceEarth": 2.6882,
+        "discoveryYear": 2020,
+        "discoveryMethod": "Transit",
+        "summary": {
+          "en": "Sub-neptune discovered in 2020 (transit); 2.69× Earth's insolation, equilibrium temperature ≈ 356 K.",
+          "ru": "Мини-нептун, открыта в 2020 г. транзитным методом; освещённость 2.69 от земной, равновесная температура ≈ 356 K."
+        }
+      },
+      "orbit": {
+        "compressedOffset": [
+          -1290.4,
+          0,
+          1182.11
+        ],
+        "inclinationDeg": -0.788,
+        "siderealRotationDays": 16.051104,
+        "orbitalPeriodDays": 16.0511039,
+        "distanceAu": 0.0931,
+        "axialTiltDegrees": 0,
+        "earthRadiusScale": 2.535,
+        "rotationRate": 0,
+        "primeMeridianDegJ2000": 146.6983,
+        "primeMeridianRateDegPerDay": 22.428363946,
+        "keplerian": {
+          "aKm": 13927561.8,
+          "e": 0.033,
+          "iDeg": -0.788,
+          "OmegaDeg": 0,
+          "omegaDeg": 81,
+          "M0Deg": 245.6983,
+          "nDegPerDay": 22.428363946,
+          "OmegaDotDegPerDay": 0,
+          "omegaDotDegPerDay": 0
+        },
+        "placeFromElements": true
+      },
+      "system": {
+        "name": "TOI-700 c",
+        "initTag": "toi_700_c",
+        "activationRadius": 800,
+        "lodThreshold": 20
+      },
+      "render": {
+        "shaderFlags": {
+          "hasNightTexture": false,
+          "hasSpecularMap": false,
+          "hasClouds": false
+        },
+        "ambientFactor": 0,
+        "procedural": {
+          "seed": 2,
+          "equilibriumTemperatureK": 356,
+          "style": "ice-giant",
+          "mode": 1,
+          "colors": [
+            [
+              0.13,
+              0.32,
+              0.55
+            ],
+            [
+              0.3,
+              0.55,
+              0.72
+            ],
+            [
+              0.62,
+              0.82,
+              0.9
+            ]
+          ],
+          "bands": 5,
+          "emissive": 0
+        }
+      },
+      "fit": {
+        "rotation": "tidally-locked"
+      },
+      "archive": {
+        "plName": "TOI-700 c",
+        "observedInclinationDeg": 88.942
+      },
+      "includeInCompanion": false
+    },
+    {
+      "id": "toi_700_e",
+      "index": 3,
+      "kind": "planet",
+      "parent": "toi_700",
+      "displayName": {
+        "en": "TOI-700 e",
+        "ru": "TOI-700 e"
+      },
+      "type": "terrestrial",
+      "facts": {
+        "diameterKm": 11710,
+        "massEarths": 0.718,
+        "siderealRotationDays": 27.810124,
+        "orbitalPeriodDays": 27.810124,
+        "distanceAu": 0.1336,
+        "moons": 0,
+        "equilibriumTemperatureK": 272.9,
+        "irradianceEarth": 1.3054,
+        "discoveryYear": 2023,
+        "discoveryMethod": "Transit",
+        "summary": {
+          "en": "Terrestrial discovered in 2023 (transit); 1.31× Earth's insolation, equilibrium temperature ≈ 273 K.",
+          "ru": "Планета земного типа, открыта в 2023 г. транзитным методом; освещённость 1.31 от земной, равновесная температура ≈ 273 K."
+        }
+      },
+      "orbit": {
+        "compressedOffset": [
+          174.85,
+          0,
+          -1992.34
+        ],
+        "inclinationDeg": 0.16,
+        "siderealRotationDays": 27.810124,
+        "orbitalPeriodDays": 27.810124,
+        "distanceAu": 0.1336,
+        "axialTiltDegrees": 0,
+        "earthRadiusScale": 0.919,
+        "rotationRate": 0,
+        "primeMeridianDegJ2000": 338.9484,
+        "primeMeridianRateDegPerDay": 12.9449261,
+        "keplerian": {
+          "aKm": 19986275.5,
+          "e": 0.059,
+          "iDeg": 0.16,
+          "OmegaDeg": 0,
+          "omegaDeg": 70,
+          "M0Deg": 88.9484,
+          "nDegPerDay": 12.9449261,
+          "OmegaDotDegPerDay": 0,
+          "omegaDotDegPerDay": 0
+        },
+        "placeFromElements": true
+      },
+      "system": {
+        "name": "TOI-700 e",
+        "initTag": "toi_700_e",
+        "activationRadius": 800,
+        "lodThreshold": 20
+      },
+      "render": {
+        "shaderFlags": {
+          "hasNightTexture": false,
+          "hasSpecularMap": false,
+          "hasClouds": false
+        },
+        "ambientFactor": 0,
+        "procedural": {
+          "seed": 3,
+          "equilibriumTemperatureK": 272.9,
+          "style": "ocean",
+          "mode": 0,
+          "colors": [
+            [
+              0.07,
+              0.22,
+              0.45
+            ],
+            [
+              0.42,
+              0.45,
+              0.28
+            ],
+            [
+              0.92,
+              0.94,
+              0.97
+            ]
+          ],
+          "seaLevel": 0.55,
+          "polarCap": 0.75,
+          "emissive": 0
+        }
+      },
+      "fit": {
+        "rotation": "tidally-locked"
+      },
+      "archive": {
+        "plName": "TOI-700 e",
+        "observedInclinationDeg": 89.89
+      },
+      "includeInCompanion": false
+    },
+    {
+      "id": "toi_700_d",
+      "index": 4,
+      "kind": "planet",
+      "parent": "toi_700",
+      "displayName": {
+        "en": "TOI-700 d",
+        "ru": "TOI-700 d"
+      },
+      "type": "terrestrial",
+      "facts": {
+        "diameterKm": 14590,
+        "massEarths": 1.58,
+        "siderealRotationDays": 37.423457,
+        "orbitalPeriodDays": 37.423457,
+        "distanceAu": 0.1642,
+        "moons": 0,
+        "equilibriumTemperatureK": 268.8,
+        "irradianceEarth": 0.8642,
+        "discoveryYear": 2020,
+        "discoveryMethod": "Transit",
+        "summary": {
+          "en": "Terrestrial discovered in 2020 (transit); 0.86× Earth's insolation, equilibrium temperature ≈ 269 K.",
+          "ru": "Планета земного типа, открыта в 2020 г. транзитным методом; освещённость 0.86 от земной, равновесная температура ≈ 269 K."
+        }
+      },
+      "orbit": {
+        "compressedOffset": [
+          1368.99,
+          0,
+          1785.6
+        ],
+        "inclinationDeg": 0.1,
+        "siderealRotationDays": 37.423457,
+        "orbitalPeriodDays": 37.423457,
+        "distanceAu": 0.1642,
+        "axialTiltDegrees": 0,
+        "earthRadiusScale": 1.145,
+        "rotationRate": 0,
+        "primeMeridianDegJ2000": 151.3361,
+        "primeMeridianRateDegPerDay": 9.619635086,
+        "keplerian": {
+          "aKm": 24563970.4,
+          "e": 0.042,
+          "iDeg": 0.1,
+          "OmegaDeg": 0,
+          "omegaDeg": 10,
+          "M0Deg": 321.3361,
+          "nDegPerDay": 9.619635086,
+          "OmegaDotDegPerDay": 0,
+          "omegaDotDegPerDay": 0
+        },
+        "placeFromElements": true
+      },
+      "system": {
+        "name": "TOI-700 d",
+        "initTag": "toi_700_d",
+        "activationRadius": 800,
+        "lodThreshold": 20
+      },
+      "render": {
+        "shaderFlags": {
+          "hasNightTexture": false,
+          "hasSpecularMap": false,
+          "hasClouds": false
+        },
+        "ambientFactor": 0,
+        "procedural": {
+          "seed": 4,
+          "equilibriumTemperatureK": 268.8,
+          "style": "ocean",
+          "mode": 0,
+          "colors": [
+            [
+              0.07,
+              0.22,
+              0.45
+            ],
+            [
+              0.42,
+              0.45,
+              0.28
+            ],
+            [
+              0.92,
+              0.94,
+              0.97
+            ]
+          ],
+          "seaLevel": 0.55,
+          "polarCap": 0.75,
+          "emissive": 0
+        }
+      },
+      "fit": {
+        "rotation": "tidally-locked"
+      },
+      "archive": {
+        "plName": "TOI-700 d",
+        "observedInclinationDeg": 89.83
+      },
+      "includeInCompanion": false
+    }
+  ]
+}

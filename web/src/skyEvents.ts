@@ -4,12 +4,7 @@ import { isoDateFromJulianDate } from './ephemeris';
  * Kinds mirror SkyEvents::EventKind in C++. The slug is what GetNextSkyEventJson emits;
  * keep the two lists in step or the chip silently falls back to the generic label.
  */
-export type SkyEventKind =
-    | 'conjunction'
-    | 'solarEclipse'
-    | 'lunarEclipse'
-    | 'transit'
-    | 'shadowTransit';
+export type SkyEventKind = 'conjunction' | 'solarEclipse' | 'lunarEclipse' | 'transit' | 'shadowTransit';
 
 /**
  * One ephemeris-derived alignment, as assembled by SkyEvents::SkyEvent in C++.
@@ -197,6 +192,38 @@ export function bindSkyEventChip(options: {
         });
     }
 
+    refresh();
+    return { refresh };
+}
+
+/**
+ * The chip's geomagnetic-storm line (space weather, ARCHITECTURE §13): the next catalog CME to
+ * reach Earth with Kp ≥ 5 after the current date (else the latest), and a button that plays it
+ * from its launch. `getStormText` and `playStorm` come from spaceWeather.ts / the runtime;
+ * nothing is computed here.
+ */
+export function bindStormChip(options: {
+    chip: HTMLElement;
+    text: HTMLElement;
+    playButton: HTMLButtonElement;
+    /** The chip's line, '' when there is no storm ahead (or outside Sol). */
+    getStormText: () => string;
+    /** Play the next storm; false when there is none. */
+    playStorm: () => boolean;
+    onPlayed?: () => void;
+}): { refresh: () => void } {
+    const refresh = (): void => {
+        const text = options.getStormText();
+        options.chip.hidden = text === '';
+        options.text.textContent = text;
+        options.playButton.disabled = text === '';
+    };
+    options.playButton.addEventListener('click', () => {
+        if (options.playStorm()) {
+            options.onPlayed?.();
+        }
+        refresh();
+    });
     refresh();
     return { refresh };
 }

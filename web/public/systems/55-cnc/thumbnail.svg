@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 160 72" width="160" height="72" role="img" aria-label="55 Cancri">
+  <defs>
+    <radialGradient id="glow"><stop offset="0" stop-color="#ffe8d6" stop-opacity="0.9"/><stop offset="1" stop-color="#ffe8d6" stop-opacity="0"/></radialGradient>
+  </defs>
+  <rect width="160" height="72" fill="#05070d"/>
+  <line x1="30.923535078211984" y1="36" x2="154" y2="36" stroke="#ffffff" stroke-opacity="0.12" stroke-width="0.6"/>
+  <circle cx="16" cy="36" r="19.6" fill="url(#glow)"/>
+  <circle cx="16" cy="36" r="8.9" fill="#ffe8d6"/>
+  <circle cx="34.9" cy="36" r="2.19" fill="#7c6155"/>
+  <circle cx="74.6" cy="36" r="5.50" fill="#eadabf"/>
+  <circle cx="89.1" cy="36" r="4.67" fill="#eadabf"/>
+  <circle cx="112.1" cy="36" r="4.41" fill="#e5e2d7"/>
+  <circle cx="150.0" cy="36" r="5.50" fill="#e5e2d7"/>
+</svg>

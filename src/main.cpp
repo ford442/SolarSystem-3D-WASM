@@ -1,7 +1,8 @@
 #include "Application.h"
-#include <iostream>
-
-using namespace std;
+#include "core/JobSystem.h"
+#include "core/Log.h"
+#include <clocale>
+#include <exception>
 
 // https://gist.github.com/statico/6809850727c708f08458
 #ifdef _WIN32
@@ -17,17 +18,21 @@ int main(int, char**) {
     // setlocale can sometimes cause issues in WebAssembly depending on environment,
     // but usually fine. If text encoding is weird, try commenting this out.
     setlocale(LC_ALL, "RUS");
+    Log::InitFromEnvironment();
+    // Before anything submits work: texture decodes, model parses and catalogue loads run on
+    // the pool (SOLARSYSTEM_JOBS / ?jobs= sets its size; 0 runs them inline).
+    Jobs::Start();
 
 #ifdef __EMSCRIPTEN__
     // Heap-allocate so a returning Exec() (possible with -fwasm-exceptions +
     // emscripten_set_main_loop) cannot run Application::~Application and clear
     // WasmExports' activeApplication while the browser main loop still renders.
     try {
-        auto* application = new Application();
+        auto* application = new Application(); // NOLINT(cppcoreguidelines-owning-memory): lives for the page
         application->Exec();
     }
-    catch (const exception& err) {
-        cerr << "FATAL ERROR: " << err.what() << endl;
+    catch (const std::exception& err) {
+        LOG_ERROR("Fatal", "%s", err.what());
         return 1;
     }
     return 0;
@@ -36,8 +41,8 @@ int main(int, char**) {
         Application application;
         application.Exec();
     }
-    catch (const exception& err) {
-        cerr << "FATAL ERROR: " << err.what() << endl;
+    catch (const std::exception& err) {
+        LOG_ERROR("Fatal", "%s", err.what());
         return 1;
     }
 

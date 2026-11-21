@@ -1,0 +1,168 @@
+{
+  "format": "solarsystem-runtime-catalog",
+  "version": 1,
+  "generatedFrom": "resource/systems/51-peg.catalog.json",
+  "id": "51-peg",
+  "name": {
+    "en": "51 Pegasi",
+    "ru": "51 Пегаса"
+  },
+  "distancePc": 15.461,
+  "spectralType": "G5V",
+  "habitableZoneAu": {
+    "innerAu": 1.11547,
+    "outerAu": 1.607
+  },
+  "star": {
+    "id": "51_peg",
+    "displayNameEn": "51 Pegasi",
+    "displayNameRu": "51 Пегаса",
+    "spectralType": "G5V",
+    "effectiveTemperatureK": 5761,
+    "glowTemperatureK": 5778,
+    "radiusKm": 827883,
+    "radiusSolar": 1.19,
+    "luminositySolar": 1.3687055,
+    "massSolar": 1.07,
+    "activity": 0,
+    "cyclePeriodYears": 0,
+    "cycleMinimumYear": 0,
+    "cycleAtMinimum": 0,
+    "cycleMeanPeakSunspots": 0
+  },
+  "layout": [
+    {
+      "index": 0,
+      "id": "51_peg",
+      "compressedOffset": [
+        0,
+        0,
+        0
+      ],
+      "auDistance": 0,
+      "orbitalPeriodDays": 0,
+      "inclinationDeg": 0,
+      "siderealRotationDays": 0,
+      "primeMeridianDegJ2000": 0,
+      "primeMeridianRateDegPerDay": 0,
+      "trueRadius": false,
+      "kepler": null
+    },
+    {
+      "index": 1,
+      "id": "51_peg_b",
+      "compressedOffset": [
+        1500,
+        0,
+        0
+      ],
+      "auDistance": 0.052,
+      "orbitalPeriodDays": 4.2307966,
+      "inclinationDeg": 0,
+      "siderealRotationDays": 4.230797,
+      "primeMeridianDegJ2000": 172.9437,
+      "primeMeridianRateDegPerDay": 85.090358634,
+      "trueRadius": false,
+      "kepler": {
+        "aAu": 0.05200000015775626,
+        "e": 0.0063,
+        "iDeg": 0,
+        "OmegaDeg": 0,
+        "omegaDeg": 0,
+        "M0Deg": 352.9437,
+        "nDegPerDay": 85.090358634
+      }
+    }
+  ],
+  "entries": [
+    {
+      "index": 1,
+      "id": "51_peg_b",
+      "parentId": "51_peg",
+      "initTag": "51_peg_b",
+      "kind": "planet",
+      "displayNameEn": "51 Pegasi b",
+      "displayNameRu": "51 Пегаса b",
+      "auDistance": 0.052,
+      "orbitalPeriodDays": 4.2307966,
+      "earthRadiusScale": 14.1,
+      "radiusKm": 89831,
+      "axialTiltDegrees": 0,
+      "artTiltXDegrees": 0,
+      "oblateness": 0,
+      "yawOffsetDegrees": 0,
+      "artRollDegrees": 0,
+      "shaderFlags": {
+        "hasNightTexture": false,
+        "hasSpecularMap": false,
+        "hasClouds": false
+      },
+      "useSphereIntersect": false,
+      "ambientFactor": 0,
+      "lod": {
+        "diffuse": "",
+        "normal": "",
+        "specular": null,
+        "night": null,
+        "clouds": null
+      },
+      "meshPath": null,
+      "sceneOrbitRadius": 0,
+      "orbitPlane": "xz",
+      "initialAnomalyRad": 0,
+      "spinDegPerSimSecond": 0,
+      "keplerian": {
+        "aKm": 7779089.3,
+        "e": 0.0063,
+        "iDeg": 0,
+        "OmegaDeg": 0,
+        "omegaDeg": 0,
+        "M0Deg": 352.9437,
+        "nDegPerDay": 85.090358634,
+        "OmegaDotDegPerDay": 0,
+        "omegaDotDegPerDay": 0
+      },
+      "cloudLayer": {
+        "diffuse": null,
+        "normal": null,
+        "scaleFactor": 0,
+        "spinDegPerSimSecond": 0,
+        "ambientFactor": 0
+      },
+      "hasCloudLayer": false,
+      "hasRings": false,
+      "hasTerrain": false,
+      "terrainAttribution": null,
+      "procedural": {
+        "enabled": true,
+        "mode": 1,
+        "seed": 1,
+        "colors": [
+          [
+            0.09,
+            0.05,
+            0.04
+          ],
+          [
+            0.42,
+            0.2,
+            0.09
+          ],
+          [
+            0.85,
+            0.45,
+            0.18
+          ]
+        ],
+        "bands": 9,
+        "seaLevel": 0,
+        "polarCap": 0,
+        "emissive": 0.25,
+        "equilibriumTemperatureK": 1328.9
+      },
+      "placeFromElements": true
+    }
+  ],
+  "atmospheres": [],
+  "auroras": []
+}

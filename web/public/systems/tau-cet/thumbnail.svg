@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 160 72" width="160" height="72" role="img" aria-label="Tau Ceti">
+  <defs>
+    <radialGradient id="glow"><stop offset="0" stop-color="#ffeadb" stop-opacity="0.9"/><stop offset="1" stop-color="#ffeadb" stop-opacity="0"/></radialGradient>
+  </defs>
+  <rect width="160" height="72" fill="#05070d"/>
+  <line x1="30.75723427712822" y1="36" x2="154" y2="36" stroke="#ffffff" stroke-opacity="0.12" stroke-width="0.6"/>
+  <circle cx="16" cy="36" r="19.3" fill="url(#glow)"/>
+  <circle cx="16" cy="36" r="8.8" fill="#ffeadb"/>
+  <circle cx="34.8" cy="36" r="1.74" fill="#c4ad95"/>
+  <circle cx="64.9" cy="36" r="1.75" fill="#c4ad95"/>
+  <circle cx="150.0" cy="36" r="2.15" fill="#dadfe5"/>
+</svg>

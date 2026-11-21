@@ -18,12 +18,14 @@ void NotifySettingsChanged(const char* field) {
     }, field);
 }
 
-void NotifyLoadingProgress(int loaded, int total) {
+// `failed` is already counted in `loaded`: it says how many of the finished resources
+// fell back instead of arriving.
+void NotifyLoadingProgress(int loaded, int total, int failed) {
     EM_ASM({
         if (typeof Module['updateLoadingProgress'] === 'function') {
-            Module['updateLoadingProgress']($0, $1);
+            Module['updateLoadingProgress']($0, $1, $2);
         }
-    }, loaded, total);
+    }, loaded, total, failed);
 }
 
 void NotifyStreamingProgress(int completed, int total, int active, int tierCode) {
@@ -37,6 +39,15 @@ void NotifyStreamingProgress(int completed, int total, int active, int tierCode)
     }, completed, total, active, tierCode);
 }
 
+// 0–1 gain the music bed should apply for scene proximity; web/src/music.ts owns the device.
+void NotifyMusicDuck(float duck) {
+    EM_ASM({
+        if (typeof Module['onMusicDuck'] === 'function') {
+            Module['onMusicDuck']($0);
+        }
+    }, duck);
+}
+
 void NotifyPlanetFocused(int index) {
     EM_ASM({
         if (typeof Module['onPlanetFocused'] === 'function') {
@@ -44,5 +55,37 @@ void NotifyPlanetFocused(int index) {
         }
     }, index);
 }
+
+// Same numbering as GetNearestPlanetIndexForJs(); fired only when it changes.
+void NotifyNearestPlanetChanged(int jsIndex) {
+    EM_ASM({
+        if (typeof Module['onNearestPlanetChanged'] === 'function') {
+            Module['onNearestPlanetChanged']($0);
+        }
+    }, jsIndex);
+}
+
+// -1 when the mission follow stops.
+void NotifyMissionFocused(int index) {
+    EM_ASM({
+        if (typeof Module['onMissionFocused'] === 'function') {
+            Module['onMissionFocused']($0);
+        }
+    }, index);
+}
+
+// A star-system jump (Application::RequestSystemJump): phase 0 = started (fading out),
+// 1 = swapped (the new system is the scene: catalog, facts and focus indices changed),
+// 2 = finished (faded in), -1 = refused (unknown id).
+// EM_ASM bodies are JavaScript, and clang-format would split `===`.
+// clang-format off
+void NotifySystemChanged(const char* id, int phase) {
+    EM_ASM({
+        if (typeof Module['onSystemChanged'] === 'function') {
+            Module['onSystemChanged'](UTF8ToString($0), $1);
+        }
+    }, id, phase);
+}
+// clang-format on
 
 #endif

@@ -1,7 +1,7 @@
 #ifndef SOLARSYSTEM_ATMOSPHERE_MODEL_H
 #define SOLARSYSTEM_ATMOSPHERE_MODEL_H
 
-#include "BodyCatalog.generated.h"
+#include "BodyCatalog.h"
 
 #include <glm/glm.hpp>
 

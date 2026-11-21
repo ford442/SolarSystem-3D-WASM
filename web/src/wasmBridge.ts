@@ -9,14 +9,16 @@ import type {
 import type { NextConjunction } from './conjunction.js';
 import { parseObserveStateJson, type ObserveState } from './observe.js';
 import { parseSkyEventJson, type NextSkyEvent } from './skyEvents.js';
+import { parseSpaceWeatherJson, type SpaceWeatherState } from './spaceWeather.js';
 import { createCachedCwrapExports } from './wasmBridge.exports.js';
-import { clearWasmCallback, registerWasmCallbacks } from './wasmCallbacks.js';
+import { clearWasmCallback, emitWasmCallback, registerWasmCallbacks } from './wasmCallbacks.js';
 
 /**
- * Planet index conventions (FocusPlanet / GetFocusedPlanetIndex):
- * - 0 = Sun, 1 = Mercury … 9 = Pluto, 10 = Ceres, 11 = Vesta (matches deepLink PLANET_IDS).
- * GetNearestPlanetIndex returns 1–11 for the nearest loaded planet, or -1 when unknown
- * (C++ adds +1 offset via GetNearestPlanetIndexForJs).
+ * Planet index conventions (FocusPlanet / GetFocusedPlanetIndex): the focus index of every
+ * body is generated into ./generated/planetIds.ts (PLANET_IDS) from resource/systems/sol.catalog.json and
+ * matches OrbitLayout::Body — Sun=0 … Vesta=11 are frozen, then Eris … 1P/Halley.
+ * GetNearestPlanetIndex returns 1–MAX_PLANET_INDEX for the nearest loaded planet, or -1 when
+ * unknown (C++ adds +1 offset via GetNearestPlanetIndexForJs).
  */
 export type { PlanetIndex, QualityPreset, SettingsChangeField, ShadowQuality, OrbitScaleMode };
 export type { NextConjunction };
@@ -96,9 +98,77 @@ function parseFocusedMissionJson(json: string): FocusedMission {
     }
 }
 
+/** A row of the body catalog (GetBodyCatalogJson): the Sun is index 0, then every catalog body. */
+export interface BodyCatalogEntry {
+    index: number;
+    id: string;
+    name: string;
+    parent: string | null;
+    kind: 'star' | 'planet' | 'dwarf-planet' | 'satellite' | 'comet';
+    radiusKm: number;
+}
+
+/**
+ * Where everything is at the current date and scale (GetSceneStateJson): heliocentric scene
+ * positions in double, drawn radii, indexed by catalog index and mission index. A moon whose
+ * system has not loaded yet is null.
+ */
+export interface SceneStateSnapshot {
+    jd: number;
+    scale: OrbitScaleMode;
+    bodies: ([number, number, number, number] | null)[];
+    missions: ([number, number, number] | null)[];
+}
+
+const EMPTY_SCENE_STATE: SceneStateSnapshot = { jd: 0, scale: 0, bodies: [], missions: [] };
+
+/** A body's drawn surface along a direction from its centre (GetSurfaceJson). */
+export interface SurfacePoint {
+    /** Centre to surface, scene units. */
+    radius: number;
+    /** Outward unit normal of the facet there (the direction itself before the body loads). */
+    normal: [number, number, number];
+}
+
+function parseBodyCatalogJson(json: string): BodyCatalogEntry[] {
+    try {
+        const raw = JSON.parse(json) as unknown;
+        return Array.isArray(raw)
+            ? raw.filter(
+                  (entry): entry is BodyCatalogEntry =>
+                      typeof entry === 'object' &&
+                      entry !== null &&
+                      typeof (entry as BodyCatalogEntry).id === 'string' &&
+                      Number.isInteger((entry as BodyCatalogEntry).index),
+              )
+            : [];
+    } catch {
+        return [];
+    }
+}
+
+function parseSceneStateJson(json: string): SceneStateSnapshot {
+    // Read every frame of a timeline: C++ writes it, so trust the shape and skip a deep check.
+    try {
+        const raw = JSON.parse(json) as SceneStateSnapshot;
+        return Array.isArray(raw.bodies) && Array.isArray(raw.missions) ? raw : EMPTY_SCENE_STATE;
+    } catch {
+        return EMPTY_SCENE_STATE;
+    }
+}
+
+function parseSurfaceJson(json: string): SurfacePoint {
+    try {
+        const raw = JSON.parse(json) as SurfacePoint;
+        return typeof raw.radius === 'number' && Array.isArray(raw.normal) ? raw : { radius: 0, normal: [0, 1, 0] };
+    } catch {
+        return { radius: 0, normal: [0, 1, 0] };
+    }
+}
+
 /** Map quality preset + shadows toggle to C++ shadow quality (0=off, 1–3 = low…full). */
 export function shadowQualityForPreset(preset: QualityPreset, shadowsEnabled: boolean): ShadowQuality {
-    return shadowsEnabled ? (preset + 1) as ShadowQuality : 0;
+    return shadowsEnabled ? ((preset + 1) as ShadowQuality) : 0;
 }
 
 export interface CameraPose {
@@ -129,14 +199,20 @@ export interface SolarSystemRuntime {
     addTouchLook(deltaX: number, deltaY: number): void;
     addTouchZoom(delta: number): void;
     isMobileWeb(): boolean;
-    setMusicVolume(volume: number): void;
-    getMusicVolume(): number;
-    setMusicMuted(muted: boolean): void;
-    getMusicMuted(): boolean;
     focusPlanet(index: PlanetIndex): void;
+    /**
+     * Jump to a star system from systems/index.json (fade out, swap, fade in; see
+     * Module['onSystemChanged']). `focusIndex` picks the landing body, -1 the Earth-like
+     * planet. False for an id with no catalog.
+     */
+    loadStarSystem(id: string, focusIndex?: number): boolean;
+    /** The active system's id ("sol" unless a jump has happened). */
+    getActiveSystemId(): string;
+    /** True between a jump's start and the end of its fade-in. */
+    isSystemJumpActive(): boolean;
     setOrbitScaleMode(mode: OrbitScaleMode): void;
     getOrbitScaleMode(): OrbitScaleMode;
-    /** 1–11 nearest loaded planet, or -1. See planet index note above. */
+    /** 1–15 nearest loaded planet, or -1. See planet index note above. */
     getNearestPlanetIndex(): number;
     getFocusedPlanetIndex(): number;
     getPlanetSceneDistance(index: PlanetIndex): number;
@@ -152,6 +228,8 @@ export interface SolarSystemRuntime {
     setObserveFov(fovDeg: number): void;
     /** Simulated seconds per wall second while running (1 = real time). */
     setObserveTimeRate(rate: number): void;
+    /** Constellation stick figures over the star field. */
+    setObserveConstellations(visible: boolean): void;
     getObserveState(): ObserveState;
     focusMission(index: number): void;
     getFocusedMissionIndex(): number;
@@ -164,6 +242,19 @@ export interface SolarSystemRuntime {
     getMagneticFields(): boolean;
     setMagneticFieldMode(enabled: boolean): void;
     getMagneticFieldMode(): boolean;
+    /** The solar-wind particles (space weather, ARCHITECTURE §13); the auroras draw either way. */
+    setSolarWind(enabled: boolean): void;
+    getSolarWind(): boolean;
+    /** < 0: Kp from the wind; 0–9 holds every auroral oval at that Kp. */
+    setKpOverride(kp: number): void;
+    getKpOverride(): number;
+    /** An Earth-directed CME leaving the Sun now (turns the wind on). */
+    launchCmeNow(): void;
+    /** Play catalog event `index` from its launch, slowed so the pulse is seen; false if out of range. */
+    playSpaceWeatherEvent(index: number): boolean;
+    /** Set the date to an ISO-8601 UTC instant (`&cme=`) with the wind on; false if it does not parse. */
+    jumpToSpaceWeatherDate(isoUtc: string): boolean;
+    getSpaceWeather(): SpaceWeatherState;
     setXrSessionActive(active: boolean): void;
     setXrBaseLayerFramebuffer(framebuffer: number): void;
     /**
@@ -179,7 +270,46 @@ export interface SolarSystemRuntime {
     getCameraPosition(): { x: number; y: number; z: number };
     getCameraYaw(): number;
     getCameraPitch(): number;
-    setXrControllerRay(hand: number, ox: number, oy: number, oz: number, dx: number, dy: number, dz: number, visible: boolean): void;
+    setXrControllerRay(
+        hand: number,
+        ox: number,
+        oy: number,
+        oz: number,
+        dx: number,
+        dy: number,
+        dz: number,
+        visible: boolean,
+    ): void;
+    /** Roll about the view direction, degrees (timelines only; 0 restores the level camera). */
+    setCameraRoll(rollDeg: number): void;
+    getCameraRoll(): number;
+    /** Vertical field of view, degrees, clamped to the fly camera's 1–45. */
+    setCameraFov(fovDeg: number): void;
+    getCameraFov(): number;
+    /** Move the date as the clock would (spins turn with it), without a settings notification. */
+    advanceSimulationTo(julianDate: number): void;
+    getBodyCatalog(): BodyCatalogEntry[];
+    getSceneState(): SceneStateSnapshot;
+    /** A body's drawn surface along a world direction: the facet once loaded, its sphere before. */
+    getSurface(bodyIndex: number, dx: number, dy: number, dz: number): SurfacePoint;
+    /** Start downloading the system a body belongs to, without moving the camera. */
+    preloadBodySystem(bodyIndex: number): void;
+    getPendingAssetCount(): number;
+    /** Text overlays: bit 0 hints, bit 1 planet/star distances, bit 2 moon distances, bit 3 staging labels. */
+    setHudOverlays(mask: number): void;
+    getHudOverlays(): number;
+    /** Stop the browser main loop and draw only on stepCaptureFrame, at width × height (0 = canvas). */
+    beginCapture(width: number, height: number): boolean;
+    stepCaptureFrame(deltaSeconds: number): void;
+    endCapture(): void;
+    /** The last frame's profile as JSON (core/FrameProfile.h); perfHud.ts parses it. */
+    getFrameStatsJson(): string;
+    /** GPU stage timers, when the context has EXT_disjoint_timer_query_webgl2. */
+    setGpuTimersEnabled(enabled: boolean): void;
+    /** Files the live shader programs were built from (MEMFS paths); dev reload only. */
+    getShaderSourceFiles(): string[];
+    /** Rebuild the programs whose files changed in MEMFS; returns how many. Dev reload only. */
+    reloadChangedShaders(): number;
 }
 
 let activeRuntime: SolarSystemRuntime | null = null;
@@ -195,10 +325,12 @@ export function createSolarSystemRuntime(instance: SolarSystemModule): SolarSyst
         heapF32: instance.HEAPF32,
 
         setCameraPose: exports.setCameraPose,
+        // Heliocentric, in double, the frame setCameraPose takes. getCameraPosition below is
+        // the render frame (relative to the render origin) that WebXR composes eye views in.
         getCameraPose: () => ({
-            x: exports.getCameraPositionX(),
-            y: exports.getCameraPositionY(),
-            z: exports.getCameraPositionZ(),
+            x: exports.getCameraHeliocentricX(),
+            y: exports.getCameraHeliocentricY(),
+            z: exports.getCameraHeliocentricZ(),
             yaw: exports.getCameraYaw(),
             pitch: exports.getCameraPitch(),
         }),
@@ -216,12 +348,15 @@ export function createSolarSystemRuntime(instance: SolarSystemModule): SolarSyst
         addTouchLook: exports.addTouchLook,
         addTouchZoom: exports.addTouchZoom,
         isMobileWeb: () => exports.isMobileWeb() !== 0,
-        setMusicVolume: exports.setMusicVolume,
-        getMusicVolume: exports.getMusicVolume,
-        setMusicMuted: (muted) => exports.setMusicMuted(muted ? 1 : 0),
-        getMusicMuted: () => exports.getMusicMuted() !== 0,
         focusPlanet: (index) => exports.focusPlanet(index),
-        setOrbitScaleMode: (mode) => exports.setOrbitScaleMode(mode),
+        loadStarSystem: (id, focusIndex = -1) => exports.loadStarSystem(id, focusIndex) !== 0,
+        getActiveSystemId: () => exports.getActiveSystemId(),
+        isSystemJumpActive: () => exports.isSystemJumpActive() !== 0,
+        setOrbitScaleMode: (mode) => {
+            exports.setOrbitScaleMode(mode);
+            // Only JS ever changes the scale mode, so the event is raised here rather than in C++.
+            emitWasmCallback('onSettingsChanged', 'orbitScaleMode');
+        },
         getOrbitScaleMode: () => exports.getOrbitScaleMode() as OrbitScaleMode,
         getNearestPlanetIndex: exports.getNearestPlanetIndex,
         getFocusedPlanetIndex: exports.getFocusedPlanetIndex,
@@ -246,11 +381,19 @@ export function createSolarSystemRuntime(instance: SolarSystemModule): SolarSyst
         setObserveView: (azimuthDeg, elevationDeg) => exports.setObserveView(azimuthDeg, elevationDeg),
         setObserveFov: (fovDeg) => exports.setObserveFov(fovDeg),
         setObserveTimeRate: (rate) => exports.setObserveTimeRate(rate),
+        setObserveConstellations: (visible) => exports.setObserveConstellations(visible ? 1 : 0),
         getObserveState: () => parseObserveStateJson(exports.getObserveStateJson()),
-        focusMission: (index) => exports.focusMission(index),
+        focusMission: (index) => {
+            exports.focusMission(index);
+            emitWasmCallback('onMissionFocused', exports.getFocusedMissionIndex());
+        },
         getFocusedMissionIndex: exports.getFocusedMissionIndex,
         getMissionCount: exports.getMissionCount,
         getMissionCatalog: () => parseMissionCatalogJson(exports.getMissionCatalogJson()),
+        getFrameStatsJson: () => exports.getFrameStatsJson(),
+        setGpuTimersEnabled: (enabled) => {
+            exports.setGpuTimersEnabled(enabled ? 1 : 0);
+        },
         getFocusedMission: () => parseFocusedMissionJson(exports.getFocusedMissionJson()),
         setOrbitLines: (enabled) => exports.setOrbitLines(enabled ? 1 : 0),
         getOrbitLines: () => exports.getOrbitLines() !== 0,
@@ -258,6 +401,14 @@ export function createSolarSystemRuntime(instance: SolarSystemModule): SolarSyst
         getMagneticFields: () => exports.getMagneticFields() !== 0,
         setMagneticFieldMode: (enabled) => exports.setMagneticFieldMode(enabled ? 1 : 0),
         getMagneticFieldMode: () => exports.getMagneticFieldMode() !== 0,
+        setSolarWind: (enabled) => exports.setSolarWind(enabled ? 1 : 0),
+        getSolarWind: () => exports.getSolarWind() !== 0,
+        setKpOverride: (kp) => exports.setKpOverride(kp),
+        getKpOverride: () => exports.getKpOverride(),
+        launchCmeNow: () => exports.launchCmeNow(),
+        playSpaceWeatherEvent: (index) => exports.playSpaceWeatherEvent(index) !== 0,
+        jumpToSpaceWeatherDate: (isoUtc) => exports.jumpToSpaceWeatherDate(isoUtc) !== 0,
+        getSpaceWeather: () => parseSpaceWeatherJson(exports.getSpaceWeatherJson()),
         setXrSessionActive: (active) => exports.setXrSessionActive(active ? 1 : 0),
         setXrBaseLayerFramebuffer: exports.setXrBaseLayerFramebuffer,
         registerXrFramebuffer: (framebuffer) => {
@@ -292,6 +443,27 @@ export function createSolarSystemRuntime(instance: SolarSystemModule): SolarSyst
         setXrControllerRay: (hand, ox, oy, oz, dx, dy, dz, visible) => {
             exports.setXrControllerRay(hand, ox, oy, oz, dx, dy, dz, visible ? 1 : 0);
         },
+        setCameraRoll: exports.setCameraRoll,
+        getCameraRoll: exports.getCameraRoll,
+        setCameraFov: exports.setCameraFov,
+        getCameraFov: exports.getCameraFov,
+        advanceSimulationTo: exports.advanceSimulationTo,
+        getBodyCatalog: () => parseBodyCatalogJson(exports.getBodyCatalogJson()),
+        getSceneState: () => parseSceneStateJson(exports.getSceneStateJson()),
+        getSurface: (bodyIndex, dx, dy, dz) => parseSurfaceJson(exports.getSurfaceJson(bodyIndex, dx, dy, dz)),
+        preloadBodySystem: exports.preloadBodySystem,
+        getPendingAssetCount: exports.getPendingAssetCount,
+        setHudOverlays: exports.setHudOverlays,
+        getHudOverlays: exports.getHudOverlays,
+        beginCapture: (width, height) => exports.beginCapture(width, height) !== 0,
+        stepCaptureFrame: exports.stepCaptureFrame,
+        endCapture: exports.endCapture,
+        getShaderSourceFiles: () =>
+            exports
+                .getShaderSourceFiles()
+                .split('\n')
+                .filter((path) => path.length > 0),
+        reloadChangedShaders: exports.reloadShaders,
     };
 
     activeRuntime = runtime;
@@ -311,9 +483,7 @@ export function exposeConsoleHelpers(runtime: SolarSystemRuntime): void {
     window.getObserveState = runtime.getObserveState.bind(runtime);
 }
 
-export function subscribeSettingsChanges(
-    handler: (field: SettingsChangeField) => void,
-): () => void {
+export function subscribeSettingsChanges(handler: (field: SettingsChangeField) => void): () => void {
     const wrapped = (field: string) => handler(field as SettingsChangeField);
     registerWasmCallbacks({ onSettingsChanged: wrapped });
     return () => {

@@ -1,0 +1,171 @@
+/**
+ * `?perf=1`: a small overlay with the last frame's profile from C++ (core/FrameProfile.h via
+ * GetFrameStatsJson): frame time and the worst frame since the previous read, CPU and GPU
+ * milliseconds per frame stage, the job pool and the texture-upload pump. Turning it on also
+ * turns on the GPU stage timers (EXT_disjoint_timer_query_webgl2; browsers that withhold the
+ * extension show "n/a" in that column).
+ *
+ * The parsed stats are also on `window.__solarSystemPerf` for scripts (Playwright reads the
+ * slow-frame count from there).
+ */
+import type { SolarSystemRuntime } from './wasmBridge.js';
+
+export const FRAME_STAGES = [
+    'update',
+    'background',
+    'shadow',
+    'scene',
+    'foreground',
+    'hud',
+    'uploads',
+    'spaceWeather',
+] as const;
+export type FrameStage = (typeof FRAME_STAGES)[number];
+export type StageTimes = Record<FrameStage, number>;
+
+export interface FrameStats {
+    frameMs: number;
+    /** Worst frame since the previous GetFrameStatsJson read. */
+    worstFrameMs: number;
+    frames: number;
+    /** Frames over 33.4 ms since start. */
+    slowFrames: number;
+    cpu: StageTimes;
+    gpuSupported: boolean;
+    /** Null until a frame's timer queries have been read back (or with no timer extension). */
+    gpu: StageTimes | null;
+    jobs: { workers: number; queued: number; inFlight: number; completed: number };
+    uploads: { bytes: number; pending: number };
+    uniformCalls: number;
+}
+
+function num(value: unknown): number {
+    return typeof value === 'number' && Number.isFinite(value) ? value : 0;
+}
+
+function record(value: unknown): Record<string, unknown> | null {
+    return typeof value === 'object' && value !== null && !Array.isArray(value)
+        ? (value as Record<string, unknown>)
+        : null;
+}
+
+function stageTimes(value: unknown): StageTimes | null {
+    const raw = record(value);
+    if (!raw) {
+        return null;
+    }
+    const out = {} as StageTimes;
+    for (const stage of FRAME_STAGES) {
+        out[stage] = num(raw[stage]);
+    }
+    return out;
+}
+
+/** GetFrameStatsJson's text, or null for "{}" (no application yet) and anything malformed. */
+export function parseFrameStats(json: string): FrameStats | null {
+    let raw: Record<string, unknown> | null;
+    try {
+        raw = record(JSON.parse(json));
+    } catch {
+        return null;
+    }
+    const cpu = raw ? stageTimes(raw.cpu) : null;
+    if (!raw || !cpu) {
+        return null;
+    }
+    const jobs = record(raw.jobs) ?? {};
+    const uploads = record(raw.uploads) ?? {};
+    return {
+        frameMs: num(raw.frameMs),
+        worstFrameMs: num(raw.worstFrameMs),
+        frames: num(raw.frames),
+        slowFrames: num(raw.slowFrames),
+        cpu,
+        gpuSupported: raw.gpuSupported === true,
+        gpu: stageTimes(raw.gpu),
+        jobs: {
+            workers: num(jobs.workers),
+            queued: num(jobs.queued),
+            inFlight: num(jobs.inFlight),
+            completed: num(jobs.completed),
+        },
+        uploads: { bytes: num(uploads.bytes), pending: num(uploads.pending) },
+        uniformCalls: num(raw.uniformCalls),
+    };
+}
+
+/** One right-aligned column: wide enough for a software rasteriser's 1000+ ms with a gap. */
+function ms(value: number): string {
+    return value.toFixed(2).padStart(9);
+}
+
+function kib(bytes: number): string {
+    return bytes >= 1024 * 1024 ? `${(bytes / (1024 * 1024)).toFixed(1)} MB` : `${Math.round(bytes / 1024)} KB`;
+}
+
+/** The overlay's text: one row per stage, then the totals. */
+export function formatFrameStats(stats: FrameStats): string {
+    const gpuLabel = stats.gpu ? 'gpu'.padStart(9) : stats.gpuSupported ? '   gpu…' : '   gpu n/a';
+    const lines = [
+        `frame ${stats.frameMs.toFixed(1)} ms  worst ${stats.worstFrameMs.toFixed(1)} ms`,
+        `slow (>33 ms) ${String(stats.slowFrames)} / ${String(stats.frames)}`,
+        `${'stage'.padEnd(11)}${'cpu'.padStart(9)}${gpuLabel}`,
+    ];
+    let cpuTotal = 0;
+    let gpuTotal = 0;
+    for (const stage of FRAME_STAGES) {
+        cpuTotal += stats.cpu[stage];
+        gpuTotal += stats.gpu?.[stage] ?? 0;
+        lines.push(`${stage.padEnd(11)}${ms(stats.cpu[stage])}${stats.gpu ? ms(stats.gpu[stage]) : ''}`);
+    }
+    lines.push(`${'total'.padEnd(11)}${ms(cpuTotal)}${stats.gpu ? ms(gpuTotal) : ''}`);
+    const { workers, queued, inFlight } = stats.jobs;
+    lines.push(
+        workers > 0
+            ? `jobs ${String(workers)} workers, ${String(queued)} queued, ${String(inFlight)} running`
+            : 'jobs inline (no workers)',
+    );
+    lines.push(`uploads ${kib(stats.uploads.bytes)} this frame, ${String(stats.uploads.pending)} pending`);
+    return lines.join('\n');
+}
+
+export function perfHudRequested(search: string): boolean {
+    const value = new URLSearchParams(search).get('perf');
+    return value !== null && value !== '0' && value !== 'false';
+}
+
+declare global {
+    interface Window {
+        __solarSystemPerf?: { latest: () => FrameStats | null };
+    }
+}
+
+/** How often the overlay reads C++; the worst-frame column covers everything in between. */
+const REFRESH_MS = 250;
+
+export function installPerfHud(runtime: SolarSystemRuntime, doc: Document = document): () => void {
+    runtime.setGpuTimersEnabled(true);
+    const panel = doc.createElement('pre');
+    panel.id = 'perf-hud';
+    panel.setAttribute('aria-live', 'off');
+    panel.textContent = 'perf: waiting for the first frame…';
+    doc.body.appendChild(panel);
+
+    let latest: FrameStats | null = null;
+    window.__solarSystemPerf = { latest: () => latest };
+    const timer = window.setInterval(() => {
+        const stats = parseFrameStats(runtime.getFrameStatsJson());
+        if (stats) {
+            latest = stats;
+            panel.textContent = formatFrameStats(stats);
+            panel.classList.toggle('is-slow', stats.worstFrameMs > 33.4);
+        }
+    }, REFRESH_MS);
+
+    return () => {
+        window.clearInterval(timer);
+        runtime.setGpuTimersEnabled(false);
+        panel.remove();
+        delete window.__solarSystemPerf;
+    };
+}

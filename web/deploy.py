@@ -20,7 +20,10 @@ PROJECT_ROOT = WEB_DIR.parent
 DEFAULT_APP_SOURCE = WEB_DIR / "dist"
 DEFAULT_ASSET_SOURCE = PROJECT_ROOT / "resource"
 DEFAULT_MANIFEST = DEFAULT_ASSET_SOURCE / "asset-manifest.json"
-ASSET_DIRECTORIES = ("textures", "textures_low", "textures_mid", "sounds")
+ASSET_DIRECTORIES = ("textures", "textures_low", "textures_mid", "sounds", "terrain")
+# Uploaded when present: sounds are Git LFS, and terrain/ is what scripts/bake-terrain-tiles.py
+# wrote (a body without its tiles stays the sphere).
+OPTIONAL_DIRECTORIES = ("sounds", "terrain")
 
 
 def env(name: str, default: str | None = None) -> str | None:
@@ -178,7 +181,7 @@ def upload_assets(
     for directory in ASSET_DIRECTORIES:
         local_directory = asset_root / directory
         if not local_directory.is_dir():
-            if directory == "sounds":
+            if directory in OPTIONAL_DIRECTORIES:
                 print(f"Skipping optional asset directory: {local_directory}")
                 continue
             raise FileNotFoundError(f"Required asset directory does not exist: {local_directory}")

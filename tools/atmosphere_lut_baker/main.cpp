@@ -2,8 +2,8 @@
 //
 //   atmosphere_lut_baker [--out resource/atmosphere] [--body earth] [--check]
 //
-// For every catalog atmosphere with a `physical` block (BodyCatalog::kAtmospheres, compiled
-// in from planets.catalog.json) writes <out>/<id>_transmittance.ktx2 and
+// For every catalog atmosphere with a `physical` block (BodyCatalog::kSolAtmospheres, compiled
+// in from resource/systems/sol.catalog.json) writes <out>/<id>_transmittance.ktx2 and
 // <out>/<id>_multiscatter.ktx2 as RGBA16F KTX2 with the parameter hash in the key/value
 // data. --check re-bakes in memory and fails if a committed file is missing, was baked
 // from different parameters, or differs beyond half-float rounding — CI runs it as the
@@ -116,7 +116,7 @@ int main(int argc, char** argv) {
 
     int failures = 0;
     int baked = 0;
-    for (const BodyCatalog::AtmosphereRow& row : BodyCatalog::kAtmospheres) {
+    for (const BodyCatalog::AtmosphereRow& row : BodyCatalog::kSolAtmospheres) {
         if (!row.physical.enabled || (!onlyBody.empty() && onlyBody != row.bodyId)) {
             continue;
         }

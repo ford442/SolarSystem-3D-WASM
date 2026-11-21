@@ -1,7 +1,53 @@
-import { copyShareableLink, type DeepLinkViewState } from './deepLink.js';
-import { isoDateFromJulianDate } from './ephemeris.js';
+import { copyShareableLink, runtimeLinkReaders, type DeepLinkViewState } from './deepLink.js';
+import { getClipboard } from './dom.js';
+import { stormCard } from './spaceWeather.js';
 import { createTourPlayer, loadTour, type TourPlayer } from './tourPlayer.js';
 import type { SolarSystemRuntime } from './wasmBridge.js';
+import { registerWasmCallbacks } from './wasmCallbacks.js';
+
+/**
+ * The storm card (space weather, ARCHITECTURE §13): while Earth is in a geomagnetic storm or a
+ * CME is on its way there, what the wind is doing, in GetSpaceWeatherJson's numbers. Polled:
+ * the storm comes and goes with the simulated date, which nothing signals.
+ */
+export function initStormCard(options: {
+    runtime: SolarSystemRuntime;
+    card: HTMLElement;
+    title: HTMLElement;
+    lines: HTMLElement;
+    intervalMs?: number;
+}): { refresh: () => void } {
+    const { runtime, card, title, lines } = options;
+    let shown = '';
+    const refresh = (): void => {
+        const content = stormCard(runtime.getSpaceWeather());
+        card.hidden = content === null;
+        if (!content) {
+            shown = '';
+            return;
+        }
+        const key = content.title + content.lines.join('\n');
+        if (key === shown) {
+            return;
+        }
+        shown = key;
+        title.textContent = content.title;
+        lines.replaceChildren(
+            ...content.lines.map((line) => {
+                const item = document.createElement('li');
+                item.textContent = line;
+                return item;
+            }),
+        );
+    };
+    window.setInterval(() => {
+        if (!document.hidden) {
+            refresh();
+        }
+    }, options.intervalMs ?? 500);
+    refresh();
+    return { refresh };
+}
 
 export function initEducationalLayer(options: {
     runtime: SolarSystemRuntime;
@@ -40,10 +86,6 @@ export function initEducationalLayer(options: {
         if (catalog.length === 0) {
             return;
         }
-        if (missionList.childElementCount === catalog.length) {
-            highlightMission(runtime.getFocusedMissionIndex());
-            return;
-        }
         missionList.replaceChildren();
         for (const mission of catalog) {
             const button = document.createElement('button');
@@ -70,10 +112,14 @@ export function initEducationalLayer(options: {
         }
     };
 
+    // The catalog is parsed from the .data preload before main() returns (Application::InitScene),
+    // so one render is enough; afterwards only the highlight moves, on focus events. Focusing a
+    // planet ends mission follow, hence the onPlanetFocused re-read.
     renderMissionList();
-    window.setInterval(() => {
-        renderMissionList();
-    }, 750);
+    registerWasmCallbacks({
+        onMissionFocused: (index: number) => highlightMission(index),
+        onPlanetFocused: () => highlightMission(runtime.getFocusedMissionIndex()),
+    });
 
     const player = createTourPlayer({
         runtime,
@@ -101,17 +147,19 @@ export function initEducationalLayer(options: {
     };
 
     tourPlay.addEventListener('click', () => {
-        void loadTour('inner-system').then((tour) => {
-            if (!tour) {
+        void loadTour('inner-system')
+            .then((tour) => {
+                if (!tour) {
+                    settingsStatus.textContent = 'Could not load tour';
+                    return;
+                }
+                player.play(tour, 0);
+                setTourPlaying(true);
+            })
+            .catch((error: unknown) => {
+                console.warn('[Tour] load failed:', error);
                 settingsStatus.textContent = 'Could not load tour';
-                return;
-            }
-            player.play(tour, 0);
-            setTourPlaying(true);
-        }).catch((error: unknown) => {
-            console.warn('[Tour] load failed:', error);
-            settingsStatus.textContent = 'Could not load tour';
-        });
+            });
     });
 
     tourStop.addEventListener('click', () => {
@@ -122,34 +170,24 @@ export function initEducationalLayer(options: {
     tourCopyStep.addEventListener('click', () => {
         const tour = player.currentTour();
         const step = player.currentStepIndex();
-        void copyShareableLink({
-            getQualityPreset: () => runtime.getQualityPreset(),
-            getTimeScale: () => runtime.getTimeScale(),
-            getPaused: () => runtime.getPaused(),
-            getSimulationEpoch: () => runtime.getSimulationEpoch(),
-            getOrbitScaleMode: () => runtime.getOrbitScaleMode(),
-            getShadowQuality: () => runtime.getShadowQuality(),
-            getOrbitLines: () => runtime.getOrbitLines(),
-            getMagneticFields: () => runtime.getMagneticFields(),
-            getFocusedPlanetIndex: () => runtime.getFocusedPlanetIndex(),
-            getFocusedMission: () => runtime.getFocusedMission(),
-            getCameraPose: () => runtime.getCameraPose(),
-            isoDateFromJulianDate,
-        }).then((link) => {
-            const url = new URL(link);
-            if (tour) {
-                url.searchParams.set('tour', tour.id);
-                if (step >= 0) {
-                    url.searchParams.set('step', String(step));
+        void copyShareableLink(runtimeLinkReaders(runtime, { getObserveState: undefined }))
+            .then((link) => {
+                const url = new URL(link);
+                if (tour) {
+                    url.searchParams.set('tour', tour.id);
+                    if (step >= 0) {
+                        url.searchParams.set('step', String(step));
+                    }
                 }
-            }
-            return navigator.clipboard?.writeText(url.toString()) ?? Promise.resolve();
-        }).then(() => {
-            settingsStatus.textContent = 'Tour step link copied';
-        }).catch((error: unknown) => {
-            console.warn('[Tour] copy failed:', error);
-            settingsStatus.textContent = 'Could not copy tour step';
-        });
+                return getClipboard()?.writeText(url.toString()) ?? Promise.resolve();
+            })
+            .then(() => {
+                settingsStatus.textContent = 'Tour step link copied';
+            })
+            .catch((error: unknown) => {
+                console.warn('[Tour] copy failed:', error);
+                settingsStatus.textContent = 'Could not copy tour step';
+            });
     });
 
     window.startTour = (id = 'inner-system') => {

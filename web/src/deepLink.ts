@@ -1,4 +1,9 @@
-import type { OrbitScaleMode, PlanetIndex, QualityPreset } from './SolarSystem.js';
+import type { OrbitScaleMode, QualityPreset } from './SolarSystem.js';
+import { getClipboard } from './dom.js';
+import { isoDateFromJulianDate } from './ephemeris.js';
+import { systemBodyLinkNameInActiveIndex } from './systemPicker.js';
+import type { SolarSystemRuntime } from './wasmBridge.js';
+import { MAX_PLANET_INDEX, PLANET_ID_BY_INDEX, PLANET_IDS, type PlanetIndex } from './generated/planetIds.js';
 
 export interface DeepLinkViewState {
     quality?: QualityPreset;
@@ -11,10 +16,25 @@ export interface DeepLinkViewState {
     shadows?: boolean;
     orbitLines?: boolean;
     magneticFields?: boolean;
+    /** `?wind=`: the solar-wind particles (space weather, ARCHITECTURE §13). */
+    solarWind?: boolean;
+    /** `?kp=`: hold every auroral oval at this Kp (0–9). */
+    kp?: number;
+    /** `?cme=2003-10-29T06:00Z`: start at that UTC instant with the wind on (C++ parses it). */
+    cme?: string;
+    /**
+     * `?system=`: a star system from systems/index.json other than Sol. C++ reads it (and its
+     * `planet=`, a letter like `e`) before the scene is built, so `planet` here stays Sol's.
+     */
+    system?: string;
     planet?: PlanetIndex;
     mission?: string;
     tour?: string;
     tourStep?: number;
+    /** `?timeline=`: a shipped cinematic id (public/timelines/<id>.json) or an http(s) URL of one. */
+    timeline?: string;
+    /** `?tt=`: seconds into the timeline to start from. */
+    timelineTime?: number;
     /** `?mode=observe` opens straight into Observe mode (camera on Earth). */
     mode?: 'explore' | 'observe';
     /** Observe-mode site, view, field of view and time rate (`lat`, `lon`, `az`, `el`, `fov`, `rate`). */
@@ -56,7 +76,14 @@ export interface DeepLinkRuntimeReaders {
     getShadowQuality?: () => number;
     getOrbitLines?: () => boolean;
     getMagneticFields?: () => boolean;
+    getSolarWind?: () => boolean;
+    /** < 0 when Kp follows the wind (then no `kp=`). */
+    getKpOverride?: () => number;
     getFocusedPlanetIndex?: () => number;
+    /** The active star system ("sol" when absent). */
+    getActiveSystemId?: () => string;
+    /** Outside Sol: the `planet=` name of a focus index (systemPicker.ts systemBodyLinkName). */
+    getSystemBodyLinkName?: (index: number) => string | undefined;
     getFocusedMission?: () => { valid: boolean; id: string } | null;
     getCameraPosition?: () => { x: number; y: number; z: number };
     getCameraYaw?: () => number;
@@ -70,25 +97,6 @@ export interface DeepLinkRuntimeReaders {
     };
     isoDateFromJulianDate?: (jd: number) => string;
 }
-
-const PLANET_IDS: Record<string, PlanetIndex> = {
-    sun: 0,
-    mercury: 1,
-    venus: 2,
-    earth: 3,
-    mars: 4,
-    jupiter: 5,
-    saturn: 6,
-    uranus: 7,
-    neptune: 8,
-    pluto: 9,
-    ceres: 10,
-    vesta: 11,
-};
-
-const PLANET_ID_BY_INDEX = Object.fromEntries(
-    Object.entries(PLANET_IDS).map(([id, index]) => [index, id]),
-) as Record<PlanetIndex, string>;
 
 function parseFiniteNumber(value: string | null): number | undefined {
     if (!value) return undefined;
@@ -122,11 +130,12 @@ function parseQuality(value: string | null): QualityPreset | undefined {
 function parsePlanetIndex(value: string | null): PlanetIndex | undefined {
     if (!value) return undefined;
     const normalized = value.toLowerCase();
-    if (normalized in PLANET_IDS) {
-        return PLANET_IDS[normalized];
+    // Own keys only: `'constructor' in PLANET_IDS` is true for a plain object.
+    if (Object.hasOwn(PLANET_IDS, normalized)) {
+        return PLANET_IDS[normalized as keyof typeof PLANET_IDS];
     }
     const asNumber = Number(value);
-    if (Number.isInteger(asNumber) && asNumber >= 0 && asNumber <= 11) {
+    if (Number.isInteger(asNumber) && asNumber >= 0 && asNumber <= MAX_PLANET_INDEX) {
         return asNumber as PlanetIndex;
     }
     return undefined;
@@ -142,6 +151,19 @@ function parseOrbitScale(value: string | null): OrbitScaleMode | undefined {
     return undefined;
 }
 
+/** 0–9 in steps of 0.1. */
+function parseKp(value: string | null): number | undefined {
+    const kp = parseFiniteNumber(value);
+    return kp !== undefined && kp >= 0 && kp <= 9 ? Math.round(kp * 10) / 10 : undefined;
+}
+
+/** An ISO-8601 UTC date or instant (SpaceWeather::ParseIsoUtc's forms); C++ does the parsing. */
+function parseCmeInstant(value: string | null): string | undefined {
+    if (!value) return undefined;
+    const trimmed = value.trim();
+    return /^\d{4}-\d{2}-\d{2}(T\d{2}:\d{2}(:\d{2}(\.\d{1,3})?)?Z?)?$/.test(trimmed) ? trimmed : undefined;
+}
+
 function parseSimulationDate(value: string | null): string | undefined {
     if (!value) return undefined;
     return /^\d{4}-\d{2}-\d{2}$/.test(value) ? value : undefined;
@@ -155,6 +177,26 @@ function parseMissionId(value: string | null): string | undefined {
 
 function parseTourId(value: string | null): string | undefined {
     return parseMissionId(value);
+}
+
+/** A timeline id like a tour's, or a URL; timelinePlayer.ts resolves it and the page fetches only http(s). */
+function parseTimelineSource(value: string | null): string | undefined {
+    if (!value || value.length > 2048) return undefined;
+    const trimmed = value.trim();
+    if (/^[a-z][a-z0-9-]{0,47}$/.test(trimmed)) return trimmed;
+    try {
+        const url = new URL(trimmed, window.location.href);
+        return url.protocol === 'https:' || url.protocol === 'http:' ? trimmed : undefined;
+    } catch {
+        return undefined;
+    }
+}
+
+/** Same rule as StarSystemCatalog::IsValidId; "sol" reads as no system (the default). */
+function parseSystemId(value: string | null): string | undefined {
+    if (!value) return undefined;
+    const normalized = value.toLowerCase();
+    return /^[a-z0-9-]{1,48}$/.test(normalized) && normalized !== 'sol' ? normalized : undefined;
 }
 
 function parseMode(value: string | null): 'explore' | 'observe' | undefined {
@@ -175,7 +217,7 @@ function parseObserver(params: URLSearchParams): DeepLinkObserver | undefined {
         lon: lon !== undefined && lon >= -360 && lon <= 360 ? lon : undefined,
         az,
         el: el !== undefined && el >= -90 && el <= 90 ? el : undefined,
-        fov: fov !== undefined && fov >= 1 && fov <= 120 ? fov : undefined,
+        fov: fov !== undefined && fov >= 0.25 && fov <= 120 ? fov : undefined,
         rate: rate !== undefined && rate >= 0 && rate <= 1e7 ? rate : undefined,
     };
     return Object.values(observer).some((value) => value !== undefined) ? observer : undefined;
@@ -185,8 +227,26 @@ function roundCoord(value: number): number {
     return Math.round(value * 100) / 100;
 }
 
+/**
+ * Camera coordinates. Realistic scale is true scale and the camera can stand a metre above
+ * the ground, so it keeps 1e-9 scene units (8 cm; a metre is 1.3e-8 units). setCameraPose
+ * takes doubles, and 1e-9 of a coordinate in the thousands is still well inside a double's
+ * 15 significant digits, so the round trip is exact to that.
+ */
+function roundPosition(value: number, orbitScale: OrbitScaleMode | undefined): number {
+    if (orbitScale === 1) {
+        return Math.round(value * 1e9) / 1e9;
+    }
+    return roundCoord(value);
+}
+
 function roundAngle(value: number): number {
     return Math.round(value * 10) / 10;
+}
+
+/** Observe angles keep 0.01°: a 0.25° telescope field would lose its target at 0.1°. */
+function roundSkyAngle(value: number): number {
+    return Math.round(value * 100) / 100;
 }
 
 /** Parse shareable view state from the current page URL. */
@@ -201,10 +261,18 @@ export function parseDeepLinkFromUrl(search = window.location.search): DeepLinkV
     const shadows = parseBooleanParam(params.get('shadows'));
     const orbitLines = parseBooleanParam(params.get('orbits') ?? params.get('orbitLines'));
     const magneticFields = parseBooleanParam(params.get('fields') ?? params.get('magneticFields'));
-    const planet = parsePlanetIndex(params.get('planet') ?? params.get('focus'));
+    const solarWind = parseBooleanParam(params.get('wind'));
+    const kp = parseKp(params.get('kp'));
+    const cme = parseCmeInstant(params.get('cme'));
+    const system = parseSystemId(params.get('system'));
+    // In another system `planet=e` names one of its bodies, which C++ resolves; a Sol index
+    // parsed from it would focus the wrong body.
+    const planet = system ? undefined : parsePlanetIndex(params.get('planet') ?? params.get('focus'));
     const mission = parseMissionId(params.get('mission') ?? params.get('probe'));
     const tour = parseTourId(params.get('tour'));
     const tourStep = parseFiniteNumber(params.get('step'));
+    const timeline = parseTimelineSource(params.get('timeline'));
+    const timelineTime = parseFiniteNumber(params.get('tt'));
     const mode = parseMode(params.get('mode'));
     const observer = parseObserver(params);
 
@@ -213,10 +281,10 @@ export function parseDeepLinkFromUrl(search = window.location.search): DeepLinkV
     const z = parseFiniteNumber(params.get('z'));
     const yaw = parseFiniteNumber(params.get('yaw'));
     const pitch = parseFiniteNumber(params.get('pitch'));
-    const camera = x !== undefined && y !== undefined && z !== undefined
-        && yaw !== undefined && pitch !== undefined
-        ? { x, y, z, yaw, pitch }
-        : undefined;
+    const camera =
+        x !== undefined && y !== undefined && z !== undefined && yaw !== undefined && pitch !== undefined
+            ? { x, y, z, yaw, pitch }
+            : undefined;
 
     return {
         quality,
@@ -228,12 +296,16 @@ export function parseDeepLinkFromUrl(search = window.location.search): DeepLinkV
         shadows,
         orbitLines,
         magneticFields,
+        solarWind,
+        kp,
+        cme,
+        system,
         planet,
         mission,
         tour,
-        tourStep: tourStep !== undefined && Number.isInteger(tourStep) && tourStep >= 0
-            ? tourStep
-            : undefined,
+        tourStep: tourStep !== undefined && Number.isInteger(tourStep) && tourStep >= 0 ? tourStep : undefined,
+        timeline,
+        timelineTime: timeline && timelineTime !== undefined && timelineTime >= 0 ? timelineTime : undefined,
         mode,
         observer,
         camera,
@@ -244,11 +316,38 @@ export function hasDeepLinkViewState(state: DeepLinkViewState): boolean {
     return Object.values(state).some((value) => value !== undefined);
 }
 
+/**
+ * The readers "Copy view link", a tour step link and the context-loss reload all use. Pass
+ * `overrides` to drop one (`{ getObserveState: undefined }`) or add another.
+ */
+export function runtimeLinkReaders(
+    runtime: SolarSystemRuntime,
+    overrides: Partial<DeepLinkRuntimeReaders> = {},
+): DeepLinkRuntimeReaders {
+    return {
+        getQualityPreset: () => runtime.getQualityPreset(),
+        getTimeScale: () => runtime.getTimeScale(),
+        getPaused: () => runtime.getPaused(),
+        getSimulationEpoch: () => runtime.getSimulationEpoch(),
+        getOrbitScaleMode: () => runtime.getOrbitScaleMode(),
+        getShadowQuality: () => runtime.getShadowQuality(),
+        getOrbitLines: () => runtime.getOrbitLines(),
+        getMagneticFields: () => runtime.getMagneticFields(),
+        getSolarWind: () => runtime.getSolarWind(),
+        getKpOverride: () => runtime.getKpOverride(),
+        getFocusedPlanetIndex: () => runtime.getFocusedPlanetIndex(),
+        getFocusedMission: () => runtime.getFocusedMission(),
+        getActiveSystemId: () => runtime.getActiveSystemId(),
+        getSystemBodyLinkName: (index) => systemBodyLinkNameInActiveIndex(runtime.getActiveSystemId(), index),
+        getCameraPose: () => runtime.getCameraPose(),
+        getObserveState: () => runtime.getObserveState(),
+        isoDateFromJulianDate,
+        ...overrides,
+    };
+}
+
 /** Build a shareable URL for the current simulation view. */
-export function buildShareableUrl(
-    readers: DeepLinkRuntimeReaders,
-    baseUrl = window.location.href,
-): string {
+export function buildShareableUrl(readers: DeepLinkRuntimeReaders, baseUrl = window.location.href): string {
     const url = new URL(baseUrl);
     url.search = '';
 
@@ -259,7 +358,8 @@ export function buildShareableUrl(
 
     const timeScale = readers.getTimeScale?.();
     if (timeScale !== undefined && Number.isFinite(timeScale)) {
-        url.searchParams.set('time', String(roundCoord(timeScale)));
+        // Three significant figures: another star system's arrival clock is a few hundredths.
+        url.searchParams.set('time', String(Number(timeScale.toPrecision(3))));
     }
 
     const paused = readers.getPaused?.();
@@ -295,6 +395,15 @@ export function buildShareableUrl(
         url.searchParams.set('fields', magneticFields ? '1' : '0');
     }
 
+    const solarWind = readers.getSolarWind?.();
+    if (solarWind !== undefined) {
+        url.searchParams.set('wind', solarWind ? '1' : '0');
+    }
+    const kp = readers.getKpOverride?.();
+    if (kp !== undefined && kp >= 0) {
+        url.searchParams.set('kp', String(Math.round(kp * 10) / 10));
+    }
+
     // In Observe the view is a site plus a look direction; a fly-through pose or focus target
     // would mean nothing (and `mode=observe` ignores them on load anyway).
     const observe = readers.getObserveState?.();
@@ -302,21 +411,31 @@ export function buildShareableUrl(
         url.searchParams.set('mode', 'observe');
         url.searchParams.set('lat', String(Math.round(observe.latDeg * 10000) / 10000));
         url.searchParams.set('lon', String(Math.round(observe.lonDeg * 10000) / 10000));
-        url.searchParams.set('az', String(roundAngle(observe.azDeg)));
-        url.searchParams.set('el', String(roundAngle(observe.elDeg)));
-        url.searchParams.set('fov', String(roundAngle(observe.fovDeg)));
+        url.searchParams.set('az', String(roundSkyAngle(observe.azDeg)));
+        url.searchParams.set('el', String(roundSkyAngle(observe.elDeg)));
+        url.searchParams.set('fov', String(roundSkyAngle(observe.fovDeg)));
         url.searchParams.set('rate', String(observe.timeRate));
         return url.toString();
     }
 
     const focusedPlanet = readers.getFocusedPlanetIndex?.() ?? -1;
-    if (focusedPlanet >= 0 && focusedPlanet <= 11) {
-        url.searchParams.set('planet', PLANET_ID_BY_INDEX[focusedPlanet as PlanetIndex]);
-    }
+    const systemId = readers.getActiveSystemId?.() ?? 'sol';
+    if (systemId !== 'sol') {
+        // Another star system: its id, and the focused body by letter. Missions are Sol's.
+        url.searchParams.set('system', systemId);
+        const name = focusedPlanet >= 0 ? readers.getSystemBodyLinkName?.(focusedPlanet) : undefined;
+        if (name) {
+            url.searchParams.set('planet', name);
+        }
+    } else {
+        if (focusedPlanet >= 0 && focusedPlanet <= MAX_PLANET_INDEX) {
+            url.searchParams.set('planet', PLANET_ID_BY_INDEX[focusedPlanet as PlanetIndex]);
+        }
 
-    const mission = readers.getFocusedMission?.();
-    if (mission?.valid && mission.id) {
-        url.searchParams.set('mission', mission.id);
+        const mission = readers.getFocusedMission?.();
+        if (mission?.valid && mission.id) {
+            url.searchParams.set('mission', mission.id);
+        }
     }
 
     const pose = readers.getCameraPose?.();
@@ -324,9 +443,9 @@ export function buildShareableUrl(
     const yaw = pose?.yaw ?? readers.getCameraYaw?.();
     const pitch = pose?.pitch ?? readers.getCameraPitch?.();
     if (position && yaw !== undefined && pitch !== undefined) {
-        url.searchParams.set('x', String(roundCoord(position.x)));
-        url.searchParams.set('y', String(roundCoord(position.y)));
-        url.searchParams.set('z', String(roundCoord(position.z)));
+        url.searchParams.set('x', String(roundPosition(position.x, orbitScale)));
+        url.searchParams.set('y', String(roundPosition(position.y, orbitScale)));
+        url.searchParams.set('z', String(roundPosition(position.z, orbitScale)));
         url.searchParams.set('yaw', String(roundAngle(yaw)));
         url.searchParams.set('pitch', String(roundAngle(pitch)));
     }
@@ -339,8 +458,9 @@ export async function copyShareableLink(
     baseUrl = window.location.href,
 ): Promise<string> {
     const link = buildShareableUrl(readers, baseUrl);
-    if (navigator.clipboard?.writeText) {
-        await navigator.clipboard.writeText(link);
+    const clipboard = getClipboard();
+    if (clipboard) {
+        await clipboard.writeText(link);
     } else {
         const textarea = document.createElement('textarea');
         textarea.value = link;
@@ -349,6 +469,8 @@ export async function copyShareableLink(
         textarea.style.left = '-9999px';
         document.body.appendChild(textarea);
         textarea.select();
+        // Legacy path for non-secure contexts, where navigator.clipboard does not exist.
+        // eslint-disable-next-line @typescript-eslint/no-deprecated -- no replacement without a secure context
         document.execCommand('copy');
         textarea.remove();
     }

@@ -11,7 +11,7 @@ Canonical architecture reference for contributors. For build commands and deploy
 | Target | Graphics | Windowing | Audio |
 |--------|----------|-----------|-------|
 | **Native desktop** | OpenGL 4.6 Core + GLEW | GLFW3 | irrKlang |
-| **Web (WASM)** | WebGL 2 / OpenGL ES 3.0 | GLFW3 (Emscripten port) | SDL_mixer |
+| **Web (WASM)** | WebGL 2 / OpenGL ES 3.0 | GLFW3 (Emscripten port) | HTMLAudioElement (`web/src/music.ts`) |
 
 The web build adds async resource loading, staged planet initialization, and distance-based texture LOD. The native build loads everything synchronously at startup with full-resolution textures only.
 
@@ -24,12 +24,20 @@ The web build adds async resource loading, staged planet initialization, and dis
 ```
 SolarSystem-3D-WASM/
 ├── src/                        # C++ application
-│   ├── Application.h/.cpp      # Main loop, loading, rendering
-│   ├── Auxiliary_Modules/      # Engine subsystems (Shader, Camera, LOD queue, …)
-│   └── Solar_System/           # Celestial bodies by system (Earth_System/, …)
+│   ├── Application.h/.cpp      # Main loop, loading, simulation (+ PlatformWindow, InputHandler, …)
+│   ├── Renderer.h, Scene*Renderer.cpp  # Draw passes over a FrameContext
+│   ├── core/                   # Log, Camera, FrameTimer
+│   ├── gfx/                    # GL objects: GlHandle, Shader/ShaderLibrary, Mesh, textures, FBOs
+│   ├── render/                 # Overlays and post effects built on gfx/ (lens flare, text, paths, field lines)
+│   ├── assets/                 # Downloads, texture streaming/LOD, manifests, texture formats
+│   ├── astro/                  # GL-free ephemerides, sky events, observer maths, catalogs, field models
+│   └── Solar_System/           # Scene objects: catalog bodies, Sun/, ring meshes, shells, OrbitLayout
 ├── resource/                   # Runtime assets
-│   ├── planets.catalog.json    # **Canonical** body metadata (edit this)
-│   ├── planets.catalog.schema.json
+│   ├── systems/                # Star-system catalogs (§12)
+│   │   ├── sol.catalog.json    # **Canonical** Sol body metadata (edit this)
+│   │   ├── <id>.catalog.json   # GENERATED from the NASA archive (generate-exoplanet-systems.mjs)
+│   │   ├── catalog.schema.json
+│   │   └── generated/          # GENERATED <id>.runtime.json, read by StarSystemCatalog
 │   ├── planet_manifest.json    # GENERATED staged-loading systems
 │   ├── shaders/                # GLSL (preloaded into WASM VFS)
 │   ├── textures/               # High-res DDS (hosted at deploy time, not all in git)
@@ -52,10 +60,11 @@ SolarSystem-3D-WASM/
 
 Planet-related data used to live in several hand-edited files. The **single source of truth** is now:
 
-`resource/planets.catalog.json` (schema: `resource/planets.catalog.schema.json`)
+`resource/systems/sol.catalog.json` (schema: `resource/systems/catalog.schema.json`); the
+other star systems' catalogs sit beside it (§12).
 
 ```
-resource/planets.catalog.json
+resource/systems/sol.catalog.json
             │
             ▼
   scripts/generate-planet-metadata.mjs
@@ -82,14 +91,17 @@ resource/asset-manifest.json  ◄──  web/deploy.py --update-manifest  (fill 
 `OrbitLayout::kBodies[]` (heliocentric compressed-art offset, AU distance, orbital period,
 inclination, sidereal rotation) is generated into
 `src/Solar_System/OrbitLayoutBodies.generated.inc` and `#include`d by `OrbitLayout.cpp`. Focus-body
-row count must stay in lockstep with `OrbitLayout::Body` / `kBodyCount` (Sun=0 … Vesta=11).
+row count must stay in lockstep with `OrbitLayout::Body` / `kBodyCount` (Sun=0 … Halley=15).
+Outer-system bodies (`OrbitLayout::UsesTrueRadius`, Eris … Halley) are placed at their
+ephemeris distance in both scale modes instead of a fixed art radius, so eccentric orbits read.
 
 `src/Solar_System/BodyCatalog.generated.h` is generated from each body's `render` block
 (shader flags, ambient factor, texture LOD ids, display names, `earthRadiusScale`,
 `axialTiltDegrees`) for planets, dwarf planets, and moons. `CatalogBody` /
 `CatalogSatellite` / `CatalogClouds` consume a row directly, so a rocky body whose
 only distinguishing features fit in that row needs **no C++ class at all**. Mercury–Pluto,
-Ceres, Vesta, the Moon, the Galileans, and the other currently rendered moons are built
+Ceres, Vesta, Eris, Haumea, Makemake, 1P/Halley's nucleus, the Moon, the Galileans, and the
+other currently rendered moons are built
 this way. Adding another catalog-only rocky body is: catalog row + textures + `initTag`
 on the allowlist (the factory loops catalog systems; `MakePlanetInitFunc` is generic).
 
@@ -101,9 +113,9 @@ value. This replaced the previous split where C++ used `Rotate(81.2°, X)` for U
 vs catalog `−97.8°`, `+28.3°` vs `−28.3°` for Neptune, and no tilt at all for Pluto.
 
 Atmospheres are catalog data too: `render.atmosphere` carries the O'Neil shell numbers
-(`oneil`) and, for Earth/Venus/Mars/Titan, the physical coefficients (`physical`) that
+(`oneil`) and, for Earth/Venus/Mars/Titan and the four giants, the physical coefficients (`physical`) that
 `tools/atmosphere_lut_baker` turns into `resource/atmosphere/*.ktx2` (§9.2). The flow is
-catalog → `generate-planet-metadata.mjs` → `BodyCatalog::kAtmospheres` → baker → LUTs
+catalog → `generate-planet-metadata.mjs` → `BodyCatalog::kSolAtmospheres` → baker → LUTs
 preloaded into `.data`. The Sun and Saturn/Uranus *ring geometry* remain hand-maintained
 (`Sun`, `SaturnRing`/`UranusRing`, `SystemVisuals.h`). Moon motion is
 described under § Ephemeris accuracy: Keplerian where the row has measured elements, the
@@ -143,7 +155,6 @@ Application()
     → InitSystems()          # GLFW, OpenGL, audio
     → InitScene()
         → LoadCoreResources()    # async download of core assets
-        → LoadOptionalSounds()   # fire-and-forget music tracks
         → _appState = LOADING
     → Exec() → RunOneFrame() loop
 
@@ -168,7 +179,6 @@ Downloads a **small fixed set** before the scene can run (~15 files: models, sun
 void Application::InitScene() {
 #ifdef __EMSCRIPTEN__
     LoadCoreResources();
-    LoadOptionalSounds();
 #else
     InitSceneObjects();
     _appState = AppState::RUNNING;
@@ -206,9 +216,19 @@ Every frame, `UpdatePlanetSystemLoading()` checks camera distance:
 
 ```
 NOT_LOADED + dist < activationRadius
-    → DOWNLOADING (async WebResourceFetcher::DownloadFile per asset)
+    → DOWNLOADING (async WebResourceFetcher::DownloadWithFallback per asset)
     → pendingDownloads == 0 → initFunc() (e.g. InitEarthSystem()) → READY
 ```
+
+Two paths skip the distance test: `ActivateNearestPlanetSystems()` starts the
+`eagerPlanetSystems` systems nearest the start pose (3 on Low; see `QualityTierSettings`) as
+soon as the manifest loads, and `FocusPlanetByIndex()` (UI focus, deep links) starts the focused
+body's system immediately instead of when the camera arrives.
+
+`DownloadFile` reports the transfer's own result; a second request for a path already in flight
+joins it. `DownloadWithFallback` tries each URL in turn and, when all fail but the path is
+resident (the `--preload-file` placeholder tier), reports `KeptResident` instead of `Failed` —
+the fetch is still made, because the deployed copy is what replaces the 4×4 placeholder.
 
 While `NOT_LOADED` or `DOWNLOADING`, `RenderPlanetProxyMarkers()` draws 3D labels such as `Earth (approach to load)` or `Earth [downloading 42%]`.
 
@@ -245,6 +265,15 @@ After a planet is `READY`, it renders with **low-res** textures (`GetTexturePath
 | Preset **full** | Allow mid then high |
 
 Loads are deduplicated, cancellable on camera retreat, concurrency-capped by quality preset, and reported through `window.updateStreamingProgress(completed, total, active, tierCode)` (`tierCode`: 0 generic, 1 mid, 2 high).
+
+**Off the main thread (§7.7).** A tier swap reads the file's bytes on the main thread,
+decodes it in a job (`assets/TextureDecode`: DDS/KTX2 parse, CPU DXT decode, WebGL RGB
+widening) and uploads it through `assets/UploadQueue` under the per-frame byte budget,
+in row bands across frames when it is bigger than one frame's budget. The old texture is
+drawn until the new one is complete, and a load counts against the concurrency cap until
+it is swapped in, so the cap also bounds decoded payloads held in memory. Natively the same
+streaming is opt-in (`SOLARSYSTEM_TEXTURE_LOD=1`); by default native loads the high tier at
+start-up, as it always has.
 
 **Mipmap safety:** every upload path — `nv_dds`, the KTX2 reader, and the software BC decoder — sets `GL_TEXTURE_BASE_LEVEL=0` and `GL_TEXTURE_MAX_LEVEL` to the last uploaded mip level. Incomplete mip chains cause black textures on WebGL 2.
 
@@ -344,6 +373,27 @@ window.__solarSystemAssetBase = runtimeAssetBase;  // consumed by WebResourceFet
 {VITE_ASSET_BASE or page base URL} + resource/...
 ```
 
+### 6.1.1 Fetched assets are cached in the page
+
+`WebResourceFetcher` normally downloads with `emscripten_async_wget2`. When
+`window['__solarSystemFetchAsset']` exists (`web/src/assetCache.ts`, installed by `bootstrap.ts`
+before `Module()` runs), `StartTransfer` calls it instead and only writes the returned bytes into
+MEMFS. The hook resolves a cached body or fetches it and stores it in the **Cache API**:
+
+- Cache name `solarsystem-assets:<asset base URL>`: a deploy that moves to a new base starts
+  clean, and caches of other bases are deleted. A deploy that replaces files *in place* at the
+  same base must change the base (a versioned path, as in the S3 layout above) or the old bytes
+  are served.
+- Hit: no network request. Miss: fetch, and store only a complete `200` body — not an HTTP error,
+  a `206`, a body shorter than its `Content-Length`, or a `text/html` body (Vite's SPA fallback
+  answers a missing file with `index.html` and a 200).
+- Core preloads in `SolarSystem.data` never come through here; neither does anything prefetch.
+  What gets requested is still decided by the texture LOD tier, so a Low preset never pulls high tiers.
+- Off in `npm run dev` (edited textures would be pinned); `?assetcache=1` / `?assetcache=0`
+  overrides either way. Without the Cache API (insecure origin) it fetches uncached.
+
+It is not a service worker and not an offline shell. Quadtree terrain tiles will use the same storage.
+
 ### 6.1 Dev, preview, and production (single rule)
 
 | Mode | Command | Default asset origin | Notes |
@@ -365,11 +415,13 @@ The value is the directory **containing** `resource/`, with a trailing slash. It
 
 | Asset class | WASM `.data` preload | Runtime fetch |
 |-------------|---------------------|---------------|
-| Shaders, fonts, icons | Yes | — |
+| Shaders, fonts, missions, sky | Yes | — |
+| `resource/icons/` (14 MB, native window icon only) | **No** | — |
 | Atmosphere LUTs (`resource/atmosphere/`, ~560 KB RGBA16F KTX2) | Yes | — |
 | Low-res placeholders | Partial (via build copy to `web/public/`) | Core + staged + LOD |
 | High-res textures | No | LOD queue + skybox core load |
 | Sounds | No (may be absent in checkout) | Optional parallel download |
+| Terrain height tiles (`terrain/<body>/`, baked offline, not in git) | No | `TileCache` through `WebResourceFetcher`, only on Medium/Full and only near a flagged body (§11.3) |
 
 See [README.md § Runtime asset hosting](../README.md#runtime-asset-hosting) for CDN layout, manifest checksums, and `web/deploy.py` targets. For COEP/CORS/CORP header matrix and subdomain CDN setup, see [docs/CROSS_ORIGIN_HEADERS.md](CROSS_ORIGIN_HEADERS.md).
 
@@ -381,39 +433,79 @@ See [README.md § Runtime asset hosting](../README.md#runtime-asset-hosting) for
 
 | Module | Role |
 |--------|------|
-| `Application` | Scene graph, render passes, loading orchestration, quality presets |
-| `SystemModules.h` | Platform-conditional OpenGL/audio includes; `glBindTextureUnit` polyfill on WASM |
-| `Shader` | GLSL compile/link; lazy uniform-location cache; `Set*Double` casts to float on WASM |
-| `ShaderSource` | GL-free source assembly: `#version` rewrite, `common/preamble.glsl`, `#include`, `#line` bookkeeping (§9.1) |
+| `Application` | Scene graph, simulation (`UpdateScene`, once per frame), culling, loading orchestration, quality presets |
+| `Renderer` / `FrameContext` / `FramePasses` | Draw passes and the GPU resources they own; each pass reads only its `FrameContext`; `FramePasses` is the GL-free frame order (§7.5) |
+| `SystemModules.h` | Platform-conditional GLFW/SDL/audio/FreeType includes; the GL header and the WASM `glBindTextureUnit` polyfill come from `gfx/GlPlatform.h` |
 
-### 7.2 Auxiliary
+### 7.2 Subsystems by folder
 
-| Module | Role |
-|--------|------|
-| `Camera`, `FPS_Handler` | First-person navigation |
-| `ShadowMapFBO` | PCF / ray-traced shadows |
-| `HDR`, `LensFlare` | Post-processing (star glow only) |
-| `FloatLutTexture` | Loads a baked RGBA16F LUT (atmosphere); quiet `nullopt` instead of a checkerboard |
-| `MagneticFieldBloom` | Half-res field-line bloom (not the star HDR FBO) |
-| `TextureImage2D` | DDS load, reload, mip level management |
-| `WebResourceFetcher` | `DownloadFile` (async, callback-based) + `RequireResident` (residency probe) — WASM only |
-| `TextureLoadingQueue` | Serialized high-res LOD downloads |
-| `OrbitPathRenderer` | Faint heliocentric `GL_LINE_LOOP` guides |
-| `MissionCatalog` / `MissionPathRenderer` | Sampled probe ribbons (Voyager); quality downsample; AU→scene via `HelioAuToScene` |
-| `XrPointerRenderer` | WebXR controller rays (skipped on Low) |
-| `Ephemeris` | `IEphemeris` backend: Standish planets, Keplerian Pluto/belt bodies, Keplerian moons, GMST |
-| `SkyEvents` | Conjunction, eclipse, transit, and shadow-transit searches over the active backend; `GeocentricEclipticKm` exposes the geocentric vectors it searches with |
-| `StarCatalog` | GL-free parser for `resource/sky/bright_stars.json` (columnar, J2000, sorted brightest first) and the B−V → colour fit; see §7.4 |
-| `Observer` | GL-free ground-observer maths: sidereal time, precession, ecliptic→equatorial→horizon frames (X=East, Y=Up, Z=−North), Moon parallax, `ComputeSky` for the Sun, Moon and naked-eye planets, `DiscOverlapFraction` (§7.4) |
-| `MagneticFieldTracer` / `MagneticFieldLineRenderer` / `MagneticFieldBloom` | Optional dipole+toroidal ribbons (static VBO, GPU flow, half-res bloom on Medium+) |
+The old `Auxiliary_Modules/` grab-bag is split by what a file depends on. `astro/` and most
+of `assets/` are GL-free and compile into the unit tests; `gfx/` owns every GL object
+(`scripts/check-gl-handles.sh`); `render/` composes `gfx/` into drawable features.
+`scripts/check-source-rules.sh` (CI) keeps `using namespace` out of headers and iostream
+logging out of `src/`.
+
+| Folder | Module | Role |
+|--------|--------|------|
+| `core/` | `Log` | `LOG_*` macros, level from `SOLARSYSTEM_LOG` / `?log=` (§7.6) |
+| | `Camera`, `FrameTimer` | First-person camera (double world position); native frame pacing and the FPS count |
+| | `CameraNavigation` | GL-free altitude, floor, facet ray cast, clip planes, altitude-scaled speed and anchor hysteresis (§11.1) |
+| `gfx/` | `GlHandle`, `GlPlatform.h` | Move-only RAII GL objects (the only `glGen*`/`glDelete*`); the GL header and web polyfills |
+| | `Shader` / `ShaderLibrary` | Deferred compile/link (`KHR_parallel_shader_compile`), link-time uniform table with a value cache, hot reload; programs keyed by `ShaderSpec` (files + permutation defines) (§9.1) |
+| | `ShaderSource` | GL-free source assembly: `#version` rewrite, `common/preamble.glsl`, permutation `#define`s, `#include`, sampler bindings, `#line` bookkeeping (§9.1) |
+| | `FrameUniforms`, `TextureUnits.h` | The per-view `FrameUBO` and the shared texture-unit list (§9.1) |
+| | `SpaceWeatherUniforms` | The `MagnetosphereUBO` (std140, binding 1) the solar-wind programs read (§13.2) |
+| | `Mesh`, `MeshHolder`, `Vertex.h`, `LineStripBatch` | Model meshes (with bounding radius and a CPU copy of their triangles) and the one ribbon VAO layout |
+| | `MeshAnchor.h`, `SurfacePatch`, `SurfacePatchMesh` | Relative-to-eye vertex placement and the re-tessellated facets under a camera metres up (§11.1) |
+| | `TextureImage2D`, `FloatLutTexture` | DDS/KTX2 load, reload, mip level management; baked RGBA16F LUTs (quiet `nullopt` instead of a checkerboard) |
+| | `ShadowMapFBO`, `HDR`, `Frustum.h` | Shadow map target; star HDR target; frustum test and fitted depth range (§7.5) |
+| | `GlCapabilities` | One probe of extensions and limits (compressed formats, float FBOs, parallel compile) |
+| `render/` | `LensFlare`, `TextRenderer` | Star lens flare; FreeType HUD text |
+| | `OrbitPathRenderer` | Faint heliocentric `GL_LINE_LOOP` guides |
+| | `MissionPathRenderer` | Sampled probe ribbons (Voyager); quality downsample; AU→scene via `HelioAuToScene` |
+| | `XrPointerRenderer` | WebXR controller rays (skipped on Low) |
+| | `MagneticFieldLineMesh` / `MagneticFieldLineRenderer` / `MagneticFieldBloom` | Optional dipole+toroidal ribbons (static VBO, GPU flow, half-res bloom on Medium+, separate from the star HDR FBO); the day side squeezed by the space-weather standoff (§13) |
+| | `SolarWindRenderer` | Solar-wind particles: ping-pong transform-feedback buffers in seven groups, culled per group (§13.2) |
+| `render/terrain/` | `CubeSphere`, `TerrainTile`, `TerrainQuadtree` | GL-free: equal-angle cube-sphere tile keys and float-exact placement, R16 KTX2 tile parse and Catmull-Rom upsample, screen-space-error selection with horizon/frustum/light-box culling and the geomorph (§11.3) |
+| | `TileCache`, `TerrainSystem` | GL-free: one LRU of tiles under the tier's byte budget with an in-flight cap; when each flagged body swaps its sphere for tiles, and the floor's surface radius (§11.3) |
+| | `TerrainRenderer` | The shared 65×65 grid with skirts and a height texture per drawn tile; draws a selection with the bound program |
+| `assets/` | `WebResourceFetcher` | `DownloadFile` (async, callback-based) + `RequireResident` (residency probe) — WASM only |
+| | `TextureLoadingQueue`, `TextureLODController` | Serialized high-res LOD downloads; per-texture tier state machine (§4.3) |
+| | `PlanetManifestLoader` | Parses `planet_manifest.json` for staged loading (§4.2) |
+| | `TextureFormatSupport`, `BlockCompression` | Texture-pack choice; CPU BC decode when S3TC is missing (§4.4) |
+| `astro/` | `Ephemeris` | `IEphemeris` backend: Standish planets, Keplerian Pluto/belt bodies, Keplerian moons, GMST |
+| | `SkyEvents` | Conjunction, eclipse, transit, and shadow-transit searches over the active backend; `GeocentricEclipticKm` exposes the geocentric vectors it searches with |
+| | `StarCatalog` | Parser for `resource/sky/bright_stars.json` (columnar, J2000, sorted brightest first) and the B−V → colour fit; see §7.4 |
+| | `Observer`, `LunarTheory`, `SeatedView.h` | Ground-observer maths: sidereal time, precession, ecliptic→equatorial→horizon frames (X=East, Y=Up, Z=−North), Moon parallax, `ComputeSky` for the Sun, Moon and naked-eye planets, `DiscOverlapFraction`; the XR seated-sky rotation (§7.4) |
+| | `MissionCatalog` | Probe trajectory samples (`resource/missions/catalog.json`) |
+| | `MagneticFieldParams` / `MagneticFieldModel` / `MagneticFieldTracer` | Per-body field parameters, the dipole+toroidal model and the line tracer behind the ribbons |
+| | `SpaceWeather` | Magnetopause standoffs, the ambient wind, Kp and the auroral ovals, the sunspot cycle, the CME list and its drag model (§13.1) |
+
+**Tests.** `SolarSystemTests` is GL-free (it links GL only for the inline `GlHandle`
+destructors, which never run on an empty handle). `SolarSystemGlTests` (`tests/gl/`) opens a
+hidden GLFW window with a real GL 4.6 core context and checks handles, that every
+planetLighting permutation links and reads `FrameUBO` at its binding, sampler units, the
+uniform cache, the shadow/HDR framebuffers, one `LineStripBatch` draw read back with
+`glReadPixels`, a DDS upload that must not fall back, that every terrain permutation links
+with its sampler units, that a terrain tile lands where `CubeSphere` puts it, that the
+solar-wind feedback seeds, moves and precipitates its groups, and that sunspots darken only
+the butterfly bands (§13). CI runs it under Xvfb/llvmpipe; with no display it skips
+(`MESA_GL_VERSION_OVERRIDE=4.6 MESA_GLSL_VERSION_OVERRIDE=460 xvfb-run -a <build>/tests/SolarSystemGlTests`).
 
 ### 7.3 Scene objects
 
 Inheritance: `SpaceObject` → `Transformable` → `Planet` / `Satellite` / `Star`.
 
-Each planet system lives in `src/Solar_System/<Name>_System/`. `SolarSystem.h` aggregates includes. Atmospheres, clouds, and rings are separate render components. `Atmosphere` is configured from its catalog row and owns its LUTs; `AtmosphereModel` is the GL-free physics behind them, shared with the baker and the tests (§9.2).
+Planets and moons are catalog rows (`CatalogBody`, `CatalogSatellite`, `CatalogClouds`), so there is no per-planet folder any more: the only subfolders left are `Sun/` and the two ring meshes, `Saturn_System/SaturnRing` and `Uranus_System/UranusRing`. `SolarSystem.h` aggregates the scene-object includes. Atmospheres, clouds, and rings are separate render components. `Atmosphere` is configured from its catalog row and owns its LUTs; `AtmosphereModel` is the GL-free physics behind them, shared with the baker and the tests (§9.2).
 
-**Magnetic field params:** `MagneticFieldParams` on `SpaceObject` (set in `StarSystemFactory.cpp` via `MagneticFieldCatalog::IntrinsicParamsForBody`). Values are visual/educational — not SI magnetosphere physics. `ParamsForBody(body, quality)` adds seed/sample scaling and quality enable gates for the ribbon renderer. `Application::ForEachEnabledMagneticField` walks the Sun, loaded planets, and satellites whose `enabled` flag is set. Satellites default to disabled. Magnetic mode (`SetMagneticFields` / alias `SetMagneticFieldMode`, settings **M**) dims planet/cloud/atmosphere/ring shaders via `uSurfaceDim` and fades orbit paths; the Sun is left at full brightness.
+**Drawing.** A scene object holds no program: a pass `Use()`s one, sets its own uniforms
+and calls `SpaceObject::Draw(shader)`, which adds `model` and the object's material maps.
+So the shadow pass and the colour pass draw the same body with different programs, and a
+catalog body's colour pass uses its own planetLighting permutation (§9.1).
+`GetBoundingSphere()` is the mesh's radius (`MeshHolder::BoundingRadius`) under the current
+model matrix, in the render frame.
+
+**Magnetic field params:** `MagneticFieldParams` on `SpaceObject` (set in `StarSystemFactory.cpp` via `MagneticFieldCatalog::IntrinsicParamsForBody`). Values are visual/educational — not SI magnetosphere physics. `ParamsForBody(body, quality)` adds seed/sample scaling and quality enable gates for the ribbon renderer. `Renderer::RenderMagneticFields` walks the Sun, loaded planets, and satellites whose `enabled` flag is set. Satellites default to disabled. Magnetic mode (`SetMagneticFields` / alias `SetMagneticFieldMode`, settings **M**) dims planet/cloud/atmosphere/ring shaders via `uSurfaceDim` and fades orbit paths; the Sun is left at full brightness.
 
 ### 7.4 Observe mode
 
@@ -421,20 +513,177 @@ Observe puts the camera on Earth at a lat/lon and a UTC instant (`?mode=observe&
 
 | Piece | Role |
 |-------|------|
-| `Auxiliary_Modules/Observer.*` | Pure maths. Never reads the Earth model's matrix (its pole and prime meridian are art); goes ecliptic J2000 → equatorial J2000 → equatorial of date (precession) → horizon (local sidereal time, geodetic latitude). Moon parallax uses the WGS84 observer vector; Sun and planets are geocentric. |
+| `astro/Observer.*` | Pure maths. Never reads the Earth model's matrix (its pole is art; §11 for how its prime meridian is calibrated); goes ecliptic J2000 → equatorial J2000 → equatorial of date (precession) → horizon (local sidereal time, geodetic latitude). Moon parallax uses the WGS84 observer vector; Sun and planets are geocentric. |
+| Refraction and extinction | `Observer::RefractionArcmin` is Saemundsson's formula for a geometric altitude at 1010 hPa / 10 °C (scaled by P and 1/T if given): ~29′ at the geometric horizon, so a Sun whose centre is on it is drawn ~0.48° up and sets ~2–3 min late. Held at its −1° value and faded to 0 by −5° (the formula diverges near −5.1°; everything there is under the ground). `ExtinctionMagnitudes` is 0.2 mag × (Kasten–Young air mass − 1): ~7.4 mag at the horizon. Every `SkyBody` keeps the geometric `dir`/`altDeg` (eclipse geometry, phases, lighting) and adds `apparentDir`/`apparentAltDeg`/`extinctionMag` (what is drawn, labelled, reported to JS and used for "above your horizon"). Stars and constellation lines are refracted on the GPU by `common/refraction.glsl`; `test_observer.cpp` checks its coefficients match. Nutation is still ignored. |
 | Moon orientation | `Observer::MoonBodyAxesEquatorialJ2000` is the IAU 2009 WGCCRE lunar orientation (pole α0/δ0 and prime-meridian angle W with the E1–E13 terms), as right-handed body axes (X lon 0, Y lon +90 east, Z north). `ComputeSky` carries them into the horizon frame as `moonBodyToHorizon` and reports the sub-Earth point (libration). The fragment shader turns each disc point's topocentric surface normal into selenographic lon/lat with the transpose, so parallax and libration are already in it. Tests pin the frame by behaviour: right-handedness, a pole near (270°, 66.5°), longitude libration following the orbit's equation of centre (corr > 0.9, within ~10°), and latitude libration opposite the Moon's ecliptic latitude. The map is sampled as equirectangular, centre lon 0, north at the top (`MOON_MAP_CENTRE_LON` in `observeSprite.fs` if a deployed texture differs); DDS textures are loaded unflipped here, so t = 0.5 − lat/π. The texture comes from the loaded Moon `CatalogSatellite` (`GetDiffuseTexture()`, which changes on LOD reloads), falling back to the plain lit disc until its system has loaded; Observe keeps Earth's component re-placed each frame so the LOD manager sees the Moon as near. |
-| `ObserveState.h`, `ObserveMode.cpp` | State on `Application` (not `SimState`, which the tests link): site, time rate, saved Explore camera. `SetObserveMode` locks camera movement (`Camera::SetMovementLocked`, which also covers touch and the XR stick), widens the zoom range to 2–90°, and restores the Explore pose on exit. Focus keys, `FocusPlanetByIndex`/`FocusMissionByIndex` and `SetCameraPose` are ignored while active. `GetObserveStateJson` is the JS-facing snapshot. |
-| `Solar_System/ObserveSky.*`, `shaders/observe*.{vs,fs}` | The sky pass: an analytic sky/ground gradient from the Sun's altitude, additive point sprites for planets, an additive Sun disc with limb darkening and halo, and an alpha-blended lit Moon disc. Stars are one static instance buffer of J2000 unit vectors, rotated into the horizon frame by a single matrix uniform (`Observer::HorizonFromEquatorialJ2000`); their size and brightness come from `LimitingMagnitude(sunAlt)` in the vertex shader, so they fade in through twilight. Stars and planets are fixed-size screen-space points (round out to the edge of a wide FOV); the Sun and Moon are true angular discs on the tangent plane. Camera at the origin, no depth buffer, drawn back to front. Per-instance varyings are `flat` — an interpolated float `kind` will occasionally round to the wrong branch. |
+| `ObserveState.h`, `ObserveMode.cpp` | State on `Application` (not `SimState`, which the tests link): site, time rate, saved Explore camera. `SetObserveMode` locks camera movement (`Camera::SetMovementLocked`, which also covers touch and the XR stick), widens the zoom range to 0.25–90° with sky-style zoom (`Camera::SetSkyZoom`: a scroll notch scales the FOV by a ratio, and look sensitivity scales with FOV / 60°, so a telescope field handles like the naked eye), and restores the Explore pose on exit. Focus keys, `FocusPlanetByIndex`/`FocusMissionByIndex` and `SetCameraPose` are ignored while active. `GetObserveStateJson` is the JS-facing snapshot. |
+| Daytime sky | On the presets with `enablePbrAtmosphere` (Medium/Full) and once Earth's LUTs are resident, `observeSky.fs` draws Earth's physical atmosphere from inside the shell: the observer is at (0, `bottomRadius` + altitude, 0) km with the planet centre straight down, each pixel's ray is marched by `common/atmosphere_march.glsl` (the same integral `atmospherePbr.fs` runs, factored out; each includer defines `AtmosphereSunVisibility`), at the catalog's `physical.exposure` and the tier's step count — no new bake. The Moon is an eclipse caster on every sample (`EclipseVisibilityAt` with the topocentric Moon and true radii), so at totality the air overhead goes dark while the distant horizon stays sunlit. Below the horizon a flat Lambertian ground takes the LUT sunlight plus a share of the horizon sky. The Sun and Moon discs are tinted by `ObserveSky::DiscTint`: the hue of `AtmosphereModel::IntegrateTransmittance` along their apparent direction with its strength compressed (display-referred: the eye adapts to a sunset). Stars and planets fade by the limiting magnitude plus their extinction. Low keeps the analytic gradient and never runs the march. Thickness-scaled atmospheres (`thicknessScale`, Earth 2) keep their vertical optical depth but lengthen horizontal paths, so the horizon is a little hazier than real air. |
+| `Solar_System/ObserveSky.*`, `shaders/observe*.{vs,fs}` | The sky pass: the physical sky above or an analytic sky/ground gradient from the Sun's altitude, additive point sprites for planets, an additive Sun disc with limb darkening and halo, and an alpha-blended lit Moon disc. Stars are one static instance buffer of J2000 unit vectors, rotated into the horizon frame by a single matrix uniform (`Observer::HorizonFromEquatorialJ2000`); their size and brightness come from `LimitingMagnitude(sunAlt)` in the vertex shader, so they fade in through twilight. Stars and planets are fixed-size screen-space points (round out to the edge of a wide FOV); the Sun and Moon are true angular discs on the tangent plane. A planet becomes a tangent-plane disc too once its true radius (`SkyBody::angRadiusDeg`, IAU equatorial radius over geocentric distance; Saturn without rings) reaches 2 px and half its point sprite — in practice only in a telescope field — lit from the Sun's side using the phase angle and bright-limb angle packed into the instance (`params.zw`), so Venus shows its crescent. `tangentBasis` in `ObserveSky.cpp` must match the vertex shader's basis for that angle to land. Camera at the origin, no depth buffer, drawn back to front. Per-instance varyings are `flat` — an interpolated float `kind` will occasionally round to the wrong branch. |
 | `resource/sky/bright_stars.json` | The 5000 brightest Yale BSC5 stars (public domain), generated by `scripts/generate-star-catalog.mjs --input <catalog>` (the raw catalogue is not committed; `--check` validates the committed file, or compares against `--input`). Columnar `[ra, dec, vmag, bv]` in J2000 degrees, sorted by magnitude so a quality tier draws a prefix (`observeStarCount`: Low 500, Medium 2000, Full 5000). Preloaded for web (`--preload-file resource/sky`) and read lazily on the first Observe frame. Proper motion is ignored. |
-| `ObserveRenderer.cpp` | `Renderer::RenderObserveSky` (view/projection, XR eyes) and `RenderObserveHud` (compass, body names, readout, disclaimer). |
+| `resource/sky/constellation_lines.json` | Stick figures as index pairs into `bright_stars.json`, generated by `scripts/generate-constellation-lines.mjs --input <catalog>` (`--check` validates against the shipped stars). The IAU defines boundaries, not figures, so the 39 figures (238 segments) are authored in the script as Bayer/Flamsteed designations and joined through the same BSC5 file; 20 are `core`. `StarCatalog::ParseConstellations` rejects a file whose `starCount` differs from the star catalog (a misjoin). `ObserveSky` subdivides each segment (refraction is per vertex) and draws them as thin additive `GL_LINES` under the stars with the stars' rotation matrix, so precession moves both; they fade in as the limiting magnitude passes ~2–5. A segment is drawn only if both its stars are within the tier's star prefix; Low (`observeCoreConstellationsOnly`) draws the core 20 only. Toggled by the panel's **Constellation lines** switch (`SetObserveConstellations`, persisted in the panel's local storage). No names or art. |
+| `ObserveRenderer.cpp` | `Renderer::RenderObserveSky` (view/projection, XR eyes, Earth's LUTs for the daytime sky) and `RenderObserveHud` (compass, body names, readout, disclaimer). |
 
 **Seated sky in a headset.** `RenderXrStereoFrame` already calls `RenderFrameContent` per eye, so Observe needs only the sky pass to accept the eye matrices. `SeatedView::ViewRotation` (header-only, unit-tested) is `mat3(eye.view) * rotateY(heading)`: the headset supplies pitch, roll and yaw inside the room, and a single rotation about the vertical — the azimuth the room's forward currently faces, which is the camera yaw + 90° — ties that to the horizon frame. Translation is dropped (the sky is at infinity) and the camera's pitch is ignored (it is the viewer's own head). A level head reproduces the flat-screen camera exactly (test). `ObserveSky` already sizes stars and planets in pixels from the eye's viewport and projection, and the world-anchored compass/body/star labels are drawn per eye through `RenderObserveLabels`, scaled with the eye's resolution; the 2D readout is not drawn in a headset. In `webxr.ts`, while Observe is active the sticks stop flying: the left stick scrubs time (quadratic, up to 3 simulated hours per second, via `setSimulationEpoch`), the right stick snap-turns the heading by 30° (via `setObserveView`), `setTouchMovement` is held at zero, and the XR tooltip says so. Not exercised in CI (the Enter VR button stays hidden without `navigator.xr`); the maths is covered by `tests/test_seated_view.cpp`.
 
 The epoch is still `OrbitLayout::GetJulianDate()`, so the date controls and `SetSimulationEpoch` keep working; in Observe the frame loop advances it at wall-clock UTC × `timeRate` (instead of the orrery's 3 days per second) and honours Pause. The scene camera is parked just above Earth each frame so staged loading, LOD and the nearest-planet search behave as if the viewer were there; scene components are not drawn or re-placed while Observe is active, so their positions are stale until Explore resumes.
 
-Web: `web/src/observe.ts` (panel, sites, rates, 2017 preset, `ObserveState` parsing), `deepLink.ts` (`mode`, `lat`, `lon`, `az`, `el`, `fov`, `rate`; an Observe share link omits the fly-through pose), exports `SetObserveMode`/`SetObserverSite`/`SetObserveView`/`SetObserveFov`/`SetObserveTimeRate`/`GetObserveStateJson`. Accuracy is visualizer-grade (§11): UTC is fed straight into GMST, nutation and refraction are ignored, and the Moon comes from the Meeus ch. 47 series (§11), so eclipses land within seconds of NASA's circumstances.
+**Telescope.** Not a separate mode: a field of view at or below 2° (`TELESCOPE_MAX_FOV_DEG` in `observe.ts`). The panel's **Telescope** select offers 2° / 1° / 0.5° / 0.25° eyepieces and "Naked eye" (back to the wide field in use before); scroll and pinch reach the same range. While the FOV is in that range an HTML overlay (`#telescope-overlay`, pointer-events off) draws a circular field over the canvas's short side with a faint crosshair and the field across the circle. No optics are simulated: no magnitude gain, no inverted image, no Galilean moons or rings yet.
+
+Web: `web/src/observe.ts` (panel, sites, rates, 2017 preset, eyepieces and the telescope overlay, `ObserveState` parsing), `deepLink.ts` (`mode`, `lat`, `lon`, `az`, `el`, `fov` 0.25–120, `rate`; Observe angles keep 0.01° so a telescope link still lands on its target; an Observe share link omits the fly-through pose), exports `SetObserveMode`/`SetObserverSite`/`SetObserveView`/`SetObserveFov`/`SetObserveTimeRate`/`SetObserveConstellations`/`GetObserveStateJson`. Accuracy is visualizer-grade (§11): UTC is fed straight into GMST, nutation is ignored, refraction is a standard atmosphere rather than the weather, and the Moon comes from the Meeus ch. 47 series (§11), so eclipses land within seconds of NASA's circumstances.
 
 ---
+
+### 7.5 Frame pipeline
+
+One frame (`Application::RenderFrame` → `FramePasses::Run`):
+
+1. **Simulate once** (`UpdateScene`): orbit placement, light frusta, belts, mission probes,
+   LOD, the nearest-planet search, sky events. XR does this once for both eyes.
+2. **Snapshot** (`BuildFrameSnapshot`): one `CameraView` per view and a `SceneSnapshot`; the
+   passes see the frame only through a `FrameContext` built from them.
+3. **Cull** (`CullScene`): each object's bounding sphere against the side planes of every
+   view's frustum (`gfx/Frustum.h`). A component no view sees gets neither a shadow nor a
+   colour pass — its shadow map only shades its own bodies — except the nearest one, whose
+   colour pass is where the star is drawn. Visible components are drawn front to back.
+4. **Draw**: background per view; then per component, its shadow pass followed by each
+   view's colour pass (one shadow FBO); then the foreground per view.
+
+**Shadow frustum.** Each component's light frustum is an ortho box looking from the Sun at
+the planet, with its depth range fitted to the component's own bodies (`FitDepthRange`): the
+only casters drawn into that map and the only receivers that read it. The sideways extent is
+±3 planet radii from orbit, which holds a full-disk view's terminator and the rings and moons
+that receive the planet's shadow. One map has one texel size, so on realistic scale near the
+ground that box is a texel of kilometres. Inside 3 radii of the planet's centre (released
+past 4, so the resolution does not pump on the boundary) with shadows on and no XR session,
+`Application::FitShadowBox` fits the box to the **visible cap** instead (`gfx/ShadowFit.h`,
+GL-free, double): the part of the planet's sphere the camera's frustum sees. Camera rays
+along the frustum's rim and across a grid give the visible surface; each line of rays that
+turns from hitting to missing is bisected to the grazing ray, which is the horizon; the
+horizon circle is included where it lies inside the view; the point under the camera is
+always in; a ring or moon whose bounding sphere is in the frustum (and inside the old box)
+is added. The square around that, plus 10 %, is rounded up to a quarter octave with its
+centre snapped to a 1/1024 grid of the box, so it does not swim as the camera turns, and is
+never tighter than 1e-4 radii (0.64 km half-extent on Earth, a 0.3 m texel at 4096). It is
+only used when it is smaller than the ±3-radii box. The light still looks from the Sun at the
+planet; the box is off-centre in that view (`glm::ortho` with asymmetric bounds), and the
+depth fit, `shadowDepthRange` and the bias-over-range path are unchanged. The cap is the
+analytic sphere, not terrain, and a camera floored on the facets just under it (they sag
+kilometres on realistic Earth) is given a ground a hair under its own radius. There is one
+map and one pass: no cascades. `[ShadowFit]` at debug level logs the half-extent in scene
+units whenever it changes. `shadowDepthRange` (near, far − near) goes to the shaders that turn a stored depth
+back into a distance (the ring tests), and each pass's `bias` is a fixed scene-unit bias
+divided by that range, which keeps the comparisons the shaders always made. (The frustum
+used to borrow the camera's 0.001–20000, which also clipped every body more than 20000
+units from the Sun — Uranus and beyond on realistic scale.)
+
+At debug level (§7.6) the `[FrameStats]` line logs, every N frames (`SOLARSYSTEM_FRAME_STATS=N`,
+120 by default), the previous frame's simulate count, view binds, shadow passes, component and
+body draws, culled components and `glUniform*` calls, and a second line with the frame's
+profile (`core/FrameProfile.h`): wall time, CPU and GPU milliseconds per stage, job-pool
+counters, upload bytes and the slow-frame count.
+
+**Stages.** `update` (simulate, snapshot, terrain, cull), `background`, `shadow`, `scene`
+(colour passes), `foreground` (corona, belts, field lines, lens flare, HDR), `hud` and
+`uploads` (texture queue and the upload pump). `Application::TimeStage` brackets each hook:
+CPU with `steady_clock`, GPU with `gfx/GpuTimer` (`GL_TIME_ELAPSED`; on the web
+`EXT_disjoint_timer_query_webgl2`, probed and enabled in `GlCapabilities::gpuTimerQuery`).
+A stage that runs many times a frame (shadow and scene alternate per component) is the sum
+of its brackets, one query each. Time queries cannot nest, so a bracket opened inside
+another is ignored. The query sets are double-buffered and read back a frame or more late:
+a set whose results are not ready yet costs that frame its GPU sample rather than stalling
+it, and a WebGL disjoint event throws away the frames it overlapped. The GPU timers are off
+unless something reads them: natively at debug log level (or `SOLARSYSTEM_GPU_TIMERS=1`), on
+the web from the perf HUD.
+
+**Perf HUD.** `?perf=1` turns on the GPU timers and shows `web/src/perfHud.ts`'s overlay:
+frame time and the worst frame since the last refresh (4 Hz), CPU/GPU per stage, the job
+pool and the upload pump. It reads `GetFrameStatsJson()` (`WasmExports.cpp`), whose JSON
+is `FrameProfile::ToJson`; `window.__solarSystemPerf.latest()` returns the parsed stats for
+scripts. "Slow" is over 33.4 ms (30 fps).
+
+### 7.6 Logging
+
+All diagnostics go through `src/core/Log.h`: `LOG_DEBUG/INFO/WARN/ERROR(category, fmt, ...)`
+with a printf-style format, which is not evaluated when the level is off. A line reads
+`[Category] message`, so the smoke test's and CI's greps (`[StagedLoading] Loaded manifest`,
+`[ShaderSelfTest] … OK`) match on both targets.
+
+| | Native | Web |
+|---|---|---|
+| Sink | stderr, `HH:MM:SS.mmm LEVEL [Category] …` | `emscripten_log` → `console.debug/info/warn/error` |
+| Level (default `info`) | `SOLARSYSTEM_LOG=debug\|info\|warn\|error\|off` | `?log=debug` (same names) |
+| GL driver messages | KHR_debug context in Debug builds (`SOLARSYSTEM_GL_DEBUG=1/0` forces it on/off); `glDebugMessageCallback` maps severity to level as `[GL] 0x<id>: …`, at most 5 lines per id | — |
+
+Per-file chatter (each texture loaded, each download started or finished, LOD queueing) is
+`debug`. A failure the app recovers from (fallback texture, missing optional asset) is `warn`,
+and only a broken invariant (a required asset that is missing, an incomplete framebuffer, a
+shader that fails to compile) is `error`. That keeps `console.error` meaningful for the smoke
+test's error filter. Use `LOG_*` rather than `std::cout`/`std::cerr`. The parsers that used to
+`catch (...)` around `std::stod` now use `strtod` and report a malformed number as a parse error.
+
+### 7.7 Job system and the upload budget
+
+`core/JobSystem.h` is a fixed pool of `hardware_concurrency() - 1` workers (capped at 64):
+`Jobs::Submit(fn)` returns a `Jobs::Future<T>` whose `Get()` hands back the value or
+rethrows the job's exception, and `Jobs::Drain()` waits for everything submitted. Jobs run
+FIFO. A main thread that waits on a future runs queued jobs meanwhile, so a wait never
+deadlocks the pool. With no workers (`SOLARSYSTEM_JOBS=0` natively, `?jobs=0` on the web,
+or a web page that cannot start workers) `Submit` runs the job inline and returns a ready
+future, so every caller works the same without threads.
+
+**What runs in jobs:**
+
+| Work | Job | Main thread |
+|---|---|---|
+| Textures (tier swaps, staged loads) | DDS/KTX2 parse, CPU DXT decode → `TexturePayload` | read bytes, budgeted upload (`TextureImage2D::ReloadTextureAsync`) |
+| Models | Assimp parse from memory → `MeshPayload` (`assets/ModelCache`), started as each core download lands | read bytes, VAO/VBO upload in `MeshHolder` |
+| Mission catalogue | JSON parse, started in the `Application` constructor | take the result in `LoadMissionCatalog` |
+| Star catalogue, constellations | JSON parse, started by `ObserveSky`'s constructor | build the sprite and line VBOs on the first Observe frame |
+| Magnetic field lines | `MagneticFieldTracer::Trace`, one job per body | upload the ribbons once the whole set is in (a frame or so later) |
+
+The nearest-planet search, `WebResourceFetcher` and every GL call stay on the main thread.
+The asteroid instance tables (0.7 ms) are not worth a job.
+
+**GL stays main-thread.** A job produces CPU payloads only. `scripts/check-gl-handles.sh`
+rejects a `gl*` call or a `Gl*::Create` written inside a `Jobs::Submit(...)` argument, and
+`GlHandle` asserts `Jobs::IsMainThread()` in debug builds. MEMFS is not shared with workers
+either, so file bytes are read on the main thread and moved into the job.
+
+**Upload budget.** `assets/UploadQueue` holds main-thread upload tasks; a task is skipped
+until its job has finished. `Application::PumpUploads` runs it every frame (during loading
+too) under `UploadBudgetBytes()`: 2 MB on mobile web, 8 MB on desktop web, 32 MB natively,
+overridden by `?uploadkb=` / `SOLARSYSTEM_UPLOAD_BUDGET_KB`. The first step of a frame always
+runs, so an item larger than the budget still makes progress. A texture that fits uploads
+level by level, as the synchronous loader does. A larger one gets immutable storage
+(`glTexStorage2D`) and is filled in row bands with `glTex[Compressed]SubImage2D` over
+several frames. The `TextureImage2D` being reloaded keeps drawing its old texture until the
+new one is complete. A move, a later reload or the object's destruction supersedes a pending
+one (an `AsyncSlot` holds the owner and a generation instead of `this`).
+
+**Web threads.** Workers need shared Wasm memory, and a browser posts shared memory to a
+worker only from a cross-origin isolated page (verified in Chromium: without isolation,
+creating the memory works but the post throws "SharedArrayBuffer transfer requires
+self.crossOriginIsolated"). One pthread binary therefore cannot serve both kinds of page.
+The build makes two: `SolarSystem.wasm` (no pthreads, jobs inline) and `SolarSystem-mt.wasm`
+(`-DSOLARSYSTEM_WEB_THREADS=ON`, preset `web-release-mt`: `-pthread`,
+`PTHREAD_POOL_SIZE` = cores − 1 on an isolated page and 0 otherwise, `PROXY_TO_PTHREAD=0`,
+`ENVIRONMENT=web,worker`, linked against Assimp's own `-pthread` build in
+`external/assimp/build-wasm-mt`). `web/src/wasmVariant.ts` picks the threaded one when
+`crossOriginIsolated` is true and the URL has no `?jobs=0`. Its glue lives in `public/`
+because its workers import the same file again by URL, so Vite must not bundle it. Both
+variants preload the same files and share `SolarSystem.data`: `build-web.sh` refuses to
+deploy if the two packages differ. If `SolarSystem-mt.js` is missing (`build-web.sh
+--no-threads`), the page falls back to the single-threaded build after one failed import.
+The headers are in [CROSS_ORIGIN_HEADERS.md](CROSS_ORIGIN_HEADERS.md) (Option B).
+
+**Smoke runs.** `playwright.config.ts` runs every spec twice against the same build. The
+`threaded` project uses the isolated preview (port 4173), and `e2e/jobs.spec.ts` asserts
+that workers started. The `single` project uses a preview without isolation headers
+(`SOLARSYSTEM_NO_ISOLATION=1`, port 4174), where the page loads the single-threaded build
+and runs every job inline.
+
+**Tracy** is not wired in. A build that wants it adds `-DSOLARSYSTEM_TRACY=ON` with
+FetchContent and `ZoneScoped` in `TimeStage` (one place covers every stage).
 
 ## 8. Web frontend (`web/`)
 
@@ -443,8 +692,12 @@ Web: `web/src/observe.ts` (panel, sites, rates, 2017 preset, `ObserveState` pars
 | `index.html` | Canvas, loading overlay, settings panel, streaming progress bar, tour caption, XR HUD |
 | `src/main.ts` | Module init, `updateLoadingProgress`, `updateStreamingProgress`, `setCameraPose`, settings persistence |
 | `src/tourPlayer.ts` | Guided-tour playlist over `SolarSystemRuntime` |
+| `src/timeline.ts` | Cinematic timeline schema, parser and evaluator (pure; §11.2) |
+| `src/timelinePlayer.ts` | Plays a timeline through the engine; shipped timeline list, `?timeline=` URL rule |
+| `src/timelineEditor.ts` | Timeline dock: play/scrub, keys at the current pose, import/export, record |
+| `src/capture.ts` | Deterministic video capture (WebCodecs + mp4-muxer; MediaRecorder fallback) |
 | `src/educationalLayer.ts` | Mission list + tour controls |
-| `src/observe.ts` | Explore/Observe switch, site + UTC time + rate controls, 2017 eclipse preset, `ObserveState` parsing |
+| `src/observe.ts` | Explore/Observe switch, site + UTC time + rate controls, 2017 eclipse preset, telescope eyepieces + overlay, `ObserveState` parsing |
 | `vite.config.ts` | Base path `/solar-system/` |
 | `public/SolarSystem.{wasm,data}` | Generated by `./build-web.sh` |
 
@@ -463,13 +716,14 @@ Rebuild WASM after C++ changes: `./build-web.sh` then refresh the browser.
 | Precision | Qualifiers accepted and ignored | `common/preamble.glsl` sets `highp` defaults in fragments |
 | `#include "common/x.glsl"` | Expanded by `ShaderSource` | Expanded by `ShaderSource` |
 | Geometry/compute shaders | Geometry allowed | **Not supported** — no 3-arg `Shader` ctor exists |
-| Double uniforms | `glUniform1d` | Cast to float via `Shader` class |
+| Parallel compile | `KHR`/`ARB_parallel_shader_compile` via GLEW, if the driver has it | `KHR_parallel_shader_compile` WebGL extension, if exposed |
+| Hot reload | `resource/shaders/` mtime poll every 0.5 s (`SOLARSYSTEM_SHADER_HOT_RELOAD=0` turns it off) | Dev server only: `await window.__solarSystem.reloadShaders()` |
 
 **One source, two dialects.** Every file in `resource/shaders/` is written once in GLSL
 ES 3.00, because that is the only dialect WebGL 2 accepts. The native build runs an
 OpenGL 4.6 **core** context, which accepts `#version 300 es` only through
 `ARB_ES3_compatibility` — widely implemented, but not guaranteed. So `ShaderSource`
-(`src/Auxiliary_Modules/ShaderSource.cpp`, called by `Shader.cpp`) rewrites the leading
+(`src/gfx/ShaderSource.cpp`, called by `Shader.cpp`) rewrites the leading
 `#version 300 es` directive to `#version 460 core` on native builds only (GLSL ES 3.00 is a
 subset of desktop GLSL 4.60, precision qualifiers included).
 
@@ -478,6 +732,7 @@ subset of desktop GLSL 4.60, precision qualifiers included).
 ```
 #version …                         line 1 of the file (rewritten natively)
 #define SS_STAGE_VERTEX|FRAGMENT 1, SS_GLSL_ES|SS_GLSL_DESKTOP 1
+#define <each permutation define> 1   e.g. HAS_CLOUDS; from the program's ShaderSpec
 #line 1 1   common/preamble.glsl   precision defaults only; no helper macros
 #line 2 0   the file itself        on-disk line numbers
             #include "common/x.glsl" → #line 1 <id> … #line <next> <parent>
@@ -495,24 +750,73 @@ and values as parameters and declare no uniforms; each shader keeps its own
 and fails on a function defined twice.
 
 **Self-test.** `SOLARSYSTEM_SHADER_SELFTEST=1 ./build/SolarSystem` compiles every `.vs`/`.fs`
-in both dialects (Mesa's core context also accepts `300 es`), prints
-`[ShaderSelfTest] N/N … OK` and exits; the native CI job runs it under Xvfb with
-`MESA_GLSL_VERSION_OVERRIDE=460`.
+in both dialects (Mesa's core context also accepts `300 es`), once per subset of the
+defines a stage lists on its `// permutations:` line, prints `[ShaderSelfTest] N/N … OK`
+and exits; the native CI job runs it under Xvfb with `MESA_GLSL_VERSION_OVERRIDE=460`.
+
+**Permutations.** A stage that branches on a per-material switch tests a `#define` instead
+of a `uniform bool`, and names its switches on a `// permutations: A B …` line
+(`planetLighting.fs`: `HAS_NIGHT_TEXTURE HAS_SPECULAR_MAP HAS_CLOUDS USE_SPHERE_INTERSECT`).
+A program is identified by its `ShaderSpec` — stage files plus sorted defines — and
+`ShaderLibrary` (`src/gfx/ShaderLibrary.h`) builds each spec once.
+`tests/test_shader_source.cpp` checks that the declared list matches
+`CatalogMaterial::Defines()`, that each switch is tested, and that every subset preprocesses.
+
+**Compiling.** `Shader::Submit` preprocesses, compiles and links without asking for any
+status; `Finish()` (or `ShaderLibrary::Get`) checks the logs and builds the uniform table.
+`Renderer::Init` prefetches every program it owns — including every planetLighting variant a
+catalog row can reach (`CatalogMaterial::PossibleVariants`) — before waiting on the first, so
+with `KHR_parallel_shader_compile` (`GlCapabilities::parallelShaderCompile`) the driver
+compiles them side by side. `ShaderLibrary::GetIfReady` returns a program only once
+`GL_COMPLETION_STATUS_KHR` says it is done, so a variant picked mid-frame never stalls it.
+Optional effects use `TryGet` (null when the compile failed); the corona volume and the LUT
+atmosphere fall back that way.
+
+**Hot reload.** Every live `Shader` is in a registry with the files it was assembled from
+(includes and the preamble too) and their mtimes. `Shader::ReloadChanged()` rebuilds the
+ones whose files moved: in place, so references stay valid, and with every uniform value
+it had replayed onto the new program (one-off values set at init survive). A program that
+fails to compile keeps its previous build and the error is printed. Native polls it from
+the frame loop every 0.5 s. On web, `npm run dev` serves `../resource/shaders` at
+`<base>__dev/shaders/` (`vite.config.ts`), and `window.__solarSystem.reloadShaders()`
+(`web/src/shaderReload.ts`, only imported in dev) re-fetches the files, writes the changed
+ones into MEMFS (the module exports `FS` for this) and calls the `ReloadShaders` export.
 
 **No geometry stage on web.** WebGL 2 has no geometry shader, so the `Shader` constructor
 overload taking a `geometryPath` is compiled out under `__EMSCRIPTEN__`: passing one in a
 web build is a compile error, not a shader that silently fails to link.
 
 **Material binding.** `planetLighting` material state for every catalog body goes through
-`CatalogMaterial::BindMaterial` (`src/Solar_System/CatalogMaterial.h`). `CatalogBody` and
+`CatalogMaterial` (`src/Solar_System/CatalogMaterial.h`). `CatalogBody` and
 `CatalogSatellite` build a `CatalogMaterial::Material` from their row's `render.shaderFlags`,
-`useSphereIntersect`, and `ambientFactor`. `BindMaterial` sets the full flag block on every
-draw, so no body inherits the previous draw's `hasClouds`/`hasNightTexture`. It also binds
-samplers to fixed units: diffuse 0, normal 1, specular 2, night 3, clouds 4. `SceneRenderer`
-owns 6 (`shadowMap`) and 7 (`ringDiffuse`); the atmosphere passes use 9 (`ringDiffuse`),
-11 (`shadowMap`, O'Neil) and 12/13 (transmittance / multi-scattering LUTs). `generate-planet-metadata.mjs` rejects a row
-whose `shaderFlags` disagree with its `lod` ids, and a moon row that asks for night or cloud
-maps. **A new rocky body needs only a catalog row, not a `Render()`.**
+`useSphereIntersect`, and `ambientFactor`. The flags are not uniforms: `ShaderVariant()`
+turns them into a variant mask (a map counts only once its texture is resident), the
+Renderer draws the body with that permutation (`Renderer::PlanetProgram`), and
+`BindMaterial` sets `ambientFactor` and binds the maps. So no body can inherit the previous
+draw's clouds or night map, and a body without one never runs that branch.
+`generate-planet-metadata.mjs` rejects a row whose `shaderFlags` disagree with its `lod`
+ids, and a moon row that asks for night or cloud maps. **A new rocky body needs only a
+catalog row, not a `Render()`.**
+
+**Texture units.** Every sampler names its unit in the shader —
+`layout(binding = TU_SHADOW_MAP) uniform sampler2D shadowMap;`. The `TU_*` values are the
+X-list in `src/gfx/TextureUnits.h`; `scripts/generate-texture-units.mjs` writes them to
+`common/texture_units.glsl` (included by the preamble; CI checks it is current). GLSL ES
+3.00 has no sampler `binding`, so `ShaderSource` strips the qualifier and `Shader` sets the
+unit once at link; C++ binds with `glBindTextureUnit(Unit(TextureUnit::X), texture)` and
+never `SetInt`s a sampler. The units are fixed across programs (diffuse 0, normal 1,
+specular 2, night 3, clouds 4, shadow map 5, ring 6, the two atmosphere LUTs 7/8, Observe's
+Moon 9), so the shadow map is bound once per view, not per program.
+
+**Per-frame uniforms.** View/projection matrices, the eye and Sun positions, near and far
+planes, the log-depth `zCoef` and `logDepthC` (§11.1), time and exposure are one std140
+block, `FrameUBO`
+(`common/frame.glsl`, read as `frame.view` etc.; C++ layout `gfx/FrameUniforms.h`).
+`Renderer::BeginView` uploads it once per view (per eye in XR) to binding 0; `Shader` binds
+the block of every program that declares it at link. Every lit program reads it (planets,
+moons, clouds, rings, atmospheres, the Sun, the asteroid belt and comet tails); the
+screen-space and overlay programs (HUD text, lens flare, skybox, orbit/mission/field-line
+ribbons) still take their own matrices.
 
 Special cases that stay outside the catalog material path:
 - `Sun`: star, corona, and glow programs.
@@ -522,19 +826,25 @@ Special cases that stay outside the catalog material path:
 - `Atmosphere`: the O'Neil and LUT programs, configured from `render.atmosphere` (§9.2).
 - Asteroid field, comet tails, and the orbit/mission/magnetic-field overlays.
 
-**Uniform locations:** `Shader::Set*` resolves each uniform name with `glGetUniformLocation` on first use and caches the `GLint` (including `-1` for missing names) in a per-program map. Subsequent sets reuse the cache — do not call `glGetUniformLocation` at render call sites. The cache is cleared when the program is deleted (`Release` / destructor). If a re-link path is added later, clear the cache after a successful `glLinkProgram`.
+**Uniform locations:** after linking, `Shader` reads the program's active uniforms into a
+sorted name → slot table, so `Set*(std::string_view)` costs a binary search and no GL query
+or allocation; a name the program does not have is a silent no-op. Each slot keeps the last
+value set, and an unchanged value skips the `glUniform*` call. A setter on a program that
+is not current binds it for the call and restores the current one, so the cache stays true.
+The debug-level `[FrameStats]` line (§7.5) includes the `glUniform*` count.
 
 ### 9.2 Atmospheres and the Sun
 
 **Two atmosphere paths, one catalog row.** `render.atmosphere.oneil` drives the O'Neil
 single-scattering shell (`atmosphere.fs`), which every preset can afford and which is the
-only path for the gas giants and Pluto. Bodies whose row also has `physical`
-(Earth, Venus, Mars, Titan) switch to `atmospherePbr.fs` on Medium/Full:
+only path for Pluto. Bodies whose row also has `physical`
+(Earth, Venus, Mars, Titan, Jupiter, Saturn, Uranus, Neptune) switch to `atmospherePbr.fs`
+on Medium/Full:
 
 | Step | Where | What |
 |------|-------|------|
 | Bake (offline) | `tools/atmosphere_lut_baker` + `AtmosphereModel` | Transmittance LUT 256×64 (Bruneton 2017 mapping) and multi-scattering LUT 32×32 (Hillaire 2020), double precision → RGBA16F KTX2 with a parameter hash in the key/value data |
-| Ship | `resource/atmosphere/<id>_{transmittance,multiscatter}.ktx2` | Preloaded into `.data` (~140 KB per body) |
+| Ship | `resource/atmosphere/<id>_{transmittance,multiscatter}.ktx2` | Preloaded into `.data` (~140 KB per body, ~1.1 MB for all eight; `CommittedLutsFitSizeBudget` caps it at 1.2 MB) |
 | Load | `LoadAtmosphereLuts` (`StarSystemFactory.cpp`) → `FloatLutTexture` | Always loaded, so preset changes need no reload; any failure leaves the body on O'Neil |
 | Draw | `Renderer::RenderPbrAtmosphere` | One view ray per shell fragment, `uSteps` samples (8 Medium / 16 Full / 12 mobile Full) warped toward the limb; sun transmittance and Ψ_ms from the LUTs |
 
@@ -548,6 +858,51 @@ this path because it also contains the planet itself. There is no separate
 aerial-perspective pass: surfaces are spheres without displacement, so the shell's view ray,
 clipped at the ground sphere, already carries the in-scatter and attenuation for the
 terrain behind it — from orbit and from inside the shell alike.
+
+**Giant planets.** The giants use the same model and baker; only their numbers differ.
+The "ground" is the cloud deck at the 1-bar *equatorial* radius (the radius the mesh is
+drawn at), with a Lambert albedo in the deck's colour for the multiple-scattering bounce.
+Rayleigh is H₂ scattering for the column above the visible cloud tops, which on Jupiter and
+Saturn is a fraction of the 1-bar column, so it reads as a faint blue limb rather than a blue
+sky over the disc. The Mie layer is the haze: Jupiter's and Saturn's chromophore haze
+absorbs blue (single-scattering albedo falls from red to blue), and Uranus's and Neptune's
+haze scatters green and blue alike while the absorption layer — a tent centred on the deck,
+i.e. CH₄ thinning with height — takes out red, which gives the pale ice-giant limb instead
+of a λ⁻⁴ Rayleigh blue (pinned by `test_giant_atmospheres.cpp`). `thicknessScale` (2–6)
+widens each shell to 2–3 % of the radius.
+
+**Oblateness.** `render.oblateness` (flattening, 1 − polar/equatorial: Jupiter 0.065,
+Saturn 0.098, Uranus 0.023, Neptune 0.017) squashes the surface (`CatalogBody`), the cloud
+shell (`CatalogClouds`) and the atmosphere shell (`Atmosphere`) along the pole with one
+helper, `BodyShape.h`, after the tilt and before the spin. Both atmosphere shaders take
+`bodyToSphere` (and the LUT shader `sphereToBody`), the linear map from scene offsets to the
+frame where the figure is a sphere of the equatorial radius, and trace the view ray, the
+Sun direction and the camera there, where the LUT parameterisation holds. Ring and eclipse
+tests map samples back to scene space. Optical depth is stretched by up to 1/(1 − f) toward
+the poles; the limb follows the deck, which is what is visible. Spherical bodies get the
+identity, and `Atmosphere::Contains` makes the camera-inside test oblate-aware.
+
+**Ring shadows on a giant's air.** A moon's atmosphere (Titan) tests the ring once per
+fragment: the ring is far larger than the air. On the ringed planet itself
+(`isRingShadowPerSample`, Saturn and Uranus) the shadow is a band across the disc, so each
+view-ray sample tests its own sun ray against the ring annulus. The ring normal is fixed in
+the scene and the Sun direction comes from the planet's position on its orbit, so the
+opening angle follows the date. In the scene's geometry (catalog tilt plus Saturn's art
+tilt, not the real pole), Saturn's rings are open on **2008‑01‑01** (B ≈ +29°) and edge-on in
+April 2030; Uranus's are open on **2024‑01‑01** (B ≈ −38°) and edge-on in February 2033.
+`GiantRingShadow.*` checks that at those epochs the band falls on the hemisphere facing away
+from the Sun and collapses when the rings are edge-on.
+
+**Cloud shells under the air.** Jupiter and Saturn have no separate cloud shell: the
+diffuse map is the deck. Uranus's and Neptune's shells sit 0.3 % inside the mesh radius,
+under the LUT ground sphere, so the view ray stops at the surface above them; drawn first
+(as for Earth), they are attenuated with the planet.
+
+**Comparing captures.** Native `SOLARSYSTEM_CAMERA_POSE=x,y,z,yaw,pitch[,jd]` applies the same
+pose as the web's `window.setCameraPose(x, y, z, yaw, pitch)`; the optional Julian date pins
+and pauses the clock so planet positions match. `SOLARSYSTEM_SCALE=realistic` switches scale
+first (§11.1). `exposure` is a display uniform, not part of
+the bake, so a native and a web capture at one pose differ only by the display.
 
 `thicknessScale` stretches a shell while keeping vertical optical depth, for bodies whose
 real atmosphere would be a sub-pixel line; `exposure` is a display setting applied in the
@@ -590,7 +945,9 @@ the `XRWebGLLayer`'s framebuffer.
 | Task | Native | Web |
 |------|--------|-----|
 | Background music | `std::thread` | `UpdateBackgroundMusic()` per frame |
-| Nearest-planet search | `std::thread` | `UpdateSearchNearestPlanet()` every 60 frames |
+| Nearest-planet search | `UpdateSearchNearestPlanet()` every frame, main thread | same |
+| Job pool (§7.7) | `std::thread` × (cores − 1); `SOLARSYSTEM_JOBS=N` | Web Workers in `SolarSystem-mt.wasm` on a cross-origin isolated page; inline otherwise or with `?jobs=0` |
+| GL, MEMFS, downloads | main thread only | same |
 
 ### 9.4 Texture path helper
 
@@ -606,6 +963,47 @@ std::string GetTexturePath(const std::string& lowRes, const std::string& highRes
 
 ---
 
+
+### 9.5 Diagnostics
+
+| Aspect | Native | Web |
+|--------|--------|-----|
+| Log sink | stderr with `HH:MM:SS.mmm LEVEL` | `console.debug/info/warn/error` via `emscripten_log` |
+| Log level | `SOLARSYSTEM_LOG=debug` | `?log=debug` |
+| GL driver messages | KHR_debug in Debug builds (`SOLARSYSTEM_GL_DEBUG=1/0`) → `[GL]` log lines | Browser console (WebGL warnings) |
+| Frame counters | `[FrameStats]` at debug level (§7.5) | same |
+| Uncompressed DDS upload | Sized internal format (`GL_R8`/`GL_RGB8`/`GL_RGBA8`); core profile rejects the legacy component count | `GL_R8`/`GL_RGBA8` (RGB expanded to RGBA for mipmapping) |
+
+### 9.6 Antialiasing and the context attributes
+
+Context attributes are fixed for the life of the page and chosen once from the initial quality
+tier: native with `GLFW_SAMPLES` (`PlatformWindow.cpp`), web in `web/src/webglContext.ts`
+(`Module.contextAttributes` and GLFW hints are ignored by the Emscripten port; the context is
+created in TypeScript and handed in as `preinitializedWebGLContext`). Everything else about them
+(`alpha: false`, `stencil: false`, `preserveDrawingBuffer: false` because capture reads the canvas
+in the same turn as `StepCaptureFrame`, `xrCompatible: true`, `powerPreference`) stays there too.
+
+With HDR on, the colour pass draws into `gfx/HDR`'s single-sampled texture and `hdr.fs` writes the
+default framebuffer. Default-framebuffer MSAA would resolve an image that was already resolved, so
+**a tier with HDR asks the context for no samples** (`ContextMsaaSamples()`), and the tone-map pass
+antialiases instead: `hdr.fs` runs FXAA on the *tone-mapped* value (so an HDR sun many times
+brighter than its neighbours does not decide every edge test), with the HDR texture clamped to
+edge. Only a tier without HDR (low) may keep a multisampled context. Startup logs
+`[Quality] Context samples: requested N, GL_SAMPLES=M` and the `Active tier` line prints
+`AA=<path>` from `ResolveAntialiasPath(hdrEnabled, GL_SAMPLES)`. If `HDR::InitFBO` refuses (no
+float render targets) the path becomes `none`: the context was created without samples.
+
+### 9.7 Web link flags
+
+Release: `-O3 -flto --closure 1 --emit-symbol-map` (minified stacks map back through
+`SolarSystem.js.symbols`); Debug: `-O0 -g -gsource-map`. Both: `-msimd128`, `-sENVIRONMENT=web`,
+`-sSTACK_SIZE=1MB`, `-fwasm-exceptions`. `GROWABLE_ARRAYBUFFERS=0` (Chrome's WebGL/DOM APIs reject
+views over a resizable `ArrayBuffer`). `SolarSystem.wasm` has no pthread flags; the
+`SolarSystem-mt` variant adds `-pthread`, `PTHREAD_POOL_SIZE`, `PROXY_TO_PTHREAD=0` and
+`ENVIRONMENT=web,worker` (§7.7). `--preload-file`
+directories and `scripts/wasm-exports.json` are `LINK_DEPENDS` in `CMakeLists.txt`.
+`SDL2`/`SDL2_image` are native-only.
+
 ## 10. Adding a new planet
 
 **Catalog-only bodies first:** if the world needs nothing but a diffuse/normal (optional
@@ -616,10 +1014,13 @@ with a `render` block, textures, and an `initTag` on `initTagAllowlist`. Codegen
 `BodyFromName` mapping, and Keplerian elements in `Ephemeris.cpp` if it is not in the Standish
 table. A **moon** gets its Keplerian elements from its own catalog row
 (`orbit.keplerian`, including the `OmegaDotDegPerDay` / `omegaDotDegPerDay` secular rates)
-rather than from `Ephemeris.cpp`; it is only placed from those elements once its id is added
-to `kKeplerianSatellites` in `Ephemeris.cpp`, which is the gate that keeps rows still carrying
-placeholder angles on the old circular `SatelliteOrbit::Offset` path. See § Ephemeris accuracy. Keep focus indices **0–11 frozen** (Sun=0 … Vesta=11); new focus bodies continue at 12+
-only after moons (moons already occupy 12+ as non-focus catalog rows).
+rather than from `Ephemeris.cpp`; it is only placed from those elements once its row sets
+`orbit.placeFromElements: true`, which is the gate that keeps rows still carrying
+placeholder angles on the old circular `SatelliteOrbit::Offset` path. See § Ephemeris accuracy. Keep focus indices **0–11 frozen** (Sun=0 … Vesta=11). The outer system appends after them:
+**12=Eris, 13=Haumea, 14=Makemake, 15=1P/Halley** (kind `comet`). Satellites are numbered
+*after* the last focus index (Moon=16 … Charon=36) — the generator rejects a satellite index at
+or below it — so adding a focus body shifts the satellite ids, not the focus ids. Satellite ids
+are internal (Ephemeris / SkyEvents / tests), never in URLs or the JS API.
 
 **Atmosphere:** add a `render.atmosphere` block to the row (planet *or* moon). `oneil` alone
 gives the cheap shell; add `physical` and rebake (§9.2) for the LUT path. No C++ change.
@@ -643,7 +1044,7 @@ for Pluto, Ceres, and Vesta) and `Ephemeris::SatellitePosition` answers parent-r
 moons. `SkyEvents`, `OrbitLayout`, and `CatalogSatellite` all read through those two calls, so
 swapping in a different backend — a truncated VSOP87D, say — moves every consumer at once.
 
-**The Moon** is the exception to everything below: `StandishEphemeris::SatelliteParentRelative(12)`
+**The Moon** is the exception to everything below: `StandishEphemeris::SatelliteParentRelative(16)`
 returns `LunarTheory::MoonGeocentricJ2000Au`, the Meeus ch. 47 series (60 longitude/distance and 60
 latitude terms, plus the Venus/Jupiter/flattening additives; the tables are generated from a public
 transcription of Meeus's, cross-checked against his worked Example 47.a to 2e-6°). The series is in
@@ -659,8 +1060,8 @@ corrections make that so, and both are easy to lose: the Sun's apparent longitud
 one minus 20.4898″/R (`SkyEvents::geocentricKm`, Meeus ch. 25 — without it every solar eclipse is
 ~36 s late), and ΔT is applied to the Moon only (the planets move too slowly for it to show).
 
-**Other moons.** A satellite is placed from its catalog `orbit.keplerian` row only when its index
-is listed in `kKeplerianSatellites` (`Ephemeris.cpp`): today Io, Europa, Ganymede, Callisto,
+**Other moons.** A satellite is placed from its catalog `orbit.keplerian` row only when the row
+sets `orbit.placeFromElements` (it was the `kKeplerianSatellites` list in `Ephemeris.cpp`): today Io, Europa, Ganymede, Callisto,
 Titan, and Triton. Everything else still uses the circular `SatelliteOrbit::Offset` /
 `OffsetXY` helpers, because its row's node and periapsis angles are placeholder zeros and a
 confidently wrong orbital plane is worse than an obviously simplified one. `SatelliteOrbit::
@@ -680,10 +1081,36 @@ terms** (the Moon has them: see above). Frames: Triton's is genuinely ecliptic; 
 fits of Horizons ecliptic osculating elements, so their inclinations carry the parent's
 obliquity (2.2° for Jupiter, 27.7° for Saturn) rather than being Laplace-plane values.
 
-**Earth's rotation** is GMST at the epoch, not an accumulator, so a given UTC always gives the
-same terminator and scrubbing backwards is exact. The texture's prime meridian is aligned by an
-art constant that has not been calibrated against a reference image — the rate and the epoch
-behaviour are the honest parts.
+**Spins are functions of the date** (`OrbitLayout::AxialSpinDegreesAt(body, jd)`, double, wrapped to
+[0, 360)); there is no per-frame accumulator, so a reload, a shared `?date=` link, a timeline that
+starts at a keyframe, or a scrub away and back reproduces every body's spin exactly.
+
+- **Every primary but Earth** turns from the IAU WGCCRE 2015 prime-meridian angle,
+  W = W0 + Wdot · (days since J2000) (Archinal et al. 2018), generated from the catalog's
+  `orbit.primeMeridianDegJ2000` and `orbit.primeMeridianRateDegPerDay` into
+  `OrbitLayoutBodies.generated.inc`. Venus and Uranus have a negative Wdot and need no special
+  case. Eris, Haumea, Makemake and Halley have no IAU frame: W0 = 0 and the rate follows
+  `siderealRotationDays`. The generator checks each rate against the sidereal day (1.5 %, which
+  is what Neptune's fact-sheet day and the 2015 rate differ by). Poles and textures are art, not
+  IAU frames, so W0 fixes a reproducible epoch; it does not put a named feature at a real
+  longitude. Moons use `SatelliteOrbit::SpinDegreesAt`.
+- **Earth** is solved so the drawn map has the real sub-solar *longitude*. It cannot be GMST plus
+  a constant: scene axes are (ecliptic x, z, y), a reflection, and the drawn pole is art
+  (`Rz(axialTiltDegrees)`), so about the drawn pole the Sun circles the year the wrong way
+  round, and a texture turned at the GMST rate with any fixed offset is right at one instant and
+  then off by ~2° a day (a full turn over a year). So each date the Sun's true Earth-fixed
+  longitude (`Observer`: GMST, precession, J2000 ecliptic) is turned toward the scene's Sun through
+  `CatalogBody`'s tilt chain and the Blender `sphere.obj` UVs (map longitude = −atan2(z, x) in
+  model space, u = 0.5 on +X; checked against the upstream mesh). The named constant is
+  `kEarthTextureCentreLonDeg` = 0, the Greenwich-centred Blue Marble / Solar System Scope map
+  convention; the catalog's Earth W0/Wdot are the IAU values and only validate the sidereal day.
+  `test_orbit_layout.cpp` checks the drawn sub-solar longitude against `Observer` on 16 dates
+  across 2024 in both scale modes (residual < 0.01°) and against USNO equation-of-time anchors at
+  the 2024 equinox and solstice (measured 0.005° and 0.10°, locked at 0.25°). Changing the constant without recentring the texture
+  fails there. The **latitude is not calibrated**: the art pole leans along scene X, not toward
+  the mirrored true pole, so the drawn seasons are off by up to ~33° of latitude; fixing that
+  means moving Earth's pole (and its clouds/atmosphere frame), not the spin. The solved spin
+  turns at the sidereal rate less the Sun's own ~1°/day twice over (~359.0°/day).
 
 **Time scale.** Julian dates are treated as UTC (≈ UT1) throughout, which is exactly right for
 Earth rotation (GMST) and good enough for the planets: UTC↔TT (~69 s) and UT1↔UTC (< 0.9 s) are
@@ -707,7 +1134,591 @@ than a fan of `GetEclipseX/Y/Z` scalars, because an event's body pair only means
 alongside its kind tag. `web/src/skyEvents.ts` parses it and owns the chip; `web/src/
 conjunction.ts` remains for the explorer's conjunction-only chip.
 
-## 12. Common pitfalls
+### 11.1 Precision and scale (how positions reach the GPU)
+
+**World frame.** Simulation state is heliocentric scene units in double:
+`Transformable::Place` / `GetWorldPosition`, `Camera::GetWorldPosition`,
+`OrbitLayout::GetHeliocentricScenePosition`. Realistic scale is true scale — 1 AU = 1900
+units, `SceneScale::kKmPerSceneUnit` ≈ 78 737 km — so Earth's radius is 0.081 units and a
+metre is 1.27e-8 units, below a float's spacing anywhere more than ~0.1 units from the
+origin. `OrbitLayout::GetOffset` (the float cast) is for coarse callers only.
+
+**Compressed is a view of the same bodies.** The scale mode picks, per body, where it sits
+and how big it is drawn (`Solar_System/SceneScale.h`). Compressed puts planets on the art
+orbit radii, moons on their catalog `sceneOrbitRadius`, and draws every body at its art
+radius; realistic draws the true radius (`radiusKm`) at the true distances.
+`SpaceObject::SizeFactor()` is drawn size over art size (1 on compressed), and every art
+length tied to a body — atmosphere and cloud shells, rings, focus distances, LOD distances,
+magnetic-field radius, music ducking, Observe height — is multiplied by it, so those numbers
+stay compressed-scale numbers. `Application::PlaceBodies` places every body from the date
+each frame, so `ApplyOrbitScaleMode` switches without reloading; the camera keeps its offset
+in radii from its nearest body (`CaptureCameraBodyFrame` / `RestoreCameraBodyFrame`).
+
+**Floating origin.** The render origin (`OrbitLayout::GetRenderOrigin`, double) is put on
+the camera once per frame in both modes, after everything that moves the camera
+(`UpdateRenderOrigin` → `MoveRenderOrigin`). Every float position — model matrices
+(`Transformable::Rebase`), uniforms, overlay VBOs — is world minus origin taken in double
+(`ToRenderFrame`, `GetRenderPosition`); the camera sits at an exact zero and the view matrix
+has no translation (`Camera::GetViewMatrix(eyeRender)`). `MoveRenderOrigin` carries what
+holds a render-frame position across the shift: this frame's XR eye views (webxr.ts built
+them before it), XR pointer rays, the bodies, staged-loading proxies and the mission-path
+origin. Mission paths are uploaded relative to `_missionPathOrigin` and drawn with a
+`pathOffset` uniform, re-uploading only once the camera is 512 units from it. On compressed
+scale the moving origin changes positions by float rounding only: the golden poses differ
+from the Sun-origin build by under 0.04 px, all of it the ulp of the camera position that
+the old `lookAt(camPos, camPos + front)` lost from its forward axis.
+
+**Depth.** One logarithmic curve for every pass (`common/log_depth.glsl`):
+depth = log2(1 + C·w) / log2(1 + C·far), `frame.zCoef` = 2 / log2(1 + C·far),
+`frame.logDepthC` = C. Compressed keeps near 0.001, far 20000 and C = 1, bit-identical to
+the curve it always used. Realistic uses far 1e6, a near plane of half the altitude above
+the nearest surface (0.25 m up to 0.001 units) and C = 1/near
+(`CameraNavigation::ChooseClipPlanes`): a 24-bit buffer then separates 1 cm at 1 m and
+1000 km at 1 AU (`test_mesh_anchor.cpp`). Reversed-Z was the alternative, but its precision
+needs `glClipControl` (GL 4.5 / `EXT_clip_control`), which WebGL 2 does not dependably
+have, so the web needed log depth regardless; one scheme serves both targets.
+
+The vertex form (`ApplyLogDepth`) interpolates z linearly on screen, which is only right
+while a triangle is small next to its distance; the facet under the camera is neither. With
+the eye within 1.5× a body's bounding radius (`Renderer::NearSurface`), its surface, cloud
+and atmosphere programs use the **`NEAR_SURFACE`** permutation:
+- depth is written per fragment from an interpolated 1 + C·w (`PrepareLogFragDepth` /
+  `LogFragDepth`; exact, as it is linear in w);
+- clip z is parked at −`frame.nearPlane`, so clipping happens at the navigation's near
+  plane whatever near the projection was built with (WebXR keeps a fixed depthNear). Not
+  z = 0: that is the eye plane, and vertices clipped there divide by zero;
+- vertices are placed relative to the eye (below).
+
+The near programs compile on first use; until then a body draws with its normal program.
+
+**Relative-to-eye vertices** (`gfx/MeshAnchor.h`). `model * aPos` adds a body-sized
+translation and a body-sized vertex offset in float: 0.6 m of error on realistic Earth.
+`NEAR_SURFACE` planetLighting.vs computes `mat3(model) * (aPos - meshAnchor) +
+meshAnchorOffset`, where `meshAnchor` is the eye in model space rounded to float and
+`meshAnchorOffset` the render-frame position of that rounded point, both from double: a
+vertex under the eye lands within a millimetre.
+
+**Surface patch** (`gfx/SurfacePatch.h`, `Renderer::DrawSurfacePatch`). sphere.obj's facets
+are ~600 km across on realistic Earth. When one passes a metre under the eye, the GPU clips
+it by interpolating corners hundreds of kilometres away in float, and the clipped edges land
+about a centimetre off — 1–2 % of the screen at that range, seen as holes along the screen
+borders (measured: 13 700 hole pixels at 0.5 m, 800 at 5 m, none at 50 m). The patch
+re-tessellates every facet that comes within size/1000 of the eye until each piece is at
+most 1000× its distance (or the near plane), with barycentric attributes and positions
+stored as offsets from the eye (a float at the mesh radius is spaced 0.75 m), and draws it
+over the mesh with the same program; the facet underneath fills any T-junction crack. It
+exists only below ~600 m over Earth and is rebuilt when the eye moves, once per frame for
+both XR eyes. Terrain tiles (#151 phase 2) will replace it where a body has a DEM. Shells
+get no patch: an eye within a few hundred metres of a cloud or atmosphere shell (crossing
+it) can see the same holes in that shell for the moment it takes.
+
+**Navigation** (GL-free math in `core/CameraNavigation.h`, fed by `CameraController.cpp`).
+- *Co-moving anchor:* the camera carries the motion of the body it is near (engage within
+  64 radii, release past 80, hand over to a body twice as close), so a planet does not run
+  off at 30 km/s and a date jump keeps it in view. A focus flight pins its target; mission
+  follow and Observe pose the camera themselves and suspend the anchor, and so does a
+  timeline (`setCameraPose` clears it every frame).
+- *Co-rotation, only while hovering:* inside `kHoverRadii` (0.05 radii of altitude, the same
+  distance the floor starts ray-casting facets; released past 0.06) the anchor also carries
+  the body's spin, so the camera stays over the same ground point at the same altitude with
+  time running. Outside it the anchor is translation-only and a fly-around sees the body
+  turn. The camera keeps its offset in the body's *drawn* frame: `CameraNavigation::CarryEye`
+  puts the eye at `after.center + after.shape · (before.shape⁻¹ · (eye − before.center))`
+  from the model matrix's 3×3, in double, so it needs no spin law (planets, moons and the
+  Sun alike), follows the axis the mesh is really drawn about, never drifts from the
+  surface that is drawn whatever the float matrix's rounding does, and `Camera::Reorient`
+  turns the view by the same rotation. The render origin rebases afterwards as always; no
+  rotation is stored in a render-frame offset. A focus flight (`IsTransitionActive`), Observe,
+  mission follow and a timeline's `setCameraPose` are authored motion and suspend co-rotation
+  with the anchor: the engine never adds a second rotation to a timeline's.
+- *Speed:* on realistic scale movement is scaled by the altitude above the nearest surface,
+  altitude per second at the default speed, from 1 mm/s to 1 AU/s. Compressed keeps its
+  constant speed.
+- *Floor:* the camera stays a margin above the drawn surface (0.5 m realistic, 0.002 units
+  compressed). Within 0.05 radii the facets are ray-cast (`FacetRadius`, double
+  Möller–Trumbore cast inward from outside the mesh, so an eye that ended up beneath a facet
+  still finds it), since they sit up to kilometres inside the analytic sphere.
+
+**Interfaces.** The camera pose JS reads and writes is heliocentric: `SetCameraPose` takes
+doubles, and deep links keep 1e-9-unit coordinates on realistic scale (8 cm).
+`GetCameraPositionX/Y/Z` stay render-frame, because webxr.ts composes eye views from them.
+Native `SOLARSYSTEM_SCALE=compressed|realistic` runs the toggle at start-up, before
+`SOLARSYSTEM_CAMERA_POSE`, so a pose can be given in realistic coordinates.
+
+**Known limits.** The shadow fit (§7.5) is against the analytic sphere until a DEM exists, one
+map with no cascades: a view that takes in the horizon from a kilometre up still spans ~100
+km. Co-rotation holds the camera to the drawn float model matrix, whose own spin rounds to
+~3e-5° (a few metres at Earth's radius) per step.
+
+**Tests.** `test_render_origin.cpp`: a flyby 90 AU out stays on its exact track to 0.01 px
+with the origin on the camera, while the float-only control is over 10 px off; compressed
+positions match the float computation they replaced. `test_camera_navigation.cpp`: altitude,
+the floor from above and beneath a facet, clip planes, speed, anchor hysteresis, the camera
+moving in double. `test_mesh_anchor.cpp`: millimetre placement and both depth curves.
+`test_surface_patch.cpp`: the pieces tile their facet in place to the millimetre and meet
+the size rule. Co-rotation (`test_camera_navigation.cpp`): at 1 km a sidereal day, a quarter
+day or ten years leave the camera's offset in the drawn Earth frame unchanged to 1e-10, at 2
+radii the carry is translation only, the engage/release hysteresis, `RotationBetween` under
+a scale change, `Camera::Reorient`. Shadow fit (`test_shadow_fit.cpp`): the cap is metres to
+tens of kilometres where ±3 radii is thousands, reaches the horizon, holds every visible
+surface point across pitches and altitudes, stays put under a metre of drift, and still fits a
+camera floored below the analytic sphere.
+
+### 11.2 Cinematic timelines and capture
+
+A timeline (`web/public/timelines/*.json`, issue #151 phase 3) is a keyframed camera and
+date track that the web front end evaluates and the engine only draws. `web/src/timeline.ts`
+is pure (parsing, splines, the date track; unit-tested in `timeline.test.ts`),
+`timelinePlayer.ts` drives the engine with it, `timelineEditor.ts` is the dock (play, scrub,
+add a key at the current pose, import/export JSON, copy a link, record), and `capture.ts`
+writes the video. `?timeline=<id or http(s) URL>` deep-links one (`&tt=` starts it part
+way). Shipped: Voyager 2's Grand Tour (compressed scale, along the mission path), the
+2024-04-08 eclipse seen from the Moon, and a seamless descent to 1 m above Earth (both
+realistic). The "descent to Olympus Mons" in the issue waits for terrain (phase 2).
+
+**Schema.** `{id, title, description?, durationSec, view?, keyframes[]}`. `view` is a
+tour step's view (`tourPlayer.ts`: scale, overlays, quality…) applied once when the
+timeline takes the camera, without its camera, planet or mission. A keyframe is
+`{t, jd?, dateEase?, focus?, camera, path?, tension?, continuity?, bias?, fov?, timeScale?,
+overlays?, caption?}`:
+- *Where:* `focus` is a catalog body id or `mission:<id>` (a probe on its path), and
+  `camera.position` an offset from it in `units`: `scene`, `radii` (drawn radius, so a shot
+  holds on both scales) or `km` (true km scaled body-relatively). `camera.altitudeKm`
+  instead puts the camera that far above the drawn surface along `position`'s direction.
+  `camera.frame: <body>` turns the offset into a frame with +Z toward that body from the
+  focus and +Y toward ecliptic north (right-handed), so "sunward of Jupiter" stays sunward
+  as the date moves. Each key is resolved at the date being drawn, so a key on a moving body
+  moves with it.
+- *Path:* Kochanek–Bartels (Catmull-Rom at tension = continuity = bias = 0) through the
+  resolved points, with tangents scaled for uneven key spacing so the speed is continuous.
+  `path: "polar"` between two keys on the same focus splines the direction instead, and
+  log(height above the surface) with a monotone cubic: a descent from 1.5 million km to a
+  metre is exponential and never dips below its lowest key.
+- *Look:* a fixed quaternion `rotation` ([x, y, z, w]; −Z forward, +Y up; consecutive
+  quaternion keys use squad), or `lookAt` (body id or offset point) with `up`
+  `ecliptic` | `radial`, or `horizon {azimuthDeg, elevationDeg}` (azimuth 0 = the Sun's
+  bearing, clockwise from above), else the focus centre. Look-at and horizon keys are
+  re-aimed from wherever the camera is on the spline and slerped with smoothstep. Radial up
+  turns from the radial direction to the normal of the drawn facet below between 0.02 and
+  0.002 radii (`GetSurfaceJson` returns both radius and normal, `CameraNavigation::FacetAlong`):
+  near the ground the horizon is that flat facet, a few degrees off radial.
+- *Date:* `jd` anchors a key; a key without one follows from the previous key at
+  `timeScale` (orrery rate, 365.25/120 days per second at 1×) or, without a rate in force,
+  is interpolated between its dated neighbours. A monotone cubic runs through the dates;
+  `dateEase` (`smooth`, `linear`, `ease-in`, `ease-out`, `ease-in-out`, `step`) shapes the
+  segment that starts at the key. FOV is a monotone cubic (default 45°, clamped 1–45° by the
+  engine); `overlays {orbitLines, magneticFields, hud}` and `caption` are steps carried
+  forward.
+
+**Playback.** While a timeline holds the camera the orrery clock is paused, Observe and
+mission follow are off, and each frame does `AdvanceSimulationTo(jd)` (no UI notification),
+`GetSceneStateJson` (every body's position and drawn radius, and each probe's position, in
+%.17g after `PlaceBodies`), evaluates, then `setCameraPose` / `SetCameraRoll` /
+`SetCameraFov`. Overlay setters run only on a change. A focus whose system is not loaded
+yet (staged loading) returns null and the player holds the last pose; taking the camera
+preloads every referenced system. Releasing it restores clock, FOV, HUD and overlays and
+reports the date the timeline left. Every spin is a function of the date (§ above:
+planets' `AxialSpinDegreesAt`, moons' and cloud layers' `SpinDegreesAt`), so which longitude
+of Jupiter faces the camera at a keyframe's date does not depend on how the session got
+there, and `AdvanceSimulationTo` is the same as `SetSimulationEpoch` without the settings
+notification. Earth's map longitude is calibrated to the true sub-solar point, so the
+eclipse's umbra lands on the right continents.
+
+**Camera roll and HUD.** `Camera::SetRoll` turns right/up about the view direction (the
+engine camera is otherwise yaw/pitch); the player converts each quaternion to
+yaw/pitch/roll, with heading from the up vector within 0.1° of straight up or down.
+`SetHudOverlays` is a mask: bit 0 hints, 1 planet/star distances, 2 moon distances, 3 the
+staged-loading "(approach to load)" labels; `hud: false` clears all four.
+
+**Capture.** Offline and deterministic:
+- `BeginCapture(w, h)` pauses the Emscripten main loop (as WebXR does) and sets the canvas
+  backing store and every render target to the output size. Window and GLFW resize callbacks
+  are ignored until `EndCapture` fits the canvas to the page again.
+- Frame i puts the timeline at t = i / fps. `StepCaptureFrame(1/fps)` then runs one frame
+  with exactly that delta, re-asserting the size first, and `new VideoFrame(canvas)` is taken
+  in the same task, while the drawing buffer holds the frame.
+- Animated shaders read `SimState::animationSeconds`, the sum of frame deltas, not
+  `glfwGetTime()`, so the corona and the field ribbons advance by exactly 1/fps per frame.
+- Before a frame is encoded, pending textures and manifests (`GetPendingAssetCount`) get up
+  to 5 s to arrive, redrawing at the same instant. After one timeout, later frames wait only
+  for focus bodies that are not loaded at all, so a missing file does not cost every frame.
+- Encoding: WebCodecs `VideoEncoder` (H.264 High → Baseline, then AV1, then VP9, picked by
+  `isConfigSupported`, ~0.12 bits per pixel, keyframe every 2 s) and mp4-muxer into an
+  in-memory fast-start MP4.
+- Without WebCodecs, `MediaRecorder` records `canvas.captureStream()` while the timeline
+  plays in real time, at the canvas size and with no determinism. It waits for the
+  recorder's `start` event and fails on an empty recording.
+
+**Tests.** `timeline.test.ts` (Vitest, `npm run test:unit`, run in CI): splines through
+their keys, linear motion under uneven spacing, C1 continuity, tension, a moving focus, frame
+axes, polar descent (lands at 1 m, monotone, exponential, facet surface, facet-normal
+horizon), squad and slerp, yaw/pitch/roll round trips including straight down, the date
+track (anchors, rates, interpolation, eases), steps, `keyframeFromPose` round trip, parse
+errors, and every shipped timeline parses and evaluates. Native: spins are date functions
+and survive a fresh start (`test_orbit_layout.cpp`), roll keeps the view direction, and `FacetAlong`
+gives the hit facet's outward normal (`test_camera_navigation.cpp`).
+
+### 11.3 Terrain (cube-sphere height tiles)
+
+Bodies whose catalog row has `render.terrain` (Moon, Mars, Mercury, Earth) draw height tiles
+instead of their sphere while the camera is close. From altitude nothing changes: the sphere
+mesh, catalog material, atmosphere and eclipse decal are what they were. The code is
+`src/render/terrain/` (GL-free except `TerrainRenderer`), wired in by
+`TerrainController.cpp` and two small branches in `SceneRenderer.cpp`.
+
+**When.** `TerrainSystem` loads a body's `terrain/<id>/tileset.json` below 2 radii of altitude
+(`kPrefetchRadii`), swaps the sphere for tiles below 0.5 (back above 0.55), and grows the
+heights from zero between 0.45 and 0.2 radii (`HeightFade`), so the swap happens on the bare
+analytic sphere under the same material. A body without a tile set (or a deployment without
+`terrain/`) logs `[Terrain] <id>: no tile set … it stays the sphere` once. Low
+(`terrainBudgetMiB = 0`) never fetches anything; Observe and bodies out of reach draw spheres.
+
+**Tiles.** Equal-angle cube sphere (`w = tan(π/4·s)`), faces +X −X +Y −Y +Z −Z with the bases in
+`CubeSphere.cpp`. A tile is 65×65 samples (64 quads) plus a one-sample apron: 67×67
+`R16_UNORM` KTX2 at `terrain/<body>/<face>/<z>/<x>/<y>.ktx2`, quantised between the tile's own
+min and max, with the mask of children that exist (`SSterrain` key/value). Heights are metres
+above the catalog radius. The baker (`scripts/bake-terrain-tiles.py`, GDAL, run by hand,
+never in CI) samples every tile of a level from one block-averaged grid, so shared edges
+agree exactly; deep levels can be limited to regions (Shackleton, Olympus Mons). A child the
+data set does not have, or one whose fetch failed, is upsampled from its parent
+(Catmull-Rom), so there is no hole and no procedural detail.
+
+**Selection** (`TerrainQuadtree::Select`). Split on screen-space error: a level's tiles split
+inside `ratio × diagonal`, the ratio chosen so a quad spans the tier's pixel error
+(`terrainPixelError`: Full 6 px, Medium 8, mobile 10–12) and never below 1.5. A tile splits
+only when all four children are resident; otherwise it draws itself and asks for them
+(priority: error bucket, then angle from the view centre). Tiles behind the horizon, out of
+every view frustum and out of the component's light box are dropped.
+
+**Placement.** A vertex is an offset from the tile's centre computed small-to-small in float
+(`tan(a+b) − tan(a)`, series sin/cos; `GridOffset` is the C++ mirror the tests hold to a
+millimetre), added to the tile centre in the render frame, which is the body's
+`GetWorldPosition() − renderOrigin` taken in double each frame (§11.1). Nothing render-frame
+is kept across frames. Tiles nearer than their own diagonal use the `NEAR_SURFACE`
+permutation (fragment log depth); the rest use vertex log depth.
+
+**No pop, no cracks.** `terrain.vs` geomorphs heights (not grid positions) from the tile's own
+samples to the parent's surface across `[split + diagonal, split(parent)]`, so a split or a
+merge changes nothing on screen at the moment it happens; skirts as deep as a level step
+covers hide the T-junctions between levels.
+
+**Shading.** `terrain.fs` is the catalog material: it and `planetLighting.fs` include
+`common/planet_surface.glsl` (maps, night side, specular, clouds, shadow map, ring and eclipse
+tests) with the same `CatalogMaterial` permutations. Texture coordinates and the
+east/north/up frame are derived per fragment from the model direction in the sphere mesh's
+convention, and the relief normal (from the height samples, in the vertex shader; no normal
+tiles in v1) is folded into the normal map (`SURFACE_RELIEF`). The shadow pass draws the
+tiles too (`terrain.vs` `SHADOW_PASS` + `shadowMap.fs`): the sphere's facets would shadow the
+ground from below.
+
+**Memory and network.** One LRU across bodies under the tier's budget (`kTileGpuBytes` per
+tile; Full 128 MiB, Medium 64, mobile 32–48), an in-flight cap (Full 8, Medium 6, mobile 4),
+roots pinned. Every request goes through `WebResourceFetcher`, so the page's asset cache
+(§6.1.1) answers a revisit with the network off; the MEMFS copy is unlinked once read. The
+tier line logs the budget next to the shadow map, and while tiles are drawn
+`[Terrain] budget … resident … drawn … in flight …` goes out at most every 5 s.
+
+**Camera floor.** `ConstrainCamera` and `SurfaceAlong` stand on `TerrainSystem::SurfaceRadius`:
+the drawn tile under the eye with its morph, else the deepest resident tile (the roots always
+are). The floor only lifts: a camera placed before finer tiles arrive stays above the coarse
+surface it was lifted to. Co-rotation (§11) keeps a hover over one tile while time runs.
+
+## 12. Star systems
+
+The app is a catalogue of planetary systems. Sol is the default and is unchanged: its tables
+are compiled in, and its frames render pixel-identical to the single-system build. Every
+other system is generated data, so adding one needs no C++ change and no factory edit.
+
+### 12.1 Catalogs, generated files and the active system
+
+| File | Written by | Read by |
+|------|------------|---------|
+| `resource/systems/sol.catalog.json` | hand-edited | `generate-planet-metadata.mjs` |
+| `resource/systems/<id>.catalog.json`, `index.json` | `generate-exoplanet-systems.mjs` (§12.3), committed | `generate-planet-metadata.mjs` |
+| `resource/systems/catalog.schema.json` | hand-edited | both generators (validation) |
+| `src/Solar_System/BodyCatalog.generated.h` (`kSolEntries`, `kSolAtmospheres`, `kSolStar`), `OrbitLayoutBodies.generated.inc` | metadata generator, Sol only | compiled in |
+| `resource/systems/generated/<id>.runtime.json` | metadata generator, every system but Sol | `StarSystemCatalog::LoadRuntimeJson` (preloaded into MEMFS on web) |
+| `web/public/systems/index.json`, `systems/<id>/planet_facts.json`, `thumbnail.svg` | metadata generator | `systemPicker.ts`, `planetExplorer.ts` |
+
+`StarSystemCatalog` (GL-free) owns which system is active. `ParseRuntimeJson` turns a runtime
+file into the same `Entry`, `AtmosphereRow`, `StarRow` and `OrbitLayout::BodyRow` structs the
+compiled tables use, and interns their strings. `Activate` makes them what
+`BodyCatalog::Entries()`, `Atmospheres()`, `Star()` and the `OrbitLayout` body table serve.
+`ActivateSol()` switches back to the compiled tables. Code reads rows only through
+`BodyCatalog.h`, never through `kSol*`, so the same draw, physics and UI paths serve every
+system. Focus indices are per system: the star is 0 and planets follow by semi-major axis.
+Sol's 0–15 are frozen as before.
+
+A moon or planet is placed from its Keplerian elements only when its row carries
+`orbit.placeFromElements` (this was `kKeplerianSatellites` in `Ephemeris.cpp`). Every
+exoplanet sets it, and `Ephemeris::KeplerianPosition` evaluates the elements against the date.
+
+### 12.2 The star
+
+`render.star` holds `effectiveTemperatureK`, `radiusSolar`, `luminositySolar`, `massSolar`,
+`spectralType`, `glowTemperatureK` and `activity`. `astro/StarPhysics.h` derives the rest:
+
+- **Colour.** `RelativeTint(T)` is the Krystek/Planckian blackbody colour divided by that of
+  5772 K, peak-normalised. It tints the corona and glow, the lens flare, the skybox sprite,
+  and `FrameUBO.starColor`, which every lit shader (`planet_surface.glsl`,
+  `cloudsLighting.fs`) multiplies into its light. Sol's tint is exactly (1, 1, 1), which is
+  why Sol is unchanged. The glow ramp stays calibrated at `glowTemperatureK` (5778 for every
+  star), so the ramp does not redden a red dwarf a second time.
+- **Size.** The art radius is `SceneScale::SunArtRadius()`, √radiusSolar clamped to 0.35–3.
+  `StarRadiusKm()` feeds the eclipse caster and angular size (`AngularRadiusRad`).
+- **Irradiance.** `IrradianceEarthUnits`, `EquilibriumTemperatureK`, `HabitableZoneAu` and
+  `HabitabilityDistance` choose the landing planet (`StarSystemCatalog::EarthLikeFocusIndex`)
+  and the procedural style (§12.4).
+- **Activity.** 0–1 modulates the corona volume's noise frequency, drift and brightness
+  (`starCoronaVolume.fs`). It is a visual and the UI says so; at 0 the shader output is
+  unchanged.
+
+`tests/test_star_physics.cpp` holds 5772 K to the current Sun colour within 1%.
+
+### 12.3 Exoplanet data
+
+`scripts/generate-exoplanet-systems.mjs` pulls NASA's Planetary Systems Composite Parameters
+table (`pscomppars`) over TAP and writes the curated systems. There are eight: TRAPPIST-1,
+Proxima Centauri, τ Ceti, TOI-700, Kepler-186, Kepler-90, 55 Cancri and 51 Pegasi.
+
+- **Snapshot.** The archive rows are kept in `resource/systems/archive/`, so `--offline`
+  rebuilds without the network and `--check` (CI) fails on drift.
+- **Gaps.** Gaps are filled the way the composite table does it: Chen & Kipping
+  mass ↔ radius, Kepler's third law, e = 0, i = 90°, ω = 90°, L from R²T⁴. Every filled value
+  is listed in the body's `fit` block, and the facts card says which numbers are fits.
+- **Index.** `index.json` lists the systems with the star's colour and how many archive
+  systems would qualify (`archive.systemsAvailable`).
+- **Spins.** Planets inside the tidal-locking distance rotate once per orbit, with
+  W0 = ω + M0 − 180°. The rate is stored in the IAU sense, so the validator's sign rule holds
+  (§12.5).
+
+### 12.4 Procedural surfaces
+
+No exoplanet has been imaged, so a body with `render.procedural` has no textures. The
+`PROCEDURAL_SURFACE` permutation of `planetLighting` (`CatalogMaterial::kProcedural`) draws
+it from noise on the sphere direction (`common/procedural_surface.glsl`). The generator picks
+the mode and three colours from the planet's equilibrium temperature and radius:
+
+| Mode | Look | Extra parameters |
+|------|------|------------------|
+| 0 rocky | ocean, land, caps | `seaLevel`, `polarCap` |
+| 1 banded gas | zonal bands | `bands` |
+| 2 lava | glowing cracks | `emissive` |
+| 3 ice | ridged lineae | |
+
+`CatalogBody` skips the texture loads for these bodies, and terrain masks the bit
+(`TerrainProgram`). `Renderer::PrefetchCatalogVariants` compiles the new system's variants
+before its first frame.
+
+### 12.5 Orbits, spins and the mirror
+
+The scene maps ecliptic y to +Z, so a prograde orbit turns the negative way about +Y. Sol's
+spins were calibrated in that frame and are kept as they are. For other systems,
+`OrbitLayout::AxialSpinDegreesAt` returns −W, so a catalog's IAU-sense rate turns with its
+orbit. A tidally locked planet keeps its sub-stellar point at map longitude 0 (u = 0.5);
+`TidallyLockedPlanetsKeepOneFaceToTheirStar` checks it to 2°. The poses are functions of the
+date (§11), so a system's resonances, such as TRAPPIST-1 b:c:d, come out of the elements
+directly.
+
+### 12.6 Travel
+
+```
+RequestSystemJump(id)       Out 0.9 s: fade to the departing star's colour, then black   onSystemChanged(id, 0)
+  └─ first Black frame ──▶  LoadSystem(id): tear down, Activate, InitStarSystem,
+                            PlaceBodies, arrival clock, land the camera                    onSystemChanged(id, 1)
+                            Black 0.25 s, then In 1.2 s fade up                           onSystemChanged(id, 2)
+```
+
+- **Teardown.** `TearDownStarSystem` cancels in-flight texture jobs
+  (`TextureLoadingQueue::CancelAll` bumps an epoch, and stale results are dropped without
+  their callbacks) and bumps `_manifestGeneration`, so a late manifest download finds nothing
+  to touch. It then releases the scene. The render origin moves with the camera as usual.
+- **Landing.** The camera lands on the requested body, or else on the Earth-like planet. It
+  approaches from the star side, about 40° off the sub-stellar direction, so the planet's day
+  side fills the view.
+- **Arrival clock.** Sol keeps `SimState{}.timeScale`. Other systems start with the landing
+  planet moving about 1°/s along its orbit: 100–10 000× real time, and never below the
+  slider's 0.01 floor.
+- **Sol-only features.** Observe mode, missions, belts, the magnetic field, sky events and space
+  weather's magnetospheres and CMEs (§13) stand on Earth or Sol data. Outside Sol they are refused or empty, and the page greys out
+  Observe.
+- **Web.** `systemPicker.ts` lists `index.json` with Sol first, then by distance, plus a
+  "⌂ Sol" home button. It calls `LoadStarSystem` and follows `Module['onSystemChanged']`.
+  On phase 1 the explorer loads the system's `planet_facts.json`.
+- **Deep links.** `?system=trappist-1&planet=e` is read by C++ before the scene is built
+  (`ApplySystemEnvOverride`; native `SOLARSYSTEM_SYSTEM=trappist-1:e`), so the page opens
+  directly in that system. `StarSystemCatalog::FocusIndexForName` resolves the planet name.
+  "Copy view link" writes `system=` and the planet letter.
+
+### 12.7 Adding a system
+
+1. Add its host to `CURATED` in `scripts/generate-exoplanet-systems.mjs` and run it
+   (online once, then `--offline`). Alternatively, write `resource/systems/<id>.catalog.json`
+   by hand against the schema.
+2. Run `node scripts/generate-planet-metadata.mjs`.
+3. Rebuild. The runtime JSON is preloaded, and `StarSystemTest.EverySystemInTheIndexLoads`
+   parses it.
+
+## 13. Space weather
+
+The magnetic-field layer (§7.3) becomes a simulation: the solar wind streams out of the Sun,
+presses each magnetosphere in, drives the auroral ovals, and carries CMEs that set off
+geomagnetic storms. The Sun's sunspot cycle sets the background. Work is split by language:
+
+- **Physics** lives in C++ and is GL-free and unit-tested: `src/astro/SpaceWeather.{h,cpp}`.
+- **Application side.** `src/SpaceWeatherController.cpp` evaluates the model, fills the
+  frame snapshot and handles the controls.
+- **Renderer side.** `src/SpaceWeatherRenderer.cpp` handles the UBO, particles, aurora and
+  photosphere, and `render/SolarWindRenderer` holds the particle buffers.
+- **Shaders** are declared permutations that the self-test covers.
+- **TypeScript** (`web/src/spaceWeather.ts`) only parses and formats `GetSpaceWeatherJson()`.
+
+The magnetospheres and the CME list are Sol data, gated on `StarSystemCatalog::IsSol()`. The
+sunspot cycle is the active star's `render.star.activity.cycle`.
+
+### 13.1 The model
+
+The model is a function of the date, plus the Kp override and any CME launched by hand. A date
+jump, the scrubber or a capture therefore lands on the same state, and nothing accumulates per
+frame. Distances are true ones (AU, km, planet radii), and the renderer maps them into the
+scene.
+
+| Piece | What it is | Checked by (`tests/test_space_weather.cpp`) |
+|-------|------------|---------------------------------------------|
+| Pressure | P = m_p·n·v², n = 5 cm⁻³ / r² in a 400 km/s slow wind | `QuietWindPressureAtEarthIsAboutOneNanopascal` |
+| Standoff | r_mp = R_p · inflation · ((2B₀)² / 2μ₀P)^(1/6). The factor 2 is the Chapman–Ferraro compression; inflation stands for the Io/Enceladus plasma disc (Jupiter 1.6, Saturn 1.25) | `EarthQuietStandoffIsTenEarthRadii`, `JupiterStandoffIsSixtyToNinetyJovianRadii`, `OtherStandoffsMatchSpacecraftCrossings` |
+| Shape | Shue et al. (1997): r(θ) = r₀ (2 / (1 + cos θ))^α | `ShueMagnetopauseFlaresTowardTheTail` |
+| Ambient wind | Streamer belt (its half-width follows the cycle), fast streams from coronal holes, Parker spiral tan ψ = Ωr cos λ / v | `ParkerSpiralIsFortyFiveDegreesAtEarth` |
+| Kp | coupling = (P/P₀)^(2/3) · (v/v₀) · geoeffectiveness; Kp = 2 + 1.25 log₂(coupling), clamped to 0–9 | `QuietWindGivesTheBaselineKp` |
+| Ovals | Earth: Feldstein–Starkov linearised, with the midnight equatorward edge at 66° at Kp 0 moving down ~2° per Kp. The giants have their own `OvalModel`. The override holds every oval | `EarthOvalMovesEquatorwardWithKp`, `KpOverrideHoldsEveryOval` |
+| Cycle | 11 years from the 2008.9 minimum; Hathaway shape with SILSO amplitudes; Spörer latitude 28° · e^(−t/90 months); two butterfly wings (this cycle and the last) | `SunspotCycleReachesMaximumIn2014`, `SporerLawMovesSpotsEquatorward` |
+| CMEs | Drag-based model (Vršnak 2013). Each catalog event is calibrated so its front reaches Earth at the observed shock and its peak Kp is the observed one. At most 4 are active at once | `HalloweenCmeArrivesWhenObservedAndSaturatesKp`, `CommittedCmeListCalibratesToEveryObservedArrival` |
+
+Kp is the model's. It is not counted from particles reaching the cusps on the GPU: a readback
+would stall the frame, and it would tie Kp to the tier's particle count. The particles are the
+picture, and the precipitating ones carry the model's numbers.
+
+**The CME list.** `resource/spaceweather/cmes.json` is preloaded on web. It holds the curated
+events (Carrington 1859, March 1989, Bastille Day 2000, Halloween 2003 ×2, November 2003, the
+July 2012 near miss, St. Patrick's Day 2015, September 2017, Gannon May 2024, October 2024)
+plus NASA DONKI's Earth-impacting CMEs from 2010 onward, written by
+`scripts/generate-cme-list.mjs`. DONKI's rows are snapshotted in
+`resource/spaceweather/archive/donki.json`, so `--offline` rebuilds without the network and
+`npm run generate:cme-list:check` (CI) fails on drift. "Launch CME now" adds an Earth-directed
+1800 km/s CME with a 50° half-angle at the current date.
+
+### 13.2 Frame flow
+
+```
+Update stage
+ └─ SpaceWeather stage   Application::UpdateSpaceWeather: Evaluate(jd, heliocentric positions)
+                         → SpaceWeatherFrame (FrameContext.h) in SceneSnapshot::spaceWeather
+                         Renderer::UpdateSpaceWeather: star program for the tier + spot uniforms;
+                         if particles > 0, pack MagnetosphereUBO (binding 1) and advect
+                         by transform feedback
+Scene pass               AuroraShell per magnetosphere component (aurora.fs), before the rings
+Foreground               corona, belts, RenderSolarWind (additive points), field lines
+                         (magneticFieldLine.vs squeezes the day side by standoff / quiet standoff),
+                         aurora bloom (Full)
+Observe                  observeSky.fs marches the same common/aurora.glsl shell from the ground
+```
+
+**Particles** (`render/SolarWindRenderer`, `solarWindUpdate.vs`, `solarWind.vs`/`.fs`):
+
+- **Groups.** There are seven: the background stream (45%) and one per magnetosphere
+  (Mercury, Earth and the four giants). Each is culled on its own. The background needs the
+  view, more than 40 px and a camera within 3× the stream's edge; a magnetosphere needs the
+  frustum and a quiet standoff spanning more than 6 px. A culled group neither advects nor
+  draws, so the wind costs nothing at Pluto. A group that comes back into view reseeds.
+- **Buffers.** Each particle is two `vec4`s (32 bytes) in a pair of ping-pong `GlBuffer`s.
+  Each group is updated with `glBindBufferRange` over its slice under `GL_RASTERIZER_DISCARD`,
+  and the transform-feedback buffer is unbound before drawing, because WebGL refuses a buffer
+  bound for feedback and as an attribute at once. WebGL 2 has transform feedback natively, so
+  no `-sFULL_ES3` is needed.
+- **Motion.** The background follows the Parker spiral at the evaluated wind speed. A
+  magnetosphere group's particles deflect round the Shue magnetopause. Those that reach a cusp
+  precipitate down the field to the oval, turning the auroral colour only near its end, and
+  flash on arrival.
+- **Clipping.** Particles whose alpha would add nothing are clipped in the vertex shader. They
+  are most of a group (the faded tail, the far flanks, parcels spawning), and rasterising
+  zeros was most of the draw's fill.
+- **Scale.** True AU reach the scene through `OrbitLayout::AuToSceneKnots()` (the compressed
+  scale's knots, or one linear knot on realistic) in the UBO. On the compressed scale the
+  drawn magnetosphere is capped so its tail (20 standoffs) spans at most 0.35 of the body's
+  distance from the Sun; the ovals and Kp keep their physical values.
+- **Clock.** The visual clock is the frame delta, capped at 0.1 s. It is 0 when paused or in
+  Observe. Parcels move at the wind speed times the orrery's days per second, clamped to
+  0.02–0.25 AU/s, so the stream reads at any time scale.
+
+### 13.3 Aurora
+
+`render.aurora` rows sit on Earth, Jupiter, Saturn, Uranus and Neptune. Each row gives
+`altitudeKm` [bottom, top], `colorLow`, `colorHigh`, `colorEdge` and `brightness`. Earth uses
+O 557.7 nm green below, O 630.0 nm red above, and N₂⁺ 427.8 nm blue-violet on the lower
+border in storms. Jupiter's H₂ bands are drawn blue. `StarSystemFactory` gives each such
+component an `AuroraShell`: a sphere at the top of the layer, placed like the cloud deck but not
+spun, because the oval hangs on the magnetic pole in the Sun's frame.
+
+`aurora.fs` and `observeSky.fs` include `common/aurora.glsl` and differ only in where the ray
+starts:
+
+- **Placement.** The oval sits on the dipole's pole (`MagneticFieldParams` through the body's
+  rotation), with its boundaries from §13.1, cosine-blended from magnetic noon to midnight.
+- **Night side.** Only the night side emits.
+- **Tiers.** `AURORA_ANIMATED` moves the brightness along the oval on `frame.time`, and
+  `AURORA_CURTAINS` adds folded sheets with vertical rays. Neither gives a static ring.
+- **Ray march.** From space the march takes 1, 6 or 14 steps per tier; from the ground in
+  Observe it takes 4, 8 or 16, using the geomagnetic pole at 80.65° N 72.68° W.
+
+### 13.4 Photosphere
+
+`star.fs` declares `PHOTOSPHERE SUNSPOTS`. Without either, the original sprite is unchanged.
+
+- **`PHOTOSPHERE`** animates granulation at three scales on `frame.time`.
+- **`SUNSPOTS`** adds two butterfly wings: this cycle's at `uSpotBands.xy` (latitude,
+  half-width) and the previous cycle's at `.zw`, weighted by `uSpotCoverage`. Spots rotate
+  differentially (Snodgrass) over `uSpotDays` and have umbrae, penumbrae and limb faculae.
+
+The GL test `Photosphere.SunspotsDarkenTheButterflyBandsAndNothingElse` renders the cap at
+maximum and minimum, and checks that only the ±20° wings darken.
+
+### 13.5 Tiers
+
+| Tier | Solar-wind particles | Aurora | Photosphere |
+|------|----------------------|--------|-------------|
+| Low, and every mobile preset | none | static ring | sprite |
+| Medium | 50 000 | animated oval | granulation |
+| Full | 200 000 | curtains + bloom | granulation + spots |
+
+These are `QualitySettings::solarWindParticles`, `auroraMode` and `photosphereMode`. The
+`[Quality]` log line names them.
+
+**Defaults.** The aurora always draws in Sol. The wind is a toggle and is off by default; with
+no particles nothing is packed, uploaded or advected.
+
+**Cost.** Low's frame time is unchanged against the previous build (llvmpipe, interleaved runs:
+p10 29.9 → 30.0 ms, p50 44.8 → 43.0 ms). On Full the wind is two passes of 200k vertices: the
+update and the draw. llvmpipe shades vertices on one thread, so there the wind costs about as
+much as the rest of the frame. That says nothing about a GPU, where 400k vertices is well under
+the shadow pass's 3000² depth fill.
+
+### 13.6 Controls and the page
+
+| | |
+|-|-|
+| Exports (`WasmExports.cpp`) | `SetSolarWind` / `GetSolarWind`, `SetKpOverride` / `GetKpOverride` (< 0: Kp from the wind), `LaunchCmeNow`, `PlaySpaceWeatherEvent(index)`, `JumpToSpaceWeatherDate(iso)`, `GetSpaceWeatherJson()` |
+| `onSettingsChanged` fields | `solarWind`, `kpOverride` |
+| Settings panel | "Space weather" group: solar wind, an "Aurora Kp" slider (far left is Auto), "Launch CME now". Persisted with the panel |
+| Sky-event chip | "Next geomagnetic storm" with "Play storm". Past the catalog's end (today, by default) it offers the latest catalogued storm instead. `PlaySpaceWeatherEvent` goes to just before the launch, turns the wind on and slows the clock so the transit takes about 8 s |
+| Storm card | `educationalLayer.ts` `initStormCard`: while Earth's Kp ≥ 5 or a CME is on its way to Earth, it shows the oval latitude, the standoff, the wind and the CME front, polled from `GetSpaceWeatherJson()` |
+| Deep link | `?kp=7&cme=2003-10-29T06:00Z&wind=1`. `cme=` takes an ISO-8601 UTC date or instant, which C++ parses (`SpaceWeather::ParseIsoUtc`), and turns the wind on; "Copy view link" writes `wind=` and `kp=` |
+| Native | `SOLARSYSTEM_SOLAR_WIND=0\|1`, `SOLARSYSTEM_KP=<0–9>`, `SOLARSYSTEM_CME=<ISO>` |
+
+The acceptance case is the link above. At the first Halloween CME's arrival, Earth's oval
+reaches ~50° magnetic latitude, and the day side is compressed within an hour of the shock
+(standoff below 0.8 of quiet; `HalloweenCmeArrivesWhenObservedAndSaturatesKp`).
+
+## 14. Common pitfalls
 
 1. Do not use a blocking main loop on WASM.
 2. Do not spawn `std::thread` in the web build.
@@ -717,10 +1728,14 @@ conjunction.ts` remains for the explorer's conjunction-only chip.
 6. Do not preload sounds in the Emscripten CMake block (Git LFS files may be missing).
 7. After `TextureImage2D::ReloadTexture`, render passes must rebind texture IDs each frame.
 8. Black textures on web usually mean incorrect `GL_TEXTURE_MAX_LEVEL` — verify mip chain upload.
+9. Do not add a heliocentric float to a render-frame float (`sun->GetPosition() + GetOffset(...)`)
+   or cache a render-frame position across frames without shifting it in `MoveRenderOrigin`;
+   keep world positions (`GetWorldPosition`) in double instead, and multiply an art length
+   tied to a body by its `SizeFactor()` (§11.1).
 
 ---
 
-## 13. Local verification (summary)
+## 15. Local verification (summary)
 
 ```bash
 ./build-web.sh
@@ -737,11 +1752,22 @@ window.setQualityPreset(0);                     // 0=low, 1=medium, 2=full
 
 Expect proxy labels → staged download → low-res planet → LOD streaming overlay when close. With placeholders only, visual quality change is minimal; console logs and UI prove the code paths.
 
+Native, under Xvfb (`export MESA_GL_VERSION_OVERRIDE=4.6 MESA_GLSL_VERSION_OVERRIDE=460`):
+
+```bash
+cmake -B build-check -DSOLARSYSTEM_BUILD_TESTS=ON && cmake --build build-check -j
+ctest --test-dir build-check --exclude-regex '^gl\.'          # GL-free unit tests
+xvfb-run -a build-check/tests/SolarSystemGlTests              # GL tests (§7.2)
+SOLARSYSTEM_SHADER_SELFTEST=1 xvfb-run -a build-check/SolarSystem   # every permutation, both dialects
+SOLARSYSTEM_LOG=debug xvfb-run -a build-check/SolarSystem 2>&1 | grep FrameStats
+scripts/check-gl-handles.sh && scripts/check-source-rules.sh
+```
+
 Full scenarios: [docs/plans/TESTING_GUIDE.md](plans/TESTING_GUIDE.md).
 
 ---
 
-## 14. Related documentation
+## 16. Related documentation
 
 | Document | Purpose |
 |----------|---------|

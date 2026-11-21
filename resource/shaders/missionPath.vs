@@ -9,7 +9,9 @@ uniform mat4 view;
 uniform mat4 projection;
 uniform vec3 cameraPos;
 uniform float ribbonWidth;
-uniform float zCoef;
+// Render-frame position of the origin the path was uploaded against (Renderer::RenderMissionPaths);
+// zero for the XR pointer rays, which are streamed in the render frame.
+uniform vec3 pathOffset;
 
 out float vArcLength;
 out float vEdgeFade;
@@ -17,7 +19,7 @@ out float vEdgeFade;
 #include "common/log_depth.glsl"
 
 void main() {
-    vec3 worldPos = aPosition;
+    vec3 worldPos = aPosition + pathOffset;
     vec3 worldTangent = aTangent;
     float tLen = length(worldTangent);
     worldTangent = (tLen > 1e-5) ? worldTangent / tLen : vec3(0.0, 1.0, 0.0);
@@ -46,5 +48,5 @@ void main() {
     vEdgeFade = 1.0 - abs(aLineUV);
 
     gl_Position = projection * view * vec4(worldPos, 1.0);
-    gl_Position = ApplyLogDepth(gl_Position, zCoef);
+    gl_Position = ApplyLogDepth(gl_Position);
 }

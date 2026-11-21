@@ -1,0 +1,421 @@
+#include "Ephemeris.h"
+
+#include "../Solar_System/BodyCatalog.h"
+#include "LunarTheory.h"
+
+#include <algorithm>
+#include <chrono>
+#include <cmath>
+#include <ctime>
+
+namespace Ephemeris {
+namespace {
+
+constexpr double kPi = 3.14159265358979323846;
+constexpr double kTwoPi = 6.28318530717958647692;
+constexpr double kDegToRad = kPi / 180.0;
+constexpr double kDaysPerCentury = 36525.0;
+constexpr double kKmPerAu = 149597870.7;
+constexpr int kMoonId = 16;
+
+// Catalog satellites are placed from their orbit.keplerian row only where the row sets
+// orbit.placeFromElements (BodyCatalog::Entry::placeFromElements): the rows whose six
+// elements are all measured (Io, Europa, Ganymede, Callisto, Titan, Triton today). Every
+// other satellite row still ships OmegaDeg / omegaDeg / M0Deg = 0 placeholders, which would
+// swing the moon into a plainly wrong plane, so those keep the circular SatelliteOrbit
+// offset. Set the flag on a row once it gets measured angles; no C++ edit.
+//
+// Two documented approximations:
+// The Moon does not use the flag: it comes from the Meeus ch. 47 series (LunarTheory), because
+// mean elements cannot get its evection, variation and annual equation (up to 2.4 deg).
+//
+//  - Elements are J2000-epoch mean elements. The node and periapsis rates the row carries
+//    are applied; the large periodic terms are not — the Laplace resonance for the Galileans.
+//    Good enough to put a shadow on the right day, not to time a contact.
+//  - We treat i / Omega / omega as referred to the J2000 ecliptic. For Triton that is the
+//    published frame. For the Galileans and Titan the published frame is the
+//    parent's Laplace plane, so their orbit planes come out tilted by the parent's own
+//    obliquity (~3.1 deg for Jupiter, ~26.7 deg for Saturn) from the truth.
+
+struct Elements {
+    double a0, aDot;   // AU, AU/Cy
+    double e0, eDot;   // eccentricity
+    double I0, IDot;   // deg, deg/Cy
+    double L0, LDot;   // deg, deg/Cy
+    double wBar0, wBarDot; // longitude of perihelion deg, deg/Cy
+    double Om0, OmDot; // longitude of ascending node deg, deg/Cy
+};
+
+// JPL SSD Approximate Positions of the Planets — Table 1 (1800–2050 AD).
+// Order: Mercury, Venus, EM Bary (Earth), Mars, Jupiter, Saturn, Uranus, Neptune.
+constexpr Elements kStandish[] = {
+    // Mercury
+    {0.38709927, 0.00000037, 0.20563593, 0.00001906, 7.00497902, -0.00594749,
+     252.25032350, 149472.67411175, 77.45779628, 0.16047689, 48.33076593, -0.12534081},
+    // Venus
+    {0.72333566, 0.00000390, 0.00677672, -0.00004107, 3.39467605, -0.00078890,
+     181.97909950, 58517.81538729, 131.60246718, 0.00268329, 76.67984255, -0.27769418},
+    // Earth (EM Bary)
+    {1.00000261, 0.00000562, 0.01671123, -0.00004392, -0.00001531, -0.01294668,
+     100.46457166, 35999.37244981, 102.93768193, 0.32327364, 0.0, 0.0},
+    // Mars
+    {1.52371034, 0.00001847, 0.09339410, 0.00007882, 1.84969142, -0.00813131,
+     -4.55343205, 19140.30268499, -23.94362959, 0.44441088, 49.55953891, -0.29257343},
+    // Jupiter
+    {5.20288700, -0.00011607, 0.04838624, -0.00013253, 1.30439695, -0.00183714,
+     34.39644051, 3034.74612775, 14.72847983, 0.21252668, 100.47390909, 0.20469106},
+    // Saturn
+    {9.53667594, -0.00125060, 0.05386179, -0.00050991, 2.48599187, 0.00193609,
+     49.95424423, 1222.49362201, 92.59887831, -0.41897216, 113.66242448, -0.28867794},
+    // Uranus
+    {19.18916464, -0.00196176, 0.04725744, -0.00004397, 0.77263783, -0.00242939,
+     313.23810451, 428.48202785, 170.95427630, 0.40805281, 74.01692503, 0.04240589},
+    // Neptune
+    {30.06992276, 0.00026291, 0.00859048, 0.00005105, 1.77004347, 0.00035372,
+     -55.12002969, 218.45945325, 44.96476227, -0.32241464, 131.78422574, -0.00508664},
+};
+
+// Fixed-element Keplerian bodies: no Standish secular rates, just osculating elements
+// propagated in mean anomaly from their own epoch. Accuracy degrades away from that epoch
+// (~2° at 26 yr for the belt bodies) — fine for a visualiser, not for flight dynamics.
+struct KeplerBody {
+    double epochJd;
+    double a;        // AU
+    double e;
+    double IDeg;
+    double OmDeg;    // longitude of ascending node
+    double wDeg;     // argument of perihelion
+    double M0Deg;    // mean anomaly at epochJd
+    double nDegPerDay;
+};
+
+// Pluto: rough J2000 elements, mean motion from the ~248 yr sidereal period.
+constexpr KeplerBody kPluto{
+    kJ2000, 39.482, 0.2488, 17.16, 110.299, 113.834, 14.53, 360.0 / 90465.0};
+
+// Ceres and Vesta: JPL SBDB osculating elements, epoch 2461200.5 (2026-Aug-08 TDB),
+// solutions 48 / 39 respectively. Refresh from
+// https://ssd-api.jpl.nasa.gov/sbdb.api?sstr=ceres&full-prec=true if the drift ever matters.
+constexpr KeplerBody kCeres{
+    2461200.5, 2.765552595034094, 0.07969229514816586, 10.58802780183462,
+    80.24862682043221, 73.29421453021587, 274.4193463761342, 0.21430445064843};
+constexpr KeplerBody kVesta{
+    2461200.5, 2.361365965127599, 0.09020374382834395, 7.143925545058711,
+    103.701293265032, 151.4686478221564, 81.19015607686903, 0.2716183613599909};
+
+// Outer system (focus 12–15). Rounded JPL SBDB osculating elements; mean motion from
+// Kepler's third law (0.9856076686 / a^1.5 deg/day), so the period matches `a`.
+// The TNOs move < 1.5 deg/decade, so a fixed-element ellipse is fine for decades around
+// the epoch. Refresh from https://ssd-api.jpl.nasa.gov/sbdb.api?sstr=<name> if needed.
+constexpr KeplerBody kEris{
+    2460600.5, 67.86, 0.4370, 44.04, 35.95, 151.64, 205.99, 0.0017631258};
+constexpr KeplerBody kHaumea{
+    2460600.5, 43.12, 0.1964, 28.21, 121.80, 240.89, 219.62, 0.0034808551};
+constexpr KeplerBody kMakemake{
+    2460600.5, 45.51, 0.1604, 29.03, 79.27, 297.08, 168.83, 0.0032102867};
+// 1P/Halley: epoch is the 1986 perihelion (T = 1986-Feb-09.46 TDB), so M0 = 0. Planetary
+// perturbations shift each return by months; this ellipse lands the 1986 perihelion
+// exactly and the 2061 one within a few months — fine for a deep link, not for observing.
+constexpr KeplerBody kHalley{
+    2446470.96, 17.834, 0.96714, 162.26, 58.42, 111.33, 0.0, 0.0130867236};
+
+double wrapDeg180(double deg) {
+    deg = std::fmod(deg + 180.0, 360.0);
+    if (deg < 0.0) {
+        deg += 360.0;
+    }
+    return deg - 180.0;
+}
+
+double wrapRadTwoPi(double rad) {
+    rad = std::fmod(rad, kTwoPi);
+    if (rad < 0.0) {
+        rad += kTwoPi;
+    }
+    return rad;
+}
+
+/** Solve Kepler's equation M = E - e sin E (radians). */
+double solveKepler(double MRad, double e) {
+    MRad = wrapRadTwoPi(MRad);
+    if (MRad > kPi) {
+        MRad -= kTwoPi;
+    }
+
+    // M + e sin M is a good starter for e < ~0.3; Halley (e = 0.967) needs E0 = pi
+    // (Danby) or Newton can overshoot near perihelion.
+    double E = (e < 0.8) ? MRad + e * std::sin(MRad) : (MRad < 0.0 ? -kPi : kPi);
+    for (int i = 0; i < 50; ++i) {
+        const double dM = MRad - (E - e * std::sin(E));
+        const double dE = dM / (1.0 - e * std::cos(E));
+        E += dE;
+        if (std::fabs(dE) < 1e-10) {
+            break;
+        }
+    }
+    return E;
+}
+
+/** Ecliptic-of-J2000 Cartesian position for a classical element set (same units as `a`). */
+void orbitalPlaneToEcliptic(double a, double e, double IDeg, double OmDeg, double wDeg,
+                            double MDeg, double out[3]) {
+    const double I = IDeg * kDegToRad;
+    const double Om = OmDeg * kDegToRad;
+    const double w = wDeg * kDegToRad;
+    const double E = solveKepler(MDeg * kDegToRad, e);
+
+    const double xp = a * (std::cos(E) - e);
+    const double yp = a * std::sqrt(std::max(0.0, 1.0 - e * e)) * std::sin(E);
+
+    const double cosW = std::cos(w);
+    const double sinW = std::sin(w);
+    const double cosOm = std::cos(Om);
+    const double sinOm = std::sin(Om);
+    const double cosI = std::cos(I);
+    const double sinI = std::sin(I);
+
+    // J2000 ecliptic: x toward equinox, z toward north ecliptic pole.
+    const double xe =
+        (cosW * cosOm - sinW * sinOm * cosI) * xp + (-sinW * cosOm - cosW * sinOm * cosI) * yp;
+    const double ye =
+        (cosW * sinOm + sinW * cosOm * cosI) * xp + (-sinW * sinOm + cosW * cosOm * cosI) * yp;
+    const double ze = (sinW * sinI) * xp + (cosW * sinI) * yp;
+
+    out[0] = xe;
+    out[1] = ye;
+    out[2] = ze;
+}
+
+HelioLB fromOrbitalPlane(double a, double e, double IDeg, double OmDeg, double wDeg, double MDeg) {
+    double xyz[3] = {0.0, 0.0, 0.0};
+    orbitalPlaneToEcliptic(a, e, IDeg, OmDeg, wDeg, MDeg, xyz);
+
+    const double r = std::sqrt(xyz[0] * xyz[0] + xyz[1] * xyz[1] + xyz[2] * xyz[2]);
+    HelioLB out;
+    out.rAu = r;
+    if (r < 1e-12) {
+        return out;
+    }
+    out.lonRad = wrapRadTwoPi(std::atan2(xyz[1], xyz[0]));
+    out.latRad = std::asin(std::clamp(xyz[2] / r, -1.0, 1.0));
+    return out;
+}
+
+bool hasKeplerianSolution(int satelliteId) {
+    const BodyCatalog::Entry* entry = BodyCatalog::FindByIndex(satelliteId);
+    return entry && entry->placeFromElements;
+}
+
+HelioLB standishPosition(const Elements& el, double jd) {
+    const double T = (jd - kJ2000) / kDaysPerCentury;
+
+    const double a = el.a0 + el.aDot * T;
+    const double e = el.e0 + el.eDot * T;
+    const double I = el.I0 + el.IDot * T;
+    const double L = el.L0 + el.LDot * T;
+    const double wBar = el.wBar0 + el.wBarDot * T;
+    const double Om = el.Om0 + el.OmDot * T;
+
+    const double w = wBar - Om;
+    const double M = wrapDeg180(L - wBar);
+
+    return fromOrbitalPlane(a, e, I, Om, w, M);
+}
+
+HelioLB keplerPosition(const KeplerBody& body, double jd) {
+    const double M = wrapDeg180(body.M0Deg + body.nDegPerDay * (jd - body.epochJd));
+    return fromOrbitalPlane(body.a, body.e, body.IDeg, body.OmDeg, body.wDeg, M);
+}
+
+} // namespace
+
+double DeltaTSeconds(double jd) {
+    // Espenak & Meeus, "Five Millennium Canon of Solar Eclipses" polynomials. y is a decimal year.
+    const double y = 2000.0 + (jd - kJ2000) / 365.25;
+    if (y < 1800.0 || y >= 2150.0) {
+        const double u = (y - 1820.0) / 100.0;
+        return -20.0 + 32.0 * u * u;
+    }
+    if (y < 1860.0) {
+        const double t = y - 1800.0;
+        return 13.72 - 0.332447 * t + 0.0068612 * t * t + 0.0041116 * t * t * t -
+               0.00037436 * t * t * t * t + 0.0000121272 * std::pow(t, 5) -
+               0.0000001699 * std::pow(t, 6) + 0.000000000875 * std::pow(t, 7);
+    }
+    if (y < 1900.0) {
+        const double t = y - 1860.0;
+        return 7.62 + 0.5737 * t - 0.251754 * t * t + 0.01680668 * t * t * t -
+               0.0004473624 * t * t * t * t + std::pow(t, 5) / 233174.0;
+    }
+    if (y < 1920.0) {
+        const double t = y - 1900.0;
+        return -2.79 + 1.494119 * t - 0.0598939 * t * t + 0.0061966 * t * t * t -
+               0.000197 * t * t * t * t;
+    }
+    if (y < 1941.0) {
+        const double t = y - 1920.0;
+        return 21.20 + 0.84493 * t - 0.076100 * t * t + 0.0020936 * t * t * t;
+    }
+    if (y < 1961.0) {
+        const double t = y - 1950.0;
+        return 29.07 + 0.407 * t - t * t / 233.0 + t * t * t / 2547.0;
+    }
+    if (y < 1986.0) {
+        const double t = y - 1975.0;
+        return 45.45 + 1.067 * t - t * t / 260.0 - t * t * t / 718.0;
+    }
+    if (y < 2005.0) {
+        const double t = y - 2000.0;
+        return 63.86 + 0.3345 * t - 0.060374 * t * t + 0.0017275 * t * t * t +
+               0.000651814 * std::pow(t, 4) + 0.00002373599 * std::pow(t, 5);
+    }
+    if (y < 2050.0) {
+        const double t = y - 2000.0;
+        return 62.92 + 0.32217 * t + 0.005589 * t * t;
+    }
+    const double u = (y - 1820.0) / 100.0;
+    return -20.0 + 32.0 * u * u - 0.5628 * (2150.0 - y);
+}
+
+double JulianDateFromYmd(int year, int month, int day) {
+    // Meeus / Fliegel–Van Flandern civil calendar → Julian Date at 0h UT.
+    const int a = (14 - month) / 12;
+    const int y = year + 4800 - a;
+    const int m = month + 12 * a - 3;
+    const double jdn = day + (153 * m + 2) / 5 + 365 * y + y / 4 - y / 100 + y / 400 - 32045.0;
+    return jdn - 0.5;
+}
+
+void YmdFromJulianDate(double jd, int& year, int& month, int& day) {
+    // Convert to chronological Julian day number at noon-centered integer.
+    const long long J = static_cast<long long>(std::floor(jd + 0.5));
+    const long long f = J + 1401 + (((4 * J + 274277) / 146097) * 3) / 4 - 38;
+    const long long e = 4 * f + 3;
+    const long long g = (e % 1461) / 4;
+    const long long h = 5 * g + 2;
+    day = static_cast<int>((h % 153) / 5 + 1);
+    month = static_cast<int>((h / 153 + 2) % 12 + 1);
+    year = static_cast<int>(e / 1461 - 4716 + (12 + 2 - month) / 12);
+}
+
+double JulianDateNowUtc() {
+    using clock = std::chrono::system_clock;
+    const auto now = clock::now();
+    const std::time_t t = clock::to_time_t(now);
+    std::tm tmUtc{};
+#if defined(_WIN32)
+    gmtime_s(&tmUtc, &t);
+#else
+    gmtime_r(&t, &tmUtc);
+#endif
+    const double dayFraction =
+        (tmUtc.tm_hour + (tmUtc.tm_min + tmUtc.tm_sec / 60.0) / 60.0) / 24.0;
+    return JulianDateFromYmd(tmUtc.tm_year + 1900, tmUtc.tm_mon + 1, tmUtc.tm_mday) + dayFraction;
+}
+
+namespace {
+
+class StandishEphemeris final : public IEphemeris {
+public:
+    const char* Name() const override { return "standish"; }
+
+    HelioLB PlanetHeliocentric(int bodyIndex, double julianDate) const override {
+        // 0=Sun, 1=Mercury … 8=Neptune, 9=Pluto, 10=Ceres, 11=Vesta, 12–15 outer system
+        switch (bodyIndex) {
+            case 9:
+                return keplerPosition(kPluto, julianDate);
+            case 10:
+                return keplerPosition(kCeres, julianDate);
+            case 11:
+                return keplerPosition(kVesta, julianDate);
+            case 12:
+                return keplerPosition(kEris, julianDate);
+            case 13:
+                return keplerPosition(kHaumea, julianDate);
+            case 14:
+                return keplerPosition(kMakemake, julianDate);
+            case 15:
+                return keplerPosition(kHalley, julianDate);
+            default:
+                break;
+        }
+        if (bodyIndex <= 0 || bodyIndex > 8) {
+            return {};
+        }
+        return standishPosition(kStandish[bodyIndex - 1], julianDate);
+    }
+
+    bool SatelliteParentRelative(int satelliteId, double julianDate,
+                                 double outXyzAu[3]) const override {
+        outXyzAu[0] = outXyzAu[1] = outXyzAu[2] = 0.0;
+        if (satelliteId == kMoonId) {
+            // Meeus ch. 47 wants Julian Ephemeris Days; our dates are UTC-ish (≈ UT1).
+            LunarTheory::MoonGeocentricJ2000Au(julianDate + DeltaTSeconds(julianDate) / 86400.0, outXyzAu);
+            return true;
+        }
+        if (!hasKeplerianSolution(satelliteId)) {
+            return false;
+        }
+
+        const BodyCatalog::Entry* entry = BodyCatalog::FindByIndex(satelliteId);
+        if (!entry || entry->kind != BodyCatalog::Kind::Satellite ||
+            entry->keplerian.aKm <= 0.0f || entry->keplerian.nDegPerDay == 0.0f) {
+            return false;
+        }
+
+        // Catalog angles are all J2000 epoch values; there is no epoch column by design.
+        const BodyCatalog::Keplerian& k = entry->keplerian;
+        const double days = julianDate - kJ2000;
+        const double M = wrapDeg180(k.M0Deg + k.nDegPerDay * days);
+        const double Om = k.OmegaDeg + k.OmegaDotDegPerDay * days;
+        const double w = k.omegaDeg + k.omegaDotDegPerDay * days;
+        orbitalPlaneToEcliptic(k.aKm / kKmPerAu, k.e, k.iDeg, Om, w, M, outXyzAu);
+        return true;
+    }
+};
+
+const IEphemeris* g_backend = nullptr;
+
+} // namespace
+
+const IEphemeris& StandishBackend() {
+    static const StandishEphemeris instance;
+    return instance;
+}
+
+const IEphemeris& GetBackend() {
+    return g_backend ? *g_backend : StandishBackend();
+}
+
+void SetBackend(const IEphemeris* backend) {
+    g_backend = backend;
+}
+
+HelioLB KeplerianPosition(double aAu, double e, double iDeg, double OmegaDeg, double omegaDeg, double M0Deg,
+                          double nDegPerDay, double julianDate) {
+    const double M = wrapDeg180(M0Deg + nDegPerDay * (julianDate - kJ2000));
+    return fromOrbitalPlane(aAu, e, iDeg, OmegaDeg, omegaDeg, M);
+}
+
+HelioLB Position(int bodyIndex, double julianDate) {
+    return GetBackend().PlanetHeliocentric(bodyIndex, julianDate);
+}
+
+bool SatellitePosition(int satelliteId, double julianDate, double outXyzAu[3]) {
+    return GetBackend().SatelliteParentRelative(satelliteId, julianDate, outXyzAu);
+}
+
+double GreenwichMeanSiderealTimeDeg(double julianDate) {
+    // IAU 1982 GMST series (Aoki et al.), expressed in degrees. See the header for why
+    // feeding UTC rather than UT1/TT is good enough here.
+    const double T = (julianDate - kJ2000) / kDaysPerCentury;
+    const double seconds = 67310.54841 + (876600.0 * 3600.0 + 8640184.812866) * T +
+                           0.093104 * T * T - 6.2e-6 * T * T * T;
+    double deg = std::fmod(seconds / 240.0, 360.0); // 240 s of GMST == 1 degree
+    if (deg < 0.0) {
+        deg += 360.0;
+    }
+    return deg;
+}
+
+} // namespace Ephemeris

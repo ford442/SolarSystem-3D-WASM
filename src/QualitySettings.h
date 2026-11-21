@@ -18,6 +18,8 @@ struct QualityTierSettings {
     bool enableMagneticBloom;
     int magneticBloomPasses;
     int asteroidInstanceCount;
+    // Kuiper-disk rocks (a second AsteroidField population, drawn in realistic scale only).
+    int kuiperInstanceCount;
     TextureLodTier maxTextureLodTier;
     // LUT-based atmosphere (atmospherePbr.fs) on bodies whose catalog row has a `physical`
     // block; atmosphereSteps is the view-ray sample count. Off = the O'Neil shell.
@@ -30,20 +32,74 @@ struct QualityTierSettings {
     // How many of the brightest catalog stars Observe mode draws (the list is sorted by
     // magnitude, so this is a prefix). Planets, Sun and Moon are always drawn.
     int observeStarCount;
+    // Web staged loading: how many planet systems nearest the start pose load right away
+    // instead of waiting for the camera to approach them (see ActivateNearestPlanetSystems).
+    int eagerPlanetSystems;
+    // Height tiles on bodies flagged render.terrain (src/render/terrain/). A budget of 0 keeps
+    // every body its sphere and never fetches a tile. The pixel error is the largest a tile's
+    // quad may span on screen before it splits; the in-flight cap bounds tile downloads.
+    int terrainBudgetMiB;
+    float terrainPixelError;
+    int terrainMaxInFlight;
+    // Observe's constellation lines: only the 20 `core` figures of constellation_lines.json
+    // (Low), or all of them. Either way a segment is drawn only if both its stars are.
+    bool observeCoreConstellationsOnly;
+    // Space weather (docs/ARCHITECTURE.md §13). Solar-wind particles when the layer is on (0:
+    // none); the auroral shell's look — 0 a static ring, 1 an animated oval, 2 curtains with
+    // bloom; the Sun's photosphere — 0 the spectrum sprite, 1 granulation, 2 granulation and
+    // the sunspot cycle's spots. Low and every mobile tier keep the frame time they had.
+    int solarWindParticles;
+    int auroraMode;
+    int photosphereMode;
     const char* name;
 };
 
+/**
+ * Samples to ask the GL context for. A tier that renders through the HDR target gets none:
+ * the colour pass draws into HDR's single-sampled texture, so default-framebuffer MSAA would
+ * only resolve an image that is already resolved. Those tiers antialias in the tone-map
+ * pass instead (hdr.fs). Native applies this with GLFW_SAMPLES; web mirrors it in
+ * web/src/webglContext.ts, which owns the context attributes.
+ */
+int ContextMsaaSamples(const QualityTierSettings& settings);
+
+/** What actually antialiases the final image. */
+enum class AntialiasPath : uint8_t {
+    None,
+    ContextMsaa, // multisampled default framebuffer, drawn into directly (HDR off)
+    HdrResolve,  // FXAA inside the tone-map pass
+};
+AntialiasPath ResolveAntialiasPath(bool hdrEnabled, int contextSamples);
+const char* AntialiasPathName(AntialiasPath path);
+
 std::string GetTexturePath(const std::string& lowRes, const std::string& highRes);
+/**
+ * Whether LOD-managed textures start at their low tier and stream up through
+ * TextureLODController (decode in a job, upload under the frame budget). Always on the web;
+ * native opts in with SOLARSYSTEM_TEXTURE_LOD=1 and otherwise loads the high tier at start-up.
+ */
+bool TextureLodStreamingEnabled();
+/** The path an LOD-managed texture is first built from: the low tier when streaming, else GetTexturePath. */
+std::string GetLodStartTexturePath(const std::string& lowRes, const std::string& highRes);
 QualityTierSettings GetQualitySettings(int preset, bool mobile);
-TextureLodTier GetMaxTextureLodTier();
+/**
+ * What the quality tier allows the texture LOD controllers: the highest tier they may
+ * stream, and the factor on a planet's upgrade distance (web Medium upgrades 1.5x closer).
+ */
+struct TextureLodPolicy {
+    TextureLodTier maxTier = TextureLodTier::High;
+    float planetThresholdScale = 1.0f;
+};
+TextureLodPolicy GetTextureLodPolicy(int preset, bool mobile);
 const char* TextureLodTierName(TextureLodTier tier);
-void LogQualityTier(const QualityTierSettings& settings, bool hdrEnabled, int shadowQuality);
+/** `contextSamples` is what GL_SAMPLES reported, not what the tier asked for. */
+void LogQualityTier(const QualityTierSettings& settings, bool hdrEnabled, int shadowQuality, int contextSamples);
 
 /**
  * Quality tier to build the GL context from, before any UI exists. Web reads
  * window.__solarSystemInit (set from the ?quality= query parameter); native reads the
  * SOLARSYSTEM_QUALITY environment variable ("low"/"medium"/"full" or 0/1/2). Defaults to
- * 2 ("full"). This is the only point where MSAA can still be chosen — see LogQualityTier.
+ * 2 ("full"). This is the only point where context MSAA can still be chosen — see ContextMsaaSamples.
  */
 int ReadInitialQualityPreset();
 

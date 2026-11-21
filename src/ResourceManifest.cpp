@@ -1,16 +1,19 @@
 #include "Application.h"
 #include "ResourceManifest.h"
+#include "assets/ModelCache.h"
 #include "QualitySettings.h"
-#include "Auxiliary_Modules/WebResourceFetcher.h"
+#include "assets/WebResourceFetcher.h"
 #include "Solar_System/TexturePaths.h"
 #include <array>
 #include <chrono>
 #include <fstream>
-#include <iostream>
+#include "core/Log.h"
 #include <random>
+#include <string>
+#include <utility>
 #include <vector>
-
-using namespace std;
+#include <algorithm>
+#include <cstdint>
 
 namespace {
 constexpr std::array<const char*, 6> kLowSkyBoxFaces = {
@@ -56,6 +59,11 @@ void Application::LoadCoreResources() {
     struct CoreResource {
         std::string url;
         std::string virtualPath;
+        // Tried (into the same virtualPath) when url fails; empty for none.
+        std::string fallbackUrl;
+
+        CoreResource(std::string urlIn, std::string virtualPathIn, std::string fallbackUrlIn = std::string())
+            : url(std::move(urlIn)), virtualPath(std::move(virtualPathIn)), fallbackUrl(std::move(fallbackUrlIn)) {}
     };
 
     std::vector<CoreResource> coreResources = {
@@ -79,55 +87,52 @@ void Application::LoadCoreResources() {
         // fetch from resource/textures_low/Main_SkyBox/ (not the high-res
         // resource/textures/Main_SkyBox/ which 404s when only placeholder files
         // are deployed).  On native both paths are the high-res path anyway.
-        coreResources.push_back({skyBoxFaces[i], skyBoxFaces[i]});
+        // Deployments have shipped only resource/textures/Main_SkyBox/ (the low-res
+        // folder 404s), so retry the high-res face rather than fall back to black.
+        const std::string highFace = kHighSkyBoxFaces[i];
+        coreResources.push_back({skyBoxFaces[i], skyBoxFaces[i],
+                                 highFace != skyBoxFaces[i] ? highFace : std::string()});
     }
 
     _totalResources = static_cast<int>(coreResources.size());
     _resourcesPending = _totalResources;
+    _resourcesFailed = 0;
 
-    std::cout << "Loading " << _totalResources << " core resources..." << std::endl;
+    LOG_INFO("Loading", "Loading %d core resources...", _totalResources);
     UpdateLoadingProgress();
 
     for (const auto& res : coreResources) {
-        WebResourceFetcher::DownloadFile(res.url, res.virtualPath, [this, virtualPath = res.virtualPath](bool success) {
-            _resourcesPending--;
-            if (!success) {
-                std::cerr << "[Loading] Failed to download required core resource: " << virtualPath << std::endl;
-            }
-            UpdateLoadingProgress();
-        });
+        std::vector<std::string> urls{res.url};
+        if (!res.fallbackUrl.empty()) {
+            urls.push_back(res.fallbackUrl);
+        }
+        // A face the deployment lacks keeps its preloaded placeholder (KeptResident); only a
+        // resource with no copy anywhere counts as failed.
+        WebResourceFetcher::DownloadWithFallback(std::move(urls), res.virtualPath,
+            [this, virtualPath = res.virtualPath](WebResourceFetcher::FetchOutcome outcome) {
+                _resourcesPending--;
+                if (outcome == WebResourceFetcher::FetchOutcome::Failed) {
+                    _resourcesFailed++;
+                    LOG_ERROR("Loading", "Failed to download required core resource: %s", virtualPath.c_str());
+                } else if (virtualPath.size() > 4 && virtualPath.compare(virtualPath.size() - 4, 4, ".obj") == 0) {
+                    // Parse it in a job now, while the rest downloads; MeshHolder picks it up.
+                    ModelCache::Prefetch(virtualPath);
+                }
+                UpdateLoadingProgress();
+            });
     }
-}
-
-void Application::LoadOptionalSounds() {
-#ifdef __EMSCRIPTEN__
-    const auto& songPaths = GetBackgroundSongPaths();
-    std::cout << "[Audio] Starting optional background music download ("
-              << songPaths.size() << " tracks)..." << std::endl;
-
-    for (const auto& path : songPaths) {
-        WebResourceFetcher::DownloadFile(path, path, [this, path](bool success) {
-            if (success && WebResourceFetcher::ResourceExists(path)) {
-                _availableSongPaths.insert(path);
-                std::cout << "[Audio] Loaded track: " << path << std::endl;
-                return;
-            }
-
-            std::cerr << "[Audio] Missing track (skipped): " << path << std::endl;
-        });
-    }
-#endif
 }
 
 void Application::InitSongList() {
     _backgroundSongPaths = GetBackgroundSongPaths();
 
-    default_random_engine randEngine(static_cast<uint32_t>(chrono::high_resolution_clock::now().time_since_epoch().count()));
-    shuffle(_backgroundSongPaths.begin(), _backgroundSongPaths.end(), randEngine);
+    std::default_random_engine randEngine(
+        static_cast<uint32_t>(std::chrono::high_resolution_clock::now().time_since_epoch().count()));
+    std::shuffle(_backgroundSongPaths.begin(), _backgroundSongPaths.end(), randEngine);
 
 #if defined(SOLARSYSTEM_USE_SDL_MIXER) && !defined(__EMSCRIPTEN__)
     for (const auto& path : _backgroundSongPaths) {
-        ifstream songFile(path);
+        std::ifstream songFile(path);
         if (songFile.good()) {
             _availableSongPaths.insert(path);
         }

@@ -1,25 +1,32 @@
 #ifndef SOLARSYSTEM_STAR_H
 #define SOLARSYSTEM_STAR_H
 #include "SpaceObject.h"
-#include "../Auxiliary_Modules/TextureImage2D.h"
+#include "../gfx/TextureImage2D.h"
+#include "../gfx/GlHandle.h"
 #include <array>
 #include <optional>
 #include <vector>
 
 struct StarInfo {
     MeshHolder starModel;
-    const Shader* starShader;
-    const Shader* glowStarShader;
     TextureImage2D starSpectrum;
     float starTemperature;
     float starRadius;
     std::wstring engName;
     std::wstring otherLangName;
     glm::vec3 glowTintMult;
+    /**
+     * The star's light relative to the Sun's (StarPhysics::RelativeTint of render.star's
+     * effective temperature): (1, 1, 1) for the Sun. Multiplies the glow tint, the corona and
+     * every lit surface (FrameUBO.starColor).
+     */
+    glm::vec3 lightTint{1.0f};
+    /** render.star.activity: 0 for the Sun; a flaring red dwarf's corona churns with it (a visual, not a model). */
+    float activity = 0.0f;
 
-    explicit StarInfo(MeshHolder model, const Shader& shader, const Shader& glowShader, const TextureImage2D& spectrum, float temperature,
+    explicit StarInfo(MeshHolder model, TextureImage2D spectrum, float temperature,
                       float radius, const glm::vec3& glowTintMult, std::wstring engName = L"", std::wstring otherLangName = L"") :
-                      starModel(std::move(model)), starShader(&shader), glowStarShader(&glowShader), starSpectrum(spectrum),
+                      starModel(std::move(model)), starSpectrum(std::move(spectrum)),
                       starTemperature(temperature), starRadius(radius), engName(std::move(engName)), otherLangName(std::move(otherLangName)),
                       glowTintMult(glowTintMult) {}
 };
@@ -34,9 +41,9 @@ struct RingCameraInfo {
 
 class Star : public SpaceObject {
 public:
-    explicit Star(const StarInfo& starInfo);
+    explicit Star(StarInfo&& starInfo);
     virtual void TakeStarSystemCenter() = 0;
-    void RenderGlow(const glm::mat4& projection, const glm::mat4& view, const glm::vec3& vs, float aspect, float distance,
+    void RenderGlow(const Shader& glowShader, const glm::mat4& projection, const glm::mat4& view, const glm::vec3& vs, float aspect, float distance,
                     const std::optional<RingCameraInfo>& ringCameraInfo, float starTemperature = 5778.0f);
     void SetVisibility(float visibility);
     float GetStarTemperatureInKelvin() const;
@@ -47,12 +54,13 @@ public:
     GLuint GetStarSpectrumTexture() const;
     glm::vec3 GetShiftColor() const;
     glm::vec3 GetGlowTintMult() const;
+    glm::vec3 GetLightTint() const { return _lightTint; }
+    float GetActivity() const { return _activity; }
     /** Drawn radius in scene units (sphere.obj's radius 2 times the Sun's 0.5 scale). */
     virtual float GetSceneRadius() const { return 1.0f; }
     /** `count` instances of the unit glow quad: the slices of the volumetric corona. */
     void DrawCoronaSlices(int count) const;
-    GLuint& GetStarOcclusionValue(size_t index);
-    std::array<GLuint, 2>& GetStarOcclusion();
+    GLuint GetStarOcclusionValue(size_t index) const;
 
 private:
     float _starTemperature;
@@ -61,10 +69,12 @@ private:
     float _visibility = 1.0;
     float _currentGlowSize = 0.0;
     glm::vec3 _starShiftColor = glm::vec3(), _glowTintMult;
+    glm::vec3 _lightTint{1.0f};
+    float _activity = 0.0f;
     TextureImage2D _starSpectrumTexture;
-    std::array<GLuint, 2> _starOcclusion;
-    GLuint _glowVao = 0, _glowVbo = 0, _glowEbo = 0;
-    const Shader* _glowShader;
+    std::array<GlQuery, 2> _starOcclusion; // native only: WebGL 2 has no GL_SAMPLES_PASSED
+    GlVertexArray _glowVao;
+    GlBuffer _glowVbo, _glowEbo;
 
     void InitBuffers();
     void CalculateShiftColor();

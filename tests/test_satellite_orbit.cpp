@@ -4,15 +4,15 @@
 
 #include <glm/glm.hpp>
 
-#include "Auxiliary_Modules/Ephemeris.h"
-#include "Solar_System/BodyCatalog.generated.h"
+#include "astro/Ephemeris.h"
+#include "Solar_System/BodyCatalog.h"
 #include "Solar_System/SatelliteOrbit.h"
 
 namespace {
 
-constexpr int kMoonIndex = 12;
-constexpr int kIoIndex = 15;
-constexpr int kMimasIndex = 19; // placeholder Keplerian row — stays on the circular path
+constexpr int kMoonIndex = 16;
+constexpr int kIoIndex = 19;
+constexpr int kMimasIndex = 23; // placeholder Keplerian row — stays on the circular path
 
 const BodyCatalog::Entry& Row(int index) {
     const BodyCatalog::Entry* entry = BodyCatalog::FindByIndex(index);

@@ -1,0 +1,11 @@
+dist/
+node_modules/
+public/
+threejs/
+test-results/
+playwright-report/
+package-lock.json
+# Regenerated wholesale by scripts/generate-*.mjs (their --check mode guards them)
+src/generated/
+src/wasmBridge.exports.ts
+src/SolarSystem.d.ts
