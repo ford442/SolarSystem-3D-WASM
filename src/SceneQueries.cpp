@@ -3,21 +3,18 @@
 // preloads, the HUD mask and pending assets. The timeline itself is evaluated in TypeScript
 // (web/src/timeline.ts); fixed-step capture is the Cinematics module (Cinematics.h).
 #include "Application.h"
+#include "Renderer.h"
+#include "Solar_System/SpaceObject.h"
 #include "Solar_System/BodyCatalog.h"
 #include "Solar_System/CatalogSatellite.h"
 #include "Solar_System/OrbitLayout.h"
 #include "Solar_System/SceneScale.h"
 #include "assets/TextureLoadingQueue.h"
-#include "core/Log.h"
 #include <algorithm>
-#include <cstddef>
 #include <cstdio>
+#include <memory>
 #include <cstdlib>
-#include <fstream>
-#include <ios>
-#include <sstream>
 #include <string>
-#include <vector>
 
 namespace {
 

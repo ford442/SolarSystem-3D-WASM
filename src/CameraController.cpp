@@ -10,7 +10,6 @@
 #include "Solar_System/OrbitLayout.h"
 #include "Solar_System/SceneScale.h"
 #include "Solar_System/SpaceObject.h"
-#include "Solar_System/Star.h"
 #include "TerrainController.h"
 #include "core/Camera.h"
 #include "core/CameraNavigation.h"

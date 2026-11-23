@@ -356,6 +356,8 @@ void Application::EnableGlDebugOutput() {
         glEnable(GL_DEBUG_OUTPUT);
         glEnable(GL_DEBUG_OUTPUT_SYNCHRONOUS);
         glDebugMessageCallback(GlDebugCallback, nullptr);
+        // Every frame-graph pass a debug group, so RenderDoc and apitrace show the graph.
+        _renderer.SetDebugGroups(glPushDebugGroup != nullptr);
         LOG_INFO("GL", "KHR_debug output enabled");
     }
 #endif

@@ -13,7 +13,9 @@
 #include "gfx/Frustum.h"
 #include "gfx/ShadowFit.h"
 #include <algorithm>
+#include <cmath>
 #include <cstddef>
+#include <cstdint>
 #include <vector>
 
 void Application::UpdateScene(double julianDate) {

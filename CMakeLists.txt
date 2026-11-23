@@ -301,7 +301,7 @@ if(EMSCRIPTEN)
         "SHELL:-sEXPORT_ES6=1"
         # 'GL' is needed so web/src/wasmBridge.ts can register the XRWebGLLayer's opaque
         # framebuffer in Emscripten's GL name table; without a name the WASM side cannot
-        # rebind it after an off-screen pass (see SceneRenderer.cpp ShadowMapPass).
+        # rebind it after an off-screen pass (see render/passes/ShadowPasses.cpp).
         "SHELL:-sEXPORTED_RUNTIME_METHODS=['ccall','cwrap','HEAPF32','GL','UTF8ToString','FS']"
         # Default list (see emscripten/src/settings.js INCOMING_MODULE_JS_API) plus
         # 'preinitializedWebGLContext' — web/src/bootstrap.ts creates the WebGL2 context

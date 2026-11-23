@@ -45,7 +45,7 @@ private:
     std::unique_ptr<Terrain::TerrainSystem> _terrain;
     std::vector<SceneSnapshot::TerrainBody> _selection;
     std::string _logged; // the last [Terrain] stats line, and when it went out
-    double _loggedAt = 0.0;
+    double _loggedAt = 0.0; // steady_clock seconds
 };
 
 #endif // SOLARSYSTEM_TERRAINCONTROLLER_H

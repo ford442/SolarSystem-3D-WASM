@@ -136,6 +136,8 @@ public:
     void SetUploadPump(std::function<void()> pump) { _uploadPump = std::move(pump); }
     /** Where per-pass timings go (any may be null): see rhi::GlCommandList::SetProfiling. */
     void SetProfiling(GpuTimer* gpu, FrameProfile::PassTimings* passes, FrameProfile::CpuStages* stages);
+    /** Native, with a KHR_debug context: a debug group named after each frame-graph pass. */
+    void SetDebugGroups(bool enabled);
     /** The last frame's compiled graph. */
     const FrameGraph::Graph& Graph() const { return _graph; }
     /**

@@ -144,6 +144,10 @@ void Renderer::SetProfiling(GpuTimer* gpu, FrameProfile::PassTimings* passes, Fr
     _commands->SetProfiling(gpu, passes, stages);
 }
 
+void Renderer::SetDebugGroups(bool enabled) {
+    _commands->SetDebugGroups(enabled);
+}
+
 void Renderer::DumpGraphIfChanged() {
     if (!_graphDump) {
         return;

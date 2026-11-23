@@ -574,6 +574,28 @@ Smaller LOD = closer for upgrade. Larger activation = planets "pop in" from fart
 
 **Related GitHub Issues (cross-linked per P3 task)**: #51–#58 (mipmap safety, async/queue, feedback/UI, presets+memory, staged+proxies, render, nav, docs alignment).
 
+## Native golden images (refactors that must not change pixels)
+
+A change that should not alter the picture — the frame graph, a pass moved onto the RHI, a
+module split — is checked by drawing the same shots with the old and the new binary and
+diffing them (docs/ARCHITECTURE.md §7.5):
+
+```bash
+# Build the base (e.g. a worktree of main) and the change, then:
+scripts/golden-native.sh <base>/build/SolarSystem /tmp/golden-base
+scripts/golden-native.sh build/SolarSystem /tmp/golden-change
+scripts/golden-compare.py /tmp/golden-base /tmp/golden-change --diff /tmp/golden-diff
+```
+
+Each shot is `SOLARSYSTEM_GOLDEN=frames=N,out=<ppm>[,focus=i,jd=d,fields=1]` under Xvfb/llvmpipe
+on Low, Medium and Full: the default start view, Earth, Saturn, Jupiter and the Sun with field
+lines (and their bloom), Earth with the solar wind at Kp 7, Earth on realistic scale, and
+Observe. Jobs run inline and the date is pinned before the scene is built, so two runs of one
+binary are byte-identical; any `DIFFERS` line is the build. A checkout lacks the deploy
+textures and the moon/ring models, so the script stages a scratch `resource/` with stand-ins
+(set `GOLDEN_ROOT` to a full asset tree to use the real ones). `GOLDEN_ONLY='saturn|observe'`
+and `GOLDEN_TIERS=full` narrow the matrix.
+
 ## Additional Notes
 
 ### Adjusting LOD Threshold

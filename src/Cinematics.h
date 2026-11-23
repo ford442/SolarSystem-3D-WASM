@@ -63,8 +63,10 @@ private:
     bool _active = false;
     double _stepSeconds = 0.0;
     bool _resized = false; // Begin set a render size; End fits the canvas again
-    int _width = 0;        // that size, re-asserted before every captured frame
+#ifdef __EMSCRIPTEN__
+    int _width = 0; // that size, re-asserted before every captured frame
     int _height = 0;
+#endif
     bool _frozenHud = false;
     std::string _readbackPath;
 };

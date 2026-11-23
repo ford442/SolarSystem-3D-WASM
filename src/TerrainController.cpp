@@ -3,6 +3,7 @@
 // and the [Terrain] log line. The quadtree, cache and LOD are GL-free in src/render/terrain/;
 // Renderer draws what Contribute puts in the frame snapshot.
 #include "TerrainController.h"
+#include "FrameContext.h"
 #include "ApplicationTypes.h"
 #include "IAppModule.h"
 #include "ObserveState.h"
@@ -11,13 +12,13 @@
 #include "SimState.h"
 #include "Solar_System/BodyCatalog.h"
 #include "Solar_System/SpaceObject.h"
-#include "SystemModules.h"
 #include "gfx/Frustum.h"
 #include "assets/WebResourceFetcher.h"
 #include "core/CameraNavigation.h"
 #include "core/Log.h"
 #include "render/terrain/TerrainSystem.h"
 #include <algorithm>
+#include <chrono>
 #include <cmath>
 #include <cstddef>
 #include <cstdint>
@@ -160,7 +161,7 @@ void TerrainController::Update(SimState& sim) {
         char gpu[48];
         std::snprintf(gpu, sizeof(gpu), ", %zu on the GPU", _renderer.TerrainTextureCount());
         const std::string line = _terrain->StatsLine() + gpu;
-        const double now = glfwGetTime();
+        const double now = std::chrono::duration<double>(std::chrono::steady_clock::now().time_since_epoch()).count();
         if (!anyActive || (line != _logged && now - _loggedAt >= kTerrainLogSeconds)) {
             LOG_INFO("Terrain", "%s", line.c_str());
             _logged = anyActive ? line : std::string();

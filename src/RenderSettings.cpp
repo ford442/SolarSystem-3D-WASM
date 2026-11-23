@@ -2,6 +2,7 @@
 // they resize, the orbit distance scale mode, and the texture LOD manager that trades
 // high-res textures in and out as the camera moves.
 #include "Application.h"
+#include "CameraController.h"
 #include "QualitySettings.h"
 #include "assets/TextureLoadingQueue.h"
 #include "Solar_System/OrbitLayout.h"

@@ -9,7 +9,6 @@
 #include <cstdlib>
 #include <sstream>
 #include <string>
-#include <utility>
 #ifdef __EMSCRIPTEN__
 #include <emscripten/html5.h>
 #else

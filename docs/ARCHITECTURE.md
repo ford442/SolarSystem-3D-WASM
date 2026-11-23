@@ -433,8 +433,10 @@ See [README.md § Runtime asset hosting](../README.md#runtime-asset-hosting) for
 
 | Module | Role |
 |--------|------|
-| `Application` | Scene graph, simulation (`UpdateScene`, once per frame), culling, loading orchestration, quality presets |
-| `Renderer` / `FrameContext` / `FramePasses` | Draw passes and the GPU resources they own; each pass reads only its `FrameContext`; `FramePasses` is the GL-free frame order (§7.5) |
+| `Application` | Lifecycle, the frame loop, scene placement (`UpdateScene`, once per frame, `SceneFrame.cpp`), culling, loading orchestration, quality presets, and the module list below |
+| `IAppModule` / `ModuleContext` | A subsystem that owns its state and, once a frame after the scene is placed, runs `Update(SimState&)` then `Contribute(SceneSnapshot&)`: `TerrainController` (§11.3), `SpaceWeatherController` (§13), `MissionController` (probe catalog, focus/follow, per-frame probe positions). `ModuleContext` is their read-only view of Application (components, star, views, Observe, frame step) |
+| `CameraController`, `Cinematics`, `FrameProfiler`, `SkyEventCache` | Owned by Application but outside the module loop: the camera's anchor/floor/clip planes (around the input, §11.1), fixed-step capture and the golden readback (§11.2), stage and pass timing (§7.5), the cached sky-event searches |
+| `Renderer` / `FrameContext` | Draw passes and the GPU resources they own; each pass reads only its `FrameContext`. `Renderer` is the `FramePlan::PassSink` behind every frame-graph pass (§7.5); the pass bodies are `src/render/passes/` |
 | `SystemModules.h` | Platform-conditional GLFW/SDL/audio/FreeType includes; the GL header and the WASM `glBindTextureUnit` polyfill come from `gfx/GlPlatform.h` |
 
 ### 7.2 Subsystems by folder
@@ -460,6 +462,10 @@ logging out of `src/`.
 | | `TextureImage2D`, `FloatLutTexture` | DDS/KTX2 load, reload, mip level management; baked RGBA16F LUTs (quiet `nullopt` instead of a checkerboard) |
 | | `ShadowMapFBO`, `HDR`, `Frustum.h` | Shadow map target; star HDR target; frustum test and fitted depth range (§7.5) |
 | | `GlCapabilities` | One probe of extensions and limits (compressed formats, float FBOs, parallel compile) |
+| `gfx/rhi/` | `RhiTypes.h`, `CommandList`, `GlCommandList` | The thin render-hardware interface the frame graph records through: `TextureDesc`, `PipelineState` (optional fields: a delta, so a pass moved onto it issues the same GL calls), a fixed-size `BindGroup`, and `CommandList` (`BeginPass`/`EndPass`, target, clear, state, bindings, full-screen triangle). `GlCommandList` is the only backend: it opens each pass's GPU timer scope, CPU timing and (native, KHR_debug) debug group (§7.5) |
+| `render/graph/` | `FrameGraph` | GL-free: passes declare versioned reads/writes of virtual resources; `Compile()` culls, orders and aliases transients; `ToDot`/`ToJson` (§7.5) |
+| | `FramePlan` | GL-free: this app's frame declared on the graph from a `Features` struct, calling a `PassSink` (`tests/test_frame_plan.cpp`) |
+| `render/passes/` | `RendererSetup`, `RendererFrame`, `ShadowPasses`, `ScenePasses`, `ShellPasses`, `StarPasses`, `OverlayPasses`, `SpaceWeatherPasses`, `HudPasses`, `ObservePasses` | `Renderer`'s members by pass family: resources and their lifetime; `DescribeFrame`/`RenderFrame`/`BeginView`; one file per family of passes |
 | `render/` | `LensFlare`, `TextRenderer` | Star lens flare; FreeType HUD text |
 | | `OrbitPathRenderer` | Faint heliocentric `GL_LINE_LOOP` guides |
 | | `MissionPathRenderer` | Sampled probe ribbons (Voyager); quality downsample; AU→scene via `HelioAuToScene` |
@@ -521,7 +527,7 @@ Observe puts the camera on Earth at a lat/lon and a UTC instant (`?mode=observe&
 | `Solar_System/ObserveSky.*`, `shaders/observe*.{vs,fs}` | The sky pass: the physical sky above or an analytic sky/ground gradient from the Sun's altitude, additive point sprites for planets, an additive Sun disc with limb darkening and halo, and an alpha-blended lit Moon disc. Stars are one static instance buffer of J2000 unit vectors, rotated into the horizon frame by a single matrix uniform (`Observer::HorizonFromEquatorialJ2000`); their size and brightness come from `LimitingMagnitude(sunAlt)` in the vertex shader, so they fade in through twilight. Stars and planets are fixed-size screen-space points (round out to the edge of a wide FOV); the Sun and Moon are true angular discs on the tangent plane. A planet becomes a tangent-plane disc too once its true radius (`SkyBody::angRadiusDeg`, IAU equatorial radius over geocentric distance; Saturn without rings) reaches 2 px and half its point sprite — in practice only in a telescope field — lit from the Sun's side using the phase angle and bright-limb angle packed into the instance (`params.zw`), so Venus shows its crescent. `tangentBasis` in `ObserveSky.cpp` must match the vertex shader's basis for that angle to land. Camera at the origin, no depth buffer, drawn back to front. Per-instance varyings are `flat` — an interpolated float `kind` will occasionally round to the wrong branch. |
 | `resource/sky/bright_stars.json` | The 5000 brightest Yale BSC5 stars (public domain), generated by `scripts/generate-star-catalog.mjs --input <catalog>` (the raw catalogue is not committed; `--check` validates the committed file, or compares against `--input`). Columnar `[ra, dec, vmag, bv]` in J2000 degrees, sorted by magnitude so a quality tier draws a prefix (`observeStarCount`: Low 500, Medium 2000, Full 5000). Preloaded for web (`--preload-file resource/sky`) and read lazily on the first Observe frame. Proper motion is ignored. |
 | `resource/sky/constellation_lines.json` | Stick figures as index pairs into `bright_stars.json`, generated by `scripts/generate-constellation-lines.mjs --input <catalog>` (`--check` validates against the shipped stars). The IAU defines boundaries, not figures, so the 39 figures (238 segments) are authored in the script as Bayer/Flamsteed designations and joined through the same BSC5 file; 20 are `core`. `StarCatalog::ParseConstellations` rejects a file whose `starCount` differs from the star catalog (a misjoin). `ObserveSky` subdivides each segment (refraction is per vertex) and draws them as thin additive `GL_LINES` under the stars with the stars' rotation matrix, so precession moves both; they fade in as the limiting magnitude passes ~2–5. A segment is drawn only if both its stars are within the tier's star prefix; Low (`observeCoreConstellationsOnly`) draws the core 20 only. Toggled by the panel's **Constellation lines** switch (`SetObserveConstellations`, persisted in the panel's local storage). No names or art. |
-| `ObserveRenderer.cpp` | `Renderer::RenderObserveSky` (view/projection, XR eyes, Earth's LUTs for the daytime sky) and `RenderObserveHud` (compass, body names, readout, disclaimer). |
+| `render/passes/ObservePasses.cpp` | The `observe-sky` and `observe-hud` passes: `Renderer::RenderObserveSky` (view/projection, XR eyes, Earth's LUTs for the daytime sky) and `RenderObserveHud` (compass, body names, readout, disclaimer). |
 
 **Seated sky in a headset.** `RenderXrStereoFrame` already calls `RenderFrameContent` per eye, so Observe needs only the sky pass to accept the eye matrices. `SeatedView::ViewRotation` (header-only, unit-tested) is `mat3(eye.view) * rotateY(heading)`: the headset supplies pitch, roll and yaw inside the room, and a single rotation about the vertical — the azimuth the room's forward currently faces, which is the camera yaw + 90° — ties that to the horizon frame. Translation is dropped (the sky is at infinity) and the camera's pitch is ignored (it is the viewer's own head). A level head reproduces the flat-screen camera exactly (test). `ObserveSky` already sizes stars and planets in pixels from the eye's viewport and projection, and the world-anchored compass/body/star labels are drawn per eye through `RenderObserveLabels`, scaled with the eye's resolution; the 2D readout is not drawn in a headset. In `webxr.ts`, while Observe is active the sticks stop flying: the left stick scrubs time (quadratic, up to 3 simulated hours per second, via `setSimulationEpoch`), the right stick snap-turns the heading by 30° (via `setObserveView`), `setTouchMovement` is held at zero, and the XR tooltip says so. Not exercised in CI (the Enter VR button stays hidden without `navigator.xr`); the maths is covered by `tests/test_seated_view.cpp`.
 
@@ -535,18 +541,96 @@ Web: `web/src/observe.ts` (panel, sites, rates, 2017 preset, eyepieces and the t
 
 ### 7.5 Frame pipeline
 
-One frame (`Application::RenderFrame` → `FramePasses::Run`):
+One frame (`Application::RenderFrame`, `SceneFrame.cpp`):
 
-1. **Simulate once** (`UpdateScene`): orbit placement, light frusta, belts, mission probes,
-   LOD, the nearest-planet search, sky events. XR does this once for both eyes.
+1. **Simulate once** (`UpdateScene`): orbit placement, light frusta, belts, LOD, the
+   nearest-planet search, sky events. XR does this once for both eyes.
 2. **Snapshot** (`BuildFrameSnapshot`): one `CameraView` per view and a `SceneSnapshot`; the
    passes see the frame only through a `FrameContext` built from them.
 3. **Cull** (`CullScene`): each object's bounding sphere against the side planes of every
    view's frustum (`gfx/Frustum.h`). A component no view sees gets neither a shadow nor a
    colour pass — its shadow map only shades its own bodies — except the nearest one, whose
-   colour pass is where the star is drawn. Visible components are drawn front to back.
-4. **Draw**: background per view; then per component, its shadow pass followed by each
-   view's colour pass (one shadow FBO); then the foreground per view.
+   colour pass is where the star is drawn. Visible components are drawn front to back
+   (`SceneSnapshot::drawOrder`).
+4. **Modules** (`IAppModule`, §7.1): missions, terrain and space weather each `Update` and
+   `Contribute` to the snapshot (probe positions, tile selections, `SpaceWeatherFrame`).
+5. **Describe** (`Renderer::PrepareFrame`, `Renderer::DescribeFrame`): the photosphere program
+   and the MagnetosphereUBO contents, then `FramePlan::Features` — which passes this frame has
+   (views, components in draw order, shadows, overlays, effects, HUD lines, the fade, the
+   upload pump, the loading line) and the targets' sizes.
+6. **Graph** (`Renderer::RenderFrame`): `FramePlan::Build` declares the frame on a
+   `FrameGraph::Graph`, `Compile()` culls and orders it, `Execute()` runs it on the
+   `rhi::GlCommandList`.
+
+**The frame graph** (`render/graph/FrameGraph`, GL-free, `tests/test_frame_graph.cpp`). A
+pass declares what it reads and writes. Every write makes a new version of the resource, so
+"the shadow map component 3 drew" and "the one component 4 drew" are different things to
+depend on. `Write` loads what the previous version held (drawing onto the scene); `Overwrite`
+does not (a cleared target). `Import`ed resources are owned outside the graph (`Backbuffer`,
+`Depth`, `ShadowAtlas`, `HdrColor`, `SolarWindParticles`); `Backbuffer` is the output, so any
+pass that writes it is a root. `Create`d resources are transients the graph places.
+`Compile()`:
+
+- **Culls.** A pass survives if it has a side effect (`uploads`, `loading-progress`), writes an
+  output, or produces a version a surviving pass reads. So a producer whose consumer was
+  never declared disappears on its own: with the solar wind off, or nothing to draw it,
+  `solar-wind-update` (the MagnetosphereUBO upload and the transform-feedback advection) is
+  declared and culled.
+- **Orders.** Kahn's algorithm over read-after-write, write-after-write and write-after-read
+  edges, always taking the earliest-declared ready pass, so a frame declared in a valid order
+  runs in that order. There is one shadow map: component N's shadow pass overwrites what
+  component N-1's colour passes read, and the write-after-read edge is what keeps every view's
+  colour pass between them.
+- **Aliases.** A transient lives from its first to its last surviving use; two with equal
+  `TextureDesc`s and disjoint lifetimes share a physical slot. The field-line bloom and the
+  aurora bloom are two `BloomChain` transients that alias onto one chain
+  (`Renderer::BloomChain(slot)` makes a second only if a frame ever overlapped them).
+
+**The frame** (`render/graph/FramePlan`, GL-free, `tests/test_frame_plan.cpp`), one view or
+both XR eyes per block:
+
+```
+solar-wind-update                                       (culled unless solar-wind reads it)
+per view:  observe-sky | skybox, orbit-paths, mission-paths, xr-pointers, corona
+per component (front to back):
+           shadow:<name> (one shadow-clear instead with shadows off)
+           per view: scene:<name>/<view>                 (bodies, star, shells, aurora, ring)
+per view:  corona-volume, asteroids, solar-wind, magnetic-fields,
+           magnetic-bloom + composite, aurora-bloom + composite
+mono:      proxy-labels, star-glow, hdr-composite, lens-flare
+mono:      observe-hud | distances, hints; screen-fade
+uploads, loading-progress
+```
+
+A feature that is off has no pass: `FramePlan.TurningAFeatureOffRemovesItsPasses` checks each
+toggle adds exactly its passes. `Renderer` implements `FramePlan::PassSink`; every per-view
+pass starts with `BeginView` (viewport, FrameUBO, per-view program uniforms when the view
+changed).
+
+**The RHI** (`gfx/rhi/`). Passes set their target, clears, fixed-function state and
+texture/UBO bindings through `rhi::CommandList`; scene objects still draw themselves
+(`SpaceObject::Draw`). `PipelineState` fields are optional: a pass sets exactly the state its
+GL calls used to, and leaves the rest as the pass before left it, which some passes rely on
+(the aurora bloom's composite leaves depth testing and depth writes off, and the star glow
+after it has always drawn that way). Moving a pass
+onto the RHI therefore issues the same GL state, and the native golden images below are
+pixel-identical across the change. A WebGPU backend would fold the deltas into the state it
+tracks per pipeline.
+
+**Debugging.** `?graph=1` on the web, `SOLARSYSTEM_GRAPH=1` natively, logs the compiled graph
+as `[FrameGraph]` lines — pass and culled counts, JSON (`passes` with reads/writes, culled,
+order; `resources` with versions and physical slots), and Graphviz DOT — whenever its pass
+list changes. Natively with `SOLARSYSTEM_GL_DEBUG=1`, every pass is a KHR_debug group, so
+RenderDoc and apitrace show the graph.
+
+**Golden images** (native). `SOLARSYSTEM_GOLDEN=frames=N,out=<file.ppm>[,step,focus,jd,fields]`
+(`GoldenCapture.h`) builds the scene at a pinned date, draws N fixed-step capture frames with
+the FPS readout held still and writes the last back buffer. `scripts/golden-native.sh <binary>
+<dir>` runs a shot matrix (start, Earth, Saturn, Jupiter and the Sun with field lines, Earth
+with the solar wind at Kp 7, realistic scale, Observe) on Low/Medium/Full under Xvfb, staging
+stand-ins for the deploy-only textures and models; `scripts/golden-compare.py <a> <b>` diffs two
+runs. With `SOLARSYSTEM_JOBS=0` two runs of one binary are identical, so any difference is the
+build.
 
 **Shadow frustum.** Each component's light frustum is an ortho box looking from the Sun at
 the planet, with its depth range fitted to the component's own bodies (`FitDepthRange`): the
@@ -578,26 +662,30 @@ units from the Sun — Uranus and beyond on realistic scale.)
 
 At debug level (§7.6) the `[FrameStats]` line logs, every N frames (`SOLARSYSTEM_FRAME_STATS=N`,
 120 by default), the previous frame's simulate count, view binds, shadow passes, component and
-body draws, culled components and `glUniform*` calls, and a second line with the frame's
-profile (`core/FrameProfile.h`): wall time, CPU and GPU milliseconds per stage, job-pool
-counters, upload bytes and the slow-frame count.
+body draws, culled components, `glUniform*` calls and the frame graph's run and culled pass
+counts, and a second line with the frame's profile (`core/FrameProfile.h`): wall time, CPU and
+GPU milliseconds per stage, job-pool counters, upload bytes and the slow-frame count.
 
-**Stages.** `update` (simulate, snapshot, terrain, cull), `background`, `shadow`, `scene`
-(colour passes), `foreground` (corona, belts, field lines, lens flare, HDR), `hud` and
-`uploads` (texture queue and the upload pump). `Application::TimeStage` brackets each hook:
-CPU with `steady_clock`, GPU with `gfx/GpuTimer` (`GL_TIME_ELAPSED`; on the web
-`EXT_disjoint_timer_query_webgl2`, probed and enabled in `GlCapabilities::gpuTimerQuery`).
-A stage that runs many times a frame (shadow and scene alternate per component) is the sum
-of its brackets, one query each. Time queries cannot nest, so a bracket opened inside
-another is ignored. The query sets are double-buffered and read back a frame or more late:
+**Stages and passes.** Stages are `update` (simulate, snapshot, cull, terrain), `background`,
+`shadow`, `scene` (colour passes), `foreground` (corona, belts, field lines, lens flare, HDR),
+`hud`, `uploads` (texture queue and the upload pump) and `spaceWeather`. Every frame-graph pass
+has a kind (`scene`, `shadow`, `aurora-bloom`, …) and a stage. `rhi::GlCommandList::BeginPass`
+/`EndPass`, which the graph calls around every pass, time it: CPU with `steady_clock` into the
+kind's `FrameProfile::PassTimings` row and the stage's total, GPU with `gfx/GpuTimer`
+(`GL_TIME_ELAPSED`; on the web `EXT_disjoint_timer_query_webgl2`, probed and enabled in
+`GlCapabilities::gpuTimerQuery`) in slot `kStageCount` + the kind's row. The work outside the
+graph (simulation, the modules) is bracketed by `FrameProfiler::Time` in the stage's own slot.
+A stage's GPU time is its own slot plus every pass billed to it; a kind that runs many times a
+frame (one `scene` pass per component and view) is the sum of its brackets, one query each.
+Time queries cannot nest, so a bracket opened inside another is ignored. The query sets are double-buffered and read back a frame or more late:
 a set whose results are not ready yet costs that frame its GPU sample rather than stalling
 it, and a WebGL disjoint event throws away the frames it overlapped. The GPU timers are off
 unless something reads them: natively at debug log level (or `SOLARSYSTEM_GPU_TIMERS=1`), on
 the web from the perf HUD.
 
 **Perf HUD.** `?perf=1` turns on the GPU timers and shows `web/src/perfHud.ts`'s overlay:
-frame time and the worst frame since the last refresh (4 Hz), CPU/GPU per stage, the job
-pool and the upload pump. It reads `GetFrameStatsJson()` (`WasmExports.cpp`), whose JSON
+frame time and the worst frame since the last refresh (4 Hz), CPU/GPU per stage, the costliest
+pass kinds (CPU/GPU, with how many ran), the job pool and the upload pump. It reads `GetFrameStatsJson()` (`WasmExports.cpp`), whose JSON
 is `FrameProfile::ToJson`; `window.__solarSystemPerf.latest()` returns the parsed stats for
 scripts. "Slow" is over 33.4 ms (30 fps).
 
@@ -683,7 +771,8 @@ that workers started. The `single` project uses a preview without isolation head
 and runs every job inline.
 
 **Tracy** is not wired in. A build that wants it adds `-DSOLARSYSTEM_TRACY=ON` with
-FetchContent and `ZoneScoped` in `TimeStage` (one place covers every stage).
+FetchContent and `ZoneScoped` in `rhi::GlCommandList::BeginPass` and `FrameProfiler::Time`
+(between them they cover every pass and stage).
 
 ### 7.8 GPU resource lifetime (lost contexts)
 
@@ -1464,7 +1553,8 @@ Bodies whose catalog row has `render.terrain` (Moon, Mars, Mercury, Earth) draw 
 instead of their sphere while the camera is close. From altitude nothing changes: the sphere
 mesh, catalog material, atmosphere and eclipse decal are what they were. The code is
 `src/render/terrain/` (GL-free except `TerrainRenderer`), wired in by
-`TerrainController.cpp` and two small branches in `SceneRenderer.cpp`.
+`TerrainController` (an `IAppModule`) and two small branches in `render/passes/ScenePasses.cpp`
+and `ShadowPasses.cpp`.
 
 **When.** `TerrainSystem` loads a body's `terrain/<id>/tileset.json` below 2 radii of altitude
 (`kPrefetchRadii`), swaps the sphere for tiles below 0.5 (back above 0.55), and grows the
@@ -1666,10 +1756,10 @@ presses each magnetosphere in, drives the auroral ovals, and carries CMEs that s
 geomagnetic storms. The Sun's sunspot cycle sets the background. Work is split by language:
 
 - **Physics** lives in C++ and is GL-free and unit-tested: `src/astro/SpaceWeather.{h,cpp}`.
-- **Application side.** `src/SpaceWeatherController.cpp` evaluates the model, fills the
-  frame snapshot and handles the controls.
-- **Renderer side.** `src/SpaceWeatherRenderer.cpp` handles the UBO, particles, aurora and
-  photosphere, and `render/SolarWindRenderer` holds the particle buffers.
+- **Application side.** `SpaceWeatherController` (an `IAppModule`) evaluates the model,
+  contributes the frame snapshot's `SpaceWeatherFrame` and handles the controls.
+- **Renderer side.** `src/render/passes/SpaceWeatherPasses.cpp` handles the UBO, particles,
+  aurora and photosphere, and `render/SolarWindRenderer` holds the particle buffers.
 - **Shaders** are declared permutations that the self-test covers.
 - **TypeScript** (`web/src/spaceWeather.ts`) only parses and formats `GetSpaceWeatherJson()`.
 
@@ -1710,16 +1800,17 @@ plus NASA DONKI's Earth-impacting CMEs from 2010 onward, written by
 ### 13.2 Frame flow
 
 ```
-Update stage
- └─ SpaceWeather stage   Application::UpdateSpaceWeather: Evaluate(jd, heliocentric positions)
-                         → SpaceWeatherFrame (FrameContext.h) in SceneSnapshot::spaceWeather
-                         Renderer::UpdateSpaceWeather: star program for the tier + spot uniforms;
-                         if particles > 0, pack MagnetosphereUBO (binding 1) and advect
-                         by transform feedback
-Scene pass               AuroraShell per magnetosphere component (aurora.fs), before the rings
-Foreground               corona, belts, RenderSolarWind (additive points), field lines
+SpaceWeather stage       SpaceWeatherController::Update: Evaluate(jd, heliocentric positions)
+                         → SpaceWeatherFrame (FrameContext.h); Contribute puts it in
+                         SceneSnapshot::spaceWeather
+                         Renderer::PrepareSpaceWeather: star program for the tier + spot
+                         uniforms; if particles > 0, pack the MagnetosphereUBO contents
+solar-wind-update pass   upload the MagnetosphereUBO (binding 1) and advect by transform
+                         feedback; culled by the frame graph unless a solar-wind pass reads it
+scene passes             AuroraShell per magnetosphere component (aurora.fs), before the rings
+foreground passes        corona, belts, solar-wind (additive points), field lines
                          (magneticFieldLine.vs squeezes the day side by standoff / quiet standoff),
-                         aurora bloom (Full)
+                         aurora-bloom + composite (Full)
 Observe                  observeSky.fs marches the same common/aurora.glsl shell from the ground
 ```
 
@@ -1863,7 +1954,10 @@ ctest --test-dir build-check --exclude-regex '^gl\.'          # GL-free unit tes
 xvfb-run -a build-check/tests/SolarSystemGlTests              # GL tests (§7.2)
 SOLARSYSTEM_SHADER_SELFTEST=1 xvfb-run -a build-check/SolarSystem   # every permutation, both dialects
 SOLARSYSTEM_LOG=debug xvfb-run -a build-check/SolarSystem 2>&1 | grep FrameStats
+SOLARSYSTEM_GRAPH=1 xvfb-run -a build-check/SolarSystem 2>&1 | grep FrameGraph  # the frame graph (§7.5)
 scripts/check-gl-handles.sh && scripts/check-source-rules.sh
+scripts/golden-native.sh <base binary> /tmp/a && scripts/golden-native.sh build-check/SolarSystem /tmp/b
+scripts/golden-compare.py /tmp/a /tmp/b                        # pixel-identical refactors (§7.5)
 ```
 
 Full scenarios: [docs/plans/TESTING_GUIDE.md](plans/TESTING_GUIDE.md).

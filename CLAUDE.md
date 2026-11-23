@@ -62,6 +62,12 @@ ctest --test-dir build-test --output-on-failure
 
 # Web: Playwright smoke (web/e2e/) against `npm run preview`; see docs/plans/TESTING_GUIDE.md
 cd web && SMOKE_TEST_URL=http://127.0.0.1:4173/solar-system/ npm run test:smoke
+
+# Native golden images: a refactor that should not change pixels must diff as identical
+# (Low/Medium/Full under Xvfb; stand-ins are staged for the deploy-only assets)
+scripts/golden-native.sh <base build>/SolarSystem /tmp/golden-a
+scripts/golden-native.sh build/SolarSystem /tmp/golden-b
+scripts/golden-compare.py /tmp/golden-a /tmp/golden-b --diff /tmp/golden-diff
 ```
 
 CI also runs `npm run generate:planet-metadata:check` and `npm run generate:wasm-exports:check` (in `web/`). After adding/changing an `EMSCRIPTEN_KEEPALIVE` export in `src/WasmExports.cpp`, run `npm run generate:wasm-exports` to regenerate `web/src/SolarSystem.d.ts` and `wasmBridge.exports.ts`.
@@ -87,34 +93,45 @@ and `web-debug`; `build-web.sh` wraps the web ones. All write `compile_commands.
 
 **Core Modules**
 - `main.cpp` — Application entry point
-- `Application.h` — The `Application` class: lifecycle, window/input/audio, scene construction
-  and the mission/magnetic-field-toggle public API. Its members are split across several
-  translation units by responsibility; `Application.h` is the one place that declares them all:
-  - `Application.cpp` — lifecycle (ctor/dtor, `InitScene`/`InitSceneObjects`) and the frame loop
+- `Application.h` — The `Application` class: lifecycle, the frame loop, window/input/audio, scene
+  construction, the public API the page calls, and the module list. Subsystems with state of their
+  own are owned objects with their own headers (ARCHITECTURE §7.1):
+  - `IAppModule.h` — `IAppModule { Update(SimState&), Contribute(SceneSnapshot&) }` and `ModuleContext`
+    (read-only references into Application). `RenderFrame` runs `MissionController`, `TerrainController`
+    and `SpaceWeatherController` once a frame after the scene is placed; what they contribute to the
+    snapshot is all the renderer sees of them. A new per-frame subsystem is a new module, not new
+    `Application` members
+  - `CameraController.h`, `Cinematics.h` (+ `GoldenCapture.h`), `FrameProfiler.h`, `SkyEventCache.h` — owned
+    classes outside the module loop (camera steps bracket the input; captures are driven by the page)
+  Application's own members are split across a few translation units by responsibility:
+  - `Application.cpp` — lifecycle (ctor/dtor, `InitScene`/`InitSceneObjects`), `RunOneFrame`, the golden capture driver
+  - `SceneFrame.cpp` — `UpdateScene` (placement, light boxes), `CullScene`, `BuildFrameSnapshot`, `RenderFrame`
   - `PlatformWindow.cpp` — GLFW/SDL/GL bring-up, window icon, resize, vsync, `Dispose`
   - `InputHandler.cpp` — polled input plus the mouse/scroll/key callbacks
-  - `CameraController.cpp` — per-frame camera navigation: co-moving anchor, altitude-scaled speed, the surface floor, clip planes (math in `core/CameraNavigation`)
+  - `CameraController.h/.cpp` — per-frame camera navigation: co-moving anchor, altitude-scaled speed, the surface floor, clip planes (math in `core/CameraNavigation`)
   - `AudioPlayer.cpp` — native background music (SDL_mixer on Linux, irrKlang on Windows); web music is `web/src/music.ts`, C++ only reports `MusicDuckAmount()` via `onMusicDuck`
   - `RenderSettings.cpp` — quality/shadow presets, orbit scale mode, texture LOD manager
   - `StarSystemFactory.cpp` / `PlanetSystemLoader.cpp` — scene construction and staged web loading
   - `XrSession.cpp` — WebXR eye state and the stereo render pass (web only)
   - `GpuContextRestore.cpp` — `RestoreGpuContext` after a lost context (web `OnContextRestored`, native `GL_KHR_robustness` reset or `SOLARSYSTEM_LOSE_CONTEXT=<s>`), ARCHITECTURE §7.8
-  - `ObserveMode.cpp` / `ObserveRenderer.cpp` (+ `ObserveState.h`) — Observe mode: ground-level sky from a lat/lon and UTC instant, drawn in a separate true-angular-size pass (ARCHITECTURE §7.4)
+  - `ObserveMode.cpp` / `render/passes/ObservePasses.cpp` (+ `ObserveState.h`) — Observe mode: ground-level sky from a lat/lon and UTC instant, drawn in a separate true-angular-size pass (ARCHITECTURE §7.4)
 - `WasmExports.cpp` / `JsBridge.cpp` — exported C API (cwrap) and C++→JS callbacks
-  - `TerrainController.cpp` — terrain fetch hook, per-frame tile selection into the frame snapshot, the `[Terrain]` log line
-  - `Cinematics.cpp` — what web timelines and capture call: body catalog / scene state JSON, surface queries, system preload, HUD mask, `BeginCapture`/`StepCaptureFrame`/`EndCapture` (ARCHITECTURE §11.2)
-  - `SpaceWeatherController.cpp` — evaluates `astro/SpaceWeather` each frame into `SpaceWeatherFrame` (snapshot), the solar-wind/Kp/CME controls and `GetSpaceWeatherJson` (ARCHITECTURE §13)
-- `Renderer.h` — The `Renderer` class: shadow/color/overlay/HDR draw passes and the GPU
-  resources they own (shaders, shadow FBO, HDR, skybox, lens flare, text renderer, orbit/
-  mission/magnetic-field overlay meshes), all private. `Application` holds one (`_renderer`).
-  Every pass takes a `FrameContext` (`FrameContext.h`: `CameraView`, `SceneSnapshot`,
-  `SimState`, display size, XR flag), which `Application::BuildFrameSnapshot` fills after
-  `UpdateScene`. The renderer has no reference back to `Application`, and there is no global
-  `SimState`: anything a pass needs goes into the snapshot.
-  - `FramePasses.h` — the GL-free frame order: simulate once, then per-component shadow pass followed by every view's colour pass (unit-tested). `Application::CullScene` drops components no view sees (bounding spheres vs `gfx/Frustum.h`) and orders the rest front to back; each light frustum's depth range is fitted to its component's bodies (ARCHITECTURE §7.5)
+  - `TerrainController.h/.cpp` (module) — terrain fetch hook, per-frame tile selection into the frame snapshot, the `[Terrain]` log line
+  - `SceneQueries.cpp` — what web timelines call: body catalog / scene state JSON, surface queries, system preload, HUD mask; `Cinematics.h/.cpp` is `BeginCapture`/`StepCaptureFrame`/`EndCapture` and the golden readback (ARCHITECTURE §11.2)
+  - `SpaceWeatherController.h/.cpp` (module) — evaluates `astro/SpaceWeather` each frame into `SpaceWeatherFrame` (snapshot), the solar-wind/Kp/CME controls and `GetSpaceWeatherJson` (ARCHITECTURE §13)
+  - `MissionController.h/.cpp` (module) — the probe catalog (parsed in a job), mission focus/follow, each probe's position per frame
+- `Renderer.h` — The `Renderer` class: the draw passes and the GPU resources they own (shaders,
+  shadow FBO, HDR, bloom chains, skybox, lens flare, text renderer, orbit/mission/magnetic-field
+  overlay meshes), all private. `Application` holds one (`_renderer`). Every pass reads a
+  `FrameContext` (`FrameContext.h`: `CameraView`, `SceneSnapshot`, `SimState`, display size, XR
+  flag), which `Application::BuildFrameSnapshot` and the modules fill after `UpdateScene`. The
+  renderer has no reference back to `Application`, and there is no global `SimState`: anything a
+  pass needs goes into the snapshot.
+  - **The frame is a graph** (ARCHITECTURE §7.5): `render/graph/FrameGraph` (GL-free) — passes declare versioned reads/writes of virtual resources; `Compile()` culls passes nothing consumes, orders them, aliases transients. `render/graph/FramePlan` (GL-free) declares this app's frame from a `Features` struct; `Renderer` implements its `PassSink`. A new pass is a `PassSink` method plus its declaration in `FramePlan::Build` with honest reads/writes — never a hand-placed call in the frame loop. A feature that is off must not declare its pass (`FramePlan.TurningAFeatureOffRemovesItsPasses`); a producer with no consumer is culled by the graph. Both are unit-tested (`test_frame_graph.cpp`, `test_frame_plan.cpp`)
+  - `gfx/rhi/` — `CommandList` (+ `GlCommandList`): passes set target, clears, `PipelineState` and `BindGroup` through it. `PipelineState` fields are optional deltas: set exactly the GL state the pass needs, because later passes may rely on what an earlier one left (pixel-identical goldens depend on it). The graph opens each pass's GPU timer scope there, not by hand
+  - `Application::CullScene` drops components no view sees (bounding spheres vs `gfx/Frustum.h`) and orders the rest front to back; each light frustum's depth range is fitted to its component's bodies (ARCHITECTURE §7.5)
   - Scene objects hold no shader: a pass calls `SpaceObject::Draw(shader)` with the program it bound
-  - `SceneRenderer.cpp` — shadow/color passes for planets, atmospheres, rings, clouds, text overlays
-  - `SceneOverlayRenderer.cpp` — magnetic field ribbons, orbit paths, mission paths, asteroid belt
+  - `render/passes/` — `Renderer`'s members by pass family: `RendererSetup` (resources), `RendererFrame` (`DescribeFrame`/`RenderFrame`/`BeginView`), `ShadowPasses`, `ScenePasses` (bodies, terrain, eclipse), `ShellPasses` (atmospheres, clouds, rings), `StarPasses` (star, corona, glow, HDR composite, lens flare), `OverlayPasses` (field lines and their bloom, orbit/mission paths, XR rays, belts), `SpaceWeatherPasses`, `HudPasses`, `ObservePasses`
 - `SystemModules.h` — Convenience headers bundling system includes
 
 **Auxiliary Modules** (`Auxiliary_Modules/`)
@@ -123,11 +140,11 @@ and `web-debug`; `build-web.sh` wraps the web ones. All write `compile_commands.
 - Rendering: `ShadowMapFBO` (PCF/ray-traced shadows), `LensFlare`, `HDR`, `TextRenderer`
 - Astronomy: `Ephemeris`, `LunarTheory` (Meeus ch. 47 Moon), `Observer` (GL-free horizon-frame maths), `StarCatalog` (BSC5 stars in `resource/sky/`), `SkyEvents`
 - Async loading: `WebResourceFetcher` (Emscripten-specific async file loading via callback-based `emscripten_async_wget2`; the blocking `emscripten_wget_data` path is gone — see "No blocking fetches" below)
-  - `SpaceWeatherRenderer.cpp` — `MagnetosphereUBO`, solar-wind particles (transform feedback), auroral shells and their bloom, the photosphere permutation per tier
+  - `render/passes/SpaceWeatherPasses.cpp` — `MagnetosphereUBO`, solar-wind particles (transform feedback; the `solar-wind-update` pass is culled when nothing draws them), auroral shells and their bloom, the photosphere permutation per tier
 - `SystemModules.h` — Convenience headers bundling system includes (GL itself comes from `gfx/GlPlatform.h`)
 
 **Subsystem folders** (ARCHITECTURE §7.2; there is no `Auxiliary_Modules/` any more)
-- `core/` — `Log` (`LOG_*`), `Camera` (double world position) with acceleration/zoom, `CameraNavigation` (GL-free floor/speed/clip/anchor math), `FrameTimer`, `JobSystem` (`Jobs::Submit` → `Future`, ARCHITECTURE §7.7), `FrameProfile` (per-stage CPU/GPU times, `[FrameStats]`, `GetFrameStatsJson`)
+- `core/` — `Log` (`LOG_*`), `Camera` (double world position) with acceleration/zoom, `CameraNavigation` (GL-free floor/speed/clip/anchor math), `FrameTimer`, `JobSystem` (`Jobs::Submit` → `Future`, ARCHITECTURE §7.7), `FrameProfile` (per-stage and per-pass-kind CPU/GPU times, `[FrameStats]`, `GetFrameStatsJson`)
 - `gfx/` — every GL object: `GlHandle` (the only `glGen*`/`glDelete*`; tracked by `GpuResourceRegistry` for lost-context restore), `GpuTimer` (`GL_TIME_ELAPSED` per frame stage), `Shader`/`ShaderLibrary`/`ShaderSource`, `Mesh`/`MeshHolder`, `LineStripBatch`, `TextureImage2D`, `FloatLutTexture`, `ShadowMapFBO`, `HDR`, `FrameUniforms`, `TextureUnits.h`, `Frustum.h`, `GlCapabilities`
 - `render/` — features built on `gfx/`: `LensFlare`, `TextRenderer`, orbit/mission/XR-pointer/magnetic-field renderers, field-line bloom
 - `assets/` — `WebResourceFetcher` (callback-based `emscripten_async_wget2`; the blocking `emscripten_wget_data` path is gone — see "No blocking fetches" below), `TextureDecode` (GL-free DDS/KTX2 → `TexturePayload`, run in jobs), `UploadQueue` (per-frame upload byte budget), `ModelCache` (Assimp parse in a job → `MeshPayload`), `TextureLoadingQueue`, `TextureLODController`, `PlanetManifestLoader`, `TextureFormatSupport`, `BlockCompression`
@@ -261,7 +278,8 @@ To check a timeline shot without real-time playback, `window.solarSystemTimeline
 
 ## Debugging Notes
 
-- **Logging**: use `LOG_DEBUG/INFO/WARN/ERROR("Category", fmt, ...)` from `src/core/Log.h`, not `std::cout`/`std::cerr`; lines read `[Category] …` (tests grep for them). Level: `SOLARSYSTEM_LOG=debug` native, `?log=debug` web. Native Debug builds get a KHR_debug context whose messages arrive as `[GL] 0x…` (`SOLARSYSTEM_GL_DEBUG=1/0` overrides). See ARCHITECTURE §7.6
+- **Logging**: use `LOG_DEBUG/INFO/WARN/ERROR("Category", fmt, ...)` from `src/core/Log.h`, not `std::cout`/`std::cerr`; lines read `[Category] …` (tests grep for them). Level: `SOLARSYSTEM_LOG=debug` native, `?log=debug` web. Native Debug builds get a KHR_debug context whose messages arrive as `[GL] 0x…` (`SOLARSYSTEM_GL_DEBUG=1/0` overrides), and every frame-graph pass is a debug group. See ARCHITECTURE §7.6
+- **Frame graph**: `?graph=1` (web) / `SOLARSYSTEM_GRAPH=1` (native) logs the compiled graph as `[FrameGraph]` JSON and DOT whenever its passes change; `?perf=1` lists per-pass CPU/GPU ms
 - **Emscripten console output**: Appears in browser DevTools Console (`console.debug` lines need the Verbose filter)
 - **WebResourceFetcher errors**: Check Network tab for CORS or 404 errors
 - **Memory issues**: If the app crashes during texture load, check Emscripten memory ceiling and Browser console for OOM messages

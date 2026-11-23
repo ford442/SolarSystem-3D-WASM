@@ -2,6 +2,7 @@
 // position for the frame. Renderer draws the paths (render/passes/OverlayPasses.cpp) from what
 // Contribute puts in the snapshot.
 #include "MissionController.h"
+#include "FrameContext.h"
 #include "IAppModule.h"
 #include "JsBridge.h"
 #include "ObserveState.h"
