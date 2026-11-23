@@ -1,7 +1,11 @@
 #include "ShadowMapFBO.h"
 #include "../core/Log.h"
+#include "GpuResourceRegistry.h"
+#include <cstdint>
 
-ShadowMapFBO::ShadowMapFBO(uint16_t shadowMapWidth, uint16_t shadowMapHeight) : _shadowMapWidth(shadowMapWidth), _shadowMapHeight(shadowMapHeight) {
+ShadowMapFBO::ShadowMapFBO(uint16_t shadowMapWidth, uint16_t shadowMapHeight)
+    : IGpuRestorable(GpuResources::Phase::Framebuffers), _shadowMapWidth(shadowMapWidth),
+      _shadowMapHeight(shadowMapHeight) {
     InitFBO();
 }
 

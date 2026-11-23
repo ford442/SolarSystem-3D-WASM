@@ -71,6 +71,9 @@ void Application::Exec() {
 
 void Application::RunOneFrame() {
     _frameTimer.RunFrameTimer();
+#ifndef __EMSCRIPTEN__
+    PollGpuContextReset(); // web hears about a lost context from the page instead
+#endif
 
     if (_appState == AppState::LOADING) {
 #ifdef __EMSCRIPTEN__

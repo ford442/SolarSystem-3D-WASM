@@ -104,6 +104,14 @@ public:
     std::string GetFrameStatsJson();
     /** GPU stage timers (gfx/GpuTimer.h): on for the perf HUD and debug-level FrameStats. */
     void SetGpuTimersEnabled(bool enabled);
+    /**
+     * The GL context was lost and is usable again (web: webglcontextrestored, through the
+     * OnContextRestored export; native: a replaced context after a reset). Rebuilds every GPU
+     * resource in place from CPU state (gfx/GpuResourceRegistry.h, docs/ARCHITECTURE.md §7.8):
+     * no scene object is recreated, nothing is downloaded, and the camera, date and toggles
+     * are untouched. Textures come back over the next frames through the upload budget.
+     */
+    void RestoreGpuContext();
     std::string GetFocusedMissionJson() const;
     void SetXrControllerRay(int hand, float ox, float oy, float oz, float dx, float dy, float dz, int visible);
     /**
@@ -403,6 +411,24 @@ private:
     std::optional<double> TerrainSurfaceRadius(const SpaceObject& object, const glm::dvec3& eye) const;
 
     void InitSystems();
+    /** The window's user pointer and GLFW input callbacks (again on a recreated native window). */
+    void InstallWindowCallbacks();
+    /** Depth test, culling, MSAA: GL state set once per context (GpuContextRestore.cpp). */
+    void ApplyGlobalGlState();
+    /** KHR_debug messages into Log when requested (native only). */
+    void EnableGlDebugOutput();
+#ifndef __EMSCRIPTEN__
+    /**
+     * Once a frame: whether the native context was reset (GL_KHR_robustness) or the
+     * SOLARSYSTEM_LOSE_CONTEXT=<seconds> test hook says it is time to pretend so. Either way
+     * the window and context are replaced and RestoreGpuContext runs; true if it did.
+     */
+    bool PollGpuContextReset();
+    /** A new window and context in place of the reset one (GLFW cannot re-make a context). */
+    void RecreateNativeWindow();
+    double _contextLossPeriod = -1.0;       // SOLARSYSTEM_LOSE_CONTEXT seconds; 0 = off, <0 = not read yet
+    double _nextSimulatedContextLoss = 0.0; // glfwGetTime of the next test-hook loss
+#endif
     void InitScene();
     void LoadCoreResources(); // Download only core assets (skybox, sun, models)
     void InitSceneObjects();

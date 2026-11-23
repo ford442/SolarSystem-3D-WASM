@@ -13,11 +13,13 @@
  * (capture → separable blur → additive composite) so star tone-mapping is
  * untouched.
  */
-class MagneticFieldBloom {
+class MagneticFieldBloom : public IGpuRestorable {
 public:
     MagneticFieldBloom(uint16_t width, uint16_t height, bool enabled);
 
     MagneticFieldBloom(const MagneticFieldBloom&) = delete;
+    /** After a lost context: the quad, and the three targets again if the bloom is on. */
+    void RestoreGpu() override;
     MagneticFieldBloom& operator=(const MagneticFieldBloom&) = delete;
 
     void SetEnabled(bool enabled, uint16_t width, uint16_t height);

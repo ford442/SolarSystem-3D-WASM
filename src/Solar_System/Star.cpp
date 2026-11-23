@@ -3,18 +3,16 @@
 #include "../gfx/TextureUnits.h"
 
 #include <utility>
+#include "../gfx/GlHandle.h"
+#include "../gfx/GpuResourceRegistry.h"
 
 Star::Star(StarInfo&& starInfo)
     : SpaceObject(starInfo.starModel, starInfo.engName, starInfo.otherLangName),
-      _starTemperature(starInfo.starTemperature), _starRadius(starInfo.starRadius),
-      _glowTintMult(starInfo.glowTintMult * starInfo.lightTint), _lightTint(starInfo.lightTint),
-      _activity(starInfo.activity), _starSpectrumTexture(std::move(starInfo.starSpectrum)) {
-    InitBuffers();
-#ifndef __EMSCRIPTEN__
-    for (GlQuery& query : _starOcclusion) {
-        query = GlQuery::Create();
-    }
-#endif
+      IGpuRestorable(GpuResources::Phase::VertexArrays), _starTemperature(starInfo.starTemperature),
+      _starRadius(starInfo.starRadius), _glowTintMult(starInfo.glowTintMult * starInfo.lightTint),
+      _lightTint(starInfo.lightTint), _activity(starInfo.activity),
+      _starSpectrumTexture(std::move(starInfo.starSpectrum)) {
+    Star::RestoreGpu(); // qualified: no virtual dispatch from a constructor
     _starTemperatureColorUCoordinate = glm::clamp((_starTemperature - 800.0f) / 29200.f, 0.0f, 1.0f);
     CalculateShiftColor();
 }
@@ -122,6 +120,15 @@ void Star::DrawCoronaSlices(int count) const {
     glBindVertexArray(_glowVao.get());
     glDrawElementsInstanced(GL_TRIANGLES, 6, GL_UNSIGNED_SHORT, nullptr, count);
     glBindVertexArray(0);
+}
+
+void Star::RestoreGpu() {
+    InitBuffers();
+#ifndef __EMSCRIPTEN__
+    for (GlQuery& query : _starOcclusion) {
+        query = GlQuery::Create();
+    }
+#endif
 }
 
 void Star::InitBuffers() {

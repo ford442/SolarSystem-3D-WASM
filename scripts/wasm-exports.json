@@ -22,6 +22,7 @@
   "_GetMissionCatalogJson",
   "_GetFrameStatsJson",
   "_SetGpuTimersEnabled",
+  "_OnContextRestored",
   "_GetFocusedMissionJson",
   "_LoadStarSystem",
   "_GetActiveSystemId",

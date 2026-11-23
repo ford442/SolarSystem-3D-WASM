@@ -26,6 +26,7 @@
 #include <emscripten.h>
 #include <emscripten/html5.h>
 #include <stdexcept>
+#include "gfx/GlPlatform.h"
 #endif
 
 namespace {
@@ -154,6 +155,9 @@ void Application::InitSystems() {
     glfwWindowHint(GLFW_SAMPLES, requestedSamples);
     // Debug builds (or SOLARSYSTEM_GL_DEBUG=1): KHR_debug context, messages routed into Log.
     glfwWindowHint(GLFW_OPENGL_DEBUG_CONTEXT, GlDebugRequested() ? GLFW_TRUE : GLFW_FALSE);
+    // GL_KHR_robustness: a GPU reset reports itself through glGetGraphicsResetStatus instead of
+    // leaving a context that silently draws nothing (GpuContextRestore.cpp polls it).
+    glfwWindowHint(GLFW_CONTEXT_ROBUSTNESS, GLFW_LOSE_CONTEXT_ON_RESET);
 #endif
 
     glfwWindowHint(GLFW_VISIBLE, GLFW_FALSE);
@@ -186,6 +190,14 @@ void Application::InitSystems() {
     if (_displayHeight == 0) _displayHeight = 600;
 
     _mainWindow = glfwCreateWindow(_displayWidth, _displayHeight, "SolarSystem", nullptr, nullptr);
+#ifndef __EMSCRIPTEN__
+    if (_mainWindow == nullptr) {
+        // A driver without ARB_create_context_robustness refuses the hint; resets then go unnoticed.
+        LOG_WARN("GL", "no robust context available; a GPU reset will not be detected");
+        glfwWindowHint(GLFW_CONTEXT_ROBUSTNESS, GLFW_NO_ROBUSTNESS);
+        _mainWindow = glfwCreateWindow(_displayWidth, _displayHeight, "SolarSystem", nullptr, nullptr);
+    }
+#endif
 
     if (_mainWindow == nullptr) {
         glfwTerminate();
@@ -237,11 +249,7 @@ void Application::InitSystems() {
     GetGlCapabilities(); // Probed once here (context is current); logs its findings.
     SelectTexturePack();  // Decide which texture pack every later asset path resolves to.
 
-    glfwSetWindowUserPointer(_mainWindow, this);
-    glfwSetFramebufferSizeCallback(_mainWindow, FramebufferSizeCallback);
-    glfwSetCursorPosCallback(_mainWindow, MouseCallback);
-    glfwSetScrollCallback(_mainWindow, ScrollCallback);
-    glfwSetKeyCallback(_mainWindow, KeyCallback);
+    InstallWindowCallbacks();
 #ifdef __EMSCRIPTEN__
     // See WebWindowResizeCallback: GLFW's own framebuffer-size callback is never invoked
     // by a plain browser window resize, only this listens for it (and orientation change).
@@ -252,12 +260,7 @@ void Application::InitSystems() {
     glewExperimental = true;
     glewInit();
 
-    if (GlDebugRequested() && glDebugMessageCallback) {
-        glEnable(GL_DEBUG_OUTPUT);
-        glEnable(GL_DEBUG_OUTPUT_SYNCHRONOUS);
-        glDebugMessageCallback(GlDebugCallback, nullptr);
-        LOG_INFO("GL", "KHR_debug output enabled");
-    }
+    EnableGlDebugOutput();
 
     if (const char* selfTest = std::getenv("SOLARSYSTEM_SHADER_SELFTEST"); selfTest && *selfTest && std::string(selfTest) != "0") {
         const int failures = Shader::SelfTestDirectory("resource/shaders");
@@ -309,22 +312,46 @@ void Application::InitSystems() {
     }
 #endif
 
+    ApplyGlobalGlState();
+
+#ifndef __EMSCRIPTEN__
+    LoadWindowIcon();
+#endif
+
+    DisplaySystemInformation();
+}
+
+void Application::InstallWindowCallbacks() {
+    glfwSetWindowUserPointer(_mainWindow, this);
+    glfwSetFramebufferSizeCallback(_mainWindow, FramebufferSizeCallback);
+    glfwSetCursorPosCallback(_mainWindow, MouseCallback);
+    glfwSetScrollCallback(_mainWindow, ScrollCallback);
+    glfwSetKeyCallback(_mainWindow, KeyCallback);
+}
+
+void Application::ApplyGlobalGlState() {
+    // State set once for the life of a context; RestoreGpuContext sets it again on a new one.
     glEnable(GL_DEPTH_TEST);
 #ifndef __EMSCRIPTEN__
-    if (actualSamples > 1) {
+    // No GL_POLYGON_SMOOTH: it is deprecated in core profiles, needs sorted blended
+    // geometry to look right, and MSAA is the antialiasing path we actually use.
+    if (_simState.contextSamples > 1) {
         glEnable(GL_MULTISAMPLE);
     }
 #endif
     glEnable(GL_CULL_FACE);
-
-#ifndef __EMSCRIPTEN__
-    // No GL_POLYGON_SMOOTH: it is deprecated in core profiles, needs sorted blended
-    // geometry to look right, and MSAA above is the antialiasing path we actually use.
-    LoadWindowIcon();
-#endif
-
     glCullFace(GL_BACK);
-    DisplaySystemInformation();
+}
+
+void Application::EnableGlDebugOutput() {
+#ifndef __EMSCRIPTEN__
+    if (GlDebugRequested() && glDebugMessageCallback) {
+        glEnable(GL_DEBUG_OUTPUT);
+        glEnable(GL_DEBUG_OUTPUT_SYNCHRONOUS);
+        glDebugMessageCallback(GlDebugCallback, nullptr);
+        LOG_INFO("GL", "KHR_debug output enabled");
+    }
+#endif
 }
 
 void Application::Dispose() {

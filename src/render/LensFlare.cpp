@@ -1,7 +1,14 @@
 #include "LensFlare.h"
 #include "../gfx/TextureUnits.h"
+#include "../gfx/GlPlatform.h"
+#include "../gfx/GpuResourceRegistry.h"
+#include "../gfx/Shader.h"
+#include "../gfx/TextureImage2D.h"
+#include <utility>
 
-LensFlare::LensFlare(const Shader& shader, TextureImage2D lensTexture, const FlaresInfo& properties) : _lensFlareShader(&shader), _lensTexture(std::move(lensTexture)) {
+LensFlare::LensFlare(const Shader& shader, TextureImage2D lensTexture, const FlaresInfo& properties)
+    : IGpuRestorable(GpuResources::Phase::VertexArrays), _lensFlareShader(&shader),
+      _lensTexture(std::move(lensTexture)) {
     _numSprites = properties.sprites.size();
 
     constexpr glm::vec2 positions[4] = {
@@ -56,16 +63,22 @@ LensFlare::LensFlare(const Shader& shader, TextureImage2D lensTexture, const Fla
         }
     }
 
+    _vertices = std::move(vertices);
+    _indices = std::move(indices);
+    UploadQuads();
+}
+
+void LensFlare::UploadQuads() {
     _vao = GlVertexArray::Create();
     _vbo = GlBuffer::Create();
     _ebo = GlBuffer::Create();
 
     glBindVertexArray(_vao.get()); // Связывание с вершинным массивом
     glBindBuffer(GL_ARRAY_BUFFER, _vbo.get()); // Связывание с вершинным буфером
-    glBufferData(GL_ARRAY_BUFFER, vertices.size() * sizeof(FlareVertex), vertices.data(), GL_STATIC_DRAW);
+    glBufferData(GL_ARRAY_BUFFER, _vertices.size() * sizeof(FlareVertex), _vertices.data(), GL_STATIC_DRAW);
 
     glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, _ebo.get()); // Связывание с элементным буфером (копируем индексы)
-    glBufferData(GL_ELEMENT_ARRAY_BUFFER, indices.size() * sizeof(uint16_t), indices.data(), GL_STATIC_DRAW);
+    glBufferData(GL_ELEMENT_ARRAY_BUFFER, _indices.size() * sizeof(uint16_t), _indices.data(), GL_STATIC_DRAW);
 
     // Установка указателей вершинных атрибутов (указание параметров доступа вершинных атрибутов к VBO)
     // Позиции вершин

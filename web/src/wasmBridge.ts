@@ -306,6 +306,12 @@ export interface SolarSystemRuntime {
     getFrameStatsJson(): string;
     /** GPU stage timers, when the context has EXT_disjoint_timer_query_webgl2. */
     setGpuTimersEnabled(enabled: boolean): void;
+    /**
+     * Rebuild every GPU resource after webglcontextrestored (ARCHITECTURE §7.8); false when the
+     * scene cannot draw again. bootstrap.ts calls the export directly, as the loss can come
+     * before this runtime exists; this is the same call for the console.
+     */
+    restoreGpuContext(): boolean;
     /** Files the live shader programs were built from (MEMFS paths); dev reload only. */
     getShaderSourceFiles(): string[];
     /** Rebuild the programs whose files changed in MEMFS; returns how many. Dev reload only. */
@@ -394,6 +400,7 @@ export function createSolarSystemRuntime(instance: SolarSystemModule): SolarSyst
         setGpuTimersEnabled: (enabled) => {
             exports.setGpuTimersEnabled(enabled ? 1 : 0);
         },
+        restoreGpuContext: () => exports.onContextRestored() !== 0,
         getFocusedMission: () => parseFocusedMissionJson(exports.getFocusedMissionJson()),
         setOrbitLines: (enabled) => exports.setOrbitLines(enabled ? 1 : 0),
         getOrbitLines: () => exports.getOrbitLines() !== 0,

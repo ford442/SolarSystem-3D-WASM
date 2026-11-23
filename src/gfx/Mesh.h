@@ -16,7 +16,8 @@ struct Texture {
     aiString path;
 };
 
-class Mesh {
+/** Vertices and indices stay on the CPU, so a lost context rebuilds the buffers (RestoreGpu). */
+class Mesh : public IGpuRestorable {
 public:
     explicit Mesh(std::vector<Vertex> vertices, std::vector<GLuint> indices, std::vector<Texture> textures);
 
@@ -28,6 +29,7 @@ public:
     Mesh& operator=(Mesh&& other) noexcept = default;
     
     void Draw(const Shader& shader) const; // Отрисовка (рендеринг) меша
+    void RestoreGpu() override { SetupMesh(); }
 
     /** Point attributes 0–4 of the bound VAO at Vertex fields in the bound GL_ARRAY_BUFFER. */
     static void SetVertexLayout();

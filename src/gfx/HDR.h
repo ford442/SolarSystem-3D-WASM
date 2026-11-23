@@ -3,9 +3,13 @@
 #include "Shader.h"
 #include "GlHandle.h"
 
-class HDR {
+class HDR : public IGpuRestorable {
 public:
     explicit HDR(const Shader& shader, uint16_t width, uint16_t height, bool enabled = true);
+    HDR(const HDR&) = delete;
+    HDR& operator=(const HDR&) = delete;
+    /** After a lost context: the quad, and the float target again if HDR was on. */
+    void RestoreGpu() override;
     void SetEnabled(bool enabled, uint16_t width, uint16_t height);
     bool IsEnabled() const;
     void Resize(uint16_t width, uint16_t height);

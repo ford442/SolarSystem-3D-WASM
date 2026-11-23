@@ -2,6 +2,7 @@
 #include "GlCapabilities.h"
 #include "GlPlatform.h"
 #include "FrameUniforms.h"
+#include "GpuResourceRegistry.h"
 #include "SpaceWeatherUniforms.h"
 #include "../core/Log.h"
 #include <algorithm>
@@ -413,6 +414,12 @@ bool Shader::Reload() {
         LOG_WARN("Shader", "hot reload of %s failed; keeping the previous program", _spec.Describe().c_str());
         return false;
     }
+    CarryUniformsTo(fresh);
+    *this = std::move(fresh);
+    return true;
+}
+
+void Shader::CarryUniformsTo(Shader& fresh) const {
     // Uniforms that were set once (at init, or on a toggle) would otherwise read 0 until the
     // next change; carry every value this Shader gave over to the same name and type.
     for (const auto& [name, oldIndex] : _uniformIndex) {
@@ -425,9 +432,50 @@ bool Shader::Reload() {
         slot->size = old.size;
         fresh.Apply(*slot);
     }
-    *this = std::move(fresh);
-    return true;
 }
+
+int Shader::RestoreAll() {
+    // Every name is already 0 (GpuResources::InvalidateAll); nothing is bound on the new context.
+    s_currentProgram = 0;
+    const std::vector<Shader*> live = Registry(); // a copy: the fresh programs register too
+    std::vector<std::pair<Shader*, Shader>> rebuilt;
+    rebuilt.reserve(live.size());
+    for (Shader* shader : live) {
+        if (shader->_spec.vertex.empty()) {
+            continue; // a temporary still being constructed
+        }
+        try {
+            rebuilt.emplace_back(shader, Submit(shader->_spec));
+        } catch (const std::exception&) {
+            LOG_ERROR("Shader", "%s: cannot resubmit after a lost context", shader->_spec.Describe().c_str());
+        }
+    }
+    int restored = 0;
+    for (auto& [shader, fresh] : rebuilt) {
+        if (!shader->_pending) {
+            try {
+                fresh.Finish();
+            } catch (const std::exception&) {
+                LOG_ERROR("Shader", "%s: no longer builds after a lost context", shader->_spec.Describe().c_str());
+                continue;
+            }
+            shader->CarryUniformsTo(fresh);
+        }
+        *shader = std::move(fresh);
+        ++restored;
+    }
+    return restored;
+}
+
+namespace {
+/** Puts every Shader on the GPU restore walk, in the Programs phase, as one batch. */
+class ShaderPrograms final : public IGpuRestorable {
+public:
+    ShaderPrograms() : IGpuRestorable(GpuResources::Phase::Programs) {}
+    void RestoreGpu() override { Shader::RestoreAll(); }
+};
+const ShaderPrograms g_shaderPrograms;
+} // namespace
 
 int Shader::ReloadChanged() {
     std::vector<std::pair<std::string, long long>> stats;

@@ -242,25 +242,53 @@ test('Observe mode puts the camera on Earth, ignores movement, and restores Expl
     expect(consoleErrors).toEqual([]);
 });
 
-test('Losing the WebGL context shows a reload panel that keeps the view', async ({ page, baseURL }) => {
-    const response = await page.goto(`${baseURL ?? '/'}?planet=mars`, { waitUntil: 'domcontentloaded' });
-    expect(response?.ok()).toBeTruthy();
-    await page.waitForFunction(() => typeof window.setCameraPose === 'function', undefined, {
-        timeout: 45_000,
+test('A lost WebGL context is rebuilt in place: no reload panel, same view, stars drawn again', async ({
+    page,
+    baseURL,
+}) => {
+    const consoleLogs: string[] = [];
+    const pageErrors: string[] = [];
+    page.on('console', (message) => consoleLogs.push(message.text()));
+    page.on('pageerror', (error) => pageErrors.push(error.message));
+    // Observe at Casper with a narrow field: the star sprites are an eagerly uploaded batch
+    // (ObserveSky::RestoreGpu), and the observer state is what "the same view" means here.
+    const response = await page.goto(`${baseURL ?? '/'}?mode=observe&lat=42.8666&lon=-106.3131&fov=20`, {
+        waitUntil: 'domcontentloaded',
     });
+    expect(response?.ok()).toBeTruthy();
+    await page.waitForFunction(() => (window.getObserveState?.()?.starCount ?? 0) > 0, undefined, {
+        timeout: 60_000,
+    });
+    const before = await page.evaluate(() => window.getObserveState?.());
 
+    // getExtension returns null on a lost context, so keep the extension from before the loss.
     await page.evaluate(() => {
         const canvas = document.getElementById('canvas') as HTMLCanvasElement;
-        canvas.getContext('webgl2')?.getExtension('WEBGL_lose_context')?.loseContext();
+        const extension = canvas.getContext('webgl2')?.getExtension('WEBGL_lose_context') ?? null;
+        (window as unknown as { loseContextExtension: WEBGL_lose_context | null }).loseContextExtension = extension;
+        extension?.loseContext();
     });
+    await expect
+        .poll(() => consoleLogs.some((line) => line.includes('[WebGL] Context lost')), { timeout: 5_000 })
+        .toBe(true);
+    await expect(page.locator('#fatal-panel')).toHaveCount(0);
 
-    const panel = page.locator('#fatal-panel');
-    await expect(panel).toBeVisible({ timeout: 5_000 });
-    await expect(panel).toContainText('Graphics context lost');
-
-    // Reload carries the current view as a deep link rather than reloading the bare URL.
-    await page.locator('#fatal-panel-reload').click();
-    await page.waitForURL(/[?&]quality=/, { timeout: 10_000 });
+    await page.evaluate(() => {
+        (
+            window as unknown as { loseContextExtension: WEBGL_lose_context | null }
+        ).loseContextExtension?.restoreContext();
+    });
+    await expect
+        .poll(() => consoleLogs.some((line) => line.includes('[GL] context restored')), { timeout: 10_000 })
+        .toBe(true);
+    const after = await page.evaluate(() => window.getObserveState?.());
+    expect(after?.active).toBe(true);
+    expect(after?.latDeg).toBeCloseTo(before?.latDeg ?? NaN, 6);
+    expect(after?.lonDeg).toBeCloseTo(before?.lonDeg ?? NaN, 6);
+    expect(after?.fovDeg).toBeCloseTo(before?.fovDeg ?? NaN, 6);
+    expect(after?.starCount).toBe(before?.starCount);
+    await expect(page.locator('#fatal-panel')).toHaveCount(0);
+    expect(pageErrors).toEqual([]);
 });
 
 test('Context is single-sampled (HDR resolves it) and a reload reads fetched assets from the Cache API', async ({

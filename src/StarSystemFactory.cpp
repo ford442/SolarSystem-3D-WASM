@@ -12,8 +12,6 @@
 #include "astro/MagneticFieldParams.h"
 #include "astro/StarPhysics.h"
 #include "Solar_System/SystemVisuals.h"
-#include "Solar_System/AtmosphereModel.h"
-#include "gfx/FloatLutTexture.h"
 #include "core/Log.h"
 #include "Solar_System/CatalogBody.h"
 #include "Solar_System/Planet.h"
@@ -57,37 +55,6 @@ SatelliteInfo MakeSatelliteInfo(const MeshHolder& model, const BodyCatalog::Entr
                          LoadLodTexture(entry.lod.specular));
 }
 
-// Physical rows get their baked LUTs whatever the current preset, so switching to
-// Medium/Full later needs no reload. Any problem leaves the shell on the O'Neil path.
-void LoadAtmosphereLuts(Atmosphere& atmosphere) {
-    const BodyCatalog::AtmosphereRow& row = atmosphere.GetRow();
-    if (!row.physical.enabled) {
-        return;
-    }
-    auto transmittance = LoadRgba16fLut(AtmosphereModel::TransmittanceLutPath(row.bodyId),
-                                        AtmosphereModel::kTransmittanceWidth, AtmosphereModel::kTransmittanceHeight);
-    auto multiScattering = LoadRgba16fLut(AtmosphereModel::MultiScatteringLutPath(row.bodyId),
-                                          AtmosphereModel::kMultiScatteringSize, AtmosphereModel::kMultiScatteringSize);
-    for (auto* lut : {&transmittance, &multiScattering}) {
-        if (*lut && (*lut)->mappingVersion != AtmosphereModel::kLutMappingVersion) {
-            LOG_WARN("Atmosphere", "%s: LUT mapping version %d != %d (rebake); using the O'Neil shell", row.bodyId,
-                     (*lut)->mappingVersion, AtmosphereModel::kLutMappingVersion);
-            lut->reset();
-        }
-    }
-    if (!transmittance || !multiScattering) {
-        return;
-    }
-    const std::string expected = AtmosphereModel::ParamsHashHex(row.physical);
-    if (transmittance->paramsHash != expected) {
-        // Still usable (same mapping), just baked from other numbers; CI's
-        // AtmosphereLutsFresh test is what keeps this from shipping.
-        LOG_WARN("Atmosphere", "%s: LUTs were baked from parameters %s, the catalog is %s — rerun atmosphere_lut_baker",
-                 row.bodyId, transmittance->paramsHash.c_str(), expected.c_str());
-    }
-    atmosphere.SetLuts(std::move(transmittance->texture), std::move(multiScattering->texture));
-}
-
 RenderableAtmosphere MakeAtmosphere(const MeshHolder& sphereModel, const BodyCatalog::AtmosphereRow& row,
                                     const std::shared_ptr<SpaceObject>& parent, float parentEarthSize) {
     RenderableAtmosphere renderable;
@@ -95,7 +62,7 @@ RenderableAtmosphere MakeAtmosphere(const MeshHolder& sphereModel, const BodyCat
     renderable.atmosphere =
         std::make_unique<Atmosphere>(sphereModel, row, parent, SceneScale::kMeshRadius * parentEarthSize);
     renderable.parentEarthSizeCoefficient = parentEarthSize;
-    LoadAtmosphereLuts(*renderable.atmosphere);
+    renderable.atmosphere->LoadLuts();
     return renderable;
 }
 

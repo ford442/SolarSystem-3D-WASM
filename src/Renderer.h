@@ -78,6 +78,12 @@ public:
     void Resize(uint16_t width, uint16_t height);
     /** Delete every GPU resource Init() built. Needs the GL context still current. */
     void Release();
+    /**
+     * After GpuResources::RecreateAll on a restored context: what the registry cannot rebuild
+     * on its own — the empty screen-fade VAO, the mission paths and field lines (uploaded once
+     * from data the renderer re-derives), and the HDR flag if the float target was refused.
+     */
+    void RestoreGpu(const MissionCatalog::Catalog& missions, int qualityPreset);
     /** Atmosphere/corona effect levels from a quality tier (preset changes call this too). */
     void ApplyEffectQuality(const QualityTierSettings& settings);
     /**

@@ -129,6 +129,11 @@ export interface SolarSystemCwrap {
     argTypes: ['number'],
   ): (enabled: number) => void;
   (
+    ident: 'OnContextRestored',
+    returnType: 'number',
+    argTypes: [],
+  ): () => number;
+  (
     ident: 'GetFocusedMissionJson',
     returnType: 'string',
     argTypes: [],
@@ -572,6 +577,7 @@ export interface SolarSystemModule {
   _GetMissionCatalogJson: () => number;
   _GetFrameStatsJson: () => number;
   _SetGpuTimersEnabled: (enabled: number) => void;
+  _OnContextRestored: () => number;
   _GetFocusedMissionJson: () => number;
   _LoadStarSystem: (id: number, focusIndex: number) => number;
   _GetActiveSystemId: () => number;

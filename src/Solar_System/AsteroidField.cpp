@@ -7,6 +7,7 @@
 #include <cstddef>
 #include "../core/Log.h"
 #include <glm/gtc/matrix_transform.hpp>
+#include "../gfx/GpuResourceRegistry.h"
 
 #ifndef M_PI
 #define M_PI 3.14159265358979323846
@@ -40,8 +41,7 @@ private:
 } // namespace
 
 AsteroidField::AsteroidField(uint32_t seed, int instanceCount, Population population)
-    : _seed(seed), _population(population)
-{
+    : IGpuRestorable(GpuResources::Phase::VertexArrays), _seed(seed), _population(population) {
     // Always generate the full pool so quality presets can raise the draw count later.
     if (population == Population::Kuiper) {
         _asteroids = AsteroidOrbit::GenerateKuiperDisk(seed, kMaxInstances);
@@ -69,6 +69,13 @@ AsteroidField::AsteroidField(uint32_t seed, int instanceCount, Population popula
 
     LOG_INFO(population == Population::Kuiper ? "KuiperField" : "AsteroidField", "seed=0x%x asteroids=%d/%zu comets=%zu",
              static_cast<unsigned>(seed), _activeCount, _asteroids.size(), _comets.size());
+}
+
+void AsteroidField::RestoreGpu() {
+    InitRockMesh();
+    InitInstanceBuffer();
+    InitCometTailMesh();
+    UploadInstances();
 }
 
 void AsteroidField::SetInstanceCount(int count) {

@@ -10,8 +10,9 @@
 #include <string>
 #include <utility>
 #include "../core/Log.h"
-#include "/root/SolarSystem-3D-WASM/src/core/JobSystem.h"
-#include "/root/SolarSystem-3D-WASM/src/astro/StarCatalog.h"
+#include "../core/JobSystem.h"
+#include "../astro/StarCatalog.h"
+#include "../gfx/GpuResourceRegistry.h"
 
 namespace {
 
@@ -81,7 +82,7 @@ std::optional<std::string> ReadText(const char* path) {
 
 } // namespace
 
-ObserveSky::ObserveSky() {
+ObserveSky::ObserveSky() : IGpuRestorable(GpuResources::Phase::VertexArrays) {
     // Parse the star catalogue and constellation figures off the main thread now; the first
     // Observe frame takes the result (long finished by then).
     _parsedSky = Jobs::Submit([stars = ReadText(kStarCatalogPath), figures = ReadText(kConstellationPath)] {
@@ -115,6 +116,18 @@ ObserveSky::ObserveSky() {
     _spriteShader = std::make_unique<Shader>("resource/shaders/observeSprite.vs", "resource/shaders/observeSprite.fs");
     _lineShader = std::make_unique<Shader>("resource/shaders/observeLines.vs", "resource/shaders/observeLines.fs");
 
+    InitBuffers();
+}
+
+void ObserveSky::RestoreGpu() {
+    InitBuffers();
+    if (_starsLoaded) {
+        UploadStars();
+    }
+    _linesBuiltForLimit = -1; // EnsureConstellationLines rebuilds the (now empty) line VBO
+}
+
+void ObserveSky::InitBuffers() {
     // A core-profile draw needs a bound VAO even when every vertex comes from gl_VertexID.
     _emptyVao = GlVertexArray::Create();
 
@@ -188,7 +201,11 @@ void ObserveSky::EnsureStarsLoaded() {
         return;
     }
     _stars = std::move(parsed.stars);
+    UploadStars();
+    LOG_INFO("Observe", "Loaded %zu stars from %s", _stars.stars.size(), kStarCatalogPath);
+}
 
+void ObserveSky::UploadStars() {
     std::vector<SpriteInstance> instances;
     instances.reserve(_stars.stars.size());
     for (const StarCatalog::Star& star : _stars.stars) {
@@ -205,7 +222,6 @@ void ObserveSky::EnsureStarsLoaded() {
     InitBatch(_starBatch, static_cast<int>(instances.size()));
     UploadBatch(_starBatch, instances);
     _starsLoaded = _starBatch.count > 0;
-    LOG_INFO("Observe", "Loaded %zu stars from %s", _stars.stars.size(), kStarCatalogPath);
 }
 
 void ObserveSky::EnsureConstellationLines() {

@@ -20,3 +20,5 @@ void TextureImage2D::ReloadTextureAsync(const std::string& path, std::function<v
         done(stillWanted && !stillWanted() ? AsyncResult::Superseded : AsyncResult::Uploaded);
     }
 }
+
+void TextureImage2D::RestoreGpu() {}
