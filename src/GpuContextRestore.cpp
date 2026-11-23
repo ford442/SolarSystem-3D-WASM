@@ -74,11 +74,11 @@ void Application::RestoreGpuContext() {
     //    from MEMFS through the upload budget; lazily-built buffers wait for their next use).
     const std::size_t owners = GpuResources::RecreateAll();
     // 4. The few things rebuilt from data only the renderer and the app hold.
-    _renderer.RestoreGpu(_missionCatalog, _simState.qualityPreset);
-    const bool gpuTimers = _gpuTimer && _gpuTimer->Enabled();
-    _gpuTimer.reset(); // its query pool named objects on the old context
+    _renderer.RestoreGpu(_missions.Catalog(), _simState.qualityPreset);
+    const bool gpuTimers = _profiler.GpuTimersEnabled();
+    _profiler.ReleaseGpu(); // its query pool named objects on the old context
     if (gpuTimers) {
-        SetGpuTimersEnabled(true);
+        _profiler.SetGpuTimersEnabled(true);
     }
     LOG_INFO("GL", "context restored (#%u): %zu stale names dropped, %zu owners rebuilt, %zu uploads queued (%.0f ms)",
              static_cast<unsigned>(GpuResources::Generation()), handles, owners, UploadQueue::Get().Pending(),

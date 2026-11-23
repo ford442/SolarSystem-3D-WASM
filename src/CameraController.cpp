@@ -2,11 +2,27 @@
 // body it is hovering near, flies at a speed set by its altitude, never goes below a
 // surface, and sets the clip planes and log-depth curve for that altitude. The math is
 // GL-free in core/CameraNavigation.h; this is where the scene's bodies are fed to it.
-#include "Application.h"
+#include "CameraController.h"
+#include "ApplicationTypes.h"
+#include "IAppModule.h"
+#include "MissionController.h"
+#include "ObserveState.h"
+#include "Solar_System/OrbitLayout.h"
 #include "Solar_System/SceneScale.h"
+#include "Solar_System/SpaceObject.h"
+#include "Solar_System/Star.h"
+#include "TerrainController.h"
+#include "core/Camera.h"
 #include "core/CameraNavigation.h"
+#include "gfx/MeshHolder.h"
+#include <algorithm>
 #include <cmath>
+#include <cstddef>
 #include <limits>
+#include <memory>
+#include <optional>
+#include <utility>
+#include <vector>
 
 namespace {
 
@@ -47,37 +63,33 @@ double SurfaceModelRadius(const SpaceObject& object, const CameraNavigation::Bod
 
 } // namespace
 
-Application::SurfacePoint Application::SurfaceAlong(int catalogIndex, const glm::dvec3& direction) const {
+CameraController::CameraController(Camera& camera, const ModuleContext& app, const TerrainController& terrain,
+                                   const MissionController& missions)
+    : _camera(camera), _app(app), _terrain(terrain), _missions(missions) {}
+
+CameraController::SurfacePoint CameraController::SurfaceOf(const SpaceObject& object,
+                                                           const glm::dvec3& direction) const {
     const double length = glm::length(direction);
     const glm::dvec3 radial = length > 0.0 ? direction / length : glm::dvec3(1.0, 0.0, 0.0);
-    const std::shared_ptr<const SpaceObject> object = FindSceneBody(catalogIndex);
-    if (!object) {
-        const BodyCatalog::Entry* entry = BodyCatalog::FindByIndex(catalogIndex);
-        return {catalogIndex == 0 ? SceneScale::SunRadius() : entry ? SceneScale::BodyRadius(*entry) : 0.0, radial};
-    }
-    const CameraNavigation::Body body = NavigationBody(*object);
+    const CameraNavigation::Body body = NavigationBody(object);
     // Any point along the direction will do: the floor's cast only takes its bearing.
     const glm::dvec3 eye = body.center + radial;
     const glm::dvec3 model = glm::normalize(CameraNavigation::ToModel(body, eye));
     // Tiles drawn there: their ground, under the sphere's own normal (no slope in v1).
-    if (const std::optional<double> terrain = TerrainSurfaceRadius(*object, eye)) {
+    if (const std::optional<double> terrain = _terrain.SurfaceRadius(object, eye)) {
         return {*terrain * CameraNavigation::WorldScaleAlong(body, model), CameraNavigation::NormalToWorld(body, model)};
     }
-    const CameraNavigation::FacetHit facet = SurfaceModelFacet(*object, body, eye);
+    const CameraNavigation::FacetHit facet = SurfaceModelFacet(object, body, eye);
     return {facet.radius * CameraNavigation::WorldScaleAlong(body, model),
             CameraNavigation::NormalToWorld(body, facet.normal)};
 }
 
-glm::vec3 Application::CameraRenderPosition() const {
-    return OrbitLayout::ToRenderFrame(_camera.GetWorldPosition());
-}
-
-std::vector<std::shared_ptr<const SpaceObject>> Application::NavigationBodies() const {
+std::vector<std::shared_ptr<const SpaceObject>> CameraController::NavigationBodies() const {
     std::vector<std::shared_ptr<const SpaceObject>> bodies;
-    if (_sun) {
-        bodies.push_back(_sun);
+    if (_app.sun) {
+        bodies.push_back(_app.sun);
     }
-    for (const auto& component : _renderableSceneComponents) {
+    for (const auto& component : _app.components) {
         if (component.planet) {
             bodies.push_back(component.planet);
         }
@@ -88,46 +100,44 @@ std::vector<std::shared_ptr<const SpaceObject>> Application::NavigationBodies() 
     return bodies;
 }
 
-void Application::SetCameraAnchor(std::shared_ptr<const SpaceObject> body, bool pinned) {
-    _cameraAnchor.pinned = pinned && body != nullptr;
-    if (body != _cameraAnchor.body) {
+void CameraController::SetAnchor(std::shared_ptr<const SpaceObject> body, bool pinned) {
+    _anchor.pinned = pinned && body != nullptr;
+    if (body != _anchor.body) {
         if (body) {
-            _cameraAnchor.last = NavigationBody(*body);
+            _anchor.last = NavigationBody(*body);
         }
-        _cameraAnchor.coRotating = false;
+        _anchor.coRotating = false;
     }
-    _cameraAnchor.body = std::move(body);
+    _anchor.body = std::move(body);
 }
 
-void Application::CarryCameraWithAnchor() {
-    if (_cameraAnchor.body) {
+void CameraController::CarryWithAnchor() {
+    if (_anchor.body) {
         // Bodies were placed for this frame's date just before; a date jump carries the
         // camera with its body too, so the scrubber keeps it in view.
-        const CameraNavigation::Body now = NavigationBody(*_cameraAnchor.body);
+        const CameraNavigation::Body now = NavigationBody(*_anchor.body);
         // Hovering turns the camera with the body: above the surface patch's altitude the
         // anchor is translation-only, so a fly-around still sees the body turn. A focus
         // flight is a camera move of its own, and Observe, mission follow and a timeline's
         // setCameraPose (which clears the anchor) pose the camera themselves, so none of them
         // gets a second rotation on top.
-        const double radius = _cameraAnchor.body->GetBoundingSphere().radius;
+        const double radius = _anchor.body->GetBoundingSphere().radius;
         const double altitudeRadii =
-            radius > 0.0 ? CameraNavigation::AnalyticAltitude(_cameraAnchor.last, _camera.GetWorldPosition()) / radius
+            radius > 0.0 ? CameraNavigation::AnalyticAltitude(_anchor.last, _camera.GetWorldPosition()) / radius
                          : std::numeric_limits<double>::max();
-        const bool authoredMotion = _camera.IsTransitionActive() || _observe.active || _missionFollowActive;
-        _cameraAnchor.coRotating =
-            !authoredMotion && CameraNavigation::CoRotates(_cameraAnchor.coRotating, altitudeRadii);
+        const bool authoredMotion = _camera.IsTransitionActive() || _app.observe.active || _missions.Following();
+        _anchor.coRotating = !authoredMotion && CameraNavigation::CoRotates(_anchor.coRotating, altitudeRadii);
 
         glm::dmat3 turn(1.0);
         const glm::dvec3 eye = _camera.GetWorldPosition();
-        const glm::dvec3 carried =
-            CameraNavigation::CarryEye(_cameraAnchor.last, now, eye, _cameraAnchor.coRotating, &turn);
-        if (_cameraAnchor.coRotating) {
+        const glm::dvec3 carried = CameraNavigation::CarryEye(_anchor.last, now, eye, _anchor.coRotating, &turn);
+        if (_anchor.coRotating) {
             _camera.SetWorldPosition(carried);
             _camera.Reorient(turn);
         } else {
             _camera.Carry(carried - eye);
         }
-        _cameraAnchor.last = now;
+        _anchor.last = now;
     }
 
     double altitude = std::numeric_limits<double>::max();
@@ -139,7 +149,7 @@ void Application::CarryCameraWithAnchor() {
                                                        OrbitLayout::kAuToSceneUnits));
 }
 
-void Application::ConstrainCamera() {
+void CameraController::Constrain() {
     const bool trueScale = SceneScale::IsTrueScale();
     const std::vector<std::shared_ptr<const SpaceObject>> bodies = NavigationBodies();
     glm::dvec3 eye = _camera.GetWorldPosition();
@@ -161,12 +171,12 @@ void Application::ConstrainCamera() {
         const double radius = nearest->GetBoundingSphere().radius;
         // A body drawing terrain tiles stands the camera on the tile under it (the deepest one
         // resident there: its roots always are). The sphere is what is drawn otherwise.
-        const std::optional<double> terrain = TerrainSurfaceRadius(*nearest, eye);
+        const std::optional<double> terrain = _terrain.SurfaceRadius(*nearest, eye);
         const double surface = terrain ? *terrain
                                : nearestAltitude < CameraNavigation::kHoverRadii * radius ? SurfaceModelRadius(*nearest, body, eye)
                                                                                          : body.meshRadius;
         // Observe parks the camera on Earth's surface itself and draws only the sky.
-        if (!_observe.active) {
+        if (!_app.observe.active) {
             const double margin = trueScale ? SceneScale::KmToScene(kRealisticFloorMarginKm) : kCompressedFloorMargin;
             eye = CameraNavigation::Floor(body, eye, surface, margin);
             _camera.SetWorldPosition(eye);
@@ -181,28 +191,28 @@ void Application::ConstrainCamera() {
     _logDepthC = clip.logDepthC;
 
     // Mission follow and Observe pose the camera themselves every frame.
-    if (_observe.active || _missionFollowActive) {
-        SetCameraAnchor(nullptr, false);
+    if (_app.observe.active || _missions.Following()) {
+        SetAnchor(nullptr, false);
         return;
     }
     if (!_camera.IsTransitionActive()) {
-        _cameraAnchor.pinned = false;
+        _anchor.pinned = false;
     }
     std::vector<double> radiiAway;
     int current = -1;
     for (size_t i = 0; i < bodies.size(); ++i) {
         const double radius = bodies[i]->GetBoundingSphere().radius;
         radiiAway.push_back(radius > 0.0 ? glm::distance(eye, bodies[i]->GetWorldPosition()) / radius : -1.0);
-        if (bodies[i] == _cameraAnchor.body) {
+        if (bodies[i] == _anchor.body) {
             current = static_cast<int>(i);
         }
     }
-    const int chosen = CameraNavigation::ChooseAnchor(current, radiiAway, _cameraAnchor.pinned);
-    SetCameraAnchor(chosen >= 0 ? bodies[static_cast<size_t>(chosen)] : nullptr, _cameraAnchor.pinned);
+    const int chosen = CameraNavigation::ChooseAnchor(current, radiiAway, _anchor.pinned);
+    SetAnchor(chosen >= 0 ? bodies[static_cast<size_t>(chosen)] : nullptr, _anchor.pinned);
 }
 
-Application::CameraBodyFrame Application::CaptureCameraBodyFrame() const {
-    CameraBodyFrame frame;
+CameraController::BodyFrame CameraController::CaptureBodyFrame() const {
+    BodyFrame frame;
     double best = std::numeric_limits<double>::max();
     for (const auto& object : NavigationBodies()) {
         const double radius = object->GetBoundingSphere().radius;
@@ -219,15 +229,15 @@ Application::CameraBodyFrame Application::CaptureCameraBodyFrame() const {
     return frame;
 }
 
-void Application::RestoreCameraBodyFrame(const CameraBodyFrame& frame) {
+void CameraController::RestoreBodyFrame(const BodyFrame& frame) {
     if (frame.body) {
         const double radius = frame.body->GetBoundingSphere().radius;
         _camera.SetWorldPosition(frame.body->GetWorldPosition() + frame.offsetInRadii * radius);
     }
     // Its target was in the other scale; and the anchor's last position jumped with it.
     _camera.CancelTransition();
-    _cameraAnchor.pinned = false;
-    if (_cameraAnchor.body) {
-        _cameraAnchor.last = NavigationBody(*_cameraAnchor.body);
+    _anchor.pinned = false;
+    if (_anchor.body) {
+        _anchor.last = NavigationBody(*_anchor.body);
     }
 }

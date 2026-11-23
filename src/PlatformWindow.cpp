@@ -2,6 +2,7 @@
 // icon, framebuffer resize plumbing and vertical sync. Everything here runs once at
 // startup or in response to a window event — no per-frame work.
 #include "Application.h"
+#include "GoldenCapture.h"
 #include "QualitySettings.h"
 #include "SimState.h"
 #include "astro/Ephemeris.h"
@@ -121,7 +122,7 @@ void Application::InitSystems() {
     OrbitLayout::SetJulianDate(Ephemeris::JulianDateNowUtc());
 #else
     // A golden capture pins the date before anything is built from it (the belts' phases).
-    const double goldenJd = GoldenStartJulianDate();
+    const double goldenJd = ::GoldenStartJulianDate();
     OrbitLayout::SetJulianDate(goldenJd > 0.0 ? goldenJd : Ephemeris::JulianDateNowUtc());
 #endif
 
@@ -386,7 +387,7 @@ void Application::Dispose() {
 }
 
 void Application::ReleaseGpuResources() {
-    _gpuTimer.reset();
+    _profiler.ReleaseGpu();
     _renderableSceneComponents.clear();
     _planetSystemManifests.clear();
     _sun.reset();
@@ -469,7 +470,7 @@ void Application::FramebufferSizeCallback(GLFWwindow* window, int width, int hei
         glViewport(0, 0, width, height);
         return;
     }
-    if (app->_capture.resized) {
+    if (app->_cinematics.RenderSizeLocked()) {
         return; // a capture renders at its own size (WebWindowResizeCallback)
     }
     app->HandleResize(width, height);
@@ -484,7 +485,7 @@ void Application::FramebufferSizeCallback(GLFWwindow* window, int width, int hei
 EM_BOOL Application::WebWindowResizeCallback(int /*eventType*/, const EmscriptenUiEvent*, void* userData) {
     auto* app = static_cast<Application*>(userData);
     // A capture renders at its own size; EndCapture fits the canvas to the window again.
-    if (!app->_capture.resized) {
+    if (!app->_cinematics.RenderSizeLocked()) {
         app->FitCanvasToCss();
     }
     return EM_FALSE; // Don't block the event from reaching other listeners.

@@ -26,9 +26,9 @@ void Application::ApplyQualityPreset(int preset) {
     if (_kuiperField) {
         _kuiperField->SetInstanceCount(settings.kuiperInstanceCount);
     }
-    _renderer.RebuildMissionPaths(_missionCatalog, _simState.qualityPreset);
+    _renderer.RebuildMissionPaths(_missions.Catalog(), _simState.qualityPreset);
     _renderer.RebuildMagneticFields(_simState.qualityPreset);
-    ConfigureTerrain(settings);
+    _terrain.Configure(settings);
     LogQualityTier(settings, _renderer.HdrEnabled(), _simState.shadowQuality, _simState.contextSamples);
 }
 
@@ -49,14 +49,14 @@ void Application::ApplyOrbitScaleMode(int mode) {
     const auto scaleMode = mode == 1 ? OrbitLayout::ScaleMode::Realistic : OrbitLayout::ScaleMode::Compressed;
     // The camera keeps its place relative to the body it is nearest, in that body's radii, so
     // the view survives the bodies resizing and moving under it (docs/ARCHITECTURE.md §11.1).
-    const CameraBodyFrame frame = CaptureCameraBodyFrame();
+    const CameraController::BodyFrame frame = _cameraController.CaptureBodyFrame();
     OrbitLayout::SetScaleMode(scaleMode);
     PlaceBodies();
-    RestoreCameraBodyFrame(frame);
+    _cameraController.RestoreBodyFrame(frame);
     UpdateRenderOrigin();
     RefreshPlanetProxyPositions();
     // Belt instance matrices follow the new AU→scene mapping at the next UpdateScene.
-    _renderer.RebuildMissionPaths(_missionCatalog, _simState.qualityPreset);
+    _renderer.RebuildMissionPaths(_missions.Catalog(), _simState.qualityPreset);
     LOG_INFO("OrbitScale", "%s distances active",
              scaleMode == OrbitLayout::ScaleMode::Realistic ? "realistic" : "compressed");
 }

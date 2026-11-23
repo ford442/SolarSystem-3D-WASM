@@ -71,6 +71,11 @@ set(SOLARSYSTEM_SOURCES_CORE
     src/TerrainController.cpp
     src/GpuContextRestore.cpp
     src/Cinematics.cpp
+    src/SceneQueries.cpp
+    src/SceneFrame.cpp
+    src/FrameProfiler.cpp
+    src/MissionController.cpp
+    src/SkyEventCache.cpp
     src/SpaceWeatherController.cpp
     src/render/passes/RendererSetup.cpp
     src/render/passes/RendererFrame.cpp

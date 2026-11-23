@@ -228,7 +228,7 @@ bool Application::LoadSystem(const std::string& id, int focusIndex) {
 
     const auto started = std::chrono::steady_clock::now();
     SetObserveMode(false);
-    StopMissionFollow();
+    _missions.Stop();
     TearDownStarSystem();
     if (system) {
         StarSystemCatalog::Activate(std::move(system));
@@ -237,10 +237,9 @@ bool Application::LoadSystem(const std::string& id, int focusIndex) {
     }
     _renderer.PrefetchCatalogVariants();
     InitStarSystem();
-    InitSpaceWeather(); // the new star's cycle; CMEs launched by hand were the last system's
+    _spaceWeather.Init(); // the new star's cycle; CMEs launched by hand were the last system's
     // The sky-event caches are Sol's; searched afresh after a round trip.
-    _nextConjunctionCached = false;
-    _nextSkyEventCached = false;
+    _skyEvents.Reset();
     PlaceBodies();
     _simState.timeScale = ArrivalTimeScale(LandingIndex(focusIndex));
     NotifySettingsChanged("timeScale");
@@ -257,7 +256,7 @@ void Application::TearDownStarSystem() {
     ++_manifestGeneration;
     _planetSystemManifests.clear();
 
-    SetCameraAnchor(nullptr, false);
+    _cameraController.SetAnchor(nullptr, false);
     _drawOrder.clear();
     _frameScene = SceneSnapshot{};
     _renderableSceneComponents.clear();

@@ -43,7 +43,7 @@ void Application::SetObserveMode(bool active) {
         _observe.savedZoomMax = _camera.GetZoomMax();
         _observe.savedMovementLocked = _camera.IsMovementLocked();
 
-        StopMissionFollow();
+        _missions.Stop();
         _camera.CancelTransition();
         _camera.SetMovementLocked(true);
         _camera.SetZoomRange(ObserveState::kMinFovDeg, ObserveState::kMaxFovDeg);

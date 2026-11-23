@@ -1,9 +1,13 @@
 // Space weather, Application's side (docs/ARCHITECTURE.md §13): the model in astro/SpaceWeather
 // evaluated at this frame's date and mapped into the scene (SpaceWeatherFrame), plus the
-// settings-panel API. Renderer draws what lands in _frameScene.spaceWeather; nothing here
-// touches GL.
-#include "Application.h"
+// settings-panel API. Renderer draws what Contribute puts in SceneSnapshot::spaceWeather;
+// nothing here touches GL.
+#include "SpaceWeatherController.h"
 #include "ApplicationTypes.h"
+#include "IAppModule.h"
+#include "ObserveState.h"
+#include "SimState.h"
+#include "Solar_System/Star.h"
 #include "FrameContext.h"
 #include "JsBridge.h"
 #include "QualitySettings.h"
@@ -77,41 +81,45 @@ glm::vec3 ToVec3(const BodyCatalog::Rgb& color) {
 
 } // namespace
 
-void Application::InitSpaceWeather() {
-    _spaceWeather.ClearLaunched();
-    _spaceWeather.SetCycle(SpaceWeather::CycleFromStar(BodyCatalog::Star()));
-    if (!_spaceWeatherLoaded) {
-        _spaceWeatherLoaded = true;
+SpaceWeatherController::SpaceWeatherController(const ModuleContext& app) : _app(app) {}
+
+void SpaceWeatherController::Init() {
+    _model.ClearLaunched();
+    _model.SetCycle(SpaceWeather::CycleFromStar(BodyCatalog::Star()));
+    if (!_loaded) {
+        _loaded = true;
         SpaceWeather::CmeCatalog catalog;
         std::string error;
         if (SpaceWeather::LoadCmeCatalog("resource/spaceweather/cmes.json", catalog, error)) {
             LOG_INFO("SpaceWeather", "%zu CMEs in the catalog", catalog.events.size());
-            _spaceWeather.SetCatalog(std::move(catalog));
+            _model.SetCatalog(std::move(catalog));
         } else {
             LOG_WARN("SpaceWeather", "No CME catalog (%s); storms come only from Launch CME", error.c_str());
         }
 #ifndef __EMSCRIPTEN__
         // Native counterparts of the web deep link's &kp= / &cme= (and the wind toggle).
         if (const char* wind = std::getenv("SOLARSYSTEM_SOLAR_WIND")) {
-            _spaceWeatherWind = std::strcmp(wind, "0") != 0;
+            _wind = std::strcmp(wind, "0") != 0;
         }
         if (const char* kp = std::getenv("SOLARSYSTEM_KP")) {
-            _spaceWeather.SetKpOverride(std::atof(kp));
+            _model.SetKpOverride(std::atof(kp));
         }
         if (const char* cme = std::getenv("SOLARSYSTEM_CME")) {
-            JumpToSpaceWeatherDate(cme);
+            JumpToDate(cme);
         }
 #endif
     }
 }
 
-void Application::UpdateSpaceWeather(int viewCount) {
-    SpaceWeatherFrame& frame = _spaceWeatherFrame;
-    _frameScene.spaceWeather = nullptr;
-    if (!_sun) {
+void SpaceWeatherController::Update(SimState& sim) {
+    SpaceWeatherFrame& frame = _frame;
+    _active = false;
+    if (!_app.sun) {
         return;
     }
-    const QualityTierSettings quality = GetQualitySettings(_simState.qualityPreset, _simState.isMobileWeb);
+    const Star& sun = *_app.sun;
+    const int viewCount = _app.viewCount;
+    const QualityTierSettings quality = GetQualitySettings(sim.qualityPreset, sim.isMobileWeb);
     const double jd = OrbitLayout::GetJulianDate();
     const bool sol = StarSystemCatalog::IsSol();
 
@@ -132,13 +140,13 @@ void Application::UpdateSpaceWeather(int viewCount) {
         }
         positions.push_back(lonLatR);
     }
-    _spaceWeather.Evaluate(jd, positions);
+    _model.Evaluate(jd, positions);
 
     frame.auroraMode = quality.auroraMode;
     frame.photosphereMode = quality.photosphereMode;
-    frame.windEnabled = sol && _spaceWeatherWind && quality.solarWindParticles > 0;
+    frame.windEnabled = sol && _wind && quality.solarWindParticles > 0;
     frame.particles = frame.windEnabled ? quality.solarWindParticles : 0;
-    const SpaceWeather::CycleState& cycle = _spaceWeather.Cycle();
+    const SpaceWeather::CycleState& cycle = _model.Cycle();
     frame.cyclePhase = static_cast<float>(cycle.phase);
     frame.beltHalfWidthRad = static_cast<float>(glm::radians(SpaceWeather::StreamerBeltHalfWidthDeg(cycle.phase)));
     frame.spotBandsRad = glm::vec4(glm::radians(cycle.current.latitudeDeg), glm::radians(cycle.current.halfWidthDeg),
@@ -147,12 +155,12 @@ void Application::UpdateSpaceWeather(int viewCount) {
     frame.spotDays = static_cast<float>(cycle.yearsSinceMinimum * 365.25);
 
     // The particles' clock: the frame delta (a fixed step in a capture), stopped while paused.
-    const bool paused = _simState.timePaused || _observe.active;
-    frame.visualDt = paused ? 0.0f : static_cast<float>(std::min(_deltaTime, 0.1));
-    _spaceWeatherClock += frame.visualDt;
-    frame.visualClock = static_cast<float>(std::fmod(_spaceWeatherClock, 86400.0));
+    const bool paused = sim.timePaused || _app.observe.active;
+    frame.visualDt = paused ? 0.0f : static_cast<float>(std::min(_app.deltaSeconds, 0.1));
+    _clock += frame.visualDt;
+    frame.visualClock = static_cast<float>(std::fmod(_clock, 86400.0));
     ++frame.frameCounter;
-    const double daysPerSecond = static_cast<double>(_simState.timeScale) * kDaysPerOrrerySecond;
+    const double daysPerSecond = static_cast<double>(sim.timeScale) * kDaysPerOrrerySecond;
     const double auPerSecond = SpaceWeather::kSlowWindKmS * daysPerSecond * kSecondsPerDay / SpaceWeather::kAuKm;
     frame.auPerSecond = static_cast<float>(glm::clamp(auPerSecond, kMinAuPerSecond, kMaxAuPerSecond));
     // Corotation such that a 400 km/s parcel trails the Parker angle at 1 AU, whatever the rate.
@@ -169,25 +177,25 @@ void Application::UpdateSpaceWeather(int viewCount) {
     }
     const float sceneUnitsPerAuNearSun =
         frame.knots.empty() ? OrbitLayout::kAuToSceneUnits : frame.knots.front().y / frame.knots.front().x;
-    frame.spawnAu = 1.3f * _sun->GetSceneRadius() / sceneUnitsPerAuNearSun;
+    frame.spawnAu = 1.3f * sun.GetSceneRadius() / sceneUnitsPerAuNearSun;
 
     // Background group: the inner heliosphere, while it is on screen and the camera is not far
     // out past it (at Pluto it would be a few pixels of haze).
-    const glm::vec3 sunRender = _sun->GetPosition();
+    const glm::vec3 sunRender = sun.GetPosition();
     const float edgeScene = static_cast<float>(OrbitLayout::AuToSceneDistanceDouble(kWindEdgeAu));
-    const Visibility heliosphere = SphereVisibility(_frameViews, viewCount, sunRender, edgeScene);
-    const float cameraFromSun = glm::length(sunRender - _frameViews[0].headPosition);
+    const Visibility heliosphere = SphereVisibility(_app.views, viewCount, sunRender, edgeScene);
+    const float cameraFromSun = glm::length(sunRender - _app.views[0].headPosition);
     frame.backgroundActive =
         frame.windEnabled && heliosphere.seen && heliosphere.pixels > 40.0f && cameraFromSun < 3.0f * edgeScene;
 
     frame.bodies.clear();
     if (sol) {
-        const auto& states = _spaceWeather.Bodies();
+        const auto& states = _model.Bodies();
         for (std::size_t i = 0; i < magnetospheres.size() && i < states.size(); ++i) {
             const SpaceWeather::Magnetosphere& m = magnetospheres[i];
             const SpaceWeather::BodyState& state = states[i];
             const RenderableSceneComponent* component = nullptr;
-            for (const auto& candidate : _renderableSceneComponents) {
+            for (const auto& candidate : _app.components) {
                 const BodyCatalog::Entry* entry = candidate.planet ? candidate.planet->CatalogEntry() : nullptr;
                 if (entry && std::strcmp(entry->id, m.id) == 0) {
                     component = &candidate;
@@ -240,16 +248,16 @@ void Application::UpdateSpaceWeather(int viewCount) {
                 // The group spans [+6 s, -20 s] along the Sun line and 7 s across it.
                 const float extent = 21.0f * body.quietStandoff * body.radius;
                 const glm::vec3 center = body.render - body.sunward * (7.0f * body.quietStandoff * body.radius);
-                const Visibility seen = SphereVisibility(_frameViews, viewCount, center, extent);
+                const Visibility seen = SphereVisibility(_app.views, viewCount, center, extent);
                 const Visibility standoff =
-                    SphereVisibility(_frameViews, viewCount, body.render, body.quietStandoff * body.radius);
+                    SphereVisibility(_app.views, viewCount, body.render, body.quietStandoff * body.radius);
                 body.groupActive = seen.seen && standoff.pixels > kMinStandoffPixels;
             }
             frame.bodies.push_back(body);
         }
 
         frame.cmes.clear();
-        for (const SpaceWeather::Cme* cme : _spaceWeather.ActiveCmes()) {
+        for (const SpaceWeather::Cme* cme : _model.ActiveCmes()) {
             SpaceWeatherFrame::Cme c;
             c.direction = glm::vec3(cme->direction);
             c.frontAu = static_cast<float>(SpaceWeather::FrontKm(*cme, jd) / SpaceWeather::kAuKm);
@@ -263,35 +271,39 @@ void Application::UpdateSpaceWeather(int viewCount) {
     } else {
         frame.cmes.clear();
     }
-    _frameScene.spaceWeather = &frame;
+    _active = true;
 }
 
-void Application::SetSolarWindEnabled(bool enabled) {
-    if (_spaceWeatherWind == enabled) {
+void SpaceWeatherController::Contribute(SceneSnapshot& scene) {
+    scene.spaceWeather = _active ? &_frame : nullptr;
+}
+
+void SpaceWeatherController::SetSolarWindEnabled(bool enabled) {
+    if (_wind == enabled) {
         return;
     }
-    _spaceWeatherWind = enabled;
+    _wind = enabled;
     LOG_INFO("SpaceWeather", "Solar wind %s", enabled ? "on" : "off");
     NotifySettingsChanged("solarWind");
 }
 
-void Application::SetKpOverride(double kp) {
-    _spaceWeather.SetKpOverride(kp);
+void SpaceWeatherController::SetKpOverride(double kp) {
+    _model.SetKpOverride(kp);
     NotifySettingsChanged("kpOverride");
 }
 
-void Application::LaunchCmeNow() {
+void SpaceWeatherController::LaunchCmeNow() {
     if (!StarSystemCatalog::IsSol()) {
         return;
     }
-    const SpaceWeather::Cme& cme = _spaceWeather.LaunchCme(OrbitLayout::GetJulianDate());
+    const SpaceWeather::Cme& cme = _model.LaunchCme(OrbitLayout::GetJulianDate());
     LOG_INFO("SpaceWeather", "%s: %.0f km/s, at Earth in %.1f days", cme.name.c_str(), cme.speedKmS,
              cme.modelArrivalJd > 0.0 ? cme.modelArrivalJd - cme.launchJd : 0.0);
     SetSolarWindEnabled(true);
 }
 
-bool Application::PlaySpaceWeatherEvent(int index) {
-    const auto& events = _spaceWeather.Catalog().events;
+bool SpaceWeatherController::PlayEvent(int index, SimState& sim) {
+    const auto& events = _model.Catalog().events;
     if (!StarSystemCatalog::IsSol() || index < 0 || index >= static_cast<int>(events.size())) {
         return false;
     }
@@ -301,11 +313,10 @@ bool Application::PlaySpaceWeatherEvent(int index) {
     const double arrival = cme.ArrivalAtEarthJd();
     const double transitDays = arrival > 0.0 ? arrival - cme.launchJd : 2.0;
     constexpr double kPlaySeconds = 8.0;
-    _simState.timeScale =
-        static_cast<float>(glm::clamp(transitDays / (kPlaySeconds * kDaysPerOrrerySecond), 0.01, 1.0));
-    _simState.timePaused = false;
+    sim.timeScale = static_cast<float>(glm::clamp(transitDays / (kPlaySeconds * kDaysPerOrrerySecond), 0.01, 1.0));
+    sim.timePaused = false;
     LOG_INFO("SpaceWeather", "Playing %s (launch JD %.3f), time scale %.3f", cme.name.c_str(), cme.launchJd,
-             static_cast<double>(_simState.timeScale));
+             static_cast<double>(sim.timeScale));
     NotifySettingsChanged("timeScale");
     NotifySettingsChanged("paused");
     NotifySettingsChanged("simulationEpoch");
@@ -313,7 +324,7 @@ bool Application::PlaySpaceWeatherEvent(int index) {
     return true;
 }
 
-bool Application::JumpToSpaceWeatherDate(const std::string& isoUtc) {
+bool SpaceWeatherController::JumpToDate(const std::string& isoUtc) {
     const double jd = SpaceWeather::ParseIsoUtc(isoUtc);
     if (jd <= 0.0) {
         LOG_WARN("SpaceWeather", "Not an ISO-8601 UTC time: %s", isoUtc.c_str());
@@ -325,12 +336,12 @@ bool Application::JumpToSpaceWeatherDate(const std::string& isoUtc) {
     return true;
 }
 
-std::string Application::GetSpaceWeatherJson() const {
-    const QualityTierSettings quality = GetQualitySettings(_simState.qualityPreset, _simState.isMobileWeb);
+std::string SpaceWeatherController::ToJson(const SimState& sim) const {
+    const QualityTierSettings quality = GetQualitySettings(sim.qualityPreset, sim.isMobileWeb);
     char extra[256];
     std::snprintf(extra, sizeof(extra),
                   "\"sol\":%s,\"solarWind\":%s,\"particles\":%d,\"auroraMode\":%d,\"photosphereMode\":%d",
-                  StarSystemCatalog::IsSol() ? "true" : "false", _spaceWeatherWind ? "true" : "false",
-                  _spaceWeatherFrame.particles, quality.auroraMode, quality.photosphereMode);
-    return _spaceWeather.ToJson(extra);
+                  StarSystemCatalog::IsSol() ? "true" : "false", _wind ? "true" : "false", _frame.particles,
+                  quality.auroraMode, quality.photosphereMode);
+    return _model.ToJson(extra);
 }
