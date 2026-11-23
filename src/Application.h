@@ -1,25 +1,27 @@
 #ifndef SOLARSYSTEM_APPLICATION_H
 #define SOLARSYSTEM_APPLICATION_H
 #include "ApplicationTypes.h"
+#include "CameraController.h"
+#include "Cinematics.h"
+#include "FrameProfiler.h"
+#include "IAppModule.h"
+#include "MissionController.h"
 #include "ObserveState.h"
 #include "FrameContext.h"
-#include "FramePasses.h"
 #include "Renderer.h"
 #include "SimState.h"
-#include "astro/MissionCatalog.h"
+#include "SkyEventCache.h"
+#include "SpaceWeatherController.h"
+#include "TerrainController.h"
 #include "astro/Observer.h"
 #include "astro/SkyEvents.h"
-#include "astro/SpaceWeather.h"
 #include "PlanetSystemManifest.h"
 #include "Solar_System/AsteroidField.h"
 #include "Solar_System/SolarSystem.h"
 #include "SystemModules.h"
 #include "XrState.h"
 #include "core/Camera.h"
-#include "core/CameraNavigation.h"
-#include "core/FrameProfile.h"
 #include "core/FrameTimer.h"
-#include "core/JobSystem.h"
 #include "gfx/MeshHolder.h"
 #include "gfx/ShadowFit.h"
 #include <array>
@@ -30,10 +32,6 @@
 #include <optional>
 #include <string>
 #include <unordered_set>
-
-namespace Terrain {
-class TerrainSystem;
-}
 
 #ifdef __EMSCRIPTEN__
 #include <emscripten.h>
@@ -48,12 +46,18 @@ class TerrainSystem;
 #include <irrKlang.h>
 #endif
 
-class GpuTimer;
-
-class Application {
+/**
+ * The application's lifecycle and frame loop, and the module list that does the rest
+ * (docs/ARCHITECTURE.md §7.1): Renderer draws, the IAppModules (terrain, space weather,
+ * missions) update once a frame and contribute to the snapshot the renderer reads,
+ * CameraController steers the camera around the input, Cinematics runs captures, and
+ * FrameProfiler times it all. The public methods are what the page (WasmExports.cpp) and the
+ * keyboard (InputHandler.cpp) call; the module ones forward.
+ */
+class Application : private Cinematics::Host {
 public:
     Application();
-    ~Application();
+    ~Application() override;
     void Exec();
     void RunOneFrame(); // For Emscripten main loop / XR RAF
 #ifdef __EMSCRIPTEN__
@@ -97,9 +101,9 @@ public:
     const std::string& GetActiveSystemId() const;
     bool IsSystemJumpActive() const { return _jump.phase != SystemJump::Phase::None; }
     void FocusMissionByIndex(int idx);
-    int GetFocusedMissionIndex() const;
-    int GetMissionCount() const;
-    std::string GetMissionCatalogJson() const;
+    int GetFocusedMissionIndex() const { return _missions.Focused(); }
+    int GetMissionCount() const { return _missions.Count(); }
+    std::string GetMissionCatalogJson() const { return _missions.CatalogJson(); }
     /** The last frame's FrameProfile as JSON (perf HUD); resets the worst-frame window. */
     std::string GetFrameStatsJson();
     /** GPU stage timers (gfx/GpuTimer.h): on for the perf HUD and debug-level FrameStats. */
@@ -112,7 +116,7 @@ public:
      * are untouched. Textures come back over the next frames through the upload budget.
      */
     void RestoreGpuContext();
-    std::string GetFocusedMissionJson() const;
+    std::string GetFocusedMissionJson() const { return _missions.FocusedJson(); }
     void SetXrControllerRay(int hand, float ox, float oy, float oz, float dx, float dy, float dz, int visible);
     /**
      * Next inner-planet conjunction at the current simulation epoch. Cached: the search costs
@@ -159,22 +163,22 @@ public:
 
     // --- Space weather (SpaceWeatherController.cpp; astro/SpaceWeather.h, ARCHITECTURE §13) --
     /** The solar-wind particles (the settings panel's "Solar wind"); auroras draw either way. */
-    void SetSolarWindEnabled(bool enabled);
-    bool GetSolarWindEnabled() const { return _spaceWeatherWind; }
+    void SetSolarWindEnabled(bool enabled) { _spaceWeather.SetSolarWindEnabled(enabled); }
+    bool GetSolarWindEnabled() const { return _spaceWeather.SolarWindEnabled(); }
     /** < 0: Kp from the wind; 0–9 holds every oval at that Kp. */
-    void SetKpOverride(double kp);
+    void SetKpOverride(double kp) { _spaceWeather.SetKpOverride(kp); }
     double GetKpOverride() const { return _spaceWeather.KpOverride(); }
     /** An Earth-directed CME leaving the Sun now; turns the wind on so it shows. */
-    void LaunchCmeNow();
+    void LaunchCmeNow() { _spaceWeather.LaunchCmeNow(); }
     /**
      * Play catalog event `index` (GetSpaceWeatherJson's nextStorm / lastStorm): the date goes to
      * its launch, the wind on, and the orrery slows so the pulse takes ~8 s to reach Earth.
      */
-    bool PlaySpaceWeatherEvent(int index);
+    bool PlaySpaceWeatherEvent(int index) { return _spaceWeather.PlayEvent(index, _simState); }
     /** Set the date to an ISO-8601 UTC instant (`&cme=2003-10-29T06:00Z`) with the wind on. */
-    bool JumpToSpaceWeatherDate(const std::string& isoUtc);
+    bool JumpToSpaceWeatherDate(const std::string& isoUtc) { return _spaceWeather.JumpToDate(isoUtc); }
     /** SpaceWeather::State::ToJson for this frame, with the renderer's settings. */
-    std::string GetSpaceWeatherJson() const;
+    std::string GetSpaceWeatherJson() const { return _spaceWeather.ToJson(_simState); }
 
     // --- Timelines and capture (Cinematics.cpp; web/src/timeline.ts, web/src/capture.ts) --
     /**
@@ -182,11 +186,11 @@ public:
      * of the animation clock (reset to 0 here) rather than of the wall clock. A `width` ×
      * `height` above 0 renders at that size (web: the canvas backing store) until EndCapture.
      */
-    void BeginCapture(int width, int height);
+    void BeginCapture(int width, int height) { _cinematics.Begin(width, height); }
     /** Draw one capture frame `deltaSeconds` after the previous one (0 redraws the same instant). */
-    void StepCaptureFrame(double deltaSeconds);
-    void EndCapture();
-    bool IsCaptureActive() const { return _capture.active; }
+    void StepCaptureFrame(double deltaSeconds) { _cinematics.Step(deltaSeconds); }
+    void EndCapture() { _cinematics.End(); }
+    bool IsCaptureActive() const { return _cinematics.Active(); }
     /** Textures queued or uploading, plus planet systems still downloading. */
     int PendingAssetCount() const;
     /** The Sun and every catalog row as JSON: index, id, name, parent id, kind, radiusKm. */
@@ -198,10 +202,7 @@ public:
      */
     std::string GetSceneStateJson();
     /** Where a body's drawn surface is along a world direction from its centre. */
-    struct SurfacePoint {
-        double radius;     // centre to surface, scene units
-        glm::dvec3 normal; // outward unit normal there, world frame
-    };
+    using SurfacePoint = CameraController::SurfacePoint;
     /**
      * The drawn surface along a world direction: the mesh facet the camera floor measures,
      * once the body is loaded; its analytic sphere (radius, and the direction as the normal)
@@ -234,23 +235,6 @@ public:
 private:
     SimState _simState;
     Camera _camera{0.001f, 20000.f, 5.0f, 0.05f, glm::dvec3(-134.0, 0.0, 0.0)};
-    // C of the log-depth curve this frame (CameraNavigation::ChooseClipPlanes).
-    float _logDepthC = 1.0f;
-
-    // Co-moving camera (CameraController.cpp): the body the camera rides along with while the
-    // orrery clock carries it round its orbit, and where that body was when last carried.
-    struct CameraAnchor {
-        std::shared_ptr<const SpaceObject> body;
-        CameraNavigation::Body last;  // the body's pose when last carried (centre and drawn 3×3)
-        bool pinned = false;     // a focus flight to this body: hold it until the flight lands
-        bool coRotating = false; // hovering: the camera turns with the body, not only follows it
-    };
-    CameraAnchor _cameraAnchor;
-    // Where the camera sits relative to a body, in that body's radii (scale toggles keep it).
-    struct CameraBodyFrame {
-        std::shared_ptr<const SpaceObject> body;
-        glm::dvec3 offsetInRadii{0.0};
-    };
 
     float _lastX = 0.f;
     float _lastY = 0.f;
@@ -258,15 +242,18 @@ private:
     double _deltaTime = 0.0;
     double _lastFrame = 0.0;
 
-    // Offline capture (Cinematics.cpp): the frame clock steps by a fixed dt from JS.
-    struct CaptureState {
-        bool active = false;
-        double stepSeconds = 0.0;
-        bool resized = false; // BeginCapture set a render size; EndCapture fits the canvas again
-        int width = 0;        // that size, re-asserted before every captured frame
-        int height = 0;
-    };
-    CaptureState _capture;
+#ifndef __EMSCRIPTEN__
+    /** SOLARSYSTEM_GOLDEN (GoldenCapture.h): load, draw the capture frames, write the last, return. */
+    void RunGoldenCapture(const std::string& spec);
+#endif
+    // Cinematics::Host.
+    void RunCaptureFrame() override { RunOneFrame(); }
+    void ResizeRenderTarget(int width, int height) override { HandleResize(width, height); }
+    void FitRenderTargetToPage() override;
+    bool XrPresenting() const override;
+    glm::ivec2 RenderTargetSize() const override { return DisplaySize(); }
+    void RestartFrameClock() override;
+    void ResetAnimationClock() override { _simState.animationSeconds = 0.0; }
     /** The scene object for a catalog index (0 = the Sun), or null while its system is not loaded. */
     std::shared_ptr<const SpaceObject> FindSceneBody(int catalogIndex) const;
 
@@ -287,13 +274,7 @@ private:
     int _nearestPlanetIndex = -1;      // Into _renderableSceneComponents; -1 when no planets are loaded yet
     int _focusedPlanetIndex = -1;      // FocusPlanet index (0=sun … 9=pluto); -1 = none
     FrameTimer _frameTimer;
-    // Frame profile (core/FrameProfile.h): CPU per stage this frame, the GPU timer, and the
-    // finished sample of the last frame that ReportFrameStats and GetFrameStatsJson read.
-    FrameProfile::CpuStages _cpuStages;
-    FrameProfile::Sample _frameProfile;
-    FrameProfile::Totals _frameProfileTotals;
-    std::unique_ptr<GpuTimer> _gpuTimer;
-    double _profileFrameStart = -1.0;
+    FrameProfiler _profiler; // CPU/GPU per stage and pass; GetFrameStatsJson, [FrameStats]
     FT_Library _ft = nullptr;
     bool _isBackgroundMusicPlay = false, _isSearchNearestPlanet = false;
 
@@ -313,16 +294,6 @@ private:
 #endif
 
     std::string _currentMusicTrack;
-    MissionCatalog::Catalog _missionCatalog;
-    /** The catalog's parse, started in the constructor so it runs while core resources download. */
-    struct ParsedMissionCatalog {
-        bool ok = false;
-        MissionCatalog::Catalog catalog;
-        std::string error;
-    };
-    Jobs::Future<ParsedMissionCatalog> _missionCatalogJob;
-    int _focusedMissionIndex = -1;
-    bool _missionFollowActive = false;
     std::unique_ptr<AsteroidField> _asteroidField;
     std::unique_ptr<AsteroidField> _kuiperField; // Population::Kuiper; realistic scale only
     std::shared_ptr<Star> _sun;
@@ -336,15 +307,8 @@ private:
     mutable Observer::Site _observeSkySite;
     mutable bool _observeSkyValid = false;
 
-    // Next-conjunction hint cache — see GetNextConjunction().
-    mutable SkyEvents::Conjunction _nextConjunction;
-    mutable double _nextConjunctionComputedJd = 0.0;
-    mutable bool _nextConjunctionCached = false;
-
-    // Next-sky-event cache — see GetNextSkyEvent().
-    mutable SkyEvents::SkyEvent _nextSkyEvent;
-    mutable double _nextSkyEventComputedJd = 0.0;
-    mutable bool _nextSkyEventCached = false;
+    // The next conjunction and sky event, searched only when the last one passes.
+    mutable SkyEventCache _skyEvents;
 
     /** The fade-swap-fade of RequestSystemJump, advanced once per frame by UpdateSystemJump. */
     struct SystemJump {
@@ -379,36 +343,20 @@ private:
     SceneSnapshot _frameScene;
     std::array<CameraView, 2> _frameViews{};
     HudState _frameHud;
-    // Each mission's probe position at this frame's date (UpdateScene); nullopt off its trajectory.
-    std::vector<std::optional<glm::vec3>> _missionProbes;
+    // RenderFrame's inputs to the renderer's frame graph, kept so their capacity is reused.
+    std::vector<FrameContext> _frameContexts;
+    FramePlan::Features _frameFeatures;
 
-    // --- Space weather (SpaceWeatherController.cpp, docs/ARCHITECTURE.md §13) --------------
-    SpaceWeather::State _spaceWeather;
-    SpaceWeatherFrame _spaceWeatherFrame;
-    bool _spaceWeatherWind = false;
-    bool _spaceWeatherLoaded = false;
-    double _spaceWeatherClock = 0.0; // visual seconds the particles have run
-    /** The CME list and the star's cycle, once (and again after LoadSystem). */
-    void InitSpaceWeather();
-    /** After CullScene: the model at this frame's date, mapped into _spaceWeatherFrame. */
-    void UpdateSpaceWeather(int viewCount);
-
-    // --- Terrain (TerrainController.cpp; src/render/terrain/, docs/ARCHITECTURE.md §11.3) --
-    std::unique_ptr<Terrain::TerrainSystem> _terrain;
-    std::string _terrainLogged; // the last [Terrain] stats line, and when it went out
-    double _terrainLoggedAt = 0.0;
-    /** Budget, pixel error and in-flight cap from a quality tier (Low turns terrain off). */
-    void ConfigureTerrain(const QualityTierSettings& settings);
-    /**
-     * After UpdateScene and BuildFrameSnapshot, before CullScene: which render.terrain
-     * bodies draw tiles this frame, their selections into _frameScene.terrain, and the
-     * GPU copies of evicted tiles dropped.
-     */
-    void UpdateTerrain(int viewCount);
-    /** The terrain slot of a body flagged render.terrain that UpdateTerrain has seen, else -1. */
-    int TerrainSlotOf(const SpaceObject& object) const;
-    /** The tile surface's radius under `eye` (model units) while `object` draws tiles, else nullopt. */
-    std::optional<double> TerrainSurfaceRadius(const SpaceObject& object, const glm::dvec3& eye) const;
+    // --- Modules (IAppModule.h): each owns its subsystem's state --------------------------
+    int _frameViewCount = 1; // views RenderFrame draws this frame
+    ModuleContext _moduleContext{_renderableSceneComponents, _sun, _frameViews, _frameViewCount, _observe, _deltaTime};
+    TerrainController _terrain{_moduleContext, _renderer};
+    SpaceWeatherController _spaceWeather{_moduleContext};
+    MissionController _missions{_moduleContext, _camera};
+    /** Updated and contributing to the snapshot once a frame, in this order (RenderFrame). */
+    std::array<IAppModule*, 3> _modules{&_missions, &_terrain, &_spaceWeather};
+    CameraController _cameraController{_camera, _moduleContext, _terrain, _missions};
+    Cinematics _cinematics{*this};
 
     void InitSystems();
     /** The window's user pointer and GLFW input callbacks (again on a recreated native window). */
@@ -450,19 +398,13 @@ private:
     void RefreshPlanetProxyPositions(); // Keep WASM proxy markers aligned with orbit scale
     void UpdateLOD();             // Central LOD manager: upgrade textures for nearest planets (WASM)
     glm::ivec2 DisplaySize() const { return {_displayWidth, _displayHeight}; }
-    void StartCatalogJobs();
-    void LoadMissionCatalog();
+    /** The mission catalog (parsed in a job since the constructor) and its paths on the GPU. */
     void LoadMissions();
-    void UpdateMissionFollow();
     const char* ObserveEventVisibility() const; // "above" / "below" / "unknown" / "none" for the next sky event
     void UpdateObserveFrame();          // Observe: park the camera above Earth so loading/LOD follow it
     void ApplyObserveEnvOverride();     // SOLARSYSTEM_OBSERVE=lat,lon[,jd[,az,el,fov]] for headless captures
     void ApplyScaleEnvOverride();       // SOLARSYSTEM_SCALE=compressed|realistic: the web's scale toggle, natively
     void ApplyCameraPoseEnvOverride();  // SOLARSYSTEM_CAMERA_POSE=x,y,z,yaw,pitch[,jd]: web setCameraPose, natively
-    void StopMissionFollow();
-    bool SampleMissionHeliocentricPosition(int idx, glm::dvec3& outScene) const;
-    /** SampleMissionHeliocentricPosition in the render frame. */
-    bool SampleMissionScenePosition(int idx, glm::vec3& outScene) const;
     /** Once per frame, after everything that moves the camera: put the render origin on it. */
     void UpdateRenderOrigin();
     /** Move the render origin and carry every render-frame position cached across frames. */
@@ -487,27 +429,11 @@ private:
     /** The Sun and every component, placed for the current date (PlaceSceneComponents + Sun). */
     void PlaceBodies();
 
-    // --- Camera navigation (CameraController.cpp; math in core/CameraNavigation.h) --------
-    /** Every body the camera can fly near or collide with: the Sun, planets and moons. */
-    std::vector<std::shared_ptr<const SpaceObject>> NavigationBodies() const;
-    /** Before input: move the camera with its anchor body; set the fly speed for its altitude. */
-    void CarryCameraWithAnchor();
-    /** After input: keep the camera above the surface, pick its anchor, set the clip planes. */
-    void ConstrainCamera();
-    void SetCameraAnchor(std::shared_ptr<const SpaceObject> body, bool pinned);
-    /** The nearest body in its own radii, and the camera's offset from it in those radii. */
-    CameraBodyFrame CaptureCameraBodyFrame() const;
-    /** Put the camera back at `frame`'s offset from its body (after a scale change resized it). */
-    void RestoreCameraBodyFrame(const CameraBodyFrame& frame);
-    /** Simulate once, then draw the scene into `viewCount` views (1 mono, 2 XR) — see FramePasses.h. */
+    /**
+     * Simulate once, then draw the frame into `viewCount` views (1 mono, 2 XR) as a frame graph
+     * (render/graph/FramePlan.h): scene, HUD, fade, upload pump and loading line.
+     */
     void RenderFrame(int viewCount);
-    /** Debug: the previous frame's FramePasses::Stats and glUniform* count (SOLARSYSTEM_FRAME_STATS=N). */
-    void ReportFrameStats();
-    /** Run `work` as `stage`: CPU time into _cpuStages, GPU time into _gpuTimer. */
-    template <class F>
-    void TimeStage(FrameProfile::Stage stage, F&& work);
-    void BeginFrameProfile();
-    void EndFrameProfile();
     /**
      * Frustum culling after the views are known: marks every scene object and component
      * visible or not in any of the `viewCount` views, and fills _drawOrder with the visible

@@ -1,17 +1,35 @@
 // Terrain for the bodies flagged render.terrain (docs/ARCHITECTURE.md §11.3): the tile
 // fetch hook, the per-frame decision of which of them draw tiles instead of their sphere,
 // and the [Terrain] log line. The quadtree, cache and LOD are GL-free in src/render/terrain/;
-// Renderer draws what UpdateTerrain puts in the frame snapshot.
-#include "Application.h"
+// Renderer draws what Contribute puts in the frame snapshot.
+#include "TerrainController.h"
+#include "FrameContext.h"
+#include "ApplicationTypes.h"
+#include "IAppModule.h"
+#include "ObserveState.h"
 #include "QualitySettings.h"
+#include "Renderer.h"
+#include "SimState.h"
+#include "Solar_System/BodyCatalog.h"
+#include "Solar_System/SpaceObject.h"
+#include "gfx/Frustum.h"
 #include "assets/WebResourceFetcher.h"
 #include "core/CameraNavigation.h"
 #include "core/Log.h"
 #include "render/terrain/TerrainSystem.h"
+#include <algorithm>
+#include <chrono>
 #include <cmath>
+#include <cstddef>
+#include <cstdint>
 #include <cstdio>
 #include <fstream>
 #include <iterator>
+#include <memory>
+#include <optional>
+#include <string>
+#include <utility>
+#include <vector>
 
 namespace {
 
@@ -44,7 +62,10 @@ void FetchTerrainFile(const std::string& path, Terrain::FetchDone done) {
 
 } // namespace
 
-void Application::ConfigureTerrain(const QualityTierSettings& settings) {
+TerrainController::TerrainController(const ModuleContext& app, Renderer& renderer) : _app(app), _renderer(renderer) {}
+TerrainController::~TerrainController() = default;
+
+void TerrainController::Configure(const QualityTierSettings& settings) {
     if (!_terrain) {
         _terrain = std::make_unique<Terrain::TerrainSystem>(FetchTerrainFile);
     }
@@ -56,13 +77,13 @@ void Application::ConfigureTerrain(const QualityTierSettings& settings) {
     _terrain->Configure(terrain);
 }
 
-int Application::TerrainSlotOf(const SpaceObject& object) const {
+int TerrainController::SlotOf(const SpaceObject& object) const {
     const BodyCatalog::Entry* entry = object.CatalogEntry();
     return _terrain && entry && entry->hasTerrain ? _terrain->SlotOf(entry->id) : -1;
 }
 
-std::optional<double> Application::TerrainSurfaceRadius(const SpaceObject& object, const glm::dvec3& eye) const {
-    const int slot = TerrainSlotOf(object);
+std::optional<double> TerrainController::SurfaceRadius(const SpaceObject& object, const glm::dvec3& eye) const {
+    const int slot = SlotOf(object);
     if (slot < 0) {
         return std::nullopt;
     }
@@ -72,15 +93,15 @@ std::optional<double> Application::TerrainSurfaceRadius(const SpaceObject& objec
     return _terrain->SurfaceRadius(slot, CameraNavigation::ToModel(body, eye));
 }
 
-void Application::UpdateTerrain(int viewCount) {
-    _frameScene.terrain.clear();
+void TerrainController::Update(SimState& sim) {
+    _selection.clear();
     if (!_terrain) {
         return;
     }
-    const CameraView& head = _frameViews[0];
+    const CameraView& head = _app.views[0];
     std::vector<Frustum> views;
-    for (int view = 0; view < viewCount; ++view) {
-        const CameraView& camera = _frameViews[static_cast<std::size_t>(view)];
+    for (int view = 0; view < _app.viewCount; ++view) {
+        const CameraView& camera = _app.views[static_cast<std::size_t>(view)];
         views.emplace_back(camera.projection * camera.view);
     }
     Terrain::TerrainViewInput view;
@@ -94,13 +115,13 @@ void Application::UpdateTerrain(int viewCount) {
     std::vector<Terrain::TerrainBodyInput> bodies;
     std::vector<const SpaceObject*> objects;
     std::vector<Frustum> lights;
-    lights.reserve(_renderableSceneComponents.size()); // bodies point into it
-    for (const RenderableSceneComponent& component : _renderableSceneComponents) {
-        if (_observe.active) {
+    lights.reserve(_app.components.size()); // bodies point into it
+    for (const RenderableSceneComponent& component : _app.components) {
+        if (_app.observe.active) {
             break;
         }
         const Frustum* light = nullptr;
-        if (_simState.shadowQuality > 0) {
+        if (sim.shadowQuality > 0) {
             lights.emplace_back(component.lightSpaceMatrix);
             light = &lights.back();
         }
@@ -129,22 +150,26 @@ void Application::UpdateTerrain(int viewCount) {
     for (std::size_t i = 0; i < bodies.size(); ++i) {
         if (_terrain->InReach(bodies[i].slot)) {
             const Terrain::ActiveBody* tiles = _terrain->Active(bodies[i].slot);
-            _frameScene.terrain.push_back({objects[i], tiles});
+            _selection.push_back({objects[i], tiles});
             anyActive = anyActive || tiles != nullptr;
         }
     }
     _renderer.ForgetTerrainTiles(_terrain->Cache().TakeEvicted());
 
     // The budget and what is resident, while any body draws tiles, and once more after.
-    if (anyActive || !_terrainLogged.empty()) {
+    if (anyActive || !_logged.empty()) {
         char gpu[48];
         std::snprintf(gpu, sizeof(gpu), ", %zu on the GPU", _renderer.TerrainTextureCount());
         const std::string line = _terrain->StatsLine() + gpu;
-        const double now = glfwGetTime();
-        if (!anyActive || (line != _terrainLogged && now - _terrainLoggedAt >= kTerrainLogSeconds)) {
+        const double now = std::chrono::duration<double>(std::chrono::steady_clock::now().time_since_epoch()).count();
+        if (!anyActive || (line != _logged && now - _loggedAt >= kTerrainLogSeconds)) {
             LOG_INFO("Terrain", "%s", line.c_str());
-            _terrainLogged = anyActive ? line : std::string();
-            _terrainLoggedAt = now;
+            _logged = anyActive ? line : std::string();
+            _loggedAt = now;
         }
     }
+}
+
+void TerrainController::Contribute(SceneSnapshot& scene) {
+    scene.terrain = _selection;
 }

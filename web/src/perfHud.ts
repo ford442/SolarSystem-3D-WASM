@@ -1,9 +1,10 @@
 /**
  * `?perf=1`: a small overlay with the last frame's profile from C++ (core/FrameProfile.h via
  * GetFrameStatsJson): frame time and the worst frame since the previous read, CPU and GPU
- * milliseconds per frame stage, the job pool and the texture-upload pump. Turning it on also
- * turns on the GPU stage timers (EXT_disjoint_timer_query_webgl2; browsers that withhold the
- * extension show "n/a" in that column).
+ * milliseconds per frame stage and per frame-graph pass kind (render/graph/FramePlan: "scene",
+ * "shadow", "aurora-bloom", …, summed over components and views), the job pool and the
+ * texture-upload pump. Turning it on also turns on the GPU timers (EXT_disjoint_timer_query_webgl2;
+ * browsers that withhold the extension show "n/a" in that column).
  *
  * The parsed stats are also on `window.__solarSystemPerf` for scripts (Playwright reads the
  * slow-frame count from there).
@@ -23,6 +24,17 @@ export const FRAME_STAGES = [
 export type FrameStage = (typeof FRAME_STAGES)[number];
 export type StageTimes = Record<FrameStage, number>;
 
+/** One frame-graph pass kind: every pass of that kind this frame, summed. */
+export interface PassTimes {
+    kind: string;
+    stage: string;
+    /** Passes of this kind that ran (one per component and view for "scene"). */
+    count: number;
+    cpu: number;
+    /** Null until the GPU timers have a finished frame (like FrameStats.gpu). */
+    gpu: number | null;
+}
+
 export interface FrameStats {
     frameMs: number;
     /** Worst frame since the previous GetFrameStatsJson read. */
@@ -37,6 +49,8 @@ export interface FrameStats {
     jobs: { workers: number; queued: number; inFlight: number; completed: number };
     uploads: { bytes: number; pending: number };
     uniformCalls: number;
+    /** Per pass kind, in the order the frame graph first ran them. */
+    passes: PassTimes[];
 }
 
 function num(value: unknown): number {
@@ -47,6 +61,27 @@ function record(value: unknown): Record<string, unknown> | null {
     return typeof value === 'object' && value !== null && !Array.isArray(value)
         ? (value as Record<string, unknown>)
         : null;
+}
+
+function passTimes(value: unknown): PassTimes[] {
+    if (!Array.isArray(value)) {
+        return [];
+    }
+    const passes: PassTimes[] = [];
+    for (const entry of value) {
+        const raw = record(entry);
+        if (!raw || typeof raw.kind !== 'string') {
+            continue;
+        }
+        passes.push({
+            kind: raw.kind,
+            stage: typeof raw.stage === 'string' ? raw.stage : '',
+            count: num(raw.count),
+            cpu: num(raw.cpu),
+            gpu: typeof raw.gpu === 'number' && Number.isFinite(raw.gpu) ? raw.gpu : null,
+        });
+    }
+    return passes;
 }
 
 function stageTimes(value: unknown): StageTimes | null {
@@ -91,6 +126,7 @@ export function parseFrameStats(json: string): FrameStats | null {
         },
         uploads: { bytes: num(uploads.bytes), pending: num(uploads.pending) },
         uniformCalls: num(raw.uniformCalls),
+        passes: passTimes(raw.passes),
     };
 }
 
@@ -103,7 +139,10 @@ function kib(bytes: number): string {
     return bytes >= 1024 * 1024 ? `${(bytes / (1024 * 1024)).toFixed(1)} MB` : `${Math.round(bytes / 1024)} KB`;
 }
 
-/** The overlay's text: one row per stage, then the totals. */
+/** Pass rows shown: the costliest kinds (by GPU time once there is one, else CPU). */
+const MAX_PASS_ROWS = 12;
+
+/** The overlay's text: one row per stage, then the totals, then the costliest pass kinds. */
 export function formatFrameStats(stats: FrameStats): string {
     const gpuLabel = stats.gpu ? 'gpu'.padStart(9) : stats.gpuSupported ? '   gpu…' : '   gpu n/a';
     const lines = [
@@ -119,6 +158,16 @@ export function formatFrameStats(stats: FrameStats): string {
         lines.push(`${stage.padEnd(11)}${ms(stats.cpu[stage])}${stats.gpu ? ms(stats.gpu[stage]) : ''}`);
     }
     lines.push(`${'total'.padEnd(11)}${ms(cpuTotal)}${stats.gpu ? ms(gpuTotal) : ''}`);
+    const ran = stats.passes.filter((pass) => pass.count > 0);
+    if (ran.length > 0) {
+        const cost = (pass: PassTimes): number => pass.gpu ?? pass.cpu;
+        const rows = [...ran].sort((a, b) => cost(b) - cost(a)).slice(0, MAX_PASS_ROWS);
+        lines.push(`${'pass'.padEnd(22)}${'cpu'.padStart(9)}${stats.gpu ? 'gpu'.padStart(9) : ''}`);
+        for (const pass of rows) {
+            const label = `${pass.kind} ×${String(pass.count)}`;
+            lines.push(`${label.padEnd(22)}${ms(pass.cpu)}${pass.gpu !== null ? ms(pass.gpu) : ''}`);
+        }
+    }
     const { workers, queued, inFlight } = stats.jobs;
     lines.push(
         workers > 0

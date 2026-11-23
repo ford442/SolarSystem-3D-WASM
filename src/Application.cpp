@@ -16,9 +16,9 @@
 #include "Solar_System/OrbitLayout.h"
 #include "Solar_System/SceneScale.h"
 #include "astro/MissionCatalog.h"
+#include "GoldenCapture.h"
+#include "IAppModule.h"
 #include "core/FrameProfile.h"
-#include "core/JobSystem.h"
-#include "gfx/GpuTimer.h"
 #include "core/Log.h"
 #include "render/XrPointerRenderer.h"
 #include "render/terrain/TerrainSystem.h"
@@ -35,13 +35,35 @@
 #include <utility>
 
 namespace {
-constexpr const char* kMissionCatalogPath = "resource/missions/catalog.json";
+#ifdef __EMSCRIPTEN__
+// `?graph=1` on the page. (EM_JS is JavaScript: keep clang-format out.)
+// clang-format off
+EM_JS(int, FrameGraphQuery, (), {
+    try {
+        const value = new URLSearchParams(location.search).get('graph');
+        return value !== null && value !== '0' ? 1 : 0;
+    } catch (e) {
+        return 0;
+    }
+});
+// clang-format on
+#endif
+
+/** ?graph=1 (web) or SOLARSYSTEM_GRAPH=1 (native): log the compiled frame graph when it changes. */
+bool FrameGraphDumpRequested() {
+#ifdef __EMSCRIPTEN__
+    return FrameGraphQuery() != 0;
+#else
+    const char* value = std::getenv("SOLARSYSTEM_GRAPH");
+    return value && *value && std::string(value) != "0";
+#endif
+}
 } // namespace
 
 Application::Application() : _frameTimer(240) {
     SetActiveApplication(this);
     InitSystems();
-    StartCatalogJobs();
+    _missions.StartCatalogJob();
     ApplyQualityPreset(_simState.qualityPreset);
     InitScene();
 }
@@ -63,10 +85,73 @@ void Application::Exec() {
     }, this, 0, 0);
     VertSync(_isVertSyncEnabled);
 #else
+    if (const char* golden = std::getenv("SOLARSYSTEM_GOLDEN"); golden && *golden) {
+        RunGoldenCapture(golden);
+        return;
+    }
     while (!glfwWindowShouldClose(_mainWindow)) {
         RunOneFrame();
     }
 #endif
+}
+
+#ifndef __EMSCRIPTEN__
+void Application::RunGoldenCapture(const std::string& spec) {
+    const GoldenSpec golden = ParseGoldenSpec(spec);
+    // InitSystems already started the clock at `golden.jd` (GoldenStartJulianDate): the belts
+    // measure their phases from the date the scene was built at, so a wall-clock start would
+    // move every asteroid between two runs. Natively the core resources are on disk: loading
+    // is a frame or two.
+    for (int i = 0; _appState == AppState::LOADING && i < 1000 && !glfwWindowShouldClose(_mainWindow); ++i) {
+        RunOneFrame();
+    }
+    if (_appState == AppState::LOADING) {
+        LOG_ERROR("Golden", "Scene never finished loading; nothing written");
+        return;
+    }
+    if (golden.jd > 0.0) {
+        OrbitLayout::SetJulianDate(golden.jd); // again: an environment override may have moved it since
+        _simState.timePaused = true;
+    }
+    if (golden.fields) {
+        SetMagneticFieldsEnabled(true);
+    }
+    if (golden.focus >= 0) {
+        FocusPlanetByIndex(golden.focus);
+    }
+    _cinematics.Begin(0, 0);
+    _cinematics.SetFrozenHud(true);
+    for (int frame = 1; frame <= golden.frames; ++frame) {
+        if (frame == golden.frames) {
+            _cinematics.RequestReadback(golden.out);
+        }
+        _cinematics.Step(golden.step);
+    }
+    _cinematics.SetFrozenHud(false);
+    _cinematics.End();
+}
+#endif
+
+void Application::FitRenderTargetToPage() {
+#ifdef __EMSCRIPTEN__
+    FitCanvasToCss();
+#endif
+}
+
+bool Application::XrPresenting() const {
+#ifdef __EMSCRIPTEN__
+    return _xr.active;
+#else
+    return false;
+#endif
+}
+
+void Application::RestartFrameClock() {
+    _lastFrame = glfwGetTime();
+}
+
+glm::vec3 Application::CameraRenderPosition() const {
+    return OrbitLayout::ToRenderFrame(_camera.GetWorldPosition());
 }
 
 void Application::RunOneFrame() {
@@ -106,10 +191,13 @@ void Application::RunOneFrame() {
         return;
     }
 
-    BeginFrameProfile();
+    _profiler.BeginFrame(glfwGetTime());
+    // The frame graph brackets every pass (rhi::GlCommandList): CPU into the profiler's stages
+    // and the pass's row, GPU into the timer's slot kStageCount + that row.
+    _renderer.SetProfiling(_profiler.Gpu(), &_profiler.Passes(), &_profiler.Stages());
     const double currentFrame = glfwGetTime();
     // A capture frame is a fixed step after the last, however long encoding it took.
-    _deltaTime = _capture.active ? _capture.stepSeconds : currentFrame - _lastFrame;
+    _deltaTime = _cinematics.FrameDelta(currentFrame - _lastFrame);
     _lastFrame = currentFrame;
     _simState.animationSeconds += _deltaTime;
     UpdateSystemJump(_deltaTime); // may swap the whole scene, so before anything places a body
@@ -132,12 +220,12 @@ void Application::RunOneFrame() {
     // Bodies at this frame's date before the camera reads them (UpdateScene places them again
     // once the render origin has followed the camera, and catches systems loaded meanwhile).
     PlaceBodies();
-    CarryCameraWithAnchor();
+    _cameraController.CarryWithAnchor();
     _camera.UpdateTransition(_deltaTime);
-    UpdateMissionFollow();
+    _missions.UpdateFollow();
 
     ProcessInput(_mainWindow);
-    ConstrainCamera();
+    _cameraController.Constrain();
     // After everything that moves the camera this frame, before anything reads positions.
     UpdateRenderOrigin();
     UpdatePlanetSystemLoading();
@@ -145,12 +233,8 @@ void Application::RunOneFrame() {
 
 #ifdef __EMSCRIPTEN__
     if (_xr.active) {
-        RenderXrStereoFrame();
-        TimeStage(FrameProfile::Stage::Uploads, [this] {
-            TextureLoadingQueue::GetInstance().ProcessQueue();
-            PumpUploads();
-        });
-        EndFrameProfile();
+        RenderXrStereoFrame(); // the frame graph's last passes pump the uploads
+        _profiler.EndFrame();
 #ifdef SOLARSYSTEM_USE_SDL_MIXER
         UpdateBackgroundMusic();
 #endif
@@ -162,25 +246,17 @@ void Application::RunOneFrame() {
 
     glBindFramebuffer(GL_FRAMEBUFFER, DefaultFramebuffer());
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+    // Scene, HUD, the jump fade, the upload pump and the loading line: one frame graph.
     RenderFrame(1);
-    TimeStage(FrameProfile::Stage::Hud, [this] {
-        _renderer.RenderHud(FrameContextFor(0));
-        _renderer.RenderScreenFade(DefaultFramebuffer(), _screenFadeColor, _screenFadeAmount);
-    });
-
-    TimeStage(FrameProfile::Stage::Uploads, [this] {
-        TextureLoadingQueue::GetInstance().ProcessQueue();
-        PumpUploads();
-    });
-    if (!_capture.active) {
-        TimeStage(FrameProfile::Stage::Hud, [this] { _renderer.RenderTextureLoadingProgress(FrameContextFor(0)); });
-    }
-    EndFrameProfile();
+    _profiler.EndFrame();
 
 #ifdef SOLARSYSTEM_USE_SDL_MIXER
     UpdateBackgroundMusic();
 #endif
 
+#ifndef __EMSCRIPTEN__
+    _cinematics.BeforeSwap(DisplaySize()); // a golden capture's readback, if one is due
+#endif
     glfwSwapBuffers(_mainWindow);
     glfwPollEvents();
     EndFrame();
@@ -238,266 +314,12 @@ void Application::EndFrame() {
 #endif
 }
 
-void Application::UpdateScene(double julianDate) {
-    _renderer.CountSceneUpdate();
-    RefreshPlanetProxyPositions();
-    if (_sun) {
-        _sun->TakeStarSystemCenter();
-    }
-    PlaceSceneComponents();
-
-    for (auto& component : _renderableSceneComponents) {
-        // Shadow frustum tracks the planet's current heliocentric position. Its depth range
-        // is fitted to the component's own bodies — the only casters drawn into its map and
-        // the only receivers that read it — instead of the camera's 0.001–20000, which
-        // wasted precision and clipped everything past 20000 units from the Sun (Uranus and
-        // beyond on realistic scale).
-        const float radius = component.planet->GetRadius();
-        const float fullExtent = radius * 3.0f;
-        std::vector<BoundingSphere> bodies;
-        component.ForEachObject([&](const SpaceObject& object) { bodies.push_back(object.GetBoundingSphere()); });
-        const glm::vec3 toPlanet = component.planet->GetPosition() - _sun->GetPosition();
-        const DepthRange depth = FitDepthRange(_sun->GetPosition(), glm::normalize(toPlanet), bodies,
-                                               0.01f * fullExtent + 0.05f, _camera.GetNear());
-        component.shadowDepthRange = glm::vec2(depth.nearPlane, depth.farPlane - depth.nearPlane);
-
-        // Built in double: the eye is the Sun, tens of thousands of units from the render
-        // origin on realistic scale, and a float lookAt folds that into the light-space x/y
-        // the shadow lookup reads. In double those reduce to the planet's own small offset.
-        const glm::dvec3 lightEye(_sun->GetPosition());
-        const glm::dvec3 lightTarget(component.planet->GetPosition());
-        const glm::mat4 lightView(glm::lookAt(lightEye, lightTarget, glm::dvec3(0.0, 1.0, 0.0)));
-
-        const ShadowFit::Box box = FitShadowBox(component, ShadowFit::LightLookAt(lightEye, lightTarget), fullExtent);
-        const float extent = static_cast<float>(box.halfExtent);
-        const glm::mat4 lightProjection = glm::ortho(static_cast<float>(box.centerX) - extent, static_cast<float>(box.centerX) + extent,
-                                                     static_cast<float>(box.centerY) - extent, static_cast<float>(box.centerY) + extent,
-                                                     depth.nearPlane, depth.farPlane);
-        component.lightSpaceMatrix = lightProjection * lightView;
-    }
-
-    // The belts and the probes are Sol's: another star system has neither.
-    const bool sol = StarSystemCatalog::IsSol();
-    if (_asteroidField && sol) {
-        _asteroidField->Update(julianDate);
-    }
-    if (_kuiperField && sol) {
-        _kuiperField->Update(julianDate);
-    }
-    _missionProbes.resize(sol ? _missionCatalog.missions.size() : 0);
-    for (size_t i = 0; i < _missionProbes.size(); ++i) {
-        glm::vec3 probe(0.0f);
-        _missionProbes[i] = SampleMissionScenePosition(static_cast<int>(i), probe) ? std::optional(probe) : std::nullopt;
-    }
-    UpdateLOD();
-    UpdateSearchNearestPlanet();
-    // Warm the lazily searched caches here so no pass is the one that pays for a search.
-    if (sol) {
-        GetNextSkyEvent();
-    }
-    if (_observe.active) {
-        CurrentObserveSky();
-    }
-}
-
-ShadowFit::Box Application::FitShadowBox(RenderableSceneComponent& component, const ShadowFit::LightBasis& light,
-                                         float fullExtent) {
-    const ShadowFit::Box full{0.0, 0.0, static_cast<double>(fullExtent)};
-    // The cap is the camera's own frustum: an XR eye pair has two, so it keeps the full box.
-    const double radius = component.planet->GetRadius();
-    const glm::dvec3 center(component.planet->GetPosition());
-    const glm::dvec3 eye(CameraRenderPosition());
-    bool xrActive = false;
-#ifdef __EMSCRIPTEN__
-    xrActive = _xr.active;
-#endif
-    const bool shadows = _simState.shadowQuality > 0 && !xrActive && radius > 0.0;
-    component.shadowVisibleCap =
-        shadows && ShadowFit::UseVisibleCap(component.shadowVisibleCap, glm::distance(eye, center) / radius);
-
-    ShadowFit::Box box = full;
-    if (component.shadowVisibleCap) {
-        ShadowFit::View view;
-        view.eye = eye;
-        view.front = glm::dvec3(_camera.GetFrontVector());
-        view.right = glm::dvec3(_camera.GetRightVector());
-        view.up = glm::dvec3(_camera.GetUpVector());
-        view.tanHalfFovY = std::tan(glm::radians(static_cast<double>(_camera.GetZoom())) * 0.5);
-        view.aspect = _camera.GetAspect();
-
-        // Receivers the old box covered that stand clear of the sphere: the ring and any moon
-        // in the frustum. (Shells hug the planet; the sphere stands for them.)
-        const Frustum frustum(_camera.GetProjectionMatrix() * _camera.GetViewMatrix(glm::vec3(eye)));
-        std::vector<BoundingSphere> extras;
-        const auto addIfSeen = [&](const SpaceObject& object) {
-            const BoundingSphere sphere = object.GetBoundingSphere();
-            const glm::dvec2 offset = light.ToLight(glm::dvec3(sphere.center));
-            if (frustum.Intersects(sphere) && glm::length(offset) - sphere.radius < fullExtent) {
-                extras.push_back(sphere);
-            }
-        };
-        for (const auto& satellite : component.satellites) {
-            addIfSeen(*satellite);
-        }
-        if (component.planetaryRing) {
-            addIfSeen(*component.planetaryRing);
-        }
-
-        const ShadowFit::Box cap = ShadowFit::FitVisibleCap(light, view, center, radius, extras);
-        if (cap.halfExtent >= 0.0) {
-            const ShadowFit::Box fitted = ShadowFit::Quantize(cap, ShadowFit::kMinCapRadii * radius);
-            if (fitted.halfExtent < full.halfExtent) {
-                box = fitted;
-            }
-        }
-    }
-
-    if (static_cast<float>(box.halfExtent) != component.shadowHalfExtent) {
-        LOG_DEBUG("ShadowFit", "light box half-extent %.6g scene units (%s, full %.6g)", box.halfExtent,
-                  component.shadowVisibleCap ? "visible cap" : "full", static_cast<double>(fullExtent));
-        component.shadowHalfExtent = static_cast<float>(box.halfExtent);
-    }
-    return box;
-}
-
-void Application::PlaceBodies() {
-    if (_sun) {
-        _sun->TakeStarSystemCenter();
-    }
-    PlaceSceneComponents();
-}
-
-void Application::PlaceSceneComponents() {
-    const bool physicalAtmosphere = _renderer.PhysicalAtmosphereAvailable();
-    for (auto& component : _renderableSceneComponents) {
-        component.planet->AdjustToParent();
-        for (const auto& satellite : component.satellites) {
-            satellite->AdjustToParent();
-        }
-        if (component.clouds) {
-            component.clouds->AdjustToParent();
-        }
-        if (component.aurora) {
-            component.aurora->AdjustToParent();
-        }
-        for (const auto& renderableAtmosphere : component.atmospheres) {
-            // Before AdjustToParent: the two paths draw different shell sizes.
-            renderableAtmosphere.atmosphere->SetPhysicalPathActive(physicalAtmosphere);
-            renderableAtmosphere.atmosphere->AdjustToParent();
-        }
-        if (component.planetaryRing) {
-            component.planetaryRing->AdjustToParent();
-        }
-    }
-}
-
-template <class F>
-void Application::TimeStage(FrameProfile::Stage stage, F&& work) {
-    const auto index = static_cast<std::size_t>(stage);
-    if (_gpuTimer) {
-        _gpuTimer->Begin(index);
-    }
-    const auto started = FrameProfile::CpuStages::Clock::now();
-    std::forward<F>(work)();
-    _cpuStages.Add(stage, FrameProfile::CpuStages::Clock::now() - started);
-    if (_gpuTimer) {
-        _gpuTimer->End(index);
-    }
-}
-
-void Application::BeginFrameProfile() {
-    if (!_gpuTimer && GpuTimer::Supported()) {
-        _gpuTimer = std::make_unique<GpuTimer>(FrameProfile::kStageCount);
-#ifndef __EMSCRIPTEN__
-        // Natively the GPU column comes with debug-level [FrameStats] (or SOLARSYSTEM_GPU_TIMERS=1);
-        // the web turns it on from the perf HUD (SetGpuTimersEnabled).
-        const char* forced = std::getenv("SOLARSYSTEM_GPU_TIMERS");
-        _gpuTimer->SetEnabled(forced ? std::string(forced) != "0" : Log::Enabled(Log::Level::Debug));
-#endif
-    }
-    const double now = glfwGetTime();
-    _frameProfile.frameMs = _profileFrameStart < 0.0 ? 0.0 : (now - _profileFrameStart) * 1000.0;
-    _profileFrameStart = now;
-    _cpuStages.Reset();
-    if (_gpuTimer) {
-        _gpuTimer->BeginFrame();
-    }
-}
-
-void Application::EndFrameProfile() {
-    if (_gpuTimer) {
-        _gpuTimer->EndFrame();
-    }
-    FrameProfile::Sample& sample = _frameProfile;
-    sample.cpuMs = _cpuStages.Ms();
-    sample.gpuSupported = GpuTimer::Supported();
-    sample.gpuValid = _gpuTimer && _gpuTimer->Enabled() && _gpuTimer->HasResult();
-    for (std::size_t i = 0; i < FrameProfile::kStageCount; ++i) {
-        sample.gpuMs[i] = sample.gpuValid ? _gpuTimer->Ms(i) : 0.0;
-    }
-    sample.jobWorkers = Jobs::WorkerCount();
-    sample.jobQueueDepth = Jobs::QueueDepth();
-    sample.jobsInFlight = Jobs::InFlight();
-    sample.jobsCompleted = Jobs::CompletedCount();
-    sample.uploadBytes = UploadQueue::Get().LastPumpBytes();
-    sample.uploadsPending = UploadQueue::Get().Pending();
-    if (sample.frameMs > 0.0) {
-        _frameProfileTotals.Add(sample);
-    }
-}
-
 std::string Application::GetFrameStatsJson() {
-    std::string json = FrameProfile::ToJson(_frameProfile, _frameProfileTotals);
-    _frameProfileTotals.ResetWorst();
-    return json;
+    return _profiler.Json();
 }
 
 void Application::SetGpuTimersEnabled(bool enabled) {
-    if (!_gpuTimer && enabled && GpuTimer::Supported()) {
-        _gpuTimer = std::make_unique<GpuTimer>(FrameProfile::kStageCount);
-    }
-    if (_gpuTimer) {
-        _gpuTimer->SetEnabled(enabled);
-    }
-}
-
-void Application::ReportFrameStats() {
-    // At debug level (SOLARSYSTEM_LOG=debug / ?log=debug), log the previous frame's pass
-    // counts and profile every N frames: SOLARSYSTEM_FRAME_STATS=N, 120 by default.
-    static const int every = [] {
-        const char* value = std::getenv("SOLARSYSTEM_FRAME_STATS");
-        return value ? std::max(0, std::atoi(value)) : 120;
-    }();
-    static unsigned long long frame = 0;
-    const unsigned long long uniformCalls = Shader::UniformCallCount();
-    Shader::ResetUniformCallCount();
-    _frameProfile.uniformCalls = uniformCalls;
-    if (every > 0 && frame++ % static_cast<unsigned long long>(every) == 0) {
-        const FramePasses::Stats& stats = _renderer.Stats();
-        LOG_DEBUG("FrameStats",
-                  "updates=%d viewBinds=%d shadowPasses=%d componentDraws=%d bodyDraws=%d culled=%d uniformCalls=%llu",
-                  stats.sceneUpdates, stats.viewBinds, stats.shadowPasses, stats.componentDraws, stats.bodyDraws,
-                  stats.culledComponents, uniformCalls);
-        if (Log::Enabled(Log::Level::Debug)) {
-            const FrameProfile::Sample& p = _frameProfile;
-            std::string cpu;
-            std::string gpu;
-            for (std::size_t i = 0; i < FrameProfile::kStageCount; ++i) {
-                const char* name = FrameProfile::StageName(static_cast<FrameProfile::Stage>(i));
-                char part[48];
-                std::snprintf(part, sizeof(part), "%s%s=%.2f", i ? " " : "", name, p.cpuMs[i]);
-                cpu += part;
-                std::snprintf(part, sizeof(part), "%s%s=%.2f", i ? " " : "", name, p.gpuMs[i]);
-                gpu += part;
-            }
-            LOG_DEBUG("FrameStats",
-                      "frame=%.2fms cpu[%s] gpu[%s] jobs workers=%d queued=%zu inFlight=%zu "
-                      "uploads bytes=%zu pending=%zu slowFrames=%llu/%llu",
-                      p.frameMs, cpu.c_str(), p.gpuValid ? gpu.c_str() : "n/a", p.jobWorkers, p.jobQueueDepth,
-                      p.jobsInFlight, p.uploadBytes, p.uploadsPending, _frameProfileTotals.slowFrames,
-                      _frameProfileTotals.frames);
-        }
-    }
+    _profiler.SetGpuTimersEnabled(enabled);
 }
 
 #ifndef __EMSCRIPTEN__
@@ -514,171 +336,11 @@ void Application::PollShaderHotReload(double now) {
 }
 #endif
 
-void Application::RenderFrame(int viewCount) {
-    FramePasses::Hooks hooks;
-    hooks.updateScene = [this, viewCount]() -> std::size_t {
-        ReportFrameStats();
-        std::size_t components = 0;
-        TimeStage(FrameProfile::Stage::Update, [&] {
-            _renderer.BeginFrame();
-            UpdateScene(OrbitLayout::GetJulianDate());
-            BuildFrameSnapshot(viewCount);
-            UpdateTerrain(viewCount);
-            CullScene(viewCount);
-            components = _observe.active ? 0 : _drawOrder.size();
-        });
-        TimeStage(FrameProfile::Stage::SpaceWeather, [&] {
-            UpdateSpaceWeather(viewCount);
-            _renderer.UpdateSpaceWeather(FrameContextFor(0));
-        });
-        return components;
-    };
-    hooks.beginView = [this](int view) { _renderer.BeginView(FrameContextFor(view)); };
-    hooks.background = [this](int view) {
-        TimeStage(FrameProfile::Stage::Background, [&] { _renderer.RenderBackground(FrameContextFor(view)); });
-    };
-    hooks.shadowPass = [this](std::size_t draw) {
-        TimeStage(FrameProfile::Stage::Shadow,
-                  [&] { _renderer.ShadowMapPass(FrameContextFor(0), _renderableSceneComponents[_drawOrder[draw]]); });
-    };
-    hooks.drawComponent = [this](int view, std::size_t draw) {
-        TimeStage(FrameProfile::Stage::Scene,
-                  [&] { _renderer.RenderPass(FrameContextFor(view), _renderableSceneComponents[_drawOrder[draw]]); });
-    };
-    hooks.foreground = [this](int view) {
-        TimeStage(FrameProfile::Stage::Foreground, [&] {
-            const FrameContext ctx = FrameContextFor(view);
-            _renderer.RenderForeground(ctx);
-            if (!ctx.xr) {
-                _renderer.RenderMonoEffects(ctx);
-            }
-        });
-    };
-    FramePasses::Run(viewCount, hooks);
-}
-
-void Application::CullScene(int viewCount) {
-    std::vector<Frustum> frusta;
-    for (int view = 0; view < viewCount; ++view) {
-        frusta.emplace_back(_frameViews[static_cast<size_t>(view)].projection * _frameViews[static_cast<size_t>(view)].view);
-    }
-    const auto seen = [&](const SpaceObject& object) {
-        const BoundingSphere sphere = object.GetBoundingSphere();
-        return std::any_of(frusta.begin(), frusta.end(), [&](const Frustum& f) { return f.Intersects(sphere); });
-    };
-
-    _drawOrder.clear();
-    int culled = 0;
-    for (size_t i = 0; i < _renderableSceneComponents.size(); ++i) {
-        RenderableSceneComponent& component = _renderableSceneComponents[i];
-        bool any = false;
-        component.ForEachObject([&](SpaceObject& object) {
-            const bool visible = seen(object);
-            object.SetVisible(visible);
-            any = any || visible;
-        });
-        component.visible = any;
-        culled += any ? 0 : 1;
-        if (any || static_cast<int>(i) == _nearestPlanetIndex) {
-            _drawOrder.push_back(i);
-        }
-    }
-    _renderer.CountCulledComponents(culled);
-
-    // Opaque surfaces front to back, so early depth rejects what is behind. Within a
-    // component the order (planet, moons, shells, ring) stays as RenderPass has it.
-    const glm::vec3 eye = CameraRenderPosition();
-    const auto distance = [&](size_t index) {
-        return glm::distance(eye, _renderableSceneComponents[index].planet->GetPosition());
-    };
-    std::stable_sort(_drawOrder.begin(), _drawOrder.end(),
-                     [&](size_t a, size_t b) { return distance(a) < distance(b); });
-}
-
-void Application::BuildFrameSnapshot(int viewCount) {
-    SceneSnapshot& scene = _frameScene;
-    scene.sun = _sun.get();
-    scene.components = &_renderableSceneComponents;
-    scene.nearestComponent = _nearestPlanetIndex;
-    const bool sol = StarSystemCatalog::IsSol();
-    static const MissionCatalog::Catalog kNoMissions;
-    scene.asteroidField = sol ? _asteroidField.get() : nullptr;
-    scene.kuiperField = sol ? _kuiperField.get() : nullptr;
-    scene.missions = sol ? &_missionCatalog : &kNoMissions;
-    scene.focusedMission = _focusedMissionIndex;
-    scene.missionProbes = &_missionProbes;
-    scene.stagedSystems = &_planetSystemManifests;
-    scene.observeActive = _observe.active;
-    scene.observe = &_observe;
-    scene.observeSky = _observe.active ? &CurrentObserveSky() : nullptr;
-    scene.observeMoonTexture = _observe.active ? ObserveMoonTexture() : 0u;
-    scene.observeEarthAtmosphere = _observe.active ? ObserveEarthAtmosphere() : nullptr;
-    scene.nextSkyEvent = &GetNextSkyEvent();
-
-    // The head: the mono camera, and the axes every eye shares.
-    CameraView head;
-    head.projection = _camera.GetProjectionMatrix();
-    head.headPosition = CameraRenderPosition();
-    head.view = _camera.GetViewMatrix(head.headPosition);
-    head.renderOrigin = OrbitLayout::GetRenderOrigin();
-    head.front = _camera.GetFrontVector();
-    head.right = _camera.GetRightVector();
-    head.up = _camera.GetUpVector();
-    head.nearPlane = _camera.GetNear();
-    head.farPlane = _camera.GetFar();
-    head.aspect = _camera.GetAspect();
-    head.zoomDeg = _camera.GetZoom();
-    head.yawDeg = _camera.GetYaw();
-    head.pitchDeg = _camera.GetPitch();
-    head.logDepthC = _logDepthC;
-    head.zCoef = static_cast<float>(2.0 / glm::log2(static_cast<double>(_logDepthC) * _camera.GetFar() + 1.0));
-    head.viewport = glm::ivec4(0, 0, _displayWidth, _displayHeight);
-
-    const int views = std::clamp(viewCount, 1, static_cast<int>(_frameViews.size()));
-    for (int i = 0; i < views; ++i) {
-        CameraView& view = _frameViews[static_cast<size_t>(i)];
-        view = head;
-#ifdef __EMSCRIPTEN__
-        if (_xr.active) {
-            const XrEyeState& eye = _xr.eyes[i];
-            view.projection = eye.projection;
-            view.view = eye.view;
-            view.viewport = glm::ivec4(eye.viewportX, eye.viewportY, eye.viewportWidth, eye.viewportHeight);
-            view.eye = i;
-        }
-#endif
-        view.eyePosition = glm::vec3(glm::inverse(view.view)[3]);
-    }
-
-    HudState& hud = _frameHud;
-    hud.fps = _frameTimer.GetCurrentFps();
-    hud.fpsColor = CurrentFpsColor();
-    hud.vsync = _isVertSyncEnabled;
-    hud.cameraSpeed = _camera.GetMovementSpeed();
-#ifdef SOLARSYSTEM_USE_SDL_MIXER
-    hud.musicVolumePercent = (_musicMuted ? 0.0f : _musicVolume) * 100.0f;
-#elif !defined(__EMSCRIPTEN__)
-    hud.musicVolumePercent = _soundEngine ? _soundEngine->getSoundVolume() * 100.0f : 0.0f;
-#endif
-    hud.musicTrack = _currentMusicTrack;
-}
-
-FrameContext Application::FrameContextFor(int view) const {
-    const size_t index = static_cast<size_t>(std::clamp(view, 0, static_cast<int>(_frameViews.size()) - 1));
-#ifdef __EMSCRIPTEN__
-    const bool xr = _xr.active;
-#else
-    const bool xr = false;
-#endif
-    return FrameContext{_frameViews[index], _frameScene, _simState, DisplaySize(), xr, DefaultFramebuffer(), &_frameHud};
-}
-
-
 void Application::InitScene() {
 #ifdef __EMSCRIPTEN__
     // Catalog JSON is in the .data preload; parse it before the first JS frame so
     // Explorer / deep links see Voyager rows before InitSceneObjects builds GL meshes.
-    LoadMissionCatalog();
+    _missions.LoadCatalog();
     LoadCoreResources();
 #else
     InitSceneObjects();
@@ -702,6 +364,11 @@ void Application::InitSceneObjects() {
 #endif
     _renderer.Init(_simState, _ft, DisplaySize());
     _ft = nullptr; // Renderer::Init released it once the font was loaded
+    _renderer.SetUploadPump([this] {
+        TextureLoadingQueue::GetInstance().ProcessQueue();
+        PumpUploads();
+    });
+    _renderer.SetGraphDump(FrameGraphDumpRequested());
     LoadMissions();
     {
         const auto asteroidQuality = GetQualitySettings(_simState.qualityPreset, _simState.isMobileWeb);
@@ -716,7 +383,7 @@ void Application::InitSceneObjects() {
     ApplySystemEnvOverride();
     _renderer.PrefetchCatalogVariants();
     InitStarSystem();
-    InitSpaceWeather();
+    _spaceWeather.Init();
 
     glfwShowWindow(_mainWindow);
 #ifdef _WIN32
@@ -795,7 +462,7 @@ void Application::FocusPlanetByIndex(int idx) {
 
 void Application::FocusPlanetByIndex(int idx, const glm::vec3& fromDirection) {
     if (_observe.active) return; // the viewer stays on the ground in Observe
-    StopMissionFollow();
+    _missions.Stop();
     idx = std::clamp(idx, 0, OrbitLayout::BodyCount() - 1);
     _focusedPlanetIndex = idx;
 
@@ -855,7 +522,7 @@ void Application::FocusPlanetByIndex(int idx, const glm::vec3& fromDirection) {
     _camera.StartTransitionTo(cameraPos, yaw, pitch, 2.0f);
     // Ride along with the body during the flight and after it lands, even from outside the
     // distance at which the camera would pick it up by itself.
-    SetCameraAnchor(anchor, true);
+    _cameraController.SetAnchor(anchor, true);
 
 #ifdef __EMSCRIPTEN__
     NotifyPlanetFocused(idx);
@@ -866,44 +533,13 @@ int Application::GetFocusedPlanetIndex() const {
     return _focusedPlanetIndex;
 }
 
-void Application::StopMissionFollow() {
-    const bool wasFocused = _focusedMissionIndex >= 0;
-    _missionFollowActive = false;
-    _focusedMissionIndex = -1;
-    if (wasFocused) {
-        NotifyMissionFocused(-1);
-    }
-}
-
-bool Application::SampleMissionHeliocentricPosition(int idx, glm::dvec3& outScene) const {
-    if (idx < 0 || idx >= static_cast<int>(_missionCatalog.missions.size())) {
-        return false;
-    }
-    glm::dvec3 au{0.0};
-    if (!MissionCatalog::InterpolateAu(_missionCatalog.missions[static_cast<size_t>(idx)],
-                                      OrbitLayout::GetJulianDate(), au)) {
-        return false;
-    }
-    outScene = OrbitLayout::HelioAuToSceneDouble(au);
-    return true;
-}
-
-bool Application::SampleMissionScenePosition(int idx, glm::vec3& outScene) const {
-    glm::dvec3 heliocentric{0.0};
-    if (!SampleMissionHeliocentricPosition(idx, heliocentric)) {
-        return false;
-    }
-    outScene = OrbitLayout::ToRenderFrame(heliocentric);
-    return true;
-}
-
 void Application::SetCameraHeliocentricPose(const glm::dvec3& position, float yaw, float pitch) {
     _camera.CancelTransition();
     _camera.SetWorldPosition(position);
     _camera.SetYawPitch(yaw, pitch);
     // A jump: whatever the camera rode along with is somewhere else now. ConstrainCamera
     // picks the body it arrived next to on the next frame.
-    SetCameraAnchor(nullptr, false);
+    _cameraController.SetAnchor(nullptr, false);
     MoveRenderOrigin(position);
 }
 
@@ -944,90 +580,17 @@ void Application::MoveRenderOrigin(const glm::dvec3& origin) {
         component.ForEachObject([](SpaceObject& object) { object.Rebase(); });
     }
     RefreshPlanetProxyPositions();
-    _renderer.FollowMissionPathOrigin(_missionCatalog, _simState.qualityPreset);
+    _renderer.FollowMissionPathOrigin(_missions.Catalog(), _simState.qualityPreset);
 }
 
 void Application::FocusMissionByIndex(int idx) {
     if (idx < 0) {
-        StopMissionFollow();
+        _missions.Stop();
         return;
     }
-    if (_observe.active) return; // the viewer stays on the ground in Observe
-    if (!StarSystemCatalog::IsSol()) return; // the probes fly in Sol
-    if (idx >= static_cast<int>(_missionCatalog.missions.size())) {
-        return;
+    if (_missions.Focus(idx)) {
+        _focusedPlanetIndex = -1;
     }
-    _focusedPlanetIndex = -1;
-    _focusedMissionIndex = idx;
-    _missionFollowActive = true;
-    NotifyMissionFocused(idx);
-
-    glm::dvec3 target(0.0);
-    if (!SampleMissionHeliocentricPosition(idx, target)) {
-        return;
-    }
-    const glm::vec3 direction = glm::normalize(glm::vec3(0.7f, 0.3f, 0.7f));
-    const glm::dvec3 cameraPos = target + glm::dvec3(direction) * 45.0;
-    const glm::vec3 lookDir = -direction;
-    const float yaw = glm::degrees(std::atan2(lookDir.z, lookDir.x));
-    const float pitch = glm::degrees(std::asin(glm::clamp(lookDir.y, -1.0f, 1.0f)));
-    _camera.StartTransitionTo(cameraPos, yaw, pitch, 2.0f);
-}
-
-int Application::GetFocusedMissionIndex() const {
-    return _focusedMissionIndex;
-}
-
-int Application::GetMissionCount() const {
-    return static_cast<int>(_missionCatalog.missions.size());
-}
-
-std::string Application::GetMissionCatalogJson() const {
-    std::ostringstream ss;
-    ss << '[';
-    for (size_t i = 0; i < _missionCatalog.missions.size(); ++i) {
-        const auto& mission = _missionCatalog.missions[i];
-        if (i > 0) {
-            ss << ',';
-        }
-        ss << R"({"id":")" << mission.id << R"(","name":")" << mission.name
-           << R"(","index":)" << i << '}';
-    }
-    ss << ']';
-    return ss.str();
-}
-
-std::string Application::GetFocusedMissionJson() const {
-    if (_focusedMissionIndex < 0 ||
-        _focusedMissionIndex >= static_cast<int>(_missionCatalog.missions.size())) {
-        return R"({"valid":false})";
-    }
-    glm::dvec3 pos{0.0};
-    if (!SampleMissionHeliocentricPosition(_focusedMissionIndex, pos)) {
-        return R"({"valid":false})";
-    }
-    const auto& mission = _missionCatalog.missions[static_cast<size_t>(_focusedMissionIndex)];
-    char buffer[384];
-    std::snprintf(buffer, sizeof(buffer),
-                  R"({"valid":true,"id":"%s","index":%d,"x":%.4f,"y":%.4f,"z":%.4f})",
-                  mission.id.c_str(), _focusedMissionIndex, pos.x, pos.y, pos.z);
-    return buffer;
-}
-
-void Application::UpdateMissionFollow() {
-    if (!_missionFollowActive || _focusedMissionIndex < 0 || _camera.IsTransitionActive()) {
-        return;
-    }
-    glm::dvec3 target(0.0);
-    if (!SampleMissionHeliocentricPosition(_focusedMissionIndex, target)) {
-        return;
-    }
-    const glm::vec3 direction = glm::normalize(glm::vec3(0.7f, 0.3f, 0.7f));
-    const glm::vec3 lookDir = -direction;
-    const float yaw = glm::degrees(std::atan2(lookDir.z, lookDir.x));
-    const float pitch = glm::degrees(std::asin(glm::clamp(lookDir.y, -1.0f, 1.0f)));
-    _camera.SetWorldPosition(target + glm::dvec3(direction) * 45.0);
-    _camera.SetYawPitch(yaw, pitch);
 }
 
 void Application::SetXrControllerRay(int hand, float ox, float oy, float oz, float dx, float dy, float dz,
@@ -1044,90 +607,19 @@ bool Application::GetOrbitLinesEnabled() const { return _renderer.GetOrbitLinesE
 void Application::SetMagneticFieldsEnabled(bool enabled) { _renderer.SetMagneticFieldsEnabled(enabled, _simState.qualityPreset); }
 bool Application::GetMagneticFieldsEnabled() const { return _renderer.GetMagneticFieldsEnabled(); }
 
-void Application::StartCatalogJobs() {
-    // The JSON is preloaded (web .data, native disk), so it can be read now and parsed while
-    // the core resources download; LoadMissionCatalog takes the result.
-    std::ifstream in(kMissionCatalogPath);
-    if (!in) {
-        return; // LoadMissionCatalog reports it
-    }
-    std::ostringstream text;
-    text << in.rdbuf();
-    _missionCatalogJob = Jobs::Submit([json = text.str()] {
-        ParsedMissionCatalog parsed;
-        parsed.ok = MissionCatalog::LoadFromString(json, parsed.catalog, parsed.error);
-        return parsed;
-    });
-}
-
-void Application::LoadMissionCatalog() {
-    std::string error;
-    bool ok = false;
-    if (_missionCatalogJob.Valid()) {
-        ParsedMissionCatalog parsed = _missionCatalogJob.Get();
-        ok = parsed.ok;
-        _missionCatalog = std::move(parsed.catalog);
-        error = std::move(parsed.error);
-    } else {
-        ok = MissionCatalog::LoadFromFile(kMissionCatalogPath, _missionCatalog, error);
-    }
-    if (!ok) {
-        LOG_WARN("Missions", "%s", error.c_str());
-        _missionCatalog = {};
-        return;
-    }
-    LOG_INFO("Missions", "Loaded %zu trajectory path(s) from catalog.json", _missionCatalog.missions.size());
-}
-
 void Application::LoadMissions() {
-    if (_missionCatalog.missions.empty()) {
-        LoadMissionCatalog();
+    if (_missions.Count() == 0) {
+        _missions.LoadCatalog();
     }
-    _renderer.RebuildMissionPaths(_missionCatalog, _simState.qualityPreset);
+    _renderer.RebuildMissionPaths(_missions.Catalog(), _simState.qualityPreset);
 }
 
 const SkyEvents::Conjunction& Application::GetNextConjunction() const {
-    // How long to wait before retrying a search that found nothing, in simulated days.
-    // Only reachable if the search window is ever shortened; the default window always hits.
-    constexpr double kEmptyRetryDays = 30.0;
-
-    const double jd = OrbitLayout::GetJulianDate();
-    const bool passed = _nextConjunction.valid && jd > _nextConjunction.julianDate;
-    const bool rewound = jd < _nextConjunctionComputedJd - 0.5;
-    const bool retryEmpty = !_nextConjunction.valid && jd > _nextConjunctionComputedJd + kEmptyRetryDays;
-
-    if (!StarSystemCatalog::IsSol()) {
-        static const SkyEvents::Conjunction kNone{};
-        return kNone; // the sky-event searches are Sol's ephemeris
-    }
-    if (!_nextConjunctionCached || passed || rewound || retryEmpty) {
-        _nextConjunction = SkyEvents::NextInnerPlanetConjunction(jd);
-        _nextConjunctionComputedJd = jd;
-        _nextConjunctionCached = true;
-    }
-    return _nextConjunction;
+    return _skyEvents.NextConjunction();
 }
 
 const SkyEvents::SkyEvent& Application::GetNextSkyEvent() const {
-    // Same cache policy as GetNextConjunction(): recompute once the event is behind us,
-    // once time is scrubbed backwards, or after a quiet stretch when nothing was found.
-    constexpr double kEmptyRetryDays = 30.0;
-
-    const double jd = OrbitLayout::GetJulianDate();
-    const bool passed = _nextSkyEvent.valid && jd > _nextSkyEvent.julianDate;
-    const bool rewound = jd < _nextSkyEventComputedJd - 0.5;
-    const bool retryEmpty = !_nextSkyEvent.valid && jd > _nextSkyEventComputedJd + kEmptyRetryDays;
-
-    if (!StarSystemCatalog::IsSol()) {
-        static const SkyEvents::SkyEvent kNone{};
-        return kNone;
-    }
-    if (!_nextSkyEventCached || passed || rewound || retryEmpty) {
-        _nextSkyEvent = SkyEvents::NextEvent(jd);
-        _nextSkyEventComputedJd = jd;
-        _nextSkyEventCached = true;
-    }
-    return _nextSkyEvent;
+    return _skyEvents.NextEvent();
 }
 
 int Application::GetNearestPlanetIndexForJs() const {

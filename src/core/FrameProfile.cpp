@@ -1,9 +1,11 @@
 #include "FrameProfile.h"
 #include <algorithm>
 #include <array>
+#include <chrono>
 #include <cmath>
 #include <cstddef>
 #include <cstdio>
+#include <ratio>
 #include <string>
 
 namespace FrameProfile {
@@ -83,8 +85,55 @@ std::string ToJson(const Sample& sample, const Totals& totals) {
     out += R"(,"uploads":{"bytes":)" + std::to_string(sample.uploadBytes) +
            ",\"pending\":" + std::to_string(sample.uploadsPending) + '}';
     out += ",\"uniformCalls\":" + std::to_string(sample.uniformCalls);
-    out += '}';
+    out += ",\"passes\":[";
+    for (std::size_t i = 0; i < sample.passes.size(); ++i) {
+        const PassSample& pass = sample.passes[i];
+        if (i) {
+            out += ',';
+        }
+        out += "{\"kind\":\"" + pass.kind + "\",\"stage\":\"" + StageName(pass.stage) +
+               "\",\"count\":" + std::to_string(pass.count) + ",\"cpu\":";
+        AppendNumber(out, pass.cpuMs);
+        out += ",\"gpu\":";
+        if (sample.gpuValid) {
+            AppendNumber(out, pass.gpuMs);
+        } else {
+            out += "null";
+        }
+        out += '}';
+    }
+    out += "]}";
     return out;
+}
+
+int PassTimings::SlotFor(const std::string& kind, Stage stage) {
+    for (std::size_t i = 0; i < _kinds.size(); ++i) {
+        if (_kinds[i] == kind) {
+            return static_cast<int>(i);
+        }
+    }
+    if (_kinds.size() >= kMaxPassKinds) {
+        return static_cast<int>(kMaxPassKinds - 1);
+    }
+    _kinds.push_back(kind);
+    _stages.push_back(stage);
+    _cpuMs.push_back(0.0);
+    _runs.push_back(0);
+    return static_cast<int>(_kinds.size() - 1);
+}
+
+void PassTimings::Reset() {
+    std::fill(_cpuMs.begin(), _cpuMs.end(), 0.0);
+    std::fill(_runs.begin(), _runs.end(), 0);
+}
+
+void PassTimings::Add(int slot, Clock::duration elapsed) {
+    if (slot < 0 || static_cast<std::size_t>(slot) >= _kinds.size()) {
+        return;
+    }
+    const auto index = static_cast<std::size_t>(slot);
+    _cpuMs[index] += std::chrono::duration<double, std::milli>(elapsed).count();
+    ++_runs[index];
 }
 
 } // namespace FrameProfile

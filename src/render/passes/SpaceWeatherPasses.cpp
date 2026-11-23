@@ -1,20 +1,25 @@
 // Space weather, Renderer's side (docs/ARCHITECTURE.md §13): the MagnetosphereUBO, the
-// solar-wind particles (render/SolarWindRenderer), the auroral shells, and which photosphere
-// program draws the Sun. Everything it draws comes from SceneSnapshot::spaceWeather, which
-// Application::UpdateSpaceWeather fills from astro/SpaceWeather; nothing here runs the model.
+// solar-wind particles (render/SolarWindRenderer), the auroral shells and their bloom, and which
+// photosphere program draws the Sun. Everything it draws comes from SceneSnapshot::spaceWeather,
+// which the space-weather module fills from astro/SpaceWeather; nothing here runs the model.
+//
+// Frame graph: PrepareSpaceWeather runs before the graph is built; `solar-wind-update` uploads
+// the UBO and advects the particles, and is culled unless a `solar-wind` pass reads them.
 #include "Renderer.h"
 #include "ApplicationTypes.h"
 #include "FrameContext.h"
 #include "Solar_System/AuroraShell.h"
 #include "Solar_System/BodyCatalog.h"
 #include "Solar_System/Star.h"
-#include "gfx/GlPlatform.h"
 #include "gfx/Shader.h"
 #include "gfx/SpaceWeatherUniforms.h"
+#include "gfx/rhi/CommandList.h"
+#include "gfx/rhi/RhiTypes.h"
 #include "render/MagneticFieldBloom.h"
 #include "render/SolarWindRenderer.h"
 #include <algorithm>
 #include <cstddef>
+#include <cstdint>
 #include <memory>
 #include <string>
 #include <utility>
@@ -82,7 +87,7 @@ Shader* Renderer::StarProgram(int photosphereMode) {
     return _starShaders[slot] ? _starShaders[slot] : _spriteStarShader;
 }
 
-void Renderer::UpdateSpaceWeather(const FrameContext& ctx) {
+void Renderer::PrepareSpaceWeather(const FrameContext& ctx) {
     static_assert(kSolarWindGroupCount == SolarWindRenderer::kMaxGroups, "one flag per particle group");
     const SpaceWeatherFrame* weather = ctx.scene.spaceWeather;
 
@@ -107,7 +112,11 @@ void Renderer::UpdateSpaceWeather(const FrameContext& ctx) {
         return;
     }
 
-    SpaceWeatherUniformData data;
+    if (!_spaceWeatherData) {
+        _spaceWeatherData = std::make_unique<SpaceWeatherUniformData>();
+    }
+    SpaceWeatherUniformData& data = *_spaceWeatherData;
+    data = SpaceWeatherUniformData{};
     data.sun = Pack(ctx.scene.sun ? ctx.scene.sun->GetPosition() : glm::vec3(0.0f),
                     ctx.scene.sun ? ctx.scene.sun->GetSceneRadius() : 1.0f);
     data.wind = glm::vec4(weather->auPerSecond, weather->edgeAu, weather->sunRotation, weather->visualClock);
@@ -154,9 +163,6 @@ void Renderer::UpdateSpaceWeather(const FrameContext& ctx) {
     if (!_spaceWeatherUbo) {
         _spaceWeatherUbo = std::make_unique<SpaceWeatherUniformBuffer>();
     }
-    _spaceWeatherUbo->Upload(data);
-    _spaceWeatherUbo->Bind();
-
     if (!_solarWind) {
         _solarWind = std::make_unique<SolarWindRenderer>();
     }
@@ -167,35 +173,37 @@ void Renderer::UpdateSpaceWeather(const FrameContext& ctx) {
     if (!_solarWindDrawShader) {
         _solarWindDrawShader = _shaders.GetIfReady(SpaceWeatherProgram("solarWind.vs", "solarWind.fs"));
     }
+}
+
+void Renderer::SolarWindUpdate(rhi::CommandList& /*cmd*/) {
+    // Declared whenever the wind has particles; culled unless a solar-wind pass draws them, so
+    // with nothing to draw neither the UBO upload nor the transform feedback runs.
+    _spaceWeatherUbo->Upload(*_spaceWeatherData);
+    _spaceWeatherUbo->Bind();
     if (_solarWindUpdateShader && _solarWindDrawShader) {
         // With the clock stopped this still runs, so a group that comes into view reseeds.
         _solarWind->Update(*_solarWindUpdateShader, _solarWindGroups);
     }
 }
 
-void Renderer::RenderSolarWind(const FrameContext& ctx) const {
-    if (!ctx.scene.spaceWeather || !_solarWind || !_solarWindDrawShader || !_spaceWeatherUbo ||
-        _solarWind->ParticleCount() == 0) {
-        return;
-    }
+void Renderer::SolarWind(rhi::CommandList& cmd, int /*view*/) {
+    // Declared only with particles to draw and the draw program built (Features::solarWind).
     _spaceWeatherUbo->Bind();
-    glEnable(GL_BLEND);
-    glBlendFunc(GL_ONE, GL_ONE);
-    glEnable(GL_DEPTH_TEST);
-    glDepthMask(GL_FALSE);
-#ifndef __EMSCRIPTEN__
-    glEnable(GL_PROGRAM_POINT_SIZE); // always on in GLES 3 / WebGL 2
-#endif
+    cmd.SetPipelineState(rhi::PipelineState()
+                             .SetBlend(true)
+                             .SetBlendFunc(rhi::BlendFactor::One, rhi::BlendFactor::One)
+                             .SetDepthTest(true)
+                             .SetDepthWrite(false)
+                             .SetProgramPointSize(true));
     _solarWind->Draw(*_solarWindDrawShader, _solarWindGroups);
-#ifndef __EMSCRIPTEN__
-    glDisable(GL_PROGRAM_POINT_SIZE);
-#endif
-    glDepthMask(GL_TRUE);
-    glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
-    glDisable(GL_BLEND);
+    cmd.SetPipelineState(rhi::PipelineState()
+                             .SetProgramPointSize(false)
+                             .SetDepthWrite(true)
+                             .SetBlendFunc(rhi::BlendFactor::SrcAlpha, rhi::BlendFactor::OneMinusSrcAlpha)
+                             .SetBlend(false));
 }
 
-void Renderer::RenderAurora(const FrameContext& ctx, const RenderableSceneComponent& component) {
+void Renderer::RenderAurora(rhi::CommandList& cmd, const FrameContext& ctx, const RenderableSceneComponent& component) {
     const AuroraShell* shell = component.aurora.get();
     const SpaceWeatherFrame* weather = ctx.scene.spaceWeather;
     if (!shell || !shell->IsVisible() || !weather) {
@@ -210,13 +218,11 @@ void Renderer::RenderAurora(const FrameContext& ctx, const RenderableSceneCompon
     const glm::mat3 toSphere = shell->ToSphere();
     const bool inside = shell->Contains(ctx.view.eyePosition);
 
-    glDepthMask(GL_FALSE);
-    glEnable(GL_BLEND);
-    glBlendFunc(GL_ONE, GL_ONE);
+    cmd.SetPipelineState(rhi::PipelineState().SetDepthWrite(false).SetBlend(true).SetBlendFunc(rhi::BlendFactor::One,
+                                                                                               rhi::BlendFactor::One));
     if (inside) {
         // The far side, and no depth test: the march itself stops at the ground.
-        glFrontFace(GL_CW);
-        glDisable(GL_DEPTH_TEST);
+        cmd.SetPipelineState(rhi::PipelineState().SetFrontFace(rhi::FrontFace::Clockwise).SetDepthTest(false));
     }
 
     program->Use();
@@ -235,31 +241,33 @@ void Renderer::RenderAurora(const FrameContext& ctx, const RenderableSceneCompon
     shell->Draw(*program);
 
     if (inside) {
-        glFrontFace(GL_CCW);
-        glEnable(GL_DEPTH_TEST);
+        cmd.SetPipelineState(rhi::PipelineState().SetFrontFace(rhi::FrontFace::CounterClockwise).SetDepthTest(true));
     }
-    glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
-    glDisable(GL_BLEND);
-    glDepthMask(GL_TRUE);
+    cmd.SetPipelineState(rhi::PipelineState()
+                             .SetBlendFunc(rhi::BlendFactor::SrcAlpha, rhi::BlendFactor::OneMinusSrcAlpha)
+                             .SetBlend(false)
+                             .SetDepthWrite(true));
 }
 
-void Renderer::RenderAuroraBloom(const FrameContext& ctx) {
+bool Renderer::AuroraBloomWanted(const FrameContext& ctx) const {
     const SpaceWeatherFrame* weather = ctx.scene.spaceWeather;
-    if (!weather || weather->auroraMode < 2 || ctx.xr || !_magneticFieldBloom || !ctx.scene.components) {
-        return;
+    if (!weather || weather->auroraMode < 2 || ctx.xr || _bloomChains.empty() || !ctx.scene.components) {
+        return false;
     }
-    const bool any = std::any_of(ctx.scene.components->begin(), ctx.scene.components->end(),
-                                 [](const RenderableSceneComponent& c) { return c.aurora && c.aurora->IsVisible(); });
-    if (!any) {
-        return;
-    }
-    _magneticFieldBloom->Resize(ctx.display.x, ctx.display.y);
-    if (!_magneticFieldBloom->IsEnabled()) {
-        return;
-    }
-    _magneticFieldBloom->BeginCapture();
+    return std::any_of(ctx.scene.components->begin(), ctx.scene.components->end(),
+                       [](const RenderableSceneComponent& c) { return c.aurora && c.aurora->IsVisible(); });
+}
+
+void Renderer::AuroraBloom(rhi::CommandList& cmd, int view, std::uint32_t bloomSlot) {
+    // Full tier: every visible oval again into a bloom chain (DescribeFrame sized it and checked
+    // that it is on), blurred and added by aurora-bloom-composite.
+    const FrameContext& ctx = View(view);
+    BloomChain(bloomSlot).BeginCapture();
     for (const RenderableSceneComponent& component : *ctx.scene.components) {
-        RenderAurora(ctx, component);
+        RenderAurora(cmd, ctx, component);
     }
-    _magneticFieldBloom->BlurAndComposite(kAuroraBloomPasses, kAuroraBloomIntensity);
+}
+
+void Renderer::AuroraBloomComposite(rhi::CommandList& /*cmd*/, int /*view*/, std::uint32_t bloomSlot) {
+    BloomChain(bloomSlot).BlurAndComposite(kAuroraBloomPasses, kAuroraBloomIntensity);
 }

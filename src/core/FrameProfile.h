@@ -4,6 +4,7 @@
 #include <chrono>
 #include <cstddef>
 #include <string>
+#include <vector>
 
 /**
  * Where one frame's time went, GL-free: CPU time per FramePasses stage (plus the HUD and the
@@ -32,6 +33,18 @@ const char* StageName(Stage stage);
 /** A frame slower than this counts as slow (the 30 fps budget the medium tier aims for). */
 constexpr double kSlowFrameMs = 33.4;
 
+/** Pass kinds the timers keep apart ("scene", "shadow", "aurora-bloom", …); more share the last. */
+constexpr std::size_t kMaxPassKinds = 48;
+
+/** One pass kind's share of a frame: every frame-graph pass of that kind summed. */
+struct PassSample {
+    std::string kind;
+    Stage stage = Stage::Update;
+    int count = 0; // passes of this kind that ran (per component, per view)
+    double cpuMs = 0.0;
+    double gpuMs = 0.0; // 0 unless Sample::gpuValid
+};
+
 struct Sample {
     double frameMs = 0.0; // wall time since the previous frame started
     std::array<double, kStageCount> cpuMs{};
@@ -45,6 +58,7 @@ struct Sample {
     std::size_t uploadBytes = 0;    // bytes the pump uploaded this frame
     std::size_t uploadsPending = 0; // upload tasks still queued
     unsigned long long uniformCalls = 0;
+    std::vector<PassSample> passes; // per frame-graph pass kind, in first-registered order
 };
 
 /** Running totals across frames, for the HUD's "worst frame" and the slow-frame count. */
@@ -56,7 +70,7 @@ struct Totals {
     void ResetWorst() { worstFrameMs = 0.0; }
 };
 
-/** {"frameMs":…,"cpu":{"update":…},"gpu":{…}|null,"jobs":{…},"uploads":{…},…} */
+/** {"frameMs":…,"cpu":{"update":…},"gpu":{…}|null,"jobs":{…},"uploads":{…},"passes":[…],…} */
 std::string ToJson(const Sample& sample, const Totals& totals);
 
 /** Sums CPU time per stage over one frame (a stage may run many times, e.g. per component). */
@@ -71,6 +85,32 @@ public:
 
 private:
     std::array<double, kStageCount> _ms{};
+};
+
+/**
+ * Timer slots by pass kind for the frame graph (render/graph/FramePlan): a kind keeps the slot
+ * it was first given, so the GPU timer's query pools and the HUD's rows stay put across frames.
+ * Slot s is GpuTimer stage kStageCount + s; the stages themselves keep slots 0…kStageCount-1.
+ */
+class PassTimings {
+public:
+    using Clock = CpuStages::Clock;
+    /** `kind`'s slot (registered on first use and billed to `stage`); past kMaxPassKinds, the last slot. */
+    int SlotFor(const std::string& kind, Stage stage);
+    /** Start a frame: CPU times and run counts back to zero (the slots stay). */
+    void Reset();
+    void Add(int slot, Clock::duration elapsed);
+    std::size_t Count() const { return _kinds.size(); }
+    const std::string& Kind(std::size_t slot) const { return _kinds[slot]; }
+    Stage StageOf(std::size_t slot) const { return _stages[slot]; }
+    double CpuMs(std::size_t slot) const { return _cpuMs[slot]; }
+    int Runs(std::size_t slot) const { return _runs[slot]; }
+
+private:
+    std::vector<std::string> _kinds;
+    std::vector<Stage> _stages;
+    std::vector<double> _cpuMs;
+    std::vector<int> _runs;
 };
 
 } // namespace FrameProfile

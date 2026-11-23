@@ -9,7 +9,7 @@ This file only records environment-specific facts for automated agents (e.g. Cur
 ## Runnable targets (Cursor Cloud / Linux VM)
 
 - **Web (WASM):** primary target for day-to-day work — `./build-web.sh`, then `cd web && npm run dev`.
-- **Native Linux:** `./build.sh` now builds with system packages (see README apt list). Run from repo root: `./build/SolarSystem`. Full textures under `resource/textures/` are deploy artifacts; without them init may fail on skybox load.
+- **Native Linux:** `./build.sh` now builds with system packages (see README apt list). Run from repo root: `./build/SolarSystem`. Full textures under `resource/textures/` are deploy artifacts; without them init may fail on skybox load. `scripts/golden-native.sh` stages a scratch `resource/` with stand-ins for them (and the moon/ring models), so it runs on a bare checkout; its `<out>/.root` is also a tree the binary can be run from by hand.
 
 ## Emscripten toolchain
 

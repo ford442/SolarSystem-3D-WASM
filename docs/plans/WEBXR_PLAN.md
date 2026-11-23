@@ -35,7 +35,7 @@ that renders off-screen has to rebind *that* on the way out. A hardcoded
 `glBindFramebuffer(GL_FRAMEBUFFER, 0)` sends the rest of the eye's geometry to the canvas
 instead of the headset. `Application::DefaultFramebuffer()` is the single answer to
 "where does the frame composite?": the XR layer framebuffer while `_xr.active`, 0
-otherwise. Every former FBO-0 exit in `Application.cpp` / `SceneRenderer.cpp` goes through
+otherwise. Every former FBO-0 exit in `Application.cpp` / the render passes goes through
 it, and FBO constructors (`HDR`, `ShadowMapFBO`, `MagneticFieldBloom`) restore whatever was
 bound on entry rather than 0.
 
@@ -46,7 +46,7 @@ Emscripten, so it has no GL name the WASM side can bind. `registerXrFramebuffer`
 `SetXrBaseLayerFramebuffer` whenever the base layer changes.
 
 **Shadow maps now run in VR.** If registration fails, `baseLayerFramebuffer` stays 0,
-`ShadowMapPass` falls back to skipping itself, and `RenderXrStereoFrame` logs the reason
+the frame graph declares no shadow pass (`FramePlan::Features::shadowTarget`), and `RenderXrStereoFrame` logs the reason
 once per session — rather than silently clobbering the stereo image.
 
 HDR glow / lens flare are still skipped in VR (`RenderFrameContent`): their fullscreen

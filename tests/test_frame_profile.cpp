@@ -50,3 +50,44 @@ TEST(FrameProfile, CpuStagesSumRepeatedBrackets) {
     stages.Reset();
     EXPECT_DOUBLE_EQ(stages.Ms()[static_cast<std::size_t>(FrameProfile::Stage::Shadow)], 0.0);
 }
+
+TEST(FrameProfile, PassTimingsKeepSlotsAndSumRunsPerKind) {
+    FrameProfile::PassTimings timings;
+    const int scene = timings.SlotFor("scene", FrameProfile::Stage::Scene);
+    const int shadow = timings.SlotFor("shadow", FrameProfile::Stage::Shadow);
+    EXPECT_EQ(scene, 0);
+    EXPECT_EQ(shadow, 1);
+    EXPECT_EQ(timings.SlotFor("scene", FrameProfile::Stage::Scene), scene);
+    timings.Add(scene, std::chrono::microseconds(250));
+    timings.Add(scene, std::chrono::microseconds(750));
+    EXPECT_EQ(timings.Runs(static_cast<std::size_t>(scene)), 2);
+    EXPECT_DOUBLE_EQ(timings.CpuMs(static_cast<std::size_t>(scene)), 1.0);
+    EXPECT_EQ(timings.StageOf(static_cast<std::size_t>(shadow)), FrameProfile::Stage::Shadow);
+    timings.Reset();
+    EXPECT_EQ(timings.Runs(static_cast<std::size_t>(scene)), 0);
+    EXPECT_EQ(timings.Count(), 2u);                // a new frame keeps the slots
+    timings.Add(-1, std::chrono::microseconds(5)); // an untimed pass is ignored
+}
+
+TEST(FrameProfile, PassTimingsShareTheLastSlotPastTheLimit) {
+    FrameProfile::PassTimings timings;
+    for (std::size_t i = 0; i < FrameProfile::kMaxPassKinds; ++i) {
+        timings.SlotFor("kind" + std::to_string(i), FrameProfile::Stage::Scene);
+    }
+    EXPECT_EQ(timings.SlotFor("one-too-many", FrameProfile::Stage::Scene),
+              static_cast<int>(FrameProfile::kMaxPassKinds - 1));
+    EXPECT_EQ(timings.Count(), FrameProfile::kMaxPassKinds);
+}
+
+TEST(FrameProfile, JsonListsPassesWithNullGpuUntilValid) {
+    FrameProfile::Sample sample;
+    sample.passes.push_back({"scene", FrameProfile::Stage::Scene, 3, 1.25, 2.5});
+    FrameProfile::Totals totals;
+    std::string json = FrameProfile::ToJson(sample, totals);
+    EXPECT_NE(json.find(R"("passes":[{"kind":"scene","stage":"scene","count":3,"cpu":1.250,"gpu":null}])"),
+              std::string::npos)
+        << json;
+    sample.gpuValid = true;
+    json = FrameProfile::ToJson(sample, totals);
+    EXPECT_NE(json.find(R"("gpu":2.500})"), std::string::npos) << json;
+}
