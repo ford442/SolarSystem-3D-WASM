@@ -63,6 +63,10 @@ void Application::Exec() {
     }, this, 0, 0);
     VertSync(_isVertSyncEnabled);
 #else
+    if (const char* golden = std::getenv("SOLARSYSTEM_GOLDEN"); golden && *golden) {
+        RunGoldenCapture(golden);
+        return;
+    }
     while (!glfwWindowShouldClose(_mainWindow)) {
         RunOneFrame();
     }
@@ -181,6 +185,11 @@ void Application::RunOneFrame() {
     UpdateBackgroundMusic();
 #endif
 
+#ifndef __EMSCRIPTEN__
+    if (!_capture.readbackPath.empty()) {
+        WriteFrameReadback();
+    }
+#endif
     glfwSwapBuffers(_mainWindow);
     glfwPollEvents();
     EndFrame();
@@ -651,8 +660,8 @@ void Application::BuildFrameSnapshot(int viewCount) {
     }
 
     HudState& hud = _frameHud;
-    hud.fps = _frameTimer.GetCurrentFps();
-    hud.fpsColor = CurrentFpsColor();
+    hud.fps = _capture.frozenHud ? uint16_t{60} : _frameTimer.GetCurrentFps();
+    hud.fpsColor = _capture.frozenHud ? glm::vec3(1.0f) : CurrentFpsColor();
     hud.vsync = _isVertSyncEnabled;
     hud.cameraSpeed = _camera.GetMovementSpeed();
 #ifdef SOLARSYSTEM_USE_SDL_MIXER

@@ -117,7 +117,13 @@ void GLAPIENTRY GlDebugCallback(GLenum /*source*/, GLenum type, GLuint id, GLenu
 #endif
 
 void Application::InitSystems() {
+#ifdef __EMSCRIPTEN__
     OrbitLayout::SetJulianDate(Ephemeris::JulianDateNowUtc());
+#else
+    // A golden capture pins the date before anything is built from it (the belts' phases).
+    const double goldenJd = GoldenStartJulianDate();
+    OrbitLayout::SetJulianDate(goldenJd > 0.0 ? goldenJd : Ephemeris::JulianDateNowUtc());
+#endif
 
     glfwSetErrorCallback(glfwErrorCallback);
 

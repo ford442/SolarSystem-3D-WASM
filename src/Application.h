@@ -265,8 +265,24 @@ private:
         bool resized = false; // BeginCapture set a render size; EndCapture fits the canvas again
         int width = 0;        // that size, re-asserted before every captured frame
         int height = 0;
+        bool frozenHud = false;   // golden capture: the hint list's FPS line holds still
+        std::string readbackPath; // native golden capture: write this frame to a PPM before the swap
     };
     CaptureState _capture;
+#ifndef __EMSCRIPTEN__
+    /**
+     * SOLARSYSTEM_GOLDEN=frames=N,out=<file.ppm>[,step=s][,focus=i][,jd=d][,fields=1]: load, then
+     * draw N capture frames a fixed `step` apart (1/30 s by default) and write the last one's
+     * back buffer to `out`, then return from Exec. With SOLARSYSTEM_JOBS=0 every input of the
+     * frame is a function of the arguments, so two builds can be compared pixel for pixel
+     * (scripts/golden-native.sh).
+     */
+    void RunGoldenCapture(const std::string& spec);
+    /** SOLARSYSTEM_GOLDEN's `jd` (0 without one): the date InitSystems starts the clock at. */
+    static double GoldenStartJulianDate();
+    /** The back buffer of the frame about to be swapped, bottom row last, to _capture.readbackPath. */
+    void WriteFrameReadback();
+#endif
     /** The scene object for a catalog index (0 = the Sun), or null while its system is not loaded. */
     std::shared_ptr<const SpaceObject> FindSceneBody(int catalogIndex) const;
 

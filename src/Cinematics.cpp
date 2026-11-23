@@ -10,8 +10,14 @@
 #include "assets/TextureLoadingQueue.h"
 #include "core/Log.h"
 #include <algorithm>
+#include <cstddef>
 #include <cstdio>
+#include <cstdlib>
+#include <fstream>
+#include <ios>
+#include <sstream>
 #include <string>
+#include <vector>
 
 namespace {
 
@@ -118,6 +124,107 @@ void Application::EndCapture() {
 #endif
     LOG_INFO("Capture", "Ended");
 }
+
+#ifndef __EMSCRIPTEN__
+namespace {
+
+struct GoldenSpec {
+    int frames = 60;
+    double step = 1.0 / 30.0;
+    int focus = -1;
+    double jd = 0.0;
+    bool fields = false;
+    std::string out = "golden.ppm";
+};
+
+GoldenSpec ParseGoldenSpec(const std::string& spec) {
+    GoldenSpec golden;
+    std::stringstream stream(spec);
+    std::string token;
+    while (std::getline(stream, token, ',')) {
+        const std::size_t eq = token.find('=');
+        const std::string key = token.substr(0, eq);
+        const std::string value = eq == std::string::npos ? std::string() : token.substr(eq + 1);
+        if (key == "frames") {
+            golden.frames = std::max(1, std::atoi(value.c_str()));
+        } else if (key == "step") {
+            golden.step = std::max(0.0, std::atof(value.c_str()));
+        } else if (key == "focus") {
+            golden.focus = std::atoi(value.c_str());
+        } else if (key == "jd") {
+            golden.jd = std::atof(value.c_str());
+        } else if (key == "fields") {
+            golden.fields = value == "1";
+        } else if (key == "out") {
+            golden.out = value;
+        } else {
+            LOG_WARN("Golden", "Unknown SOLARSYSTEM_GOLDEN key \"%s\"", key.c_str());
+        }
+    }
+    return golden;
+}
+
+} // namespace
+
+double Application::GoldenStartJulianDate() {
+    const char* spec = std::getenv("SOLARSYSTEM_GOLDEN");
+    return spec && *spec ? ParseGoldenSpec(spec).jd : 0.0;
+}
+
+void Application::RunGoldenCapture(const std::string& spec) {
+    const GoldenSpec golden = ParseGoldenSpec(spec);
+    // InitSystems already started the clock at `golden.jd` (GoldenStartJulianDate): the belts measure
+    // their phases from the date the scene was built at, so a wall-clock start would move
+    // every asteroid between two runs.
+    // Natively the core resources are on disk: loading is a frame or two.
+    for (int i = 0; _appState == AppState::LOADING && i < 1000 && !glfwWindowShouldClose(_mainWindow); ++i) {
+        RunOneFrame();
+    }
+    if (_appState == AppState::LOADING) {
+        LOG_ERROR("Golden", "Scene never finished loading; nothing written");
+        return;
+    }
+    if (golden.jd > 0.0) {
+        OrbitLayout::SetJulianDate(golden.jd); // again: an environment override may have moved it since
+        _simState.timePaused = true;
+    }
+    if (golden.fields) {
+        SetMagneticFieldsEnabled(true);
+    }
+    if (golden.focus >= 0) {
+        FocusPlanetByIndex(golden.focus);
+    }
+    BeginCapture(0, 0);
+    _capture.frozenHud = true;
+    for (int frame = 1; frame <= golden.frames; ++frame) {
+        if (frame == golden.frames) {
+            _capture.readbackPath = golden.out;
+        }
+        StepCaptureFrame(golden.step);
+    }
+    _capture.frozenHud = false;
+    EndCapture();
+}
+
+void Application::WriteFrameReadback() {
+    const int width = _displayWidth;
+    const int height = _displayHeight;
+    std::vector<unsigned char> pixels(static_cast<std::size_t>(width) * static_cast<std::size_t>(height) * 3);
+    glBindFramebuffer(GL_READ_FRAMEBUFFER, 0);
+    glReadBuffer(GL_BACK);
+    glPixelStorei(GL_PACK_ALIGNMENT, 1);
+    glReadPixels(0, 0, width, height, GL_RGB, GL_UNSIGNED_BYTE, pixels.data());
+    std::ofstream file(_capture.readbackPath, std::ios::binary);
+    file << "P6\n" << width << ' ' << height << "\n255\n";
+    const std::size_t row = static_cast<std::size_t>(width) * 3;
+    for (int y = height - 1; y >= 0; --y) {
+        file.write(reinterpret_cast<const char*>(pixels.data() + static_cast<std::size_t>(y) * row),
+                   static_cast<std::streamsize>(row));
+    }
+    LOG_INFO("Golden", "Wrote %s (%dx%d)", _capture.readbackPath.c_str(), width, height);
+    _capture.readbackPath.clear();
+}
+#endif
 
 int Application::PendingAssetCount() const {
     int pending = TextureLoadingQueue::GetInstance().GetQueuedCount() + _resourcesPending.load();
