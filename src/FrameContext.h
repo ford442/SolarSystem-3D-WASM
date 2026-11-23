@@ -8,6 +8,7 @@
 #include "astro/Observer.h"
 #include "astro/SkyEvents.h"
 #include <glm/glm.hpp>
+#include <cstddef>
 #include <optional>
 #include <string>
 #include <vector>
@@ -124,6 +125,8 @@ struct SceneSnapshot {
     // Non-const for the Sun's occlusion query, which a pass reads back. Nothing moves.
     Star* sun = nullptr;
     std::vector<RenderableSceneComponent>* components = nullptr;
+    // Indices into *components to draw this frame, front to back (Application::CullScene).
+    const std::vector<std::size_t>* drawOrder = nullptr;
     int nearestComponent = -1; // into *components; -1 none
     const AsteroidField* asteroidField = nullptr;
     const AsteroidField* kuiperField = nullptr;
@@ -179,6 +182,9 @@ struct HudState {
     float cameraSpeed = 0.0f;
     float musicVolumePercent = -1.0f; // native only; < 0 hides the line
     std::string musicTrack;
+    // The star-system jump's fade over the whole frame (0 = none).
+    glm::vec3 fadeColor{0.0f};
+    float fadeAmount = 0.0f;
 };
 
 struct FrameContext {

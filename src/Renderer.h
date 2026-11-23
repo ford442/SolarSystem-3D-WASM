@@ -2,23 +2,35 @@
 #define SOLARSYSTEM_RENDERER_H
 #include "ApplicationTypes.h"
 #include "FrameContext.h"
-#include "FramePasses.h"
 #include "SystemModules.h"
 #include "gfx/FrameUniforms.h"
 #include "gfx/GlHandle.h"
 #include "astro/MissionCatalog.h"
 #include "gfx/ShaderLibrary.h"
+#include "gfx/rhi/CommandList.h"
+#include "render/graph/FrameGraph.h"
+#include "render/graph/FramePlan.h"
 #include "Solar_System/CatalogMaterial.h"
 #include "Solar_System/ObserveSky.h"
 #include <array>
 #include <cstddef>
+#include <cstdint>
 #include <deque>
+#include <functional>
 #include <memory>
 #include <string>
 #include <vector>
 
 class SpaceObject;
+class GpuTimer;
 struct QualityTierSettings;
+namespace FrameProfile {
+class CpuStages;
+class PassTimings;
+} // namespace FrameProfile
+namespace rhi {
+class GlCommandList;
+}
 // GPU helpers held by unique_ptr: complete in the Renderer TUs only, which keeps their
 // headers out of everything that includes Application.h.
 class HDR;
@@ -32,6 +44,7 @@ class ShadowMapFBO;
 class SkyBox;
 class SolarWindRenderer;
 class SpaceWeatherUniformBuffer;
+struct SpaceWeatherUniformData;
 class SurfacePatchMesh;
 class TerrainRenderer;
 class TextRenderer;
@@ -42,15 +55,20 @@ class XrPointerRenderer;
  * HDR, skybox, lens flare, text renderer, orbit/mission/magnetic-field overlay meshes) and
  * the render-only toggles (orbit lines, magnetic fields, hint overlay, star tuning).
  *
- * Every pass takes the frame's FrameContext: the camera view, a snapshot of the scene and
+ * The frame is data (docs/ARCHITECTURE.md §7.5): RenderFrame declares it with
+ * render/graph/FramePlan on a FrameGraph::Graph, which culls, orders and runs the passes;
+ * Renderer is the PassSink behind each one, recording through an rhi::CommandList. The pass
+ * bodies live in src/render/passes/, one file per family.
+ *
+ * Every pass reads the frame's FrameContext: the camera view, a snapshot of the scene and
  * the sim/quality state. That is all a pass may read — the renderer has no reference back
  * to Application, and nothing in the scene moves during a pass (Application::UpdateScene
  * placed it before the first one). See FrameContext.h.
  */
-class Renderer {
+class Renderer : private FramePlan::PassSink {
 public:
     Renderer();
-    ~Renderer(); // out of line: the unique_ptr members above are incomplete here
+    ~Renderer() override; // out of line: the unique_ptr members above are incomplete here
     Renderer(const Renderer&) = delete;
     Renderer& operator=(const Renderer&) = delete;
 
@@ -94,40 +112,49 @@ public:
     void ResizeShadowMap(uint16_t resolution);
     bool HdrEnabled() const { return _hdrEnabled; }
 
-    // One frame, as FramePasses::Run orders it. The passes only read scene state: everything
-    // that moves (placement, light matrices, belts, LOD) happened in Application::UpdateScene.
+    // One frame. Application::UpdateScene has placed everything; the passes only read it.
+    /** Reset this frame's counters (Stats()). */
     void BeginFrame();
-    /** Bind `ctx.view`: its viewport, and its matrices the first time it is bound this frame. */
-    void BeginView(const FrameContext& ctx);
-    void RenderBackground(const FrameContext& ctx);
-    void ShadowMapPass(const FrameContext& ctx, const RenderableSceneComponent& component);
-    void RenderPass(const FrameContext& ctx, const RenderableSceneComponent& component);
-    void RenderForeground(const FrameContext& ctx);
     /**
-     * Space weather (SpaceWeatherRenderer.cpp, docs/ARCHITECTURE.md §13), once a frame after
-     * the scene is placed: the MagnetosphereUBO upload and the solar-wind particle update.
+     * Once a frame, after the scene is placed and before RenderFrame: the photosphere program
+     * for the tier and its spot uniforms, the solar-wind groups and the MagnetosphereUBO's
+     * contents (docs/ARCHITECTURE.md §13), finished field-line traces, the bloom chain's size.
      */
-    void UpdateSpaceWeather(const FrameContext& ctx);
-    /** Mono only: staged-loading proxy labels, then the star glow, HDR composite and lens flare. */
-    void RenderMonoEffects(const FrameContext& ctx);
-    /** Screen-space text after the scene: Observe's HUD, or distances and the hint list. */
-    void RenderHud(const FrameContext& ctx);
-    /** A full-screen `color` over the frame at `amount` (0 = none): the star-system jump fade. */
-    void RenderScreenFade(GLuint framebuffer, const glm::vec3& color, float amount) const;
+    void PrepareFrame(const FrameContext& ctx);
+    /**
+     * The render half of this frame's FramePlan::Features: which overlays, effects and HUD
+     * lines exist, the components in draw order (SceneSnapshot::drawOrder) and the targets'
+     * sizes. Application adds what only it knows (the loading line).
+     */
+    void DescribeFrame(const FrameContext& ctx, int viewCount, FramePlan::Features& features);
+    /**
+     * Declare the frame on the graph, compile it and run it: `views` holds one FrameContext
+     * per view (one mono, two XR eyes; none for an XR frame whose eyes have not arrived).
+     */
+    void RenderFrame(const std::vector<FrameContext>& views, const FramePlan::Features& features);
+    /** The upload pump Application runs as the frame's `uploads` pass. */
+    void SetUploadPump(std::function<void()> pump) { _uploadPump = std::move(pump); }
+    /** Where per-pass timings go (any may be null): see rhi::GlCommandList::SetProfiling. */
+    void SetProfiling(GpuTimer* gpu, FrameProfile::PassTimings* passes, FrameProfile::CpuStages* stages);
+    /** The last frame's compiled graph. */
+    const FrameGraph::Graph& Graph() const { return _graph; }
+    /**
+     * ?graph=1 on the web, SOLARSYSTEM_GRAPH=1 natively: log the compiled graph as JSON and DOT
+     * whenever its passes change ([FrameGraph] lines).
+     */
+    void SetGraphDump(bool enabled) { _graphDump = enabled; }
+    /** Whether atmospheres with LUTs should take the physical path this frame. */
+    bool PhysicalAtmosphereAvailable() const { return _pbrAtmosphereSteps > 0 && _pbrAtmosphereShader != nullptr; }
+    /** This frame's pass counts (reset by BeginFrame). */
+    const FramePlan::Stats& Stats() const { return _stats; }
+    void CountSceneUpdate() { ++_stats.sceneUpdates; }
+    void CountCulledComponents(int count) { _stats.culledComponents = count; }
     /**
      * Start compiling every planetLighting variant the active catalog can draw with (after
      * StarSystemCatalog::Activate): a new system's PROCEDURAL_SURFACE programs build while the
      * jump is black instead of on its first frame.
      */
     void PrefetchCatalogVariants();
-    /** Texture-upgrade progress line; also reports streaming progress to the page on web. */
-    void RenderTextureLoadingProgress(const FrameContext& ctx) const;
-    /** Whether atmospheres with LUTs should take the physical path this frame. */
-    bool PhysicalAtmosphereAvailable() const { return _pbrAtmosphereSteps > 0 && _pbrAtmosphereShader != nullptr; }
-    /** This frame's pass counts (reset by BeginFrame). */
-    const FramePasses::Stats& Stats() const { return _stats; }
-    void CountSceneUpdate() { ++_stats.sceneUpdates; }
-    void CountCulledComponents(int count) { _stats.culledComponents = count; }
 
     /**
      * Re-upload every mission path relative to the current render origin (scale or quality
@@ -158,21 +185,65 @@ public:
     std::size_t TerrainTextureCount() const;
 
 private:
+    // --- FramePlan::PassSink: one method per pass (src/render/passes/) ----------------------
+    void BeginView(rhi::CommandList& cmd, int view) override;
+    void SolarWindUpdate(rhi::CommandList& cmd) override;
+    void ObserveSkyPass(rhi::CommandList& cmd, int view) override;
+    void SkyBoxPass(rhi::CommandList& cmd, int view) override;
+    void OrbitPaths(rhi::CommandList& cmd, int view) override;
+    void MissionPaths(rhi::CommandList& cmd, int view) override;
+    void XrPointers(rhi::CommandList& cmd, int view) override;
+    void FlatCorona(rhi::CommandList& cmd, int view) override;
+    void ShadowMap(rhi::CommandList& cmd, std::size_t component) override;
+    void ClearShadowMap(rhi::CommandList& cmd) override;
+    void SceneComponent(rhi::CommandList& cmd, int view, std::size_t component) override;
+    void CoronaVolume(rhi::CommandList& cmd, int view) override;
+    void Asteroids(rhi::CommandList& cmd, int view) override;
+    void SolarWind(rhi::CommandList& cmd, int view) override;
+    void MagneticFields(rhi::CommandList& cmd, int view, bool restoreState) override;
+    void MagneticBloom(rhi::CommandList& cmd, int view, std::uint32_t bloomSlot) override;
+    void MagneticBloomComposite(rhi::CommandList& cmd, int view, std::uint32_t bloomSlot) override;
+    void AuroraBloom(rhi::CommandList& cmd, int view, std::uint32_t bloomSlot) override;
+    void AuroraBloomComposite(rhi::CommandList& cmd, int view, std::uint32_t bloomSlot) override;
+    void ProxyLabels(rhi::CommandList& cmd) override;
+    void StarGlow(rhi::CommandList& cmd) override;
+    void HdrComposite(rhi::CommandList& cmd) override;
+    void LensFlarePass(rhi::CommandList& cmd) override;
+    void ObserveHud(rhi::CommandList& cmd) override;
+    void Distances(rhi::CommandList& cmd) override;
+    void Hints(rhi::CommandList& cmd) override;
+    void ScreenFade(rhi::CommandList& cmd) override;
+    void Uploads(rhi::CommandList& cmd) override;
+    void LoadingProgress(rhi::CommandList& cmd) override;
+
+    /** View `view` of the frame RenderFrame is running. */
+    const FrameContext& View(int view) const { return (*_views)[static_cast<std::size_t>(view)]; }
+    /** Component `drawIndex` of this frame's draw order. */
+    const RenderableSceneComponent& DrawnComponent(const FrameContext& ctx, std::size_t drawIndex) const;
+    /** The bloom chain behind physical slot `slot` (FrameGraph aliasing), made on first use. */
+    MagneticFieldBloom& BloomChain(std::size_t slot);
+    /** Whether the frame's bloom chain is on at this display size (resizes it first). */
+    bool BloomChainReady(glm::ivec2 display);
+    /** Log the compiled graph when its passes changed since the last dump (SetGraphDump). */
+    void DumpGraphIfChanged();
+
     void ConfigureMainShaders(const FrameContext& ctx);
-    void ProcessStarRendering(const FrameContext& ctx);
+    void ProcessStarRendering(rhi::CommandList& cmd, const FrameContext& ctx);
     /** Flat corona billboard (Low, or coronaSlices == 0); drawn before the planets. */
-    void RenderStarCorona(const FrameContext& ctx) const;
+    void RenderStarCorona(rhi::CommandList& cmd, const FrameContext& ctx) const;
     /** Instanced-slice corona (coronaSlices > 0); drawn after the planets so they occlude it. */
-    void RenderStarCoronaVolume(const FrameContext& ctx) const;
-    void RenderStarEffects(const FrameContext& ctx) const;
-    void RenderPlanetProxyMarkers(const FrameContext& ctx) const;
-    void RenderPlanetSatelliteStarDistances(const FrameContext& ctx) const;
-    void RenderHints(const FrameContext& ctx) const;
-    void RenderOrbitPaths(const FrameContext& ctx) const;
-    void RenderMagneticFields(const FrameContext& ctx);
+    void RenderStarCoronaVolume(rhi::CommandList& cmd, const FrameContext& ctx) const;
+    void RenderPlanetProxyMarkers(rhi::CommandList& cmd, const FrameContext& ctx) const;
+    void RenderPlanetSatelliteStarDistances(rhi::CommandList& cmd, const FrameContext& ctx) const;
+    void RenderHints(rhi::CommandList& cmd, const FrameContext& ctx) const;
+    /** Texture-upgrade progress line; also reports streaming progress to the page on web. */
+    void RenderTextureLoadingProgress(rhi::CommandList& cmd, const FrameContext& ctx) const;
+    void RenderOrbitPaths(rhi::CommandList& cmd, const FrameContext& ctx) const;
     void RenderAsteroidField(const FrameContext& ctx) const;
-    void RenderMissionPaths(const FrameContext& ctx) const;
-    void RenderXrPointers(const FrameContext& ctx) const;
+    void RenderMissionPaths(rhi::CommandList& cmd, const FrameContext& ctx) const;
+    void RenderXrPointers(rhi::CommandList& cmd, const FrameContext& ctx) const;
+    /** The field-line ribbons of the Sun and every planet with a field, at a width and opacity. */
+    void DrawMagneticFieldRibbons(const FrameContext& ctx, float ribbonWidthScale, float opacityScale);
     /** Observe mode: the ground-level sky pass (replaces every scene pass). */
     void RenderObserveSky(const FrameContext& ctx);
     /** Observe mode: compass, body labels and the readout line, drawn over the sky. */
@@ -183,25 +254,31 @@ private:
     /** Upload the ribbons once every trace job of the build in flight has finished. */
     void CollectMagneticFieldTraces();
 
-    void RenderAtmospheres(const FrameContext& ctx, const RenderableSceneComponent& component);
-    void RenderOneilAtmosphere(const FrameContext& ctx, const RenderableAtmosphere& renderableAtmosphere,
+    void RenderAtmospheres(rhi::CommandList& cmd, const FrameContext& ctx, const RenderableSceneComponent& component);
+    void RenderOneilAtmosphere(rhi::CommandList& cmd, const FrameContext& ctx,
+                               const RenderableAtmosphere& renderableAtmosphere,
                                const RenderableSceneComponent& component);
-    void RenderPbrAtmosphere(const FrameContext& ctx, const RenderableAtmosphere& renderableAtmosphere,
+    void RenderPbrAtmosphere(rhi::CommandList& cmd, const FrameContext& ctx,
+                             const RenderableAtmosphere& renderableAtmosphere,
                              const RenderableSceneComponent& component);
-    void RenderClouds(const FrameContext& ctx, const RenderableSceneComponent& component);
-    // Space weather (SpaceWeatherRenderer.cpp).
+    void RenderClouds(rhi::CommandList& cmd, const FrameContext& ctx, const RenderableSceneComponent& component);
+    // Space weather (render/passes/SpaceWeatherPasses.cpp).
     /** The component's auroral oval, additive, after its atmosphere and clouds. */
-    void RenderAurora(const FrameContext& ctx, const RenderableSceneComponent& component);
-    /** Full tier: every visible oval again into the field-line bloom, blurred and added. */
-    void RenderAuroraBloom(const FrameContext& ctx);
-    /** The solar-wind particles, additive points in the HDR target. */
-    void RenderSolarWind(const FrameContext& ctx) const;
+    void RenderAurora(rhi::CommandList& cmd, const FrameContext& ctx, const RenderableSceneComponent& component);
+    /** Whether the Full tier's aurora bloom has an oval to draw this frame. */
+    bool AuroraBloomWanted(const FrameContext& ctx) const;
+    /**
+     * Space weather's per-frame set-up (PrepareFrame): the photosphere program for the tier and
+     * its spot uniforms, the particle groups worth running, and the MagnetosphereUBO's contents.
+     */
+    void PrepareSpaceWeather(const FrameContext& ctx);
     /** The aurora program for a tier's look, built on first use (null until it has compiled). */
     Shader* AuroraProgram(int auroraMode);
     /** The photosphere program for a tier (star.fs PHOTOSPHERE / SUNSPOTS), or the sprite. */
     Shader* StarProgram(int photosphereMode);
-    void RenderPlanetaryRing(const Shader& shader, const RenderableSceneComponent& component) const;
-    void RenderStar(const FrameContext& ctx) const;
+    void RenderPlanetaryRing(rhi::CommandList& cmd, const Shader& shader,
+                             const RenderableSceneComponent& component) const;
+    void RenderStar(rhi::CommandList& cmd, const FrameContext& ctx) const;
     void RenderSpaceObjectDistance(const FrameContext& ctx, const SpaceObject* spaceObject) const;
     void UpdateOcclusionQuery(Star& sun);
     struct EclipseUmbra {
@@ -294,7 +371,10 @@ private:
     std::unique_ptr<OrbitPathRenderer> _orbitPathRenderer;
     std::unique_ptr<XrPointerRenderer> _xrPointerRenderer;
     std::unique_ptr<MagneticFieldLineRenderer> _magneticFieldRenderer;
-    std::unique_ptr<MagneticFieldBloom> _magneticFieldBloom;
+    // Bloom chains by FrameGraph physical slot: the field-line and aurora blooms are two
+    // transients the graph aliases onto chain 0 (their lifetimes never overlap).
+    std::vector<std::unique_ptr<MagneticFieldBloom>> _bloomChains;
+    bool _bloomEnabled = false; // the tier's enableMagneticBloom, for chains made later
     std::unique_ptr<MagneticFieldTraceJobs> _magneticFieldTraces; // build in flight, if any
     std::vector<std::unique_ptr<MissionPathRenderer>> _missionPathMeshes;
     glm::dvec3 _missionPathOrigin{0.0}; // world point the path vertices are relative to
@@ -307,6 +387,8 @@ private:
     std::array<bool, kSolarWindGroupCount> _solarWindGroups{};
     Shader* _solarWindUpdateShader = nullptr;
     Shader* _solarWindDrawShader = nullptr;
+    // Packed by PrepareSpaceWeather, uploaded by SolarWindUpdate.
+    std::unique_ptr<SpaceWeatherUniformData> _spaceWeatherData;
     std::array<Shader*, 3> _auroraShaders{}; // static, animated, curtains
     std::array<Shader*, 3> _starShaders{};   // sprite (_mainStarShader's spec), granulation, spots
     Shader* _spriteStarShader = nullptr;     // star.vs + star.fs with no permutation
@@ -346,7 +428,16 @@ private:
     FrameUniformBuffer _frameUniforms;
     unsigned int _uploadedViews = 0; // bit per view whose FrameUBO this frame already uploaded
     const CameraView* _configuredView = nullptr; // view whose matrices ConfigureMainShaders last uploaded
-    FramePasses::Stats _stats;
+    FramePlan::Stats _stats;
+
+    // The frame graph (render/graph/), rebuilt every frame, and the command list it runs on.
+    FrameGraph::Graph _graph;
+    std::unique_ptr<rhi::GlCommandList> _commands;
+    FrameProfile::PassTimings* _passTimings = nullptr;
+    const std::vector<FrameContext>* _views = nullptr; // RenderFrame's views while it runs
+    std::function<void()> _uploadPump;
+    bool _graphDump = false;
+    std::string _graphSignature; // the last dumped graph's passes
 };
 
 #endif //SOLARSYSTEM_RENDERER_H

@@ -12,10 +12,13 @@
 # staged in <out dir>/.root with stand-ins: the shipped _Low placeholders under their
 # full-res names, a 4x4 grey DDS for anything else, the sphere for Phobos/Deimos and a flat
 # annulus for each ring. Shaders are symlinked, so the build under test reads its own.
+#
+# GOLDEN_TIERS (default "low medium full"), GOLDEN_ONLY (regex over shot names),
+# GOLDEN_SIZE (default 960x540), GOLDEN_ROOT (a resource tree to run from instead).
 set -euo pipefail
 
 if [ $# -lt 2 ]; then
-    sed -n 2,16p "$0"
+    sed -n 2,19p "$0"
     exit 2
 fi
 repo="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
@@ -23,6 +26,7 @@ binary="$(cd "$(dirname "$1")" && pwd)/$(basename "$1")"
 out="$(mkdir -p "$2" && cd "$2" && pwd)"
 size="${GOLDEN_SIZE:-960x540}"
 tiers="${GOLDEN_TIERS:-low medium full}"
+only="${GOLDEN_ONLY:-.}" # extended regex over shot names, e.g. GOLDEN_ONLY='saturn|observe'
 
 stage_root() {
     local root="$1"
@@ -85,6 +89,7 @@ export SDL_AUDIODRIVER=dummy SOLARSYSTEM_JOBS=0 SOLARSYSTEM_SHADER_HOT_RELOAD=0
 jd=2460409.5 # 2024-04-08
 shots=(
     "start||frames=30"
+    "sun-fields||frames=300,focus=0,fields=1"
     "earth||frames=300,focus=3"
     "saturn||frames=300,focus=6"
     "jupiter-fields||frames=300,focus=5,fields=1"
@@ -97,6 +102,7 @@ missing=0
 for tier in $tiers; do
     for shot in "${shots[@]}"; do
         IFS='|' read -r name extra keys <<<"$shot"
+        echo "$name" | grep -qE "$only" || continue
         image="$out/$tier-$name.ppm"
         rm -f "$image"
         # shellcheck disable=SC2086 # `extra` is a list of VAR=value words

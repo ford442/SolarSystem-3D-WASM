@@ -72,14 +72,23 @@ set(SOLARSYSTEM_SOURCES_CORE
     src/GpuContextRestore.cpp
     src/Cinematics.cpp
     src/SpaceWeatherController.cpp
-    src/SceneRenderer.cpp
-    src/SceneOverlayRenderer.cpp
-    src/SpaceWeatherRenderer.cpp
+    src/render/passes/RendererSetup.cpp
+    src/render/passes/RendererFrame.cpp
+    src/render/passes/ShadowPasses.cpp
+    src/render/passes/ScenePasses.cpp
+    src/render/passes/ShellPasses.cpp
+    src/render/passes/StarPasses.cpp
+    src/render/passes/OverlayPasses.cpp
+    src/render/passes/SpaceWeatherPasses.cpp
+    src/render/passes/HudPasses.cpp
+    src/render/passes/ObservePasses.cpp
+    src/render/graph/FrameGraph.cpp
+    src/render/graph/FramePlan.cpp
+    src/gfx/rhi/GlCommandList.cpp
     src/StarSystemFactory.cpp
     src/PlatformWindow.cpp
     src/InputHandler.cpp
     src/ObserveMode.cpp
-    src/ObserveRenderer.cpp
     src/AudioPlayer.cpp
     src/RenderSettings.cpp
     src/XrSession.cpp
@@ -197,6 +206,9 @@ if(WIN32)
 endif()
 
 add_executable(${PROJECT_NAME} ${SOLARSYSTEM_SOURCES})
+# Headers are named from src/ ("gfx/rhi/CommandList.h", "Renderer.h") wherever the including
+# file lives, as the test targets already do; files beside each other still find each other first.
+target_include_directories(${PROJECT_NAME} PRIVATE ${CMAKE_SOURCE_DIR}/src)
 
 # Copying of all necessary dll files on which the executable depends (Windows only)
 if(WIN32)

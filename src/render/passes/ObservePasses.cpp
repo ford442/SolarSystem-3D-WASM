@@ -2,14 +2,21 @@
 // text overlay (compass, body names, readout). The sky itself is Solar_System/ObserveSky.cpp.
 #include "Renderer.h"
 #include "FrameContext.h"
+#include "gfx/rhi/CommandList.h"
 #include "astro/SeatedView.h"
 #include "astro/Observer.h"
+#include "astro/StarCatalog.h"
+#include "gfx/GlPlatform.h"
 #include "render/TextRenderer.h"
 #include "Solar_System/Atmosphere.h"
+#include "Solar_System/AtmosphereModel.h"
+#include "Solar_System/ObserveSky.h"
 #include "Solar_System/BodyCatalog.h"
 #include "Solar_System/OrbitLayout.h"
 #include <algorithm>
 #include <cmath>
+#include <cstddef>
+#include <ios>
 #include <iomanip>
 #include <sstream>
 #include <string>
@@ -35,6 +42,14 @@ std::wstring formatCoordinate(double value, wchar_t positive, wchar_t negative) 
 }
 
 } // namespace
+
+void Renderer::ObserveSkyPass(rhi::CommandList& /*cmd*/, int view) {
+    RenderObserveSky(View(view));
+}
+
+void Renderer::ObserveHud(rhi::CommandList& /*cmd*/) {
+    RenderObserveHud(View(0));
+}
 
 void Renderer::RenderObserveSky(const FrameContext& ctx) {
     if (!_observeSky || !ctx.scene.observeSky) {
@@ -93,7 +108,8 @@ void Renderer::RenderObserveSky(const FrameContext& ctx) {
         // The 2D HUD cannot go in a headset, but the labels are world-anchored: draw them per eye,
         // grown with the eye's resolution so they stay legible.
         const float textScale = glm::clamp(static_cast<float>(frame.viewportHeight) / 720.0f, 1.0f, 2.5f);
-        RenderObserveLabels(ctx, static_cast<float>(frame.viewportWidth), static_cast<float>(frame.viewportHeight), textScale);
+        RenderObserveLabels(ctx, static_cast<float>(frame.viewportWidth), static_cast<float>(frame.viewportHeight),
+                            textScale);
     }
 #endif
 }
@@ -113,18 +129,24 @@ void Renderer::RenderObserveLabels(const FrameContext& ctx, float width, float h
     _mainTextShader->SetBool("is3D", false);
 
     // Compass points on the horizon.
-    struct Cardinal { const wchar_t* label; glm::vec3 dir; };
+    struct Cardinal {
+        const wchar_t* label;
+        glm::vec3 dir;
+    };
     const Cardinal cardinals[] = {
-        {L"N", {0.0f, 0.0f, -1.0f}}, {L"E", {1.0f, 0.0f, 0.0f}},
-        {L"S", {0.0f, 0.0f, 1.0f}},  {L"W", {-1.0f, 0.0f, 0.0f}},
+        {L"N", {0.0f, 0.0f, -1.0f}},
+        {L"E", {1.0f, 0.0f, 0.0f}},
+        {L"S", {0.0f, 0.0f, 1.0f}},
+        {L"W", {-1.0f, 0.0f, 0.0f}},
     };
     const glm::vec3 compassColor(0.95f, 0.80f, 0.45f);
     for (const Cardinal& cardinal : cardinals) {
         glm::vec2 px;
         const glm::vec3 raised = glm::normalize(cardinal.dir + glm::vec3(0.0f, 0.035f, 0.0f));
-        if (ObserveSky::ProjectToPixels(raised, _observeFrame, px) && px.x > 0.0f && px.x < width &&
-            px.y > 0.0f && px.y < height) {
-            _textRenderer->Render(*_mainTextShader, std::wstring(cardinal.label), px.x - 8.0f * textScale, px.y, 0.7f * textScale, compassColor);
+        if (ObserveSky::ProjectToPixels(raised, _observeFrame, px) && px.x > 0.0f && px.x < width && px.y > 0.0f &&
+            px.y < height) {
+            _textRenderer->Render(*_mainTextShader, std::wstring(cardinal.label), px.x - 8.0f * textScale, px.y,
+                                  0.7f * textScale, compassColor);
         }
     }
 
@@ -142,14 +164,15 @@ void Renderer::RenderObserveLabels(const FrameContext& ctx, float width, float h
         glm::vec2 px;
         const glm::vec3 dir(static_cast<float>(body.apparentDir[0]), static_cast<float>(body.apparentDir[1]),
                             static_cast<float>(body.apparentDir[2]));
-        if (ObserveSky::ProjectToPixels(dir, _observeFrame, px) && px.x > 0.0f && px.x < width &&
-            px.y > 0.0f && px.y < height) {
+        if (ObserveSky::ProjectToPixels(dir, _observeFrame, px) && px.x > 0.0f && px.x < width && px.y > 0.0f &&
+            px.y < height) {
             // Clear of the disc when a narrow field makes it big (the Moon at a few degrees, planets
             // in a telescope field): the label sits off its upper-right edge.
             const float discPx = static_cast<float>(std::tan(body.angRadiusDeg * kDegToRad)) * 0.5f *
                                  _observeFrame.projection[1][1] * static_cast<float>(_observeFrame.viewportHeight);
             const float offset = std::max(12.0f * textScale, 0.71f * discPx + 4.0f * textScale);
-            _textRenderer->Render(*_mainTextShader, widen(body.name), px.x + offset, px.y + offset, 0.35f * textScale, labelColor);
+            _textRenderer->Render(*_mainTextShader, widen(body.name), px.x + offset, px.y + offset, 0.35f * textScale,
+                                  labelColor);
         }
     }
 
@@ -184,9 +207,10 @@ void Renderer::RenderObserveLabels(const FrameContext& ctx, float width, float h
             glm::vec2 px;
             const glm::vec3 dir(static_cast<float>(horizon[0]), static_cast<float>(horizon[1]),
                                 static_cast<float>(horizon[2]));
-            if (ObserveSky::ProjectToPixels(dir, _observeFrame, px) && px.x > 0.0f && px.x < width &&
-                px.y > 0.0f && px.y < height) {
-                _textRenderer->Render(*_mainTextShader, widen(name), px.x + 8.0f * textScale, px.y + 8.0f * textScale, 0.3f * textScale, starLabelColor);
+            if (ObserveSky::ProjectToPixels(dir, _observeFrame, px) && px.x > 0.0f && px.x < width && px.y > 0.0f &&
+                px.y < height) {
+                _textRenderer->Render(*_mainTextShader, widen(name), px.x + 8.0f * textScale, px.y + 8.0f * textScale,
+                                      0.3f * textScale, starLabelColor);
             }
         }
     }
@@ -226,19 +250,19 @@ void Renderer::RenderObserveHud(const FrameContext& ctx) {
         const Observer::SkyBody& sun = sky.bodies[Observer::kSkySun];
         const Observer::SkyBody& moon = sky.bodies[Observer::kSkyMoon];
         std::wostringstream line;
-        line << std::fixed << std::setprecision(0) << L"Az " << std::fmod(ctx.view.yawDeg + 450.0f, 360.0f)
-             << L"  Alt " << ctx.view.pitchDeg << L"  FOV "
-             << std::setprecision(ctx.view.zoomDeg < 10.0f ? 2 : 0) << ctx.view.zoomDeg
-             << L"   Sun " << std::setprecision(1) << sun.altDeg << L"  Moon " << moon.altDeg << L" ("
-             << std::setprecision(0) << moon.illuminatedFraction * 100.0 << L"% lit)";
+        line << std::fixed << std::setprecision(0) << L"Az " << std::fmod(ctx.view.yawDeg + 450.0f, 360.0f) << L"  Alt "
+             << ctx.view.pitchDeg << L"  FOV " << std::setprecision(ctx.view.zoomDeg < 10.0f ? 2 : 0)
+             << ctx.view.zoomDeg << L"   Sun " << std::setprecision(1) << sun.altDeg << L"  Moon " << moon.altDeg
+             << L" (" << std::setprecision(0) << moon.illuminatedFraction * 100.0 << L"% lit)";
         if (sky.sunCoverage > 0.001) {
             line << (sky.sunCoverage >= 0.9999 ? std::wstring(L"   TOTAL ECLIPSE")
-                                                : std::wstring(L"   Eclipse ") + std::to_wstring(static_cast<int>(sky.sunCoverage * 100.0)) + L"%");
+                                               : std::wstring(L"   Eclipse ") +
+                                                     std::to_wstring(static_cast<int>(sky.sunCoverage * 100.0)) + L"%");
         }
         _textRenderer->Render(*_mainTextShader, line.str(), 0.01f * width, 0.925f * height, 0.35f, textColor);
     }
     _textRenderer->Render(*_mainTextShader, std::wstring(L"Visualization, not an almanac.  (O: back to Explore)"),
-                         0.01f * width, 0.02f * height, 0.35f, textColor);
+                          0.01f * width, 0.02f * height, 0.35f, textColor);
 
     glDisable(GL_BLEND);
 }

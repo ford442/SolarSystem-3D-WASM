@@ -36,6 +36,8 @@ set(SOLARSYSTEM_TEST_SOURCES
     ${CMAKE_SOURCE_DIR}/src/assets/UploadQueue.cpp
     ${CMAKE_SOURCE_DIR}/src/assets/ModelCache.cpp
     ${CMAKE_SOURCE_DIR}/src/core/FrameProfile.cpp
+    ${CMAKE_SOURCE_DIR}/src/render/graph/FrameGraph.cpp
+    ${CMAKE_SOURCE_DIR}/src/render/graph/FramePlan.cpp
     ${CMAKE_SOURCE_DIR}/src/3rdparty/ktx2_reader.cpp
     ${CMAKE_SOURCE_DIR}/src/3rdparty/nv_dds.cpp
     ${CMAKE_SOURCE_DIR}/src/gfx/ShaderSource.cpp
@@ -87,7 +89,8 @@ add_executable(SolarSystemTests
     test_shader_source.cpp
     test_atmosphere_model.cpp
     test_giant_atmospheres.cpp
-    test_frame_passes.cpp
+    test_frame_graph.cpp
+    test_frame_plan.cpp
     test_frustum.cpp
     test_shadow_fit.cpp
     test_log.cpp

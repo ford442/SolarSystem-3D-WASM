@@ -36,6 +36,30 @@
 
 namespace {
 constexpr const char* kMissionCatalogPath = "resource/missions/catalog.json";
+
+#ifdef __EMSCRIPTEN__
+// `?graph=1` on the page. (EM_JS is JavaScript: keep clang-format out.)
+// clang-format off
+EM_JS(int, FrameGraphQuery, (), {
+    try {
+        const value = new URLSearchParams(location.search).get('graph');
+        return value !== null && value !== '0' ? 1 : 0;
+    } catch (e) {
+        return 0;
+    }
+});
+// clang-format on
+#endif
+
+/** ?graph=1 (web) or SOLARSYSTEM_GRAPH=1 (native): log the compiled frame graph when it changes. */
+bool FrameGraphDumpRequested() {
+#ifdef __EMSCRIPTEN__
+    return FrameGraphQuery() != 0;
+#else
+    const char* value = std::getenv("SOLARSYSTEM_GRAPH");
+    return value && *value && std::string(value) != "0";
+#endif
+}
 } // namespace
 
 Application::Application() : _frameTimer(240) {
@@ -149,11 +173,7 @@ void Application::RunOneFrame() {
 
 #ifdef __EMSCRIPTEN__
     if (_xr.active) {
-        RenderXrStereoFrame();
-        TimeStage(FrameProfile::Stage::Uploads, [this] {
-            TextureLoadingQueue::GetInstance().ProcessQueue();
-            PumpUploads();
-        });
+        RenderXrStereoFrame(); // the frame graph's last passes pump the uploads
         EndFrameProfile();
 #ifdef SOLARSYSTEM_USE_SDL_MIXER
         UpdateBackgroundMusic();
@@ -166,19 +186,8 @@ void Application::RunOneFrame() {
 
     glBindFramebuffer(GL_FRAMEBUFFER, DefaultFramebuffer());
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+    // Scene, HUD, the jump fade, the upload pump and the loading line: one frame graph.
     RenderFrame(1);
-    TimeStage(FrameProfile::Stage::Hud, [this] {
-        _renderer.RenderHud(FrameContextFor(0));
-        _renderer.RenderScreenFade(DefaultFramebuffer(), _screenFadeColor, _screenFadeAmount);
-    });
-
-    TimeStage(FrameProfile::Stage::Uploads, [this] {
-        TextureLoadingQueue::GetInstance().ProcessQueue();
-        PumpUploads();
-    });
-    if (!_capture.active) {
-        TimeStage(FrameProfile::Stage::Hud, [this] { _renderer.RenderTextureLoadingProgress(FrameContextFor(0)); });
-    }
     EndFrameProfile();
 
 #ifdef SOLARSYSTEM_USE_SDL_MIXER
@@ -416,7 +425,7 @@ void Application::TimeStage(FrameProfile::Stage stage, F&& work) {
 
 void Application::BeginFrameProfile() {
     if (!_gpuTimer && GpuTimer::Supported()) {
-        _gpuTimer = std::make_unique<GpuTimer>(FrameProfile::kStageCount);
+        _gpuTimer = std::make_unique<GpuTimer>(kGpuTimerSlots);
 #ifndef __EMSCRIPTEN__
         // Natively the GPU column comes with debug-level [FrameStats] (or SOLARSYSTEM_GPU_TIMERS=1);
         // the web turns it on from the perf HUD (SetGpuTimersEnabled).
@@ -428,6 +437,10 @@ void Application::BeginFrameProfile() {
     _frameProfile.frameMs = _profileFrameStart < 0.0 ? 0.0 : (now - _profileFrameStart) * 1000.0;
     _profileFrameStart = now;
     _cpuStages.Reset();
+    _passTimings.Reset();
+    // The frame graph brackets every pass (rhi::GlCommandList): CPU into _cpuStages and the
+    // pass's row of _passTimings, GPU into the timer's slot kStageCount + that row.
+    _renderer.SetProfiling(_gpuTimer.get(), &_passTimings, &_cpuStages);
     if (_gpuTimer) {
         _gpuTimer->BeginFrame();
     }
@@ -443,6 +456,17 @@ void Application::EndFrameProfile() {
     sample.gpuValid = _gpuTimer && _gpuTimer->Enabled() && _gpuTimer->HasResult();
     for (std::size_t i = 0; i < FrameProfile::kStageCount; ++i) {
         sample.gpuMs[i] = sample.gpuValid ? _gpuTimer->Ms(i) : 0.0;
+    }
+    // A stage's GPU time is its own bracket (Update) plus every pass billed to it.
+    sample.passes.resize(_passTimings.Count());
+    for (std::size_t slot = 0; slot < _passTimings.Count(); ++slot) {
+        FrameProfile::PassSample& pass = sample.passes[slot];
+        pass.kind = _passTimings.Kind(slot);
+        pass.stage = _passTimings.StageOf(slot);
+        pass.count = _passTimings.Runs(slot);
+        pass.cpuMs = _passTimings.CpuMs(slot);
+        pass.gpuMs = sample.gpuValid ? _gpuTimer->Ms(FrameProfile::kStageCount + slot) : 0.0;
+        sample.gpuMs[static_cast<std::size_t>(pass.stage)] += pass.gpuMs;
     }
     sample.jobWorkers = Jobs::WorkerCount();
     sample.jobQueueDepth = Jobs::QueueDepth();
@@ -463,7 +487,7 @@ std::string Application::GetFrameStatsJson() {
 
 void Application::SetGpuTimersEnabled(bool enabled) {
     if (!_gpuTimer && enabled && GpuTimer::Supported()) {
-        _gpuTimer = std::make_unique<GpuTimer>(FrameProfile::kStageCount);
+        _gpuTimer = std::make_unique<GpuTimer>(kGpuTimerSlots);
     }
     if (_gpuTimer) {
         _gpuTimer->SetEnabled(enabled);
@@ -482,11 +506,12 @@ void Application::ReportFrameStats() {
     Shader::ResetUniformCallCount();
     _frameProfile.uniformCalls = uniformCalls;
     if (every > 0 && frame++ % static_cast<unsigned long long>(every) == 0) {
-        const FramePasses::Stats& stats = _renderer.Stats();
+        const FramePlan::Stats& stats = _renderer.Stats();
         LOG_DEBUG("FrameStats",
-                  "updates=%d viewBinds=%d shadowPasses=%d componentDraws=%d bodyDraws=%d culled=%d uniformCalls=%llu",
+                  "updates=%d viewBinds=%d shadowPasses=%d componentDraws=%d bodyDraws=%d culled=%d uniformCalls=%llu "
+                  "graphPasses=%d graphCulled=%d",
                   stats.sceneUpdates, stats.viewBinds, stats.shadowPasses, stats.componentDraws, stats.bodyDraws,
-                  stats.culledComponents, uniformCalls);
+                  stats.culledComponents, uniformCalls, stats.passes, stats.culledPasses);
         if (Log::Enabled(Log::Level::Debug)) {
             const FrameProfile::Sample& p = _frameProfile;
             std::string cpu;
@@ -524,46 +549,27 @@ void Application::PollShaderHotReload(double now) {
 #endif
 
 void Application::RenderFrame(int viewCount) {
-    FramePasses::Hooks hooks;
-    hooks.updateScene = [this, viewCount]() -> std::size_t {
-        ReportFrameStats();
-        std::size_t components = 0;
-        TimeStage(FrameProfile::Stage::Update, [&] {
-            _renderer.BeginFrame();
-            UpdateScene(OrbitLayout::GetJulianDate());
-            BuildFrameSnapshot(viewCount);
-            UpdateTerrain(viewCount);
-            CullScene(viewCount);
-            components = _observe.active ? 0 : _drawOrder.size();
-        });
-        TimeStage(FrameProfile::Stage::SpaceWeather, [&] {
-            UpdateSpaceWeather(viewCount);
-            _renderer.UpdateSpaceWeather(FrameContextFor(0));
-        });
-        return components;
-    };
-    hooks.beginView = [this](int view) { _renderer.BeginView(FrameContextFor(view)); };
-    hooks.background = [this](int view) {
-        TimeStage(FrameProfile::Stage::Background, [&] { _renderer.RenderBackground(FrameContextFor(view)); });
-    };
-    hooks.shadowPass = [this](std::size_t draw) {
-        TimeStage(FrameProfile::Stage::Shadow,
-                  [&] { _renderer.ShadowMapPass(FrameContextFor(0), _renderableSceneComponents[_drawOrder[draw]]); });
-    };
-    hooks.drawComponent = [this](int view, std::size_t draw) {
-        TimeStage(FrameProfile::Stage::Scene,
-                  [&] { _renderer.RenderPass(FrameContextFor(view), _renderableSceneComponents[_drawOrder[draw]]); });
-    };
-    hooks.foreground = [this](int view) {
-        TimeStage(FrameProfile::Stage::Foreground, [&] {
-            const FrameContext ctx = FrameContextFor(view);
-            _renderer.RenderForeground(ctx);
-            if (!ctx.xr) {
-                _renderer.RenderMonoEffects(ctx);
-            }
-        });
-    };
-    FramePasses::Run(viewCount, hooks);
+    ReportFrameStats();
+    // Simulate once (an XR frame draws twice), then describe and draw the frame as a graph.
+    TimeStage(FrameProfile::Stage::Update, [&] {
+        _renderer.BeginFrame();
+        UpdateScene(OrbitLayout::GetJulianDate());
+        BuildFrameSnapshot(viewCount);
+        UpdateTerrain(viewCount);
+        CullScene(viewCount);
+    });
+    TimeStage(FrameProfile::Stage::SpaceWeather, [&] {
+        UpdateSpaceWeather(viewCount);
+        _renderer.PrepareFrame(FrameContextFor(0));
+    });
+
+    _frameContexts.clear();
+    for (int view = 0; view < viewCount; ++view) {
+        _frameContexts.push_back(FrameContextFor(view));
+    }
+    _renderer.DescribeFrame(FrameContextFor(0), viewCount, _frameFeatures);
+    _frameFeatures.loadingProgress = !_frameFeatures.xr && viewCount > 0 && !_capture.active;
+    _renderer.RenderFrame(_frameContexts, _frameFeatures);
 }
 
 void Application::CullScene(int viewCount) {
@@ -608,6 +614,7 @@ void Application::BuildFrameSnapshot(int viewCount) {
     SceneSnapshot& scene = _frameScene;
     scene.sun = _sun.get();
     scene.components = &_renderableSceneComponents;
+    scene.drawOrder = &_drawOrder; // CullScene fills it next
     scene.nearestComponent = _nearestPlanetIndex;
     const bool sol = StarSystemCatalog::IsSol();
     static const MissionCatalog::Catalog kNoMissions;
@@ -670,6 +677,8 @@ void Application::BuildFrameSnapshot(int viewCount) {
     hud.musicVolumePercent = _soundEngine ? _soundEngine->getSoundVolume() * 100.0f : 0.0f;
 #endif
     hud.musicTrack = _currentMusicTrack;
+    hud.fadeColor = _screenFadeColor;
+    hud.fadeAmount = _screenFadeAmount;
 }
 
 FrameContext Application::FrameContextFor(int view) const {
@@ -711,6 +720,11 @@ void Application::InitSceneObjects() {
 #endif
     _renderer.Init(_simState, _ft, DisplaySize());
     _ft = nullptr; // Renderer::Init released it once the font was loaded
+    _renderer.SetUploadPump([this] {
+        TextureLoadingQueue::GetInstance().ProcessQueue();
+        PumpUploads();
+    });
+    _renderer.SetGraphDump(FrameGraphDumpRequested());
     LoadMissions();
     {
         const auto asteroidQuality = GetQualitySettings(_simState.qualityPreset, _simState.isMobileWeb);

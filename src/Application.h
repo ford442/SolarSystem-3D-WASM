@@ -3,7 +3,6 @@
 #include "ApplicationTypes.h"
 #include "ObserveState.h"
 #include "FrameContext.h"
-#include "FramePasses.h"
 #include "Renderer.h"
 #include "SimState.h"
 #include "astro/MissionCatalog.h"
@@ -306,8 +305,11 @@ private:
     // Frame profile (core/FrameProfile.h): CPU per stage this frame, the GPU timer, and the
     // finished sample of the last frame that ReportFrameStats and GetFrameStatsJson read.
     FrameProfile::CpuStages _cpuStages;
+    FrameProfile::PassTimings _passTimings; // per frame-graph pass kind (Renderer::SetProfiling)
     FrameProfile::Sample _frameProfile;
     FrameProfile::Totals _frameProfileTotals;
+    // Stage slots, then one per pass kind (FrameProfile::PassTimings).
+    static constexpr std::size_t kGpuTimerSlots = FrameProfile::kStageCount + FrameProfile::kMaxPassKinds;
     std::unique_ptr<GpuTimer> _gpuTimer;
     double _profileFrameStart = -1.0;
     FT_Library _ft = nullptr;
@@ -395,6 +397,9 @@ private:
     SceneSnapshot _frameScene;
     std::array<CameraView, 2> _frameViews{};
     HudState _frameHud;
+    // RenderFrame's inputs to the renderer's frame graph, kept so their capacity is reused.
+    std::vector<FrameContext> _frameContexts;
+    FramePlan::Features _frameFeatures;
     // Each mission's probe position at this frame's date (UpdateScene); nullopt off its trajectory.
     std::vector<std::optional<glm::vec3>> _missionProbes;
 
@@ -515,9 +520,12 @@ private:
     CameraBodyFrame CaptureCameraBodyFrame() const;
     /** Put the camera back at `frame`'s offset from its body (after a scale change resized it). */
     void RestoreCameraBodyFrame(const CameraBodyFrame& frame);
-    /** Simulate once, then draw the scene into `viewCount` views (1 mono, 2 XR) — see FramePasses.h. */
+    /**
+     * Simulate once, then draw the frame into `viewCount` views (1 mono, 2 XR) as a frame graph
+     * (render/graph/FramePlan.h): scene, HUD, fade, upload pump and loading line.
+     */
     void RenderFrame(int viewCount);
-    /** Debug: the previous frame's FramePasses::Stats and glUniform* count (SOLARSYSTEM_FRAME_STATS=N). */
+    /** Debug: the previous frame's FramePlan::Stats and glUniform* count (SOLARSYSTEM_FRAME_STATS=N). */
     void ReportFrameStats();
     /** Run `work` as `stage`: CPU time into _cpuStages, GPU time into _gpuTimer. */
     template <class F>
