@@ -15,7 +15,7 @@
  *    quality tier asks for it and both LUTs loaded; otherwise this falls back to O'Neil.
  * See docs/ARCHITECTURE.md §9.2.
  */
-class Atmosphere : public OuterShell {
+class Atmosphere : public OuterShell, public IGpuRestorable {
 public:
     Atmosphere(MeshHolder model, const BodyCatalog::AtmosphereRow& row,
                std::shared_ptr<SpaceObject> parent, float artParentRadius);
@@ -44,6 +44,14 @@ public:
     const glm::mat3& GetBodyToSphere() const { return _bodyToSphere; }
     const glm::mat3& GetSphereToBody() const { return _sphereToBody; }
 
+    /**
+     * Load the baked LUTs for a `physical` row (resource/atmosphere/, preloaded); any problem
+     * leaves the shell on the O'Neil path. Physical rows get them whatever the preset, so
+     * switching to Medium/Full later needs no reload.
+     */
+    void LoadLuts();
+    /** After a lost context: the LUTs again (the shell mesh restores itself). */
+    void RestoreGpu() override;
     /** Takes ownership of both LUT textures (0 = not loaded). */
     void SetLuts(GlTexture transmittance, GlTexture multiScattering);
     bool HasLuts() const { return _transmittanceLut && _multiScatteringLut; }

@@ -21,12 +21,14 @@ class Shader;
  *
  * The MagnetosphereUBO (SpaceWeatherUniformBuffer) must be bound for both programs.
  */
-class SolarWindRenderer {
+class SolarWindRenderer : public IGpuRestorable {
 public:
     static constexpr std::size_t kMaxGroups = 7;         // background + six magnetospheres
     static constexpr std::size_t kFloatsPerParticle = 8; // two vec4s
 
-    SolarWindRenderer() = default;
+    SolarWindRenderer() : IGpuRestorable(GpuResources::Phase::VertexArrays) {}
+    /** After a lost context: both feedback buffers again, every particle reseeding. */
+    void RestoreGpu() override;
     SolarWindRenderer(const SolarWindRenderer&) = delete;
     SolarWindRenderer& operator=(const SolarWindRenderer&) = delete;
 

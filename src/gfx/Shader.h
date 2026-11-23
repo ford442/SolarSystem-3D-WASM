@@ -107,6 +107,14 @@ public:
      * frames. Returns how many programs were replaced.
      */
     static int ReloadChanged();
+    /**
+     * After a lost context (gfx/GpuResourceRegistry.h): rebuild every live Shader in place on
+     * the new context, keeping its address and replaying its uniform values. Every program is
+     * submitted before any is finished, so KHR_parallel_shader_compile overlaps them; one
+     * still compiling when the context went is resubmitted and left pending. Returns how many
+     * programs were rebuilt; one that no longer builds is logged and stays empty.
+     */
+    static int RestoreAll();
     /** Every file some live Shader was built from (deduplicated; what the web dev hook re-fetches). */
     static std::vector<std::string> LiveSourceFiles();
 
@@ -171,6 +179,8 @@ private:
     void RefreshSourceTimes();
     /** Rebuild from _spec; on success take the new program and replay the uniform values. */
     bool Reload();
+    /** Give `fresh` (same spec, finished) every uniform value this Shader set. */
+    void CarryUniformsTo(Shader& fresh) const;
 
     static std::vector<Shader*>& Registry();
     static void CheckCompileErrors(size_t shader, ShaderType type, const std::string& path = "",

@@ -4,9 +4,13 @@
 #include <cstdint>
 #include <vector>
 
-class ShadowMapFBO {
+class ShadowMapFBO : public IGpuRestorable {
 public:
     explicit ShadowMapFBO(uint16_t shadowMapWidth, uint16_t shadowMapHeight);
+    ShadowMapFBO(const ShadowMapFBO&) = delete;
+    ShadowMapFBO& operator=(const ShadowMapFBO&) = delete;
+    /** After a lost context: the depth texture and FBO again, at the same size. */
+    void RestoreGpu() override { InitFBO(); }
     void Resize(uint16_t shadowMapWidth, uint16_t shadowMapHeight);
     uint16_t GetShadowMapWidth() const;
     uint16_t GetShadowMapHeight() const;

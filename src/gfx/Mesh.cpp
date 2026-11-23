@@ -1,14 +1,15 @@
 #include "Mesh.h"
+#include "GpuResourceRegistry.h"
+#include <utility>
 
 Mesh::Mesh(std::vector<Vertex> vertices, std::vector<GLuint> indices, std::vector<Texture> textures)
-    : _vertices(std::move(vertices)), _indices(std::move(indices)), _textures(std::move(textures))
-{
+    : IGpuRestorable(GpuResources::Phase::VertexArrays), _vertices(std::move(vertices)), _indices(std::move(indices)),
+      _textures(std::move(textures)) {
     SetupMesh();
 }
 
 Mesh::Mesh(const Mesh& other)
-    : _vertices(other._vertices), _indices(other._indices), _textures(other._textures)
-{
+    : IGpuRestorable(other), _vertices(other._vertices), _indices(other._indices), _textures(other._textures) {
     SetupMesh();
 }
 

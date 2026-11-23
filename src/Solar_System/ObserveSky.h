@@ -27,7 +27,7 @@
  * The sky is Earth's baked LUT atmosphere seen from inside the shell when an `Air` is passed
  * (the presets with enablePbrAtmosphere), else the analytic gradient. See docs/ARCHITECTURE.md.
  */
-class ObserveSky {
+class ObserveSky : public IGpuRestorable {
 public:
     /** One camera's worth of view state; XR eyes fill the same struct. */
     struct Frame {
@@ -70,6 +70,8 @@ public:
     ObserveSky();
 
     ObserveSky(const ObserveSky&) = delete;
+    /** After a lost context: the quad and sprite batches, the stars from the parsed catalogue. */
+    void RestoreGpu() override;
     ObserveSky& operator=(const ObserveSky&) = delete;
 
     /**
@@ -130,6 +132,10 @@ private:
     void DrawBatch(const SpriteBatch& batch, int count) const;
     /** Read the catalog and upload it once, the first time a frame needs stars. */
     void EnsureStarsLoaded();
+    /** Every catalogue star as a sprite, into _starBatch (on load, and after a lost context). */
+    void UploadStars();
+    /** The empty VAO, the shared quad and the two per-frame batches. */
+    void InitBuffers();
     /** (Re)build the line VBO for the current star limit and figure set. */
     void EnsureConstellationLines();
 

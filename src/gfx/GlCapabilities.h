@@ -49,3 +49,8 @@ struct GlCapabilities {
 };
 
 const GlCapabilities& GetGlCapabilities();
+/**
+ * Probe again (a restored or replaced context: extensions must be requested anew, and a
+ * reset may have moved to another GPU). Main thread; logs the findings like the first probe.
+ */
+const GlCapabilities& RefreshGlCapabilities();

@@ -38,7 +38,11 @@ public:
     void Clear();
     void Draw() const;
 
-    bool Empty() const { return _vertexCount <= 0; }
+    /**
+     * True after a lost context too (gfx/GpuResourceRegistry.h): Stream() rebuilds on its own,
+     * and an Upload()ed batch is re-uploaded by its owner (Renderer::RestoreGpu).
+     */
+    bool Empty() const { return !_vao || _vertexCount <= 0; }
     int VertexCount() const { return _vertexCount; }
 
 private:

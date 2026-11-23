@@ -1,8 +1,30 @@
 #include "TextRenderer.h"
+#include <stdexcept>
+#include <string>
 #include <utility>
+#include "../gfx/GpuResourceRegistry.h"
 
-TextRenderer::TextRenderer(FT_Library ft, const std::string& fontPath) : _ft(ft){
+TextRenderer::TextRenderer(FT_Library ft, const std::string& fontPath)
+    : IGpuRestorable(GpuResources::Phase::Textures), _ft(ft), _fontPath(fontPath) {
     LoadFont(fontPath);
+    InitBuffers();
+    _ft = nullptr; // Renderer::Init releases it right after
+}
+
+void TextRenderer::RestoreGpu() {
+    if (FT_Init_FreeType(&_ft)) {
+        throw std::runtime_error("ERROR::FREETYPE: cannot initialise FreeType to restore " + _fontPath);
+    }
+    _characters.clear();
+    try {
+        LoadFont(_fontPath);
+    } catch (...) {
+        FT_Done_FreeType(_ft);
+        _ft = nullptr;
+        throw;
+    }
+    FT_Done_FreeType(_ft);
+    _ft = nullptr;
     InitBuffers();
 }
 

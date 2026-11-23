@@ -19,6 +19,7 @@ import { createSolarSystemRuntime, exposeConsoleHelpers, type SolarSystemRuntime
 import { installWasmCallbacksOnConfig, registerWasmCallbacks, setModuleInstance } from './wasmCallbacks';
 import { assetCacheEnabled, createAssetFetcher } from './assetCache';
 import { computeWebGlSizing } from './webglContext';
+import { installContextLossHandling, parseLoseContextSeconds, startContextLossCycle } from './contextLoss';
 import { chooseWasmVariant, locateWasmFile, THREADED_GLUE } from './wasmVariant';
 
 const canvas = queryRequired('canvas', HTMLCanvasElement);
@@ -174,7 +175,6 @@ const BROWSER_HINTS = [
 
 let moduleInstance: SolarSystemModule | null = null;
 let runtimeForReload: SolarSystemRuntime | null = null;
-let contextLost = false;
 
 // Reload into the view the user had, using the same deep-link encoding as "Copy view link".
 // The getters below only read simulation state, so they still work after the GL context is gone.
@@ -186,34 +186,51 @@ function currentViewUrl(): string {
     return buildShareableUrl(runtimeLinkReaders(runtime));
 }
 
-function pauseMainLoop(): void {
-    // Emscripten's library_browser.js puts these on the module instance, which is built on the
-    // config object, so they are there during loading too, before the factory promise resolves.
-    const target = (moduleInstance ?? moduleConfig) as Pick<SolarSystemModule, 'pauseMainLoop'>;
-    target['pauseMainLoop']?.();
+type MainLoopControls = Pick<SolarSystemModule, 'pauseMainLoop' | 'resumeMainLoop'>;
+
+// Emscripten's library_browser.js puts these on the module instance, which is built on the
+// config object, so they are there during loading too, before the factory promise resolves.
+function mainLoopTarget(): MainLoopControls & Partial<Pick<SolarSystemModule, '_OnContextRestored'>> {
+    return (moduleInstance ?? moduleConfig) as MainLoopControls &
+        Partial<Pick<SolarSystemModule, '_OnContextRestored'>>;
 }
 
-// A mobile GPU reset or a long-backgrounded tab can drop the context. preventDefault() is
-// what tells the browser we may want it back; v1 does not rebuild GL state in place, so it
-// stops the frame loop (every GL call would fail) and offers a reload into the same view.
-canvas.addEventListener(
-    'webglcontextlost',
-    (event) => {
-        event.preventDefault();
-        if (contextLost) return;
-        contextLost = true;
-        console.error('[WebGL] Context lost; pausing the main loop');
-        pauseMainLoop();
+function pauseMainLoop(): void {
+    mainLoopTarget()['pauseMainLoop']?.();
+}
+
+function resumeMainLoop(): void {
+    mainLoopTarget()['resumeMainLoop']?.();
+}
+
+// C++ rebuilds every GPU resource in place (docs/ARCHITECTURE.md §7.8). Before the wasm module
+// is instantiated there is nothing on the GPU yet, so nothing to rebuild.
+function restoreGpuContext(): boolean {
+    const restore = mainLoopTarget()['_OnContextRestored'];
+    return restore ? restore() !== 0 : true;
+}
+
+// A mobile GPU reset or a long-backgrounded tab can drop the context: pause, and rebuild in
+// place when the browser gives it back (contextLoss.ts). Only a failed rebuild offers a reload.
+const contextLoss = installContextLossHandling(canvas, {
+    pause: pauseMainLoop,
+    resume: resumeMainLoop,
+    restore: restoreGpuContext,
+    onFatal: () => {
         showFatalPanel({
             title: 'Graphics context lost',
             message:
-                'The browser reset the GPU context, so the scene can no longer be drawn. ' +
+                'The browser reset the GPU context and the scene could not be rebuilt. ' +
                 'Reload to pick up where you left off.',
             reloadUrl: currentViewUrl,
         });
     },
-    false,
-);
+});
+const loseContextSeconds = parseLoseContextSeconds(window.location.search);
+if (loseContextSeconds !== null && preinitializedWebGLContext) {
+    // Test hook (web/e2e/contextLoss.spec.ts): drop and restore the context on a timer.
+    startContextLossCycle(preinitializedWebGLContext, canvas, loseContextSeconds * 1000);
+}
 
 for (const eventName of ['pointerdown', 'pointerup', 'click', 'keydown', 'keyup']) {
     settingsPanel.addEventListener(eventName, (event) => event.stopPropagation());
@@ -274,7 +291,7 @@ void startModule()
             console.log('Module loaded successfully', instance);
             moduleInstance = instance;
             setModuleInstance(instance);
-            if (contextLost) {
+            if (contextLoss.lost) {
                 pauseMainLoop();
             }
 

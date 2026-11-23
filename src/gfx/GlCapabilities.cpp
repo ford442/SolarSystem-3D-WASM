@@ -83,8 +83,20 @@ GlCapabilities ProbeGlCapabilities() {
 }
 }
 
+namespace {
+GlCapabilities g_caps;
+bool g_probed = false;
+} // namespace
+
 const GlCapabilities& GetGlCapabilities() {
-    static const GlCapabilities caps = [] {
+    if (!g_probed) {
+        RefreshGlCapabilities();
+    }
+    return g_caps;
+}
+
+const GlCapabilities& RefreshGlCapabilities() {
+    g_caps = [] {
         GlCapabilities c = ProbeGlCapabilities();
         const auto yesNo = [](bool value) { return value ? "yes" : "no"; };
         LOG_INFO("GlCapabilities",
@@ -96,5 +108,6 @@ const GlCapabilities& GetGlCapabilities() {
                  yesNo(c.gpuTimerQuery));
         return c;
     }();
-    return caps;
+    g_probed = true;
+    return g_caps;
 }

@@ -1,6 +1,6 @@
 #include "ModelCache.h"
 #include "../core/JobSystem.h"
-#include "/root/SolarSystem-3D-WASM/src/gfx/Vertex.h"
+#include "../gfx/Vertex.h"
 #include "TextureDecode.h"
 #include "WebResourceFetcher.h"
 #include <algorithm>

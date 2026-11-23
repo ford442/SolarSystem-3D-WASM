@@ -14,7 +14,7 @@
  * Asteroids are drawn with a single glDrawElementsInstanced call.
  * Comet nuclei share the rock mesh; tails are additive billboards.
  */
-class AsteroidField {
+class AsteroidField : public IGpuRestorable {
 public:
     static constexpr uint32_t kDefaultSeed = AsteroidOrbit::kDefaultSeed;
     static constexpr int kMaxInstances = AsteroidOrbit::kMaxInstances;
@@ -29,6 +29,8 @@ public:
                            Population population = Population::MainBelt);
 
     AsteroidField(const AsteroidField&) = delete;
+    /** After a lost context: the rock, instance and tail buffers, refilled from the CPU copy. */
+    void RestoreGpu() override;
     AsteroidField& operator=(const AsteroidField&) = delete;
 
     void SetInstanceCount(int count);

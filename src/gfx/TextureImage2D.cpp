@@ -17,6 +17,7 @@
 #include <string>
 #include <utility>
 #include <vector>
+#include "GpuResourceRegistry.h"
 
 namespace {
 /** The upload completed but the driver reports no level 0 (MAX_TEXTURE_SIZE, a lost context). */
@@ -110,6 +111,13 @@ public:
     UploadQueue::Step Advance(std::size_t budget) {
         UploadQueue::Step step;
         step.finished = false;
+        if (_phase == Phase::Bands && !texture) {
+            // The context was lost between bands (GpuResources::InvalidateAll emptied the
+            // texture): the payload is still here, so start over on the new context.
+            _phase = Phase::Start;
+            _level = 0;
+            _row = 0;
+        }
         if (_phase == Phase::Start) {
             texture = GlTexture::Create();
             glBindTexture(GL_TEXTURE_2D, texture.get());
@@ -138,6 +146,9 @@ public:
     }
 
     const std::string& Path() const { return _payload.path; }
+    GLint Wrap() const { return _wrap; }
+    GLint MinFilter() const { return _minFilter; }
+    GLint MagFilter() const { return _magFilter; }
 
     GlTexture texture;
     GLuint width = 0;
@@ -349,7 +360,8 @@ void TextureImage2D::SetWebAnisotropyCap(float cap) {
     s_webAnisotropyCap = cap;
 }
 
-TextureImage2D::TextureImage2D(const std::string& path, GLint wrapParam, GLint minFilter, GLint magFilter) {
+TextureImage2D::TextureImage2D(const std::string& path, GLint wrapParam, GLint minFilter, GLint magFilter)
+    : IGpuRestorable(GpuResources::Phase::Textures) {
     LoadTextureFromFile(path, wrapParam, minFilter, magFilter, true);
 }
 
@@ -397,6 +409,27 @@ void TextureImage2D::Adopt(TextureBuild& build) {
     _texture = std::move(build.texture);
     _width = build.width;
     _height = build.height;
+    _source = Source{build.Path(), build.Wrap(), build.MinFilter(), build.MagFilter(), false};
+}
+
+void TextureImage2D::RestoreGpu() {
+    if (_slot && _slot->settled != _slot->generation) {
+        // A reload is still decoding or uploading; it lands on the new context (TextureBuild
+        // restarts a banded upload whose texture was lost) and is newer than _source anyway.
+        return;
+    }
+    if (_source.fallback) {
+        CreateFallbackTexture(_source.wrap, _source.minFilter, _source.magFilter);
+        return;
+    }
+    if (_source.path.empty()) {
+        return;
+    }
+    // Async like any reload: a scene's worth of 4K maps decodes in jobs and uploads under the
+    // per-frame byte budget instead of stalling the first restored frame. A failure keeps the
+    // (empty) texture; the next LOD change or restore tries again.
+    const Source source = _source;
+    ReloadTextureAsync(source.path, nullptr, nullptr, source.wrap, source.minFilter, source.magFilter);
 }
 
 GLuint TextureImage2D::GetTexture() const {
@@ -414,6 +447,7 @@ GLuint TextureImage2D::GetHeight() const {
 void TextureImage2D::ReloadTexture(const std::string& path, GLint wrapParam, GLint minFilter, GLint magFilter) {
     if (_slot) {
         ++_slot->generation; // a pending async reload must not land on top of this one
+        _slot->settled = _slot->generation; // and this one finishes before returning
     }
     // The old texture stays alive until the new one is bound and ready, then goes with `previous`.
     GlTexture previous = std::move(_texture);
@@ -444,7 +478,10 @@ void TextureImage2D::ReloadTextureAsync(const std::string& path, std::function<v
     }
     const std::uint64_t generation = ++_slot->generation;
     const std::shared_ptr<AsyncSlot> slot = _slot;
-    const auto finish = [done = std::move(done)](AsyncResult result) {
+    const auto finish = [done = std::move(done), slot, generation](AsyncResult result) {
+        if (slot->generation == generation) {
+            slot->settled = generation;
+        }
         if (done) {
             done(result);
         }
@@ -502,6 +539,7 @@ void TextureImage2D::ReloadTextureAsync(const std::string& path, std::function<v
 }
 
 void TextureImage2D::CreateFallbackTexture(GLint wrapParam, GLint minFilter, GLint magFilter) {
+    _source = Source{"", wrapParam, minFilter, magFilter, true};
     _texture = GlTexture::Create();
     glBindTexture(GL_TEXTURE_2D, _texture.get());
 

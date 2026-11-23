@@ -69,6 +69,7 @@ set(SOLARSYSTEM_SOURCES_CORE
     src/PlanetSystemLoader.cpp
     src/CameraController.cpp
     src/TerrainController.cpp
+    src/GpuContextRestore.cpp
     src/Cinematics.cpp
     src/SpaceWeatherController.cpp
     src/SceneRenderer.cpp
@@ -105,6 +106,7 @@ set(SOLARSYSTEM_SOURCES_AUX
     src/gfx/HDR.cpp
     src/gfx/FloatLutTexture.cpp
     src/gfx/FrameUniforms.cpp
+    src/gfx/GpuResourceRegistry.cpp
     src/gfx/SpaceWeatherUniforms.cpp
     src/gfx/LineStripBatch.cpp
     src/gfx/SurfacePatch.cpp

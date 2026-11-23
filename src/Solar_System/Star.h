@@ -39,9 +39,11 @@ struct RingCameraInfo {
     GLuint ringDiffuse; // Ring diffuse map
 };
 
-class Star : public SpaceObject {
+class Star : public SpaceObject, public IGpuRestorable {
 public:
     explicit Star(StarInfo&& starInfo);
+    /** After a lost context: the glow quad and the occlusion queries again. */
+    void RestoreGpu() override;
     virtual void TakeStarSystemCenter() = 0;
     void RenderGlow(const Shader& glowShader, const glm::mat4& projection, const glm::mat4& view, const glm::vec3& vs, float aspect, float distance,
                     const std::optional<RingCameraInfo>& ringCameraInfo, float starTemperature = 5778.0f);

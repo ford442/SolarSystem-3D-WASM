@@ -13,6 +13,12 @@ constexpr GLsizei kStride = static_cast<GLsizei>(SolarWindRenderer::kFloatsPerPa
 constexpr float kBackgroundShare = 0.45f;
 } // namespace
 
+void SolarWindRenderer::RestoreGpu() {
+    const int particles = _particles;
+    _particles = 0; // so SetParticleCount rebuilds rather than returning early
+    SetParticleCount(particles);
+}
+
 void SolarWindRenderer::SetParticleCount(int particles) {
     particles = particles > 0 ? particles : 0;
     if (particles == _particles) {

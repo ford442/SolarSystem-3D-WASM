@@ -1,8 +1,8 @@
 #ifndef SOLARSYSTEM_GFX_GLHANDLE_H
 #define SOLARSYSTEM_GFX_GLHANDLE_H
 #include "GlPlatform.h"
+#include "GpuResourceRegistry.h"
 #include <cassert>
-#include <utility>
 
 namespace Jobs {
 bool IsMainThread(); // core/JobSystem.h; declared here so every GL file need not include <future>
@@ -20,6 +20,10 @@ bool IsMainThread(); // core/JobSystem.h; declared here so every GL file need no
  * `Create()` replaces. Deleting while the context is gone is the caller's ordering bug
  * (Application::Dispose releases the scene before terminating the window).
  *
+ * A non-empty handle is on GpuResourceRegistry's live list (two pointers, relinked only on
+ * create/move/reset): after a lost context GpuResources::InvalidateAll() empties every one
+ * without a glDelete*, and lazily-built owners rebuild on their next use.
+ *
  * GL belongs to the main thread: a job (core/JobSystem.h) builds CPU payloads and the main
  * thread uploads them, so Create/reset assert they are not running on a worker.
  *
@@ -27,16 +31,16 @@ bool IsMainThread(); // core/JobSystem.h; declared here so every GL file need no
  * under GLEW `glGenBuffers` is a runtime function pointer, not a constant expression.
  */
 template <class Traits>
-class GlHandle {
+class GlHandle : private GlHandleBase {
 public:
     GlHandle() noexcept = default;
     ~GlHandle() { reset(); }
 
-    GlHandle(GlHandle&& other) noexcept : _id(std::exchange(other._id, 0)) {}
+    GlHandle(GlHandle&& other) noexcept { Adopt(other.Release()); }
     GlHandle& operator=(GlHandle&& other) noexcept {
         if (this != &other) {
             reset();
-            _id = std::exchange(other._id, 0);
+            Adopt(other.Release());
         }
         return *this;
     }
@@ -47,7 +51,7 @@ public:
     static GlHandle Create(Args... args) {
         assert(Jobs::IsMainThread() && "GL object created inside a job");
         GlHandle handle;
-        handle._id = Traits::Gen(args...);
+        handle.Adopt(Traits::Gen(args...));
         return handle;
     }
 
@@ -57,13 +61,9 @@ public:
     void reset() noexcept {
         if (_id != 0) {
             assert(Jobs::IsMainThread() && "GL object deleted inside a job");
-            Traits::Del(_id);
-            _id = 0;
+            Traits::Del(Release());
         }
     }
-
-private:
-    GLuint _id = 0;
 };
 
 namespace gl_traits {

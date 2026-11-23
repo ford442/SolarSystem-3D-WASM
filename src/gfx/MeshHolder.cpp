@@ -1,6 +1,6 @@
 #include "MeshHolder.h"
 #include "../assets/WebResourceFetcher.h"
-#include "/root/SolarSystem-3D-WASM/src/assets/ModelCache.h"
+#include "../assets/ModelCache.h"
 #include "Mesh.h"
 #include <assimp/types.h>
 #include <memory>

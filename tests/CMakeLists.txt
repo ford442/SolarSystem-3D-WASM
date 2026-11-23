@@ -44,6 +44,7 @@ set(SOLARSYSTEM_TEST_SOURCES
     ${CMAKE_SOURCE_DIR}/src/core/Camera.cpp
     ${CMAKE_SOURCE_DIR}/src/core/CameraNavigation.cpp
     ${CMAKE_SOURCE_DIR}/src/gfx/SurfacePatch.cpp
+    ${CMAKE_SOURCE_DIR}/src/gfx/GpuResourceRegistry.cpp
     ${CMAKE_SOURCE_DIR}/src/Solar_System/CatalogMaterialVariants.cpp
     ${CMAKE_SOURCE_DIR}/src/Solar_System/AtmosphereModel.cpp
     ${CMAKE_SOURCE_DIR}/src/3rdparty/ktx2_writer.cpp
@@ -95,6 +96,7 @@ add_executable(SolarSystemTests
     test_upload_queue.cpp
     test_model_cache.cpp
     test_frame_profile.cpp
+    test_gpu_resource_registry.cpp
     test_model_cache.cpp
     stub_texture_image2d.cpp
     ${SOLARSYSTEM_TEST_SOURCES}
@@ -128,6 +130,8 @@ add_executable(SolarSystemGlTests
     gl/test_gl.cpp
     gl/test_gpu_timer.cpp
     gl/test_solar_wind.cpp
+    gl/test_context_restore.cpp
+    ${CMAKE_SOURCE_DIR}/src/gfx/Mesh.cpp
     ${CMAKE_SOURCE_DIR}/src/gfx/GpuTimer.cpp
     ${CMAKE_SOURCE_DIR}/src/core/Log.cpp
     ${CMAKE_SOURCE_DIR}/src/core/JobSystem.cpp
@@ -135,6 +139,7 @@ add_executable(SolarSystemGlTests
     ${CMAKE_SOURCE_DIR}/src/gfx/ShaderSource.cpp
     ${CMAKE_SOURCE_DIR}/src/gfx/GlCapabilities.cpp
     ${CMAKE_SOURCE_DIR}/src/gfx/FrameUniforms.cpp
+    ${CMAKE_SOURCE_DIR}/src/gfx/GpuResourceRegistry.cpp
     ${CMAKE_SOURCE_DIR}/src/gfx/SpaceWeatherUniforms.cpp
     ${CMAKE_SOURCE_DIR}/src/render/SolarWindRenderer.cpp
     ${CMAKE_SOURCE_DIR}/src/gfx/LineStripBatch.cpp

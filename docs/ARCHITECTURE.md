@@ -685,6 +685,77 @@ and runs every job inline.
 **Tracy** is not wired in. A build that wants it adds `-DSOLARSYSTEM_TRACY=ON` with
 FetchContent and `ZoneScoped` in `TimeStage` (one place covers every stage).
 
+### 7.8 GPU resource lifetime (lost contexts)
+
+A WebGL context can be lost at any time: a mobile GPU reset, a long-backgrounded tab, a driver
+update, or the browser reclaiming memory from another tab. Natively, a GPU reset on a robust
+context (`GLFW_CONTEXT_ROBUSTNESS`, `GL_KHR_robustness`) does the same. Every name the context
+handed out is then dead. The scene is rebuilt in place from CPU state it already kept: no page
+reload, no scene object recreated, nothing downloaded again, and camera, date, focus, Observe
+mode and every toggle unchanged.
+
+**The registry (`gfx/GpuResourceRegistry.h`).** Two intrusive lists, touched only when a GL
+object is made, moved or dropped (never per draw, no allocation):
+
+- Every non-empty `GlHandle` (two pointers in the handle). `GpuResources::InvalidateAll()`
+  zeroes all of them without a `glDelete*`. On a restored WebGL context the old names mean
+  nothing; on a new native context the same integers may already name new objects, so a late
+  delete would hit the wrong one.
+- Every `IGpuRestorable`, the owners that build their GL state eagerly. `GpuResources::RecreateAll()`
+  calls `RestoreGpu()` on each, in phase order (buffers, textures, framebuffers, programs,
+  vertex arrays), oldest first. The owner keeps its address, so every pointer to it stays valid.
+
+**Three kinds of owner:**
+
+| Kind | How it comes back | Owners |
+|---|---|---|
+| Lazy: builds on `if (!handle)` | `InvalidateAll` alone; the next use rebuilds | `FrameUniformBuffer`, `SpaceWeatherUniformBuffer`, `TerrainRenderer` (grid and every tile texture, from the CPU tile cache), `SurfacePatchMesh`, `LineStripBatch::Stream`, Observe's constellation lines |
+| Eager: `IGpuRestorable` | `RestoreGpu()` from CPU state it keeps | `TextureImage2D` (source path + sampler state), `Mesh` (vertices, indices), `ShadowMapFBO`, `HDR`, `MagneticFieldBloom` (sizes), `SkyBox` (face paths), `Star`, `AsteroidField`, `LensFlare`, `OrbitPathRenderer`, `TextRenderer` (re-rasterises with its own FreeType), `SolarWindRenderer` (particles reseed), `ObserveSky`, `Atmosphere` (LUTs from the preloaded `.data`), every `Shader` (one batch, below) |
+| Rebuilt by its parent | `Renderer::RestoreGpu` | mission paths and field lines (`LineStripBatch::Upload`, re-derived and re-traced), the screen-fade VAO; `Application` drops the `GpuTimer` query pool |
+
+**Textures** do not keep their bytes. They reload the file they last showed through
+`ReloadTextureAsync`, so decodes run in jobs and uploads go through the per-frame budget (§7.7).
+On web that file is still in MEMFS: `WebResourceFetcher` writes every download there and only
+terrain tiles are removed. So a restore costs a decode and an upload, never a network trip. A
+texture samples black for the few frames until its upload lands. A reload already in flight
+when the context went is not repeated. Its `TextureBuild` still holds the payload, so if the
+texture was lost between bands, the upload starts over on the new context.
+
+**Programs.** `Shader::RestoreAll()` (registered once, in the programs phase) resubmits every
+live `Shader` before finishing any, so `KHR_parallel_shader_compile` overlaps them. It then
+replays each one's recorded uniform values (the hot-reload carry-over), so a value set once
+at start-up is not lost. A program still compiling at loss time is resubmitted and left
+pending. `ShaderLibrary` entries stay valid, so `Renderer`'s `Shader*` members need no
+re-fetch.
+
+**Order (`Application::RestoreGpuContext`, `src/GpuContextRestore.cpp`):** `InvalidateAll`;
+on web, null Emscripten's object tables (`GL.textures` etc.) and re-enable extensions with
+`GL.initExtensions` (a restore turns them all off and kills cached extension objects);
+`RefreshGlCapabilities()`; the once-per-context state (`ApplyGlobalGlState`: depth test,
+culling, MSAA; KHR_debug natively); `RecreateAll`; `Renderer::RestoreGpu`. On llvmpipe the
+whole scene takes about 130 ms. The textures follow over the next frames.
+
+**Who triggers it.** Web: `web/src/contextLoss.ts` calls `preventDefault()` on
+`webglcontextlost` and pauses the main loop. On `webglcontextrestored` it calls the
+`OnContextRestored` export and resumes. The reload panel appears only if that returns 0 or
+throws. Native: `Application::PollGpuContextReset` checks `glGetGraphicsResetStatus` once a
+frame. On a reset it replaces the window and context (`RecreateNativeWindow`; GLFW cannot
+re-make a context for a window) and restores the same way.
+
+**Test hooks.** `?losecontext=<s>` (any build) drops the context through
+`WEBGL_lose_context` every *s* seconds and restores it 0.5 s later. `e2e/contextLoss.spec.ts`
+asserts that frames keep coming within 2 s of each restore, that no asset is requested twice,
+that `[GL]` reports no errors, and that the panel never appears. `SOLARSYSTEM_LOSE_CONTEXT=<s>`
+natively replaces the context on that period through the reset path. The GL test
+`ContextRestore.EveryOwnerDrawsAgainOnAFreshContextAndBack` does a real round trip onto an
+unshared context and back. `test_gpu_resource_registry.cpp` covers the lists without GL.
+
+**Adding a GL owner.** Prefer lazy creation (`if (!_vao) Build();`): it needs nothing else.
+Otherwise derive from `IGpuRestorable`, pass the phase of the last kind of object it needs,
+keep whatever CPU state the build reads, and implement `RestoreGpu()` as "build, don't
+reset" (every handle is already empty). An owner holding only handles that nobody rebuilds
+is left empty after a loss: it draws nothing, but it no longer crashes.
+
 ## 8. Web frontend (`web/`)
 
 | File | Role |
@@ -697,6 +768,7 @@ FetchContent and `ZoneScoped` in `TimeStage` (one place covers every stage).
 | `src/timelineEditor.ts` | Timeline dock: play/scrub, keys at the current pose, import/export, record |
 | `src/capture.ts` | Deterministic video capture (WebCodecs + mp4-muxer; MediaRecorder fallback) |
 | `src/educationalLayer.ts` | Mission list + tour controls |
+| `src/contextLoss.ts` | `webglcontextlost` / `webglcontextrestored`: pause, `OnContextRestored`, resume; the `?losecontext=` test cycle (§7.8) |
 | `src/observe.ts` | Explore/Observe switch, site + UTC time + rate controls, 2017 eclipse preset, telescope eyepieces + overlay, `ObserveState` parsing |
 | `vite.config.ts` | Base path `/solar-system/` |
 | `public/SolarSystem.{wasm,data}` | Generated by `./build-web.sh` |
@@ -1760,6 +1832,9 @@ reaches ~50° magnetic latitude, and the day side is compressed within an hour o
    or cache a render-frame position across frames without shifting it in `MoveRenderOrigin`;
    keep world positions (`GetWorldPosition`) in double instead, and multiply an art length
    tied to a body by its `SizeFactor()` (§11.1).
+10. A new class that holds a `GlHandle` built once in its constructor goes blank after a lost
+    context unless it is lazy or an `IGpuRestorable` (§7.8). Do not cache another object's
+    `GLuint` across frames: names change on restore.
 
 ---
 

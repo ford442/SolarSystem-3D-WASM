@@ -3,6 +3,7 @@
 
 #include <algorithm>
 #include "../core/Log.h"
+#include "../gfx/GpuResourceRegistry.h"
 
 namespace {
 
@@ -19,7 +20,7 @@ void HalfRes(uint16_t width, uint16_t height, uint16_t& outW, uint16_t& outH) {
 } // namespace
 
 MagneticFieldBloom::MagneticFieldBloom(uint16_t width, uint16_t height, bool enabled)
-    : _enabled(enabled), _fullWidth(width), _fullHeight(height) {
+    : IGpuRestorable(GpuResources::Phase::Framebuffers), _enabled(enabled), _fullWidth(width), _fullHeight(height) {
     InitQuad();
     _blurShader = std::make_unique<Shader>("resource/shaders/passThrough.vs",
                                            "resource/shaders/magneticFieldBloomBlur.fs");
@@ -27,6 +28,13 @@ MagneticFieldBloom::MagneticFieldBloom(uint16_t width, uint16_t height, bool ena
                                                 "resource/shaders/magneticFieldBloomComposite.fs");
     if (_enabled) {
         InitTargets(width, height);
+    }
+}
+
+void MagneticFieldBloom::RestoreGpu() {
+    InitQuad();
+    if (_enabled) {
+        InitTargets(_fullWidth, _fullHeight);
     }
 }
 

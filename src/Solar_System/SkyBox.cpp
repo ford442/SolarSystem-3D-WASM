@@ -2,8 +2,11 @@
 #include "../3rdparty/nv_dds.h"
 #include "../assets/WebResourceFetcher.h"
 #include "../core/Log.h"
+#include "../gfx/GpuResourceRegistry.h"
+#include <string>
+#include <vector>
 
-SkyBox::SkyBox(const std::vector<std::string>& faces) {
+SkyBox::SkyBox(const std::vector<std::string>& faces) : IGpuRestorable(GpuResources::Phase::Textures), _faces(faces) {
     InitBuffers();
 
     // Faces are downloaded by Application::LoadCoreResources() and the scene is not
@@ -14,6 +17,11 @@ SkyBox::SkyBox(const std::vector<std::string>& faces) {
     }
 
     LoadCubeMap(faces);
+}
+
+void SkyBox::RestoreGpu() {
+    InitBuffers();
+    LoadCubeMap(_faces);
 }
 
 void SkyBox::Render(const Shader& shader) const {

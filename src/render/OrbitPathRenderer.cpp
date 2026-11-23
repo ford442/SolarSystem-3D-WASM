@@ -2,12 +2,20 @@
 
 #include <cmath>
 #include <vector>
+#include "../gfx/GpuResourceRegistry.h"
+#include "../gfx/Shader.h"
+#include <memory>
 
 #ifndef M_PI
 #define M_PI 3.14159265358979323846
 #endif
 
-OrbitPathRenderer::OrbitPathRenderer() {
+OrbitPathRenderer::OrbitPathRenderer() : IGpuRestorable(GpuResources::Phase::VertexArrays) {
+    BuildCircle();
+    _shader = std::make_unique<Shader>("resource/shaders/orbitPath.vs", "resource/shaders/orbitPath.fs");
+}
+
+void OrbitPathRenderer::BuildCircle() {
     std::vector<float> verts;
     verts.reserve(static_cast<size_t>(kSegmentCount) * 3);
     for (int i = 0; i < kSegmentCount; ++i) {
@@ -25,8 +33,6 @@ OrbitPathRenderer::OrbitPathRenderer() {
     glEnableVertexAttribArray(0);
     glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(float), reinterpret_cast<void*>(0));
     glBindVertexArray(0);
-
-    _shader = std::make_unique<Shader>("resource/shaders/orbitPath.vs", "resource/shaders/orbitPath.fs");
 }
 
 void OrbitPathRenderer::Draw(const glm::mat4& projection, const glm::mat4& view, const glm::mat4& model,

@@ -1,9 +1,11 @@
 #include "HDR.h"
 #include "GlCapabilities.h"
 #include "../core/Log.h"
+#include "GpuResourceRegistry.h"
 
 HDR::HDR(const Shader& shader, uint16_t width, uint16_t height, bool enabled)
-    : _hdrShader(&shader), _enabled(enabled), _width(width), _height(height) {
+    : IGpuRestorable(GpuResources::Phase::Framebuffers), _hdrShader(&shader), _enabled(enabled), _width(width),
+      _height(height) {
     InitQuadBuffers();
     if (_enabled) {
         InitFBO(width, height);
@@ -21,6 +23,13 @@ void HDR::SetEnabled(bool enabled, uint16_t width, uint16_t height) {
     DestroyFBO();
     if (_enabled) {
         InitFBO(width, height);
+    }
+}
+
+void HDR::RestoreGpu() {
+    InitQuadBuffers();
+    if (_enabled) {
+        InitFBO(_width, _height); // may turn HDR off, as at start-up, if the float FBO is refused
     }
 }
 

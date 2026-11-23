@@ -13,6 +13,8 @@
 
 #ifdef __EMSCRIPTEN__
 #include "Solar_System/StarSystemCatalog.h"
+#include "core/Log.h"
+#include <exception>
 #endif
 
 namespace {
@@ -163,6 +165,21 @@ extern "C" {
     EMSCRIPTEN_KEEPALIVE void SetGpuTimersEnabled(int enabled) {
         if (activeApplication) {
             activeApplication->SetGpuTimersEnabled(enabled != 0);
+        }
+    }
+    // web/src/bootstrap.ts on webglcontextrestored, with the main loop still paused: rebuild
+    // every GPU resource on the restored context (docs/ARCHITECTURE.md §7.8). 1 when the scene
+    // can draw again, 0 when the restore failed (the page then offers a reload).
+    EMSCRIPTEN_KEEPALIVE int OnContextRestored() {
+        if (!activeApplication) {
+            return 0;
+        }
+        try {
+            activeApplication->RestoreGpuContext();
+            return 1;
+        } catch (const std::exception& error) {
+            LOG_ERROR("GL", "context restore failed: %s", error.what());
+            return 0;
         }
     }
     EMSCRIPTEN_KEEPALIVE const char* GetFocusedMissionJson() {

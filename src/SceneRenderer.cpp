@@ -51,6 +51,7 @@
 #include <memory>
 #include <utility>
 #include <vector>
+#include "astro/MissionCatalog.h"
 
 Renderer::Renderer() = default;
 Renderer::~Renderer() = default;
@@ -246,6 +247,20 @@ void Renderer::Release() {
     _planetVariants.fill(nullptr);
     _terrainVariants.fill(nullptr);
     _shaders.Clear();
+}
+
+void Renderer::RestoreGpu(const MissionCatalog::Catalog& missions, int qualityPreset) {
+    _screenFadeVao = GlVertexArray::Create();
+    _surfacePatchKey = SurfacePatchKey{}; // the patch re-streams on its next draw
+    _configuredView = nullptr;
+    _uploadedViews = 0;
+    if (_hdr) {
+        _hdrEnabled = _hdr->IsEnabled();
+    }
+    if (!_missionPathMeshes.empty()) {
+        RebuildMissionPaths(missions, qualityPreset);
+    }
+    RebuildMagneticFields(qualityPreset); // re-traced in jobs; nothing drawn until they land
 }
 
 void Renderer::ApplyRenderResources(const SimState& sim, uint16_t shadowResolution, bool enableHdr, glm::ivec2 display) {

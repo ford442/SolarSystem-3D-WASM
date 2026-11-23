@@ -1,5 +1,15 @@
 #include "Atmosphere.h"
+#include "AtmosphereModel.h"
 #include "BodyShape.h"
+#include "../core/Log.h"
+#include "../gfx/FloatLutTexture.h"
+#include <string>
+#include <utility>
+#include "../gfx/GpuResourceRegistry.h"
+#include "../gfx/MeshHolder.h"
+#include "BodyCatalog.h"
+#include "SpaceObject.h"
+#include <memory>
 
 namespace {
 glm::vec3 ToVec3(const BodyCatalog::Rgb& rgb) {
@@ -7,11 +17,10 @@ glm::vec3 ToVec3(const BodyCatalog::Rgb& rgb) {
 }
 } // namespace
 
-Atmosphere::Atmosphere(MeshHolder model, const BodyCatalog::AtmosphereRow& row,
-                       std::shared_ptr<SpaceObject> parent, float artParentRadius)
+Atmosphere::Atmosphere(MeshHolder model, const BodyCatalog::AtmosphereRow& row, std::shared_ptr<SpaceObject> parent,
+                       float artParentRadius)
     : OuterShell(std::move(model), std::move(parent), row.oneil.shellScale),
-      _row(&row),
-      _body(BodyCatalog::FindById(row.bodyId)),
+      IGpuRestorable(GpuResources::Phase::Textures), _row(&row), _body(BodyCatalog::FindById(row.bodyId)),
       _parentRadius(artParentRadius),
       // Pulling the inner sphere just under the surface hides the seam where the shell
       // meets the planet mesh.
@@ -20,6 +29,46 @@ Atmosphere::Atmosphere(MeshHolder model, const BodyCatalog::AtmosphereRow& row,
         _bodyToSphere = BodyShape::BodyToSphere(*_body);
         _sphereToBody = BodyShape::SphereToBody(*_body);
     }
+}
+
+// Physical rows get their baked LUTs whatever the current preset, so switching to
+// Medium/Full later needs no reload. Any problem leaves the shell on the O'Neil path.
+void Atmosphere::LoadLuts() {
+    const BodyCatalog::AtmosphereRow& row = *_row;
+    if (!row.physical.enabled) {
+        return;
+    }
+    auto transmittance = LoadRgba16fLut(AtmosphereModel::TransmittanceLutPath(row.bodyId),
+                                        AtmosphereModel::kTransmittanceWidth, AtmosphereModel::kTransmittanceHeight);
+    auto multiScattering = LoadRgba16fLut(AtmosphereModel::MultiScatteringLutPath(row.bodyId),
+                                          AtmosphereModel::kMultiScatteringSize, AtmosphereModel::kMultiScatteringSize);
+    for (auto* lut : {&transmittance, &multiScattering}) {
+        if (*lut && (*lut)->mappingVersion != AtmosphereModel::kLutMappingVersion) {
+            LOG_WARN("Atmosphere", "%s: LUT mapping version %d != %d (rebake); using the O'Neil shell", row.bodyId,
+                     (*lut)->mappingVersion, AtmosphereModel::kLutMappingVersion);
+            lut->reset();
+        }
+    }
+    if (!transmittance || !multiScattering) {
+        return;
+    }
+    const std::string expected = AtmosphereModel::ParamsHashHex(row.physical);
+    if (transmittance->paramsHash != expected) {
+        // Still usable (same mapping), just baked from other numbers; CI's
+        // AtmosphereLutsFresh test is what keeps this from shipping.
+        LOG_WARN("Atmosphere", "%s: LUTs were baked from parameters %s, the catalog is %s — rerun atmosphere_lut_baker",
+                 row.bodyId, transmittance->paramsHash.c_str(), expected.c_str());
+    }
+    SetLuts(std::move(transmittance->texture), std::move(multiScattering->texture));
+}
+
+void Atmosphere::RestoreGpu() {
+    // The LUTs are in the preloaded .data (MEMFS), so this is a file read, not a download.
+    const bool physical = _physicalPathActive;
+    if (_row->physical.enabled) {
+        LoadLuts();
+    }
+    _physicalPathActive = physical && HasLuts();
 }
 
 void Atmosphere::SetLuts(GlTexture transmittance, GlTexture multiScattering) {
