@@ -9,6 +9,8 @@
 #include "Solar_System/CatalogSatellite.h"
 #include "Solar_System/OrbitLayout.h"
 #include "Solar_System/SceneScale.h"
+#include "Solar_System/StarSystemCatalog.h"
+#include "FlightController.h"
 #include "assets/TextureLoadingQueue.h"
 #include <algorithm>
 #include <cstdio>
@@ -161,7 +163,16 @@ std::string Application::GetSceneStateJson() {
         std::snprintf(buffer, sizeof(buffer), "[%.17g,%.17g,%.17g]", probe.x, probe.y, probe.z);
         json += buffer;
     }
-    json += "]}";
+    // The flight planner's craft at this date (a timeline's `focus: "flight"`), or null.
+    json += R"(],"flight":)";
+    if (_flight.HasFlight() && StarSystemCatalog::IsSol()) {
+        const glm::dvec3 craft = _flight.Craft().WorldPositionAt(OrbitLayout::GetJulianDate());
+        std::snprintf(buffer, sizeof(buffer), "[%.17g,%.17g,%.17g]", craft.x, craft.y, craft.z);
+        json += buffer;
+    } else {
+        json += "null";
+    }
+    json += "}";
     return json;
 }
 

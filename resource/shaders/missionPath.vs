@@ -9,12 +9,18 @@ uniform mat4 view;
 uniform mat4 projection;
 uniform vec3 cameraPos;
 uniform float ribbonWidth;
+// Lower bound of the width's distance scale: 1 keeps a ribbon at least `ribbonWidth` wide up
+// close (probe paths seen from afar); the flight planner's chase camera passes ~0 so its ribbon
+// keeps a constant on-screen width however near the craft the camera rides.
+uniform float minDistScale;
 // Render-frame position of the origin the path was uploaded against (Renderer::RenderMissionPaths);
 // zero for the XR pointer rays, which are streamed in the render frame.
 uniform vec3 pathOffset;
 
 out float vArcLength;
-out float vEdgeFade;
+// The across-ribbon coordinate, -1 … 1. Interpolated as is: the fade is taken in the fragment
+// stage, since 1 - |uv| is 0 at every vertex and would interpolate to 0 across the ribbon.
+out float vLineUV;
 
 #include "common/log_depth.glsl"
 
@@ -40,12 +46,12 @@ void main() {
     }
     sideDir = (sideLen > 1e-5) ? sideDir / sideLen : vec3(0.0, 0.0, 1.0);
 
-    float distScale = clamp(viewLen / 80.0, 1.0, 14.0);
+    float distScale = clamp(viewLen / 80.0, minDistScale, 14.0);
     worldPos += sideDir * aLineUV * ribbonWidth * distScale;
     worldPos += viewDir * 0.04;
 
     vArcLength = aArcLength;
-    vEdgeFade = 1.0 - abs(aLineUV);
+    vLineUV = aLineUV;
 
     gl_Position = projection * view * vec4(worldPos, 1.0);
     gl_Position = ApplyLogDepth(gl_Position);

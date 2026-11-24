@@ -255,6 +255,8 @@ private:
     void EnsureMagneticFieldsBuilt(int qualityPreset);
     /** Upload the ribbons once every trace job of the build in flight has finished. */
     void CollectMagneticFieldTraces();
+    /** Upload the planned flight's path and flown trail (FlightFrame) when they changed. */
+    void PrepareFlight(const FrameContext& ctx);
 
     void RenderAtmospheres(rhi::CommandList& cmd, const FrameContext& ctx, const RenderableSceneComponent& component);
     void RenderOneilAtmosphere(rhi::CommandList& cmd, const FrameContext& ctx,
@@ -380,6 +382,14 @@ private:
     std::unique_ptr<MagneticFieldTraceJobs> _magneticFieldTraces; // build in flight, if any
     std::vector<std::unique_ptr<MissionPathRenderer>> _missionPathMeshes;
     glm::dvec3 _missionPathOrigin{0.0}; // world point the path vertices are relative to
+    // The flight planner's craft (FlightController): the whole planned path, dim, and the part
+    // already flown up to the craft, bright. Built on first use; relative to _flightPathOrigin.
+    std::unique_ptr<MissionPathRenderer> _flightPath;
+    std::unique_ptr<MissionPathRenderer> _flightTrail;
+    glm::dvec3 _flightPathOrigin{0.0};
+    std::uint32_t _flightPathVersion = 0;
+    std::size_t _flightTrailSamples = static_cast<std::size_t>(-1);
+    bool _flightUploaded = false;
 
     // Space weather (SpaceWeatherRenderer.cpp). Programs are owned by _shaders and built on
     // first use, so a tier that never asks for one never compiles it.

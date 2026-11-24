@@ -82,6 +82,7 @@ set(SOLARSYSTEM_SOURCES_CORE
     src/SceneFrame.cpp
     src/FrameProfiler.cpp
     src/MissionController.cpp
+    src/FlightController.cpp
     src/SkyEventCache.cpp
     src/SpaceWeatherController.cpp
     src/render/passes/RendererSetup.cpp
@@ -168,6 +169,13 @@ set(SOLARSYSTEM_SOURCES_AUX
     src/astro/LunarTheory.cpp
     src/astro/StarCatalog.cpp
     src/astro/MissionCatalog.cpp
+    src/astro/flight/FlightConstants.cpp
+    src/astro/flight/StateVector.cpp
+    src/astro/flight/Lambert.cpp
+    src/astro/flight/Porkchop.cpp
+    src/astro/flight/Propagator.cpp
+    src/astro/flight/FlightPlan.cpp
+    src/astro/flight/Spacecraft.cpp
     src/astro/MagneticFieldParams.cpp
     src/astro/MagneticFieldModel.cpp
     src/astro/MagneticFieldTracer.cpp

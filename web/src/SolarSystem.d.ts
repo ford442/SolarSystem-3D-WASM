@@ -139,6 +139,46 @@ export interface SolarSystemCwrap {
     argTypes: [],
   ): () => string;
   (
+    ident: 'GetPorkchopJson',
+    returnType: 'string',
+    argTypes: ['number', 'number', 'number', 'number', 'number', 'number', 'number', 'number'],
+  ): (fromBody: number, toBody: number, departureStartJd: number, departureSpanDays: number, tofMinDays: number, tofMaxDays: number, departureSteps: number, tofSteps: number) => string;
+  (
+    ident: 'PlanTransfer',
+    returnType: 'number',
+    argTypes: ['number', 'number', 'number', 'number'],
+  ): (fromBody: number, toBody: number, departureJd: number, tofDays: number) => number;
+  (
+    ident: 'PlanFlightPreset',
+    returnType: 'number',
+    argTypes: ['string'],
+  ): (id: string) => number;
+  (
+    ident: 'ClearFlight',
+    returnType: null,
+    argTypes: [],
+  ): () => void;
+  (
+    ident: 'SetFlightChase',
+    returnType: null,
+    argTypes: ['number'],
+  ): (enabled: number) => void;
+  (
+    ident: 'GetFlightPlanJson',
+    returnType: 'string',
+    argTypes: [],
+  ): () => string;
+  (
+    ident: 'GetFlightStateJson',
+    returnType: 'string',
+    argTypes: [],
+  ): () => string;
+  (
+    ident: 'GetFlightPresetsJson',
+    returnType: 'string',
+    argTypes: [],
+  ): () => string;
+  (
     ident: 'LoadStarSystem',
     returnType: 'number',
     argTypes: ['string', 'number'],
@@ -584,6 +624,14 @@ export interface SolarSystemModule {
   _SetGpuTimersEnabled: (enabled: number) => void;
   _OnContextRestored: () => number;
   _GetFocusedMissionJson: () => number;
+  _GetPorkchopJson: (fromBody: number, toBody: number, departureStartJd: number, departureSpanDays: number, tofMinDays: number, tofMaxDays: number, departureSteps: number, tofSteps: number) => number;
+  _PlanTransfer: (fromBody: number, toBody: number, departureJd: number, tofDays: number) => number;
+  _PlanFlightPreset: (id: number) => number;
+  _ClearFlight: () => void;
+  _SetFlightChase: (enabled: number) => void;
+  _GetFlightPlanJson: () => number;
+  _GetFlightStateJson: () => number;
+  _GetFlightPresetsJson: () => number;
   _LoadStarSystem: (id: number, focusIndex: number) => number;
   _GetActiveSystemId: () => number;
   _IsSystemJumpActive: () => number;

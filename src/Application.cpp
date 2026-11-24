@@ -19,6 +19,11 @@
 #include "Solar_System/OrbitLayout.h"
 #include "Solar_System/SceneScale.h"
 #include "astro/MissionCatalog.h"
+#include "astro/Ephemeris.h"
+#include "astro/flight/FlightConstants.h"
+#include "astro/flight/FlightPlan.h"
+#include "astro/flight/Porkchop.h"
+#include "FlightController.h"
 #include "GoldenCapture.h"
 #include "IAppModule.h"
 #include "core/FrameProfile.h"
@@ -226,6 +231,7 @@ void Application::RunOneFrame() {
     _cameraController.CarryWithAnchor();
     _camera.UpdateTransition(_deltaTime);
     _missions.UpdateFollow();
+    _flight.UpdateChase(_cameraController);
 
     ProcessInput(_mainWindow);
     _cameraController.Constrain();
@@ -409,6 +415,7 @@ void Application::InitSceneObjects() {
             NotifySystemChanged(StarSystemCatalog::ActiveId().c_str(), 2);
         }
     }
+    ApplyFlightEnvOverride();
     ApplyCameraPoseEnvOverride();
     ApplyObserveEnvOverride();
     LOG_INFO("Loading", "Scene initialised in %.0f ms (%d job worker(s))",
@@ -465,7 +472,7 @@ void Application::FocusPlanetByIndex(int idx) {
 
 void Application::FocusPlanetByIndex(int idx, const glm::vec3& fromDirection) {
     if (_observe.active) return; // the viewer stays on the ground in Observe
-    _missions.Stop();
+    StopCameraFollow();
     idx = std::clamp(idx, 0, OrbitLayout::BodyCount() - 1);
     _focusedPlanetIndex = idx;
 
@@ -594,6 +601,75 @@ void Application::FocusMissionByIndex(int idx) {
     if (_missions.Focus(idx)) {
         _focusedPlanetIndex = -1;
     }
+}
+
+std::string Application::ComputePorkchop(int from, int to, double departureStartJd, double departureSpanDays,
+                                         double tofMinDays, double tofMaxDays, int departureSteps, int tofSteps) {
+    Flight::Porkchop::Request request;
+    request.departureBody = from;
+    request.arrivalBody = to;
+    request.departureStartJd = departureStartJd;
+    request.departureSpanDays = departureSpanDays;
+    request.tofMinDays = tofMinDays;
+    request.tofMaxDays = tofMaxDays;
+    request.departureSteps = departureSteps;
+    request.tofSteps = tofSteps;
+    return _flight.ComputePorkchop(request);
+}
+
+bool Application::PlanTransfer(int from, int to, double departureJd, double tofDays) {
+    return _flight.PlanTransfer(from, to, departureJd, tofDays);
+}
+
+bool Application::PlanFlightPreset(const std::string& id) {
+    return _flight.PlanPreset(id);
+}
+
+void Application::ClearFlight() {
+    _flight.Clear();
+}
+
+void Application::SetFlightChase(bool chase) {
+    if (chase) {
+        _missions.Stop();
+        _focusedPlanetIndex = -1;
+    }
+    _flight.SetChase(chase);
+}
+
+void Application::ApplyFlightEnvOverride() {
+    // SOLARSYSTEM_FLIGHT=<from>-<to>:<YYYY-MM-DD>:<tofDays> or a preset id: plan it, put the
+    // clock on the launch and chase the craft (the native twin of ?flight=).
+    const char* spec = std::getenv("SOLARSYSTEM_FLIGHT");
+    if (!spec || !*spec) {
+        return;
+    }
+    const std::string value(spec);
+    bool ok = false;
+    if (Flight::FindPreset(value)) {
+        ok = PlanFlightPreset(value);
+    } else {
+        char from[32] = {};
+        char to[32] = {};
+        int y = 0;
+        int m = 0;
+        int d = 0;
+        double tof = 0.0;
+        if (std::sscanf(spec, "%31[a-z]-%31[a-z]:%d-%d-%d:%lf", from, to, &y, &m, &d, &tof) == 6) {
+            const Flight::BodyConstants* a = Flight::FindBody(from);
+            const Flight::BodyConstants* b = Flight::FindBody(to);
+            if (a && b) {
+                ok = PlanTransfer(a->index, b->index, Ephemeris::JulianDateFromYmd(y, m, d), tof);
+            }
+        }
+    }
+    if (!ok) {
+        LOG_WARN("Flight", "SOLARSYSTEM_FLIGHT=\"%s\" planned nothing; use earth-mars:2026-11-01:210 or a preset id",
+                 spec);
+        return;
+    }
+    OrbitLayout::SetJulianDate(_flight.Craft().GetPlan().StartJd());
+    SetFlightChase(true);
 }
 
 void Application::SetXrControllerRay(int hand, float ox, float oy, float oz, float dx, float dy, float dz,

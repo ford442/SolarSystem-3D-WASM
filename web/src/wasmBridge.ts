@@ -7,6 +7,17 @@ import type {
     SolarSystemModule,
 } from './SolarSystem.js';
 import type { NextConjunction } from './conjunction.js';
+import {
+    parseFlightPlanJson,
+    parseFlightPresetsJson,
+    parseFlightStateJson,
+    parsePorkchopJson,
+    type FlightPlanReport,
+    type FlightPreset,
+    type FlightState,
+    type PorkchopGrid,
+    type PorkchopRequest,
+} from './flight.js';
 import { parseObserveStateJson, type ObserveState } from './observe.js';
 import { parseSkyEventJson, type NextSkyEvent } from './skyEvents.js';
 import { parseSpaceWeatherJson, type SpaceWeatherState } from './spaceWeather.js';
@@ -118,6 +129,8 @@ export interface SceneStateSnapshot {
     scale: OrbitScaleMode;
     bodies: ([number, number, number, number] | null)[];
     missions: ([number, number, number] | null)[];
+    /** The flight planner's craft (timeline focus `flight`); absent or null without a flight. */
+    flight?: [number, number, number] | null;
 }
 
 const EMPTY_SCENE_STATE: SceneStateSnapshot = { jd: 0, scale: 0, bodies: [], missions: [] };
@@ -231,6 +244,19 @@ export interface SolarSystemRuntime {
     /** Constellation stick figures over the star field. */
     setObserveConstellations(visible: boolean): void;
     getObserveState(): ObserveState;
+    // Flight planner (flight.ts, flightPlanner.ts; docs/ARCHITECTURE.md §14).
+    /** C3 / arrival v∞ grid, departure date × time of flight (tiles run as jobs in C++). */
+    computePorkchop(request: PorkchopRequest): PorkchopGrid | null;
+    /** Plan a direct transfer and put the craft on it; false outside Sol or without a solution. */
+    planTransfer(from: number, to: number, departureJd: number, tofDays: number): boolean;
+    /** Plan a real mission from its encounter dates ("voyager2", "cassini", "new-horizons"). */
+    planFlightPreset(id: string): boolean;
+    clearFlight(): void;
+    /** The chase camera behind the craft (stops mission follow). */
+    setFlightChase(enabled: boolean): void;
+    getFlightPlan(): FlightPlanReport;
+    getFlightState(): FlightState;
+    getFlightPresets(): FlightPreset[];
     focusMission(index: number): void;
     getFocusedMissionIndex(): number;
     getMissionCount(): number;
@@ -389,6 +415,26 @@ export function createSolarSystemRuntime(instance: SolarSystemModule): SolarSyst
         setObserveTimeRate: (rate) => exports.setObserveTimeRate(rate),
         setObserveConstellations: (visible) => exports.setObserveConstellations(visible ? 1 : 0),
         getObserveState: () => parseObserveStateJson(exports.getObserveStateJson()),
+        computePorkchop: (r) =>
+            parsePorkchopJson(
+                exports.getPorkchopJson(
+                    r.from,
+                    r.to,
+                    r.departureStartJd,
+                    r.departureSpanDays,
+                    r.tofMinDays,
+                    r.tofMaxDays,
+                    r.departureSteps,
+                    r.tofSteps,
+                ),
+            ),
+        planTransfer: (from, to, departureJd, tofDays) => exports.planTransfer(from, to, departureJd, tofDays) !== 0,
+        planFlightPreset: (id) => exports.planFlightPreset(id) !== 0,
+        clearFlight: () => exports.clearFlight(),
+        setFlightChase: (enabled) => exports.setFlightChase(enabled ? 1 : 0),
+        getFlightPlan: () => parseFlightPlanJson(exports.getFlightPlanJson()),
+        getFlightState: () => parseFlightStateJson(exports.getFlightStateJson()),
+        getFlightPresets: () => parseFlightPresetsJson(exports.getFlightPresetsJson()),
         focusMission: (index) => {
             exports.focusMission(index);
             emitWasmCallback('onMissionFocused', exports.getFocusedMissionIndex());

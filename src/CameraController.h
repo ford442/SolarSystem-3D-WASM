@@ -33,8 +33,24 @@ public:
         glm::dvec3 offsetInRadii{0.0};
     };
 
+    /** Where the chase camera sits: `distance` behind `target` along `forward`, a little above. */
+    struct ChaseTarget {
+        glm::dvec3 target{0.0};            // heliocentric scene position of what is chased
+        glm::dvec3 forward{1.0, 0.0, 0.0}; // its unit direction of motion
+        double distance = 10.0;            // scene units
+    };
+
     CameraController(Camera& camera, const ModuleContext& app, const TerrainController& terrain,
                      const MissionController& missions);
+
+    /**
+     * Chase mode (the flight planner's craft): pose the camera behind and above the target,
+     * looking at it. Called once a frame before input while chasing; like mission follow it is
+     * authored motion, so the camera drops its anchor body and does not co-rotate.
+     */
+    void Chase(const ChaseTarget& chase);
+    void StopChase() { _chasing = false; }
+    bool Chasing() const { return _chasing; }
 
     /** Before input: move the camera with its anchor body; set the fly speed for its altitude. */
     void CarryWithAnchor();
@@ -70,6 +86,7 @@ private:
     const MissionController& _missions;
     Anchor _anchor;
     float _logDepthC = 1.0f;
+    bool _chasing = false;
 };
 
 #endif // SOLARSYSTEM_CAMERACONTROLLER_H

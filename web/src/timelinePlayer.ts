@@ -101,6 +101,11 @@ export function sampleScene(
     state: SceneStateSnapshot,
 ): SceneSample {
     const body = (focus: string): BodyState | null => {
+        if (focus === 'flight') {
+            // The flight planner's craft (flight.ts flightTimeline): a point, like a probe.
+            const craft = state.flight;
+            return craft ? { position: [craft[0], craft[1], craft[2]], radius: 0, radiusKm: 0 } : null;
+        }
         const mission = directory.missionIndex(focus);
         if (mission >= 0) {
             const probe = state.missions[mission];

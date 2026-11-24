@@ -26,6 +26,14 @@ export interface CachedCwrapExports {
     setGpuTimersEnabled: (enabled: number) => void;
     onContextRestored: () => number;
     getFocusedMissionJson: () => string;
+    getPorkchopJson: (fromBody: number, toBody: number, departureStartJd: number, departureSpanDays: number, tofMinDays: number, tofMaxDays: number, departureSteps: number, tofSteps: number) => string;
+    planTransfer: (fromBody: number, toBody: number, departureJd: number, tofDays: number) => number;
+    planFlightPreset: (id: string) => number;
+    clearFlight: () => void;
+    setFlightChase: (enabled: number) => void;
+    getFlightPlanJson: () => string;
+    getFlightStateJson: () => string;
+    getFlightPresetsJson: () => string;
     loadStarSystem: (id: string, focusIndex: number) => number;
     getActiveSystemId: () => string;
     isSystemJumpActive: () => number;
@@ -122,6 +130,14 @@ export function createCachedCwrapExports(cwrap: SolarSystemCwrap): CachedCwrapEx
     setGpuTimersEnabled: cwrap('SetGpuTimersEnabled', null, ['number']),
     onContextRestored: cwrap('OnContextRestored', 'number', []),
     getFocusedMissionJson: cwrap('GetFocusedMissionJson', 'string', []),
+    getPorkchopJson: cwrap('GetPorkchopJson', 'string', ['number', 'number', 'number', 'number', 'number', 'number', 'number', 'number']),
+    planTransfer: cwrap('PlanTransfer', 'number', ['number', 'number', 'number', 'number']),
+    planFlightPreset: cwrap('PlanFlightPreset', 'number', ['string']),
+    clearFlight: cwrap('ClearFlight', null, []),
+    setFlightChase: cwrap('SetFlightChase', null, ['number']),
+    getFlightPlanJson: cwrap('GetFlightPlanJson', 'string', []),
+    getFlightStateJson: cwrap('GetFlightStateJson', 'string', []),
+    getFlightPresetsJson: cwrap('GetFlightPresetsJson', 'string', []),
     loadStarSystem: cwrap('LoadStarSystem', 'number', ['string', 'number']),
     getActiveSystemId: cwrap('GetActiveSystemId', 'string', []),
     isSystemJumpActive: cwrap('IsSystemJumpActive', 'number', []),
@@ -193,4 +209,4 @@ export function createCachedCwrapExports(cwrap: SolarSystemCwrap): CachedCwrapEx
     };
 }
 
-export const EXPORT_COUNT = 92;
+export const EXPORT_COUNT = 100;

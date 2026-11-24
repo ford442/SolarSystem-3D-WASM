@@ -871,6 +871,68 @@ body.in-other-system #explorer-conjunction {
     -webkit-backdrop-filter: blur(12px);
 }
 
+/* Flight planner (flightPlanner.ts): the timeline dock's look, docked bottom-left. */
+.flight-panel {
+    left: max(16px, env(safe-area-inset-left));
+    transform: none;
+    width: min(440px, calc(100vw - 32px));
+}
+
+.flight-title {
+    flex: 1;
+    font-size: 0.95rem;
+}
+
+.flight-number {
+    width: 5.5em;
+}
+
+.flight-check {
+    flex-direction: row;
+    align-items: center;
+    gap: 6px;
+}
+
+.flight-plot {
+    position: relative;
+}
+
+.flight-porkchop {
+    display: block;
+    width: 100%;
+    height: auto;
+    aspect-ratio: 3 / 2;
+    image-rendering: pixelated;
+    border-radius: 8px;
+    background: #14141c;
+    cursor: crosshair;
+}
+
+.flight-axes,
+.flight-readout {
+    margin: 4px 0 0;
+    font-size: 0.78rem;
+    color: rgba(247, 251, 255, 0.78);
+    font-variant-numeric: tabular-nums;
+}
+
+.flight-report {
+    display: grid;
+    grid-template-columns: auto 1fr;
+    gap: 2px 10px;
+    margin: 0;
+    font-size: 0.8rem;
+    font-variant-numeric: tabular-nums;
+}
+
+.flight-report dt {
+    color: rgba(247, 251, 255, 0.65);
+}
+
+.flight-report dd {
+    margin: 0;
+}
+
 .timeline-row {
     display: flex;
     align-items: center;
