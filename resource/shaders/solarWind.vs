@@ -1,4 +1,5 @@
 #version 300 es
+// webgpu: replaced - point sprites (gl_PointSize/gl_PointCoord); WebGPU draws the wind as instanced quads from a compute pass (docs/plans/WEBGPU_BACKEND_PLAN.md)
 
 // Draws the solar-wind particles solarWindUpdate.vs advected (render/SolarWindRenderer):
 // additive points, depth-tested, sized in pixels. Colour says what a particle is doing —

@@ -165,6 +165,45 @@ struct BindGroup {
     }
 };
 
+/** One vertex attribute: shader location, component count (float32 x1..x4), byte offset. */
+struct VertexAttribute {
+    std::uint32_t location = 0;
+    std::uint8_t components = 4;
+    std::uint32_t offset = 0;
+};
+
+/**
+ * How one vertex buffer feeds a program (what glVertexAttribPointer calls describe in GL).
+ * Fixed capacity, like BindGroup. Pipelines are keyed by the layout, so a backend with whole
+ * pipeline objects registers each distinct layout once.
+ */
+struct VertexLayout {
+    static constexpr std::size_t kMaxAttributes = 8;
+    std::array<VertexAttribute, kMaxAttributes> attributes{};
+    std::uint8_t attributeCount = 0;
+    std::uint32_t stride = 0;
+
+    VertexLayout& Attribute(std::uint32_t location, std::uint8_t components, std::uint32_t offset) {
+        if (attributeCount < kMaxAttributes) {
+            attributes[attributeCount++] = VertexAttribute{location, components, offset};
+        }
+        return *this;
+    }
+    bool operator==(const VertexLayout& other) const {
+        if (attributeCount != other.attributeCount || stride != other.stride) {
+            return false;
+        }
+        for (std::size_t i = 0; i < attributeCount; ++i) {
+            const VertexAttribute& a = attributes[i];
+            const VertexAttribute& b = other.attributes[i];
+            if (a.location != b.location || a.components != b.components || a.offset != b.offset) {
+                return false;
+            }
+        }
+        return true;
+    }
+};
+
 /** A pass as the command list sees it: names for debuggers and the timer slot it is billed to. */
 struct PassInfo {
     const char* name = ""; // unique in the frame: "scene:Earth/0"

@@ -11,6 +11,8 @@ external/
 build/
 build-web*/
 build-test*/
+build-wgpu*/
+build-wgsl-tool/
 build-check/
 
 # Local scratch: headless capture output, deploy virtualenvs
@@ -41,3 +43,6 @@ resource/sounds/
 # Playwright output
 web/test-results/
 web/playwright-report/
+
+# Generated WGSL (tools/wgsl_shader_compiler; the wgsl_shaders target / scripts/build-wgsl-shaders.sh)
+resource/shaders-wgsl/

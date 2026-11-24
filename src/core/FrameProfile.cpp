@@ -62,7 +62,14 @@ void AppendStages(std::string& out, const std::array<double, kStageCount>& ms) {
 } // namespace
 
 std::string ToJson(const Sample& sample, const Totals& totals) {
-    std::string out = "{\"frameMs\":";
+    // Ids and names come from rhi::BackendId/BackendName: plain identifiers, nothing to escape.
+    std::string out = "{\"backend\":\"";
+    out += sample.backend;
+    out += "\",\"backendName\":\"";
+    out += sample.backendName;
+    out += "\",\"webgpu\":";
+    out += sample.webgpuJson.empty() ? "null" : sample.webgpuJson;
+    out += ",\"frameMs\":";
     AppendNumber(out, sample.frameMs);
     out += ",\"worstFrameMs\":";
     AppendNumber(out, totals.worstFrameMs);

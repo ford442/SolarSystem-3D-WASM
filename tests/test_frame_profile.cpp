@@ -5,6 +5,19 @@
 #include <chrono>
 #include <string>
 
+TEST(FrameProfile, JsonCarriesTheBackendAndAnyWebGpuDevice) {
+    FrameProfile::Sample sample;
+    sample.backend = "webgl2";
+    sample.backendName = "WebGL 2";
+    const FrameProfile::Totals totals;
+    std::string json = FrameProfile::ToJson(sample, totals);
+    EXPECT_NE(json.find("\"backend\":\"webgl2\",\"backendName\":\"WebGL 2\",\"webgpu\":null,"), std::string::npos)
+        << json;
+    sample.webgpuJson = "{\"device\":\"SwiftShader\"}";
+    json = FrameProfile::ToJson(sample, totals);
+    EXPECT_NE(json.find("\"webgpu\":{\"device\":\"SwiftShader\"},\"frameMs\""), std::string::npos) << json;
+}
+
 TEST(FrameProfile, JsonCarriesEveryStageAndNullGpuUntilValid) {
     FrameProfile::Sample sample;
     sample.frameMs = 16.5;
@@ -16,7 +29,8 @@ TEST(FrameProfile, JsonCarriesEveryStageAndNullGpuUntilValid) {
     const std::string json = FrameProfile::ToJson(sample, totals);
     for (const char* key : {"\"update\":", "\"background\":", "\"shadow\":", "\"scene\":4.250",
                             "\"foreground\":", "\"hud\":", "\"uploads\":", "\"gpu\":null", "\"workers\":3",
-                            "\"bytes\":4096", "\"frameMs\":16.500", "\"slowFrames\":0", "\"frames\":1"}) {
+                            "\"bytes\":4096", "\"frameMs\":16.500", "\"slowFrames\":0", "\"frames\":1",
+                            "\"backend\":\"opengl\"", "\"backendName\":\"OpenGL 4.6\""}) {
         EXPECT_NE(json.find(key), std::string::npos) << key << " in " << json;
     }
     sample.gpuValid = true;

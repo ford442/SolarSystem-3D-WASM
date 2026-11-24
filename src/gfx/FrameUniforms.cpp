@@ -1,4 +1,8 @@
 #include "FrameUniforms.h"
+#include "rhi/WgslBindings.h"
+
+// The WebGPU backend binds FrameUBO at the same number (gfx/rhi/WgslBindings.h).
+static_assert(rhi::wgsl::UniformBlockBinding("FrameUBO") == FrameUniformBuffer::kBinding);
 
 void FrameUniformBuffer::Upload(std::size_t view, const FrameUniformData& data) {
     if (view >= kMaxViews) {

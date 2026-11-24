@@ -263,6 +263,67 @@ TEST(ShaderSource, ReadsDeclaredPermutations) {
     EXPECT_TRUE(ShaderSource::DeclaredPermutations("// permutation A\nuniform float permutations;\n").empty());
 }
 
+// The WebGPU toolchain's input (tools/wgsl_shader_compiler, docs/ARCHITECTURE.md §7.9): the
+// bindings glslang needs spelled out, and the clip-space fix-up wrapped round the vertex main.
+TEST(ShaderSource, WebGpuDialectGivesSamplersAndBlocksExplicitBindings) {
+    MemoryFiles fs = BaseFiles();
+    fs.files["shaders/common/frame.glsl"] = "layout(std140) uniform FrameUBO {\n    mat4 view;\n} frame;\n";
+    fs.files["shaders/a.fs"] = "#version 300 es\n#include \"common/frame.glsl\"\n"
+                               "layout(binding = TU_SHADOW_MAP) uniform highp sampler2D shadowMap;\n"
+                               "out vec4 c;\nvoid main() { c = texture(shadowMap, vec2(0.0)); }\n";
+
+    const auto result = Preprocess("shaders/a.fs", Stage::Fragment, Dialect::SpirvWebGpu, fs.Reader());
+    ASSERT_TRUE(result.ok) << result.error;
+    EXPECT_EQ(result.code.rfind("#version 460 core\n", 0), 0u);
+    EXPECT_NE(result.code.find("#define SS_GLSL_DESKTOP 1\n"), std::string::npos);
+    EXPECT_NE(result.code.find("#define SS_WEBGPU 1\n"), std::string::npos);
+    // TU_SHADOW_MAP is unit 5: texture at binding 10 of group 1 (its sampler goes to 11).
+    EXPECT_NE(result.code.find("layout(set = 1, binding = 10) uniform highp sampler2D shadowMap;"), std::string::npos)
+        << result.code;
+    EXPECT_NE(result.code.find("layout(std140, set = 0, binding = 0) uniform FrameUBO {"), std::string::npos)
+        << result.code;
+    ASSERT_EQ(result.samplerBindings.size(), 1u);
+    EXPECT_EQ(result.samplerBindings[0].unit, static_cast<int>(TextureUnit::ShadowMap));
+    // A fragment stage keeps its own main.
+    EXPECT_EQ(result.code.find("ss_vertex_main"), std::string::npos);
+
+    // The GL dialects are untouched by any of it.
+    const auto gl = Preprocess("shaders/a.fs", Stage::Fragment, Dialect::Desktop460, fs.Reader());
+    ASSERT_TRUE(gl.ok) << gl.error;
+    EXPECT_EQ(gl.code.find("SS_WEBGPU"), std::string::npos);
+    EXPECT_EQ(gl.code.find("set ="), std::string::npos);
+    EXPECT_NE(gl.code.find("layout(std140) uniform FrameUBO {"), std::string::npos);
+}
+
+TEST(ShaderSource, WebGpuDialectWrapsTheVertexMainWithTheClipSpaceFixUp) {
+    MemoryFiles fs = BaseFiles();
+    fs.files["shaders/a.vs"] = "#version 300 es\nvoid main() { gl_Position = vec4(0.0); }\n";
+
+    const auto result = Preprocess("shaders/a.vs", Stage::Vertex, Dialect::SpirvWebGpu, fs.Reader());
+    ASSERT_TRUE(result.ok) << result.error;
+    const size_t rename = result.code.find("#define main ss_vertex_main\n");
+    const size_t body = result.code.find("void main() { gl_Position");
+    const size_t wrapper = result.code.find("#undef main\nvoid main() {\n    ss_vertex_main();");
+    ASSERT_NE(rename, std::string::npos) << result.code;
+    ASSERT_NE(body, std::string::npos);
+    ASSERT_NE(wrapper, std::string::npos) << result.code;
+    EXPECT_LT(rename, body);
+    EXPECT_LT(body, wrapper);
+    EXPECT_NE(result.code.find("gl_Position.y = -gl_Position.y;"), std::string::npos);
+    EXPECT_NE(result.code.find("gl_Position.z = 0.5 * (gl_Position.z + gl_Position.w);"), std::string::npos);
+}
+
+TEST(ShaderSource, WebGpuDialectRejectsAUniformBlockWithNoBinding) {
+    MemoryFiles fs = BaseFiles();
+    fs.files["shaders/a.fs"] = "#version 300 es\nlayout(std140) uniform Mystery { float x; };\n"
+                               "out vec4 c;\nvoid main() { c = vec4(x); }\n";
+    const auto result = Preprocess("shaders/a.fs", Stage::Fragment, Dialect::SpirvWebGpu, fs.Reader());
+    EXPECT_FALSE(result.ok);
+    EXPECT_NE(result.error.find("Mystery"), std::string::npos) << result.error;
+    // GL binds blocks by name at link, so the GL dialects have nothing to object to.
+    EXPECT_TRUE(Preprocess("shaders/a.fs", Stage::Fragment, Dialect::GlslEs300, fs.Reader()).ok);
+}
+
 TEST(CatalogMaterial, VariantCountsAMapOnlyWhenItIsResident) {
     using namespace CatalogMaterial;
     const Material earth{true, true, true, false, 0.1f};
@@ -318,12 +379,12 @@ std::vector<std::filesystem::path> TopLevelShaders() {
     return files;
 }
 
-TEST(ShaderSourceTree, EveryShaderPreprocessesInBothDialects) {
+TEST(ShaderSourceTree, EveryShaderPreprocessesInEveryDialect) {
     const auto files = TopLevelShaders();
     ASSERT_GT(files.size(), 20u);
     for (const auto& file : files) {
         const Stage stage = file.extension() == ".vs" ? Stage::Vertex : Stage::Fragment;
-        for (const Dialect dialect : {Dialect::GlslEs300, Dialect::Desktop460}) {
+        for (const Dialect dialect : {Dialect::GlslEs300, Dialect::Desktop460, Dialect::SpirvWebGpu}) {
             const auto result = Preprocess(file.string(), stage, dialect, ShaderSource::ReadFileFromDisk);
             ASSERT_TRUE(result.ok) << file << ": " << result.error;
             EXPECT_EQ(result.code.find("#include"), std::string::npos) << file;

@@ -50,6 +50,21 @@
       }
     },
     {
+      "name": "native-wgpu",
+      "displayName": "Native, WebGPU backend (Dawn) + unit and WebGPU tests",
+      "description": "SOLARSYSTEM_WEBGPU=ON against the Dawn, Tint and glslang that scripts/setup-webgpu-toolchain.sh builds into external/webgpu (override with CMAKE_PREFIX_PATH / SOLARSYSTEM_GLSLANG / SOLARSYSTEM_TINT).",
+      "inherits": "native",
+      "binaryDir": "${sourceDir}/build-wgpu",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Release",
+        "SOLARSYSTEM_WEBGPU": "ON",
+        "SOLARSYSTEM_BUILD_TESTS": "ON",
+        "CMAKE_PREFIX_PATH": "${sourceDir}/external/webgpu",
+        "SOLARSYSTEM_GLSLANG": "${sourceDir}/external/webgpu/bin/glslang",
+        "SOLARSYSTEM_TINT": "${sourceDir}/external/webgpu/bin/tint"
+      }
+    },
+    {
       "name": "web",
       "hidden": true,
       "inherits": "common",
@@ -83,6 +98,27 @@
         "CMAKE_BUILD_TYPE": "Release",
         "SOLARSYSTEM_WEB_THREADS": "ON"
       }
+    },
+    {
+      "name": "web-release-wgpu",
+      "displayName": "Web, Release, WebGPU backend (SolarSystem-wgpu: emdawnwebgpu)",
+      "inherits": "web",
+      "binaryDir": "${sourceDir}/build-web-wgpu",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Release",
+        "SOLARSYSTEM_WEBGPU": "ON"
+      }
+    },
+    {
+      "name": "web-release-wgpu-mt",
+      "displayName": "Web, Release, WebGPU backend (pthreads)",
+      "inherits": "web",
+      "binaryDir": "${sourceDir}/build-web-wgpu-mt",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Release",
+        "SOLARSYSTEM_WEBGPU": "ON",
+        "SOLARSYSTEM_WEB_THREADS": "ON"
+      }
     }
   ],
   "buildPresets": [
@@ -104,12 +140,24 @@
       ]
     },
     {
+      "name": "native-wgpu",
+      "configurePreset": "native-wgpu"
+    },
+    {
       "name": "web-release",
       "configurePreset": "web-release"
     },
     {
       "name": "web-release-mt",
       "configurePreset": "web-release-mt"
+    },
+    {
+      "name": "web-release-wgpu",
+      "configurePreset": "web-release-wgpu"
+    },
+    {
+      "name": "web-release-wgpu-mt",
+      "configurePreset": "web-release-wgpu-mt"
     },
     {
       "name": "web-debug",
@@ -141,6 +189,19 @@
           "name": "^gl\\."
         }
       }
+    },
+    {
+      "name": "native-wgpu",
+      "displayName": "WebGPU tests (a Vulkan adapter: SwiftShader or lavapipe; parity tests also need a GL 4.6 context)",
+      "configurePreset": "native-wgpu",
+      "output": {
+        "outputOnFailure": true
+      },
+      "filter": {
+        "include": {
+          "name": "^(wgpu\\.|ShaderWgsl$)"
+        }
+      }
     }
   ],
   "workflowPresets": [
@@ -159,6 +220,24 @@
         {
           "type": "test",
           "name": "native-tests"
+        }
+      ]
+    },
+    {
+      "name": "native-wgpu",
+      "displayName": "Configure, build and run the WebGPU backend's tests",
+      "steps": [
+        {
+          "type": "configure",
+          "name": "native-wgpu"
+        },
+        {
+          "type": "build",
+          "name": "native-wgpu"
+        },
+        {
+          "type": "test",
+          "name": "native-wgpu"
         }
       ]
     }

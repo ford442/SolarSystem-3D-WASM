@@ -1,5 +1,9 @@
 #include "SpaceWeatherUniforms.h"
 #include "GlPlatform.h"
+#include "rhi/WgslBindings.h"
+
+// The WebGPU backend binds MagnetosphereUBO at the same number (gfx/rhi/WgslBindings.h).
+static_assert(rhi::wgsl::UniformBlockBinding("MagnetosphereUBO") == SpaceWeatherUniformBuffer::kBinding);
 
 void SpaceWeatherUniformBuffer::Upload(const SpaceWeatherUniformData& data) {
     if (!_buffer) {

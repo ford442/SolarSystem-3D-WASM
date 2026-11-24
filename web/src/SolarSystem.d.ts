@@ -515,7 +515,7 @@ export interface SolarSystemModuleConfig {
   onNearestPlanetChanged?: (index: number) => void;
   onMissionFocused?: (index: number) => void;
   /**
-   * A WebGL2 context created by the caller (see web/src/webglContext.ts), reused as-is by
+   * A WebGL2 context created by the caller (see web/src/gpuContext.ts), reused as-is by
    * Emscripten's GLFW port. This is the ONLY way to control powerPreference / xrCompatible /
    * premultipliedAlpha / preserveDrawingBuffer / alpha / antialias here — GLFW builds its own
    * context-attributes object from GLFW window hints and ignores any other Module config key
@@ -523,6 +523,11 @@ export interface SolarSystemModuleConfig {
    * never read by Emscripten's runtime and has been removed).
    */
   preinitializedWebGLContext?: WebGL2RenderingContext;
+  /**
+   * The GPUDevice web/src/webgpuContext.ts requested, for the SolarSystem-wgpu binary only:
+   * emdawnwebgpu's emscripten_webgpu_get_device() imports it (gfx/rhi/wgpu/WgpuDevice.cpp).
+   */
+  preinitializedWebGPUDevice?: GPUDevice;
 }
 
 /**

@@ -5,6 +5,7 @@
 #include "core/Log.h"
 #include "gfx/GpuTimer.h"
 #include "gfx/Shader.h"
+#include "gfx/rhi/Backend.h"
 #include "render/graph/FramePlan.h"
 #include <algorithm>
 #include <cstddef>
@@ -38,6 +39,15 @@ void FrameProfiler::EndFrame() {
     }
     FrameProfile::Sample& sample = _sample;
     sample.cpuMs = _cpuStages.Ms();
+    // Every pass still records through GlCommandList; the WebGPU backend (gfx/rhi/wgpu) reports
+    // itself here once the frame runs on it (docs/plans/WEBGPU_BACKEND_PLAN.md).
+    sample.backend = rhi::BackendId(rhi::GlBackendOfThisBuild());
+    sample.backendName = rhi::BackendName(rhi::GlBackendOfThisBuild());
+#ifdef SOLARSYSTEM_WEBGPU
+    if (_webgpuStatus) {
+        sample.webgpuJson = _webgpuStatus();
+    }
+#endif
     sample.gpuSupported = GpuTimer::Supported();
     sample.gpuValid = _gpuTimer && _gpuTimer->Enabled() && _gpuTimer->HasResult();
     for (std::size_t i = 0; i < FrameProfile::kStageCount; ++i) {

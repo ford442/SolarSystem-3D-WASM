@@ -18,9 +18,10 @@ import { installPerfHud, perfHudRequested } from './perfHud';
 import { createSolarSystemRuntime, exposeConsoleHelpers, type SolarSystemRuntime } from './wasmBridge';
 import { installWasmCallbacksOnConfig, registerWasmCallbacks, setModuleInstance } from './wasmCallbacks';
 import { assetCacheEnabled, createAssetFetcher } from './assetCache';
-import { computeWebGlSizing } from './webglContext';
+import { computeGpuSizing } from './gpuContext';
 import { installContextLossHandling, parseLoseContextSeconds, startContextLossCycle } from './contextLoss';
-import { chooseWasmVariant, locateWasmFile, THREADED_GLUE } from './wasmVariant';
+import { chooseGpuBackend, chooseWasmVariant, locateWasmFile, wasmGlue, type GpuBackend } from './wasmVariant';
+import { requestWebGpuDevice } from './webgpuContext';
 
 const canvas = queryRequired('canvas', HTMLCanvasElement);
 const loadingContainer = queryRequired('loading-container');
@@ -153,8 +154,10 @@ publishInitConfig(initConfig);
 // entirely — passing powerPreference/xrCompatible/etc. there is a silent no-op. Creating
 // the context ourselves and handing it to Module.preinitializedWebGLContext is the
 // supported hook Emscripten actually honors: GLFW reuses this context as-is instead of
-// creating its own. See docs/plans/PORTING_GUIDE.md and web/src/webglContext.ts.
-const { contextOptions, tier } = computeWebGlSizing(initConfig);
+// creating its own. See docs/plans/PORTING_GUIDE.md and web/src/gpuContext.ts. The WebGPU binary
+// (wasmVariant.ts) gets this context too: until its backend draws the whole frame, it renders
+// through WebGL 2 beside the WebGPU device (docs/plans/WEBGPU_BACKEND_PLAN.md).
+const { contextOptions, adapterOptions, tier } = computeGpuSizing(initConfig);
 const preinitializedWebGLContext = canvas.getContext('webgl2', contextOptions);
 if (preinitializedWebGLContext) {
     console.log(
@@ -254,26 +257,39 @@ const moduleConfig: SolarSystemModuleConfig = installWasmCallbacksOnConfig(
 type ModuleFactory = typeof Module;
 
 /**
- * The pthread build when this page can run its workers (wasmVariant.ts), else the bundled
- * single-threaded one. A deployment without SolarSystem-mt.js (built with --no-threads)
- * falls back to the single-threaded build after one failed import.
+ * The binary this page runs (wasmVariant.ts): the pthread build when this page can run its
+ * workers, the WebGPU build for `?gpu=webgpu` on a deployment that has it, else the bundled
+ * single-threaded WebGL 2 one. A glue that fails to import (a deployment built with
+ * --no-threads, or without --webgpu) falls back one step at a time to the bundled build.
  */
-async function loadModuleFactory(): Promise<ModuleFactory> {
-    if (
-        chooseWasmVariant({ crossOriginIsolated: window.crossOriginIsolated, search: window.location.search }) !==
-        'threaded'
-    ) {
-        return Module;
+async function loadModuleFactory(backend: GpuBackend): Promise<ModuleFactory> {
+    const threads = chooseWasmVariant({
+        crossOriginIsolated: window.crossOriginIsolated,
+        search: window.location.search,
+    });
+    const candidates: { glue: string; label: string }[] = [];
+    const wanted = wasmGlue(backend, threads);
+    if (wanted) {
+        candidates.push({ glue: wanted, label: `${backend} ${threads}` });
     }
-    const url = new URL(THREADED_GLUE, deployedBaseUrl).toString();
-    try {
-        const threaded = (await import(/* @vite-ignore */ url)) as { default: ModuleFactory };
-        console.log('[Jobs] page is cross-origin isolated: loading the threaded build');
-        return threaded.default;
-    } catch (error: unknown) {
-        console.warn('[Jobs] threaded build unavailable, using the single-threaded one:', error);
-        return Module;
+    if (backend === 'webgpu' && threads === 'threaded') {
+        candidates.push({ glue: wasmGlue('webgpu', 'single') ?? '', label: 'webgpu single' });
     }
+    for (const { glue, label } of candidates) {
+        try {
+            const url = new URL(glue, deployedBaseUrl).toString();
+            const loaded = (await import(/* @vite-ignore */ url)) as { default: ModuleFactory };
+            console.log(`[Wasm] loading the ${label} build (${glue})`);
+            return loaded.default;
+        } catch (error: unknown) {
+            console.warn(`[Wasm] ${glue} unavailable:`, error);
+        }
+    }
+    if (backend === 'webgpu' && threads === 'threaded') {
+        // No WebGPU build at all: the WebGL 2 threaded one is still the better fallback.
+        return loadModuleFactory('webgl2');
+    }
+    return Module;
 }
 
 async function startModule(): Promise<SolarSystemModule> {
@@ -281,7 +297,24 @@ async function startModule(): Promise<SolarSystemModule> {
         // GLFW would try the same context creation and fail inside main(); say so up front.
         throw new Error('WebGL 2 is not available');
     }
-    const factory = await loadModuleFactory();
+    const choice = chooseGpuBackend({
+        search: window.location.search,
+        webgpuAvailable: navigator.gpu !== undefined,
+        webgpuPublished: import.meta.env.VITE_WEBGPU_BUILD === '1',
+    });
+    let backend = choice.backend;
+    console.log(`[GPU] backend ${backend} (${choice.reason})`);
+    if (backend === 'webgpu') {
+        // The device first: without one the WebGPU binary has nothing to import, so stay on WebGL 2.
+        const result = await requestWebGpuDevice({ gpu: navigator.gpu, adapterOptions });
+        if (result) {
+            moduleConfig.preinitializedWebGPUDevice = result.device;
+        } else {
+            backend = 'webgl2';
+            console.warn('[GPU] no WebGPU device: using the WebGL 2 build');
+        }
+    }
+    const factory = await loadModuleFactory(backend);
     return factory(moduleConfig);
 }
 

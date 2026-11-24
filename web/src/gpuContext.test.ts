@@ -1,7 +1,12 @@
 import { describe, expect, it } from 'vitest';
-import { computeWebGlContextOptions, computeWebGlCostTier, type WebGlCostTier } from './webglContext.js';
+import {
+    computeGpuCostTier,
+    computeWebGlContextOptions,
+    computeWebGpuAdapterOptions,
+    type GpuCostTier,
+} from './gpuContext.js';
 
-const TIERS: WebGlCostTier[] = ['lowMobile', 'medium', 'full'];
+const TIERS: GpuCostTier[] = ['lowMobile', 'medium', 'full'];
 
 describe('computeWebGlContextOptions', () => {
     it('never multisamples the default framebuffer: HDR tiers antialias in the tone-map pass', () => {
@@ -31,11 +36,21 @@ describe('computeWebGlContextOptions', () => {
     });
 });
 
-describe('computeWebGlCostTier', () => {
+describe('computeGpuCostTier', () => {
     it('forces the cheapest tier on mobile and maps desktop presets 0/1/2', () => {
-        expect(computeWebGlCostTier(2, true)).toBe('lowMobile');
-        expect(computeWebGlCostTier(0, false)).toBe('lowMobile');
-        expect(computeWebGlCostTier(1, false)).toBe('medium');
-        expect(computeWebGlCostTier(2, false)).toBe('full');
+        expect(computeGpuCostTier(2, true)).toBe('lowMobile');
+        expect(computeGpuCostTier(0, false)).toBe('lowMobile');
+        expect(computeGpuCostTier(1, false)).toBe('medium');
+        expect(computeGpuCostTier(2, false)).toBe('full');
+    });
+});
+
+describe('computeWebGpuAdapterOptions', () => {
+    it('asks the WebGPU adapter for the same GPU the WebGL context would get', () => {
+        for (const tier of TIERS) {
+            expect(computeWebGpuAdapterOptions(tier).powerPreference, tier).toBe(
+                computeWebGlContextOptions(tier).powerPreference,
+            );
+        }
     });
 });

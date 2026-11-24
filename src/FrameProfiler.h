@@ -4,6 +4,7 @@
 #include "gfx/GpuTimer.h"
 #include "render/graph/FramePlan.h"
 #include <cstddef>
+#include <functional>
 #include <memory>
 #include <string>
 #include <utility>
@@ -51,6 +52,11 @@ public:
     /** Drop the GPU timer (its queries name objects of a context that is going or gone). */
     void ReleaseGpu() { _gpuTimer.reset(); }
 
+#ifdef SOLARSYSTEM_WEBGPU
+    /** Where the sample's WebGPU status comes from (gfx/rhi/wgpu/WgpuBringUp::StatusJson). */
+    void SetWebGpuStatusSource(std::function<std::string()> source) { _webgpuStatus = std::move(source); }
+#endif
+
     GpuTimer* Gpu() { return _gpuTimer.get(); }
     FrameProfile::PassTimings& Passes() { return _passTimings; }
     FrameProfile::CpuStages& Stages() { return _cpuStages; }
@@ -58,6 +64,9 @@ public:
 private:
     FrameProfile::CpuStages _cpuStages;
     FrameProfile::PassTimings _passTimings;
+#ifdef SOLARSYSTEM_WEBGPU
+    std::function<std::string()> _webgpuStatus;
+#endif
     FrameProfile::Sample _sample;
     FrameProfile::Totals _totals;
     std::unique_ptr<GpuTimer> _gpuTimer;

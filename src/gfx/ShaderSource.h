@@ -24,16 +24,31 @@
 namespace ShaderSource {
 
 enum class Stage { Vertex, Fragment, Geometry };
-enum class Dialect { GlslEs300, Desktop460 };
+// GlslEs300: WebGL 2 as authored. Desktop460: the native GL build (directive rewritten).
+// SpirvWebGpu: the input of the GLSL → SPIR-V → WGSL toolchain (tools/wgsl_shader_compiler,
+// docs/ARCHITECTURE.md §7.9): 460 core with SS_GLSL_DESKTOP and SS_WEBGPU defined, every sampler
+// and uniform block given its explicit Vulkan set/binding (gfx/rhi/WgslBindings.h), and, in a
+// vertex stage, `main` wrapped so gl_Position leaves y-flipped with z in WebGPU's [0, 1].
+enum class Dialect { GlslEs300, Desktop460, SpirvWebGpu };
 
 // Returns the file's contents, or nullopt when it cannot be read.
 using FileReader = std::function<std::optional<std::string>(const std::string& path)>;
 
 // `layout(binding = TU_X) uniform sampler… name;` with the qualifier stripped (GLSL ES 3.00
-// has no sampler binding). Shader assigns `unit` to `uniform` once, after linking.
+// has no sampler binding). Shader assigns `unit` to `uniform` once, after linking. In the
+// SpirvWebGpu dialect the qualifier becomes `layout(set = 1, binding = 2 * unit)` instead.
 struct SamplerBinding {
     std::string uniform;
     int unit = 0;
+};
+
+// SpirvWebGpu only: a varying and the `layout(location = …)` it was given. WebGPU links stages
+// by location, so a vertex stage numbers its outputs in declaration order (text order, every
+// #ifdef branch counted, so the numbers do not depend on the defines) and a fragment stage gives
+// each input the number of its partner vertex stage's output of the same name.
+struct Varying {
+    std::string name;
+    int location = 0;
 };
 
 struct Result {
@@ -42,6 +57,12 @@ struct Result {
     // sourceNames[i] is the path that GLSL source-string number i refers to.
     std::vector<std::string> sourceNames;
     std::vector<SamplerBinding> samplerBindings;
+#ifndef __EMSCRIPTEN__ // SpirvWebGpu is host-only: a web binary carries none of this
+    // SpirvWebGpu: a vertex stage's outputs, or a fragment stage's inputs, with their locations.
+    std::vector<Varying> varyings;
+    // SpirvWebGpu: a fragment stage's colour outputs (none: a depth-only stage, shadowMap.fs).
+    std::vector<Varying> fragmentOutputs;
+#endif
     std::string error;
 };
 
@@ -55,8 +76,13 @@ Dialect NativeDialect();
 // directory; each file is expanded at most once per stage (no include guards needed).
 // `defines` are permutation switches (HAS_CLOUDS, …): each becomes `#define NAME 1` ahead of
 // the preamble, so the shader tests them with #ifdef. Names are [A-Z_][A-Z0-9_]*.
+//
+// `vertexOutputs` (SpirvWebGpu fragment stages only): the partner vertex stage's
+// Result::varyings. Each input takes the location of the output of the same name, and one the
+// vertex stage does not write is an error, as it would be at GL link time. Without it, inputs are
+// numbered in declaration order.
 Result Preprocess(const std::string& path, Stage stage, Dialect dialect, const FileReader& reader,
-                  const std::vector<std::string>& defines = {});
+                  const std::vector<std::string>& defines = {}, const std::vector<Varying>* vertexOutputs = nullptr);
 
 // Whether `name` is a valid permutation define (upper-case identifier, not SS_*/GL_*).
 bool IsValidDefine(const std::string& name);
@@ -70,6 +96,11 @@ std::optional<long long> FileModificationTime(const std::string& path);
 // The defines a top-level stage lists on a `// permutations: A B …` line (anywhere in the
 // file): the switches it tests with #ifdef. The self-test compiles every subset of them.
 std::vector<std::string> DeclaredPermutations(const std::string& text);
+
+// The vertex stages a fragment stage lists on a `// vertex: a.vs b.vs` line: the partners it
+// is linked with besides `<same name>.vs` (hdr.fs runs behind passThrough.vs). The WGSL toolchain
+// links a fragment stage once per partner, since its input locations follow the partner's outputs.
+std::vector<std::string> DeclaredVertexPartners(const std::string& text);
 
 // "0: resource/shaders/x.fs, 1: …/preamble.glsl, …" for compile-error reports.
 std::string DescribeSources(const Result& result);

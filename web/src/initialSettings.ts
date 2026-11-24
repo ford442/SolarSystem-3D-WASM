@@ -1,13 +1,13 @@
 import { parseDeepLinkFromUrl } from './deepLink';
 import { isMobileLikeDevice } from './touchControls';
 import type { QualityPreset } from './SolarSystem.js';
-import { computeBackingStoreScale, computeWebGlCostTier } from './webglContext';
+import { computeBackingStoreScale, computeGpuCostTier } from './gpuContext';
 
 /** Values consumed by C++ before GLFW / WebGL context creation (see QualitySettings.cpp). */
 export interface SolarSystemInitConfig {
     qualityPreset: QualityPreset;
     isMobileWeb: boolean;
-    /** Canvas backing-store pixels per CSS pixel, capped per quality tier. See webglContext.ts. */
+    /** Canvas backing-store pixels per CSS pixel, capped per quality tier. See gpuContext.ts. */
     backingStoreScale: number;
 }
 
@@ -20,7 +20,7 @@ export function resolveInitConfig(): SolarSystemInitConfig {
     const isMobileWeb = isMobileLikeDevice();
     const defaultQuality: QualityPreset = isMobileWeb ? 0 : 2;
     const qualityPreset = deepLink.quality ?? defaultQuality;
-    const tier = computeWebGlCostTier(qualityPreset, isMobileWeb);
+    const tier = computeGpuCostTier(qualityPreset, isMobileWeb);
     const backingStoreScale = computeBackingStoreScale(tier, window.devicePixelRatio || 1);
     return { qualityPreset, isMobileWeb, backingStoreScale };
 }

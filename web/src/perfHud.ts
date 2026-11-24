@@ -1,6 +1,7 @@
 /**
  * `?perf=1`: a small overlay with the last frame's profile from C++ (core/FrameProfile.h via
- * GetFrameStatsJson): frame time and the worst frame since the previous read, CPU and GPU
+ * GetFrameStatsJson): the GPU backend the frame records against (and, in the WebGPU binary, its
+ * device and how many WGSL modules compiled), frame time and the worst frame since the previous read, CPU and GPU
  * milliseconds per frame stage and per frame-graph pass kind (render/graph/FramePlan: "scene",
  * "shadow", "aurora-bloom", …, summed over components and views), the job pool and the
  * texture-upload pump. Turning it on also turns on the GPU timers (EXT_disjoint_timer_query_webgl2;
@@ -35,7 +36,21 @@ export interface PassTimes {
     gpu: number | null;
 }
 
+/** A WebGPU device beside the frame (gfx/rhi/wgpu/WgpuBringUp.h), in the SolarSystem-wgpu binary. */
+export interface WebGpuStatus {
+    device: string;
+    timestamps: boolean;
+    wgslTotal: number;
+    wgslCompiled: number;
+    wgslFailed: number;
+}
+
 export interface FrameStats {
+    /** rhi::BackendId of the API the frame records against: "webgl2", "opengl", "webgpu". */
+    backend: string;
+    /** "WebGL 2", "WebGPU", …; the HUD's first line. */
+    backendName: string;
+    webgpu: WebGpuStatus | null;
     frameMs: number;
     /** Worst frame since the previous GetFrameStatsJson read. */
     worstFrameMs: number;
@@ -110,7 +125,19 @@ export function parseFrameStats(json: string): FrameStats | null {
     }
     const jobs = record(raw.jobs) ?? {};
     const uploads = record(raw.uploads) ?? {};
+    const webgpu = record(raw.webgpu);
     return {
+        backend: typeof raw.backend === 'string' ? raw.backend : '',
+        backendName: typeof raw.backendName === 'string' ? raw.backendName : '',
+        webgpu: webgpu
+            ? {
+                  device: typeof webgpu.device === 'string' ? webgpu.device : '',
+                  timestamps: webgpu.timestamps === true,
+                  wgslTotal: num(webgpu.wgslTotal),
+                  wgslCompiled: num(webgpu.wgslCompiled),
+                  wgslFailed: num(webgpu.wgslFailed),
+              }
+            : null,
         frameMs: num(raw.frameMs),
         worstFrameMs: num(raw.worstFrameMs),
         frames: num(raw.frames),
@@ -145,11 +172,24 @@ const MAX_PASS_ROWS = 12;
 /** The overlay's text: one row per stage, then the totals, then the costliest pass kinds. */
 export function formatFrameStats(stats: FrameStats): string {
     const gpuLabel = stats.gpu ? 'gpu'.padStart(9) : stats.gpuSupported ? '   gpu…' : '   gpu n/a';
-    const lines = [
+    const lines: string[] = [];
+    if (stats.backendName) {
+        lines.push(`backend ${stats.backendName}`);
+    }
+    if (stats.webgpu) {
+        const { device, wgslTotal, wgslCompiled, wgslFailed } = stats.webgpu;
+        const pending = wgslTotal - wgslCompiled - wgslFailed;
+        const wgsl =
+            wgslTotal === 0
+                ? 'no WGSL'
+                : `WGSL ${String(wgslCompiled)}/${String(wgslTotal)}${wgslFailed > 0 ? ` (${String(wgslFailed)} failed)` : ''}${pending > 0 ? ' …' : ''}`;
+        lines.push(`webgpu ${device}: ${wgsl}`);
+    }
+    lines.push(
         `frame ${stats.frameMs.toFixed(1)} ms  worst ${stats.worstFrameMs.toFixed(1)} ms`,
         `slow (>33 ms) ${String(stats.slowFrames)} / ${String(stats.frames)}`,
         `${'stage'.padEnd(11)}${'cpu'.padStart(9)}${gpuLabel}`,
-    ];
+    );
     let cpuTotal = 0;
     let gpuTotal = 0;
     for (const stage of FRAME_STAGES) {

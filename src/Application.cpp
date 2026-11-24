@@ -4,6 +4,9 @@
 // SceneRenderer.cpp / SceneOverlayRenderer.cpp (drawing), StarSystemFactory.cpp and
 // PlanetSystemLoader.cpp (scene construction), XrSession.cpp (WebXR).
 #include "Application.h"
+#ifdef SOLARSYSTEM_WEBGPU
+#include "gfx/rhi/wgpu/WgpuBringUp.h" // IWYU pragma: keep (completes _webgpu for ~Application)
+#endif
 #include "Solar_System/StarSystemCatalog.h"
 #include "FrameContext.h"
 #include "JsBridge.h"

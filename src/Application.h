@@ -54,6 +54,12 @@
  * FrameProfiler times it all. The public methods are what the page (WasmExports.cpp) and the
  * keyboard (InputHandler.cpp) call; the module ones forward.
  */
+#ifdef SOLARSYSTEM_WEBGPU
+namespace rhi::webgpu {
+class BringUp;
+}
+#endif
+
 class Application : private Cinematics::Host {
 public:
     Application();
@@ -275,6 +281,11 @@ private:
     int _focusedPlanetIndex = -1;      // FocusPlanet index (0=sun … 9=pluto); -1 = none
     FrameTimer _frameTimer;
     FrameProfiler _profiler; // CPU/GPU per stage and pass; GetFrameStatsJson, [FrameStats]
+#ifdef SOLARSYSTEM_WEBGPU
+    // The WebGPU device beside the GL frame, and its WGSL check (PlatformWindow.cpp starts it;
+    // gfx/rhi/wgpu/WgpuBringUp.h). Null when there is no device.
+    std::unique_ptr<rhi::webgpu::BringUp> _webgpu;
+#endif
     FT_Library _ft = nullptr;
     bool _isBackgroundMusicPlay = false, _isSearchNearestPlanet = false;
 

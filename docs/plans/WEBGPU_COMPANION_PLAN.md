@@ -6,6 +6,11 @@
 
 ---
 
+> **Update:** the C++ renderer now has a WebGPU backend of its own behind the RHI, with
+> WebGL 2 staying the default — see [WEBGPU_BACKEND_PLAN.md](WEBGPU_BACKEND_PLAN.md). This
+> companion remains what it is: a separate Three.js app. The "do not migrate" summary below is
+> the decision as it stood before that plan.
+
 ## Executive Summary
 
 **Do not migrate the current renderer to WebGPU.** The production path stays C++17 → Emscripten → WebGL 2 with GLSL 300 es, DDS textures, custom shadows, atmospheric scattering, and staged planet loading.

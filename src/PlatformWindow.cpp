@@ -1,7 +1,13 @@
 // Platform/window bring-up and teardown: GLFW + SDL + GL context creation, the window
 // icon, framebuffer resize plumbing and vertical sync. Everything here runs once at
 // startup or in response to a window event — no per-frame work.
+#ifdef SOLARSYSTEM_WEBGPU
+#include "gfx/rhi/wgpu/WgpuBringUp.h"
+#include "gfx/rhi/wgpu/WgpuDevice.h"
+#include "gfx/rhi/wgpu/WgpuSelfTest.h"
+#endif
 #include "Application.h"
+#include "gfx/Shader.h"
 #include "GoldenCapture.h"
 #include "QualitySettings.h"
 #include "SimState.h"
@@ -142,7 +148,7 @@ void Application::InitSystems() {
     // Context samples are fixed when the context is created, so they must come from the
     // *initial* quality preset; ApplyQualityPreset cannot change them later (same
     // restriction as web, where the WebGL context's `antialias` is decided in
-    // web/src/webglContext.ts). A tier with HDR asks for none: see ContextMsaaSamples.
+    // web/src/gpuContext.ts). A tier with HDR asks for none: see ContextMsaaSamples.
     const auto qualitySettings = GetQualitySettings(_simState.qualityPreset, _simState.isMobileWeb);
     const int requestedSamples = ContextMsaaSamples(qualitySettings);
 
@@ -270,9 +276,38 @@ void Application::InitSystems() {
     EnableGlDebugOutput();
 
     if (const char* selfTest = std::getenv("SOLARSYSTEM_SHADER_SELFTEST"); selfTest && *selfTest && std::string(selfTest) != "0") {
-        const int failures = Shader::SelfTestDirectory("resource/shaders");
+        int failures = Shader::SelfTestDirectory("resource/shaders");
+#ifdef SOLARSYSTEM_WEBGPU
+        // The WGSL leg (docs/ARCHITECTURE.md §7.9): what wgsl_shader_compiler generated, on a
+        // real WebGPU device. No adapter is a skip, not a failure (a GL-only CI runner).
+        std::string wgpuError;
+        if (auto device = rhi::webgpu::Device::Create({}, wgpuError)) {
+            failures += rhi::webgpu::SelfTestWgsl(*device, "resource/shaders-wgsl");
+        } else {
+            LOG_WARN("ShaderSelfTest", "WGSL leg skipped: %s", wgpuError.c_str());
+        }
+#endif
         glfwTerminate();
         std::exit(failures == 0 ? EXIT_SUCCESS : EXIT_FAILURE);
+    }
+#endif
+
+#ifdef SOLARSYSTEM_WEBGPU
+    // Phase 1 of the WebGPU backend (docs/plans/WEBGPU_BACKEND_PLAN.md): the frame still draws
+    // through GL, beside a WebGPU device that compiles every WGSL module and shows in the perf
+    // HUD. The web SolarSystem-wgpu binary always starts it (the page made the device for it);
+    // natively, SOLARSYSTEM_GPU=webgpu asks for it.
+#ifdef __EMSCRIPTEN__
+    const bool startWebGpu = true;
+#else
+    const char* gpuRequest = std::getenv("SOLARSYSTEM_GPU");
+    const bool startWebGpu = gpuRequest && std::string(gpuRequest) == "webgpu";
+#endif
+    if (startWebGpu) {
+        _webgpu = rhi::webgpu::BringUp::Start("resource/shaders-wgsl");
+        if (_webgpu) {
+            _profiler.SetWebGpuStatusSource([this] { return _webgpu->StatusJson(); });
+        }
     }
 #endif
 
