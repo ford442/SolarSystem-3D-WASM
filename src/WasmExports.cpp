@@ -187,6 +187,48 @@ extern "C" {
         json = activeApplication ? activeApplication->GetFocusedMissionJson() : R"({"valid":false})";
         return json.c_str();
     }
+    // Flight planner (docs/ARCHITECTURE.md §14). Bodies are OrbitLayout indices (3 Earth,
+    // 4 Mars, …); dates are Julian; the grid is row-major [tof][departure] inside the JSON.
+    EMSCRIPTEN_KEEPALIVE const char* GetPorkchopJson(int fromBody, int toBody, double departureStartJd,
+                                                     double departureSpanDays, double tofMinDays, double tofMaxDays,
+                                                     int departureSteps, int tofSteps) {
+        static std::string json = "{}";
+        json = activeApplication
+                   ? activeApplication->ComputePorkchop(fromBody, toBody, departureStartJd, departureSpanDays,
+                                                        tofMinDays, tofMaxDays, departureSteps, tofSteps)
+                   : "{}";
+        return json.c_str();
+    }
+    EMSCRIPTEN_KEEPALIVE int PlanTransfer(int fromBody, int toBody, double departureJd, double tofDays) {
+        return activeApplication && activeApplication->PlanTransfer(fromBody, toBody, departureJd, tofDays) ? 1 : 0;
+    }
+    EMSCRIPTEN_KEEPALIVE int PlanFlightPreset(const char* id) {
+        return id && activeApplication && activeApplication->PlanFlightPreset(id) ? 1 : 0;
+    }
+    EMSCRIPTEN_KEEPALIVE void ClearFlight() {
+        if (activeApplication) {
+            activeApplication->ClearFlight();
+        }
+    }
+    EMSCRIPTEN_KEEPALIVE void SetFlightChase(int enabled) {
+        if (activeApplication) {
+            activeApplication->SetFlightChase(enabled != 0);
+        }
+    }
+    EMSCRIPTEN_KEEPALIVE const char* GetFlightPlanJson() {
+        static std::string json = R"({"ok":false})";
+        json = activeApplication ? activeApplication->GetFlightPlanJson() : R"({"ok":false})";
+        return json.c_str();
+    }
+    EMSCRIPTEN_KEEPALIVE const char* GetFlightStateJson() {
+        static std::string json = R"({"valid":false})";
+        json = activeApplication ? activeApplication->GetFlightStateJson() : R"({"valid":false})";
+        return json.c_str();
+    }
+    EMSCRIPTEN_KEEPALIVE const char* GetFlightPresetsJson() {
+        static std::string json = Application::GetFlightPresetsJson();
+        return json.c_str();
+    }
     // Star systems (docs/ARCHITECTURE.md §12). `id` is a resource/systems/index.json id;
     // focusIndex picks the landing body (-1: the system's Earth-like planet). 1 if the jump
     // started (Module['onSystemChanged'] reports its phases), 0 for an unknown id.

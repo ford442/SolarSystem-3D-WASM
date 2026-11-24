@@ -110,6 +110,19 @@ void CameraController::SetAnchor(std::shared_ptr<const SpaceObject> body, bool p
     _anchor.body = std::move(body);
 }
 
+void CameraController::Chase(const ChaseTarget& chase) {
+    const glm::dvec3 up(0.0, 1.0, 0.0);
+    const glm::dvec3 forward =
+        glm::length(chase.forward) > 0.0 ? glm::normalize(chase.forward) : glm::dvec3(1.0, 0.0, 0.0);
+    const glm::dvec3 eye = chase.target - forward * chase.distance + up * (0.35 * chase.distance);
+    const glm::dvec3 look = glm::normalize(chase.target - eye);
+    _camera.CancelTransition();
+    _camera.SetWorldPosition(eye);
+    _camera.SetYawPitch(static_cast<float>(glm::degrees(std::atan2(look.z, look.x))),
+                        static_cast<float>(glm::degrees(std::asin(glm::clamp(look.y, -1.0, 1.0)))));
+    _chasing = true;
+}
+
 void CameraController::CarryWithAnchor() {
     if (_anchor.body) {
         // Bodies were placed for this frame's date just before; a date jump carries the
@@ -124,7 +137,8 @@ void CameraController::CarryWithAnchor() {
         const double altitudeRadii =
             radius > 0.0 ? CameraNavigation::AnalyticAltitude(_anchor.last, _camera.GetWorldPosition()) / radius
                          : std::numeric_limits<double>::max();
-        const bool authoredMotion = _camera.IsTransitionActive() || _app.observe.active || _missions.Following();
+        const bool authoredMotion =
+            _camera.IsTransitionActive() || _app.observe.active || _missions.Following() || _chasing;
         _anchor.coRotating = !authoredMotion && CameraNavigation::CoRotates(_anchor.coRotating, altitudeRadii);
 
         glm::dmat3 turn(1.0);
@@ -189,8 +203,8 @@ void CameraController::Constrain() {
     _camera.SetFar(clip.farPlane);
     _logDepthC = clip.logDepthC;
 
-    // Mission follow and Observe pose the camera themselves every frame.
-    if (_app.observe.active || _missions.Following()) {
+    // Mission follow, the flight chase and Observe pose the camera themselves every frame.
+    if (_app.observe.active || _missions.Following() || _chasing) {
         SetAnchor(nullptr, false);
         return;
     }

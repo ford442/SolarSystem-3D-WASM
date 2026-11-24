@@ -229,6 +229,7 @@ bool Application::LoadSystem(const std::string& id, int focusIndex) {
     const auto started = std::chrono::steady_clock::now();
     SetObserveMode(false);
     _missions.Stop();
+    _flight.Clear(); // flights are planned against Sol's ephemeris
     TearDownStarSystem();
     if (system) {
         StarSystemCatalog::Activate(std::move(system));

@@ -47,7 +47,8 @@ void MissionPathRenderer::Upload(const std::vector<glm::vec3>& scenePositions) {
 }
 
 void MissionPathRenderer::Draw(const glm::mat4& projection, const glm::mat4& view, const glm::vec3& cameraPos,
-                              const glm::vec3& pathOffset, const glm::vec3& color, float opacity, bool focused) const {
+                               const glm::vec3& pathOffset, const glm::vec3& color, float opacity, bool focused,
+                               const Style& style) const {
     if (!_shader || _path.Empty()) {
         return;
     }
@@ -55,7 +56,8 @@ void MissionPathRenderer::Draw(const glm::mat4& projection, const glm::mat4& vie
     _shader->SetMat4("projection", projection);
     _shader->SetMat4("view", view);
     _shader->SetVec3("cameraPos", cameraPos);
-    _shader->SetFloat("ribbonWidth", focused ? 2.8f : 1.6f);
+    _shader->SetFloat("ribbonWidth", style.ribbonWidth >= 0.0f ? style.ribbonWidth : (focused ? 2.8f : 1.6f));
+    _shader->SetFloat("minDistScale", style.minDistScale);
     _shader->SetVec3("pathOffset", pathOffset);
     _shader->SetVec3("lineColor", color);
     _shader->SetFloat("uBaseOpacity", opacity);
@@ -63,15 +65,16 @@ void MissionPathRenderer::Draw(const glm::mat4& projection, const glm::mat4& vie
     _path.Draw();
 }
 
-void MissionPathRenderer::DrawProbe(const glm::mat4& projection, const glm::mat4& view,
-                                    const glm::vec3& cameraPos, const glm::vec3& cameraRight,
-                                    const glm::vec3& cameraUp, const glm::vec3& probePos,
-                                    const glm::vec3& color) const {
+void MissionPathRenderer::DrawProbe(const glm::mat4& projection, const glm::mat4& view, const glm::vec3& cameraPos,
+                                    const glm::vec3& cameraRight, const glm::vec3& cameraUp, const glm::vec3& probePos,
+                                    const glm::vec3& color, const Style& style) const {
     if (!_shader) {
         return;
     }
-    const float dist = std::max(glm::length(cameraPos - probePos), 8.0f);
-    const float size = kProbeSize * std::clamp(dist / 120.0f, 0.6f, 8.0f);
+    const float distance = glm::length(cameraPos - probePos);
+    const float dist = std::max(distance, 8.0f);
+    const float size = style.probeAngularSize >= 0.0f ? style.probeAngularSize * distance
+                                                      : kProbeSize * std::clamp(dist / 120.0f, 0.6f, 8.0f);
     const glm::vec3 right = glm::normalize(cameraRight) * size;
     const glm::vec3 up = glm::normalize(cameraUp) * size;
     const glm::vec3 tangent = glm::normalize(cameraPos - probePos);
@@ -84,7 +87,8 @@ void MissionPathRenderer::DrawProbe(const glm::mat4& projection, const glm::mat4
     _shader->SetMat4("projection", projection);
     _shader->SetMat4("view", view);
     _shader->SetVec3("cameraPos", cameraPos);
-    _shader->SetFloat("ribbonWidth", 0.15f);
+    _shader->SetFloat("ribbonWidth", style.probeAngularSize >= 0.0f ? 0.0f : 0.15f);
+    _shader->SetFloat("minDistScale", style.minDistScale);
     _shader->SetVec3("pathOffset", glm::vec3(0.0f)); // the quad is streamed in the render frame
     _shader->SetVec3("lineColor", color);
     _shader->SetFloat("uBaseOpacity", 0.95f);

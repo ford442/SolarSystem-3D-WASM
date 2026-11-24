@@ -9,6 +9,7 @@
 #include "astro/SkyEvents.h"
 #include <glm/glm.hpp>
 #include <cstddef>
+#include <cstdint>
 #include <optional>
 #include <string>
 #include <vector>
@@ -120,6 +121,21 @@ struct SpaceWeatherFrame {
     }
 };
 
+/**
+ * A planned flight as the mission-paths pass draws it (FlightController, docs/ARCHITECTURE.md
+ * §14): the whole path in heliocentric scene units (re-uploaded when `version` changes), how
+ * much of it is flown, and the craft in the render frame.
+ */
+struct FlightFrame {
+    std::uint32_t version = 0; // bumped when the path (plan or scale mode) changes
+    const std::vector<glm::dvec3>* path = nullptr;
+    std::size_t flownSamples = 0; // path[0, flownSamples) is behind the craft
+    glm::dvec3 craftWorld{0.0};   // heliocentric scene units (the trail's last point)
+    glm::vec3 craftRender{0.0f};
+    bool craftVisible = false;
+    glm::vec3 color{0.35f, 0.95f, 0.75f};
+};
+
 /** The scene as this frame's passes see it. Placement already happened in UpdateScene. */
 struct SceneSnapshot {
     // Non-const for the Sun's occlusion query, which a pass reads back. Nothing moves.
@@ -135,6 +151,8 @@ struct SceneSnapshot {
     int focusedMission = -1;
     // Probe position per mission at this frame's date (render frame); nullopt off its trajectory.
     const std::vector<std::optional<glm::vec3>>* missionProbes = nullptr;
+    // The planned flight; null when there is none (or outside Sol).
+    const FlightFrame* flight = nullptr;
     // Web staged loading: systems not READY yet get a proxy label.
     const std::vector<PlanetSystemManifest>* stagedSystems = nullptr;
 

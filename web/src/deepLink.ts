@@ -1,6 +1,7 @@
 import type { OrbitScaleMode, QualityPreset } from './SolarSystem.js';
 import { getClipboard } from './dom.js';
 import { isoDateFromJulianDate } from './ephemeris.js';
+import { parseFlightLink, type FlightLink } from './flight.js';
 import { systemBodyLinkNameInActiveIndex } from './systemPicker.js';
 import type { SolarSystemRuntime } from './wasmBridge.js';
 import { MAX_PLANET_INDEX, PLANET_ID_BY_INDEX, PLANET_IDS, type PlanetIndex } from './generated/planetIds.js';
@@ -35,6 +36,11 @@ export interface DeepLinkViewState {
     timeline?: string;
     /** `?tt=`: seconds into the timeline to start from. */
     timelineTime?: number;
+    /**
+     * `?flight=earth-mars&dep=2026-11-01&tof=210` plans and launches a transfer (without dep and
+     * tof it opens the porkchop), `?flight=voyager2` a real mission (flightPlanner.ts).
+     */
+    flight?: FlightLink;
     /** `?mode=observe` opens straight into Observe mode (camera on Earth). */
     mode?: 'explore' | 'observe';
     /** Observe-mode site, view, field of view and time rate (`lat`, `lon`, `az`, `el`, `fov`, `rate`). */
@@ -274,6 +280,7 @@ export function parseDeepLinkFromUrl(search = window.location.search): DeepLinkV
     const timeline = parseTimelineSource(params.get('timeline'));
     const timelineTime = parseFiniteNumber(params.get('tt'));
     const mode = parseMode(params.get('mode'));
+    const flight = parseFlightLink(params);
     const observer = parseObserver(params);
 
     const x = parseFiniteNumber(params.get('x'));
@@ -308,6 +315,7 @@ export function parseDeepLinkFromUrl(search = window.location.search): DeepLinkV
         timelineTime: timeline && timelineTime !== undefined && timelineTime >= 0 ? timelineTime : undefined,
         mode,
         observer,
+        flight,
         camera,
     };
 }

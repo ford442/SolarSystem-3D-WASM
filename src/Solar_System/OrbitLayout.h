@@ -195,6 +195,9 @@ glm::dvec3 HelioAuToSceneDouble(const glm::dvec3& auSceneAxes);
  */
 float GetOrbitRadius(Body body);
 
+/** GetOrbitRadius in double: the radius the body is drawn at (the flight planner pins craft to it). */
+double GetOrbitRadiusDouble(Body body);
+
 /** True for the eccentric outer-system bodies (Eris … Halley) placed at their real r. */
 bool UsesTrueRadius(Body body);
 

@@ -3,6 +3,7 @@
 #include "ApplicationTypes.h"
 #include "CameraController.h"
 #include "Cinematics.h"
+#include "FlightController.h"
 #include "FrameProfiler.h"
 #include "IAppModule.h"
 #include "MissionController.h"
@@ -110,6 +111,21 @@ public:
     int GetFocusedMissionIndex() const { return _missions.Focused(); }
     int GetMissionCount() const { return _missions.Count(); }
     std::string GetMissionCatalogJson() const { return _missions.CatalogJson(); }
+
+    // --- Flight planner (FlightController; docs/ARCHITECTURE.md §14) -----------------------
+    /** Porkchop grid (C3, arrival v∞) for departure body × arrival body over the date ranges, as JSON. */
+    std::string ComputePorkchop(int from, int to, double departureStartJd, double departureSpanDays, double tofMinDays,
+                                double tofMaxDays, int departureSteps, int tofSteps);
+    /** Plan a direct transfer and put a craft on it (Sol only). */
+    bool PlanTransfer(int from, int to, double departureJd, double tofDays);
+    /** Plan a real mission preset ("voyager2", "cassini", "new-horizons", …). */
+    bool PlanFlightPreset(const std::string& id);
+    void ClearFlight();
+    /** Chase the craft with the camera (stops mission follow and focus flights). */
+    void SetFlightChase(bool chase);
+    std::string GetFlightPlanJson() const { return _flight.PlanJson(); }
+    std::string GetFlightStateJson() const { return _flight.StateJson(); }
+    static std::string GetFlightPresetsJson() { return FlightController::PresetsJson(); }
     /** The last frame's FrameProfile as JSON (perf HUD); resets the worst-frame window. */
     std::string GetFrameStatsJson();
     /** GPU stage timers (gfx/GpuTimer.h): on for the perf HUD and debug-level FrameStats. */
@@ -364,8 +380,14 @@ private:
     TerrainController _terrain{_moduleContext, _renderer};
     SpaceWeatherController _spaceWeather{_moduleContext};
     MissionController _missions{_moduleContext, _camera};
+    FlightController _flight{_moduleContext, _missions};
     /** Updated and contributing to the snapshot once a frame, in this order (RenderFrame). */
-    std::array<IAppModule*, 3> _modules{&_missions, &_terrain, &_spaceWeather};
+    std::array<IAppModule*, 4> _modules{&_missions, &_flight, &_terrain, &_spaceWeather};
+    /** Input took the camera back: stop mission follow and the flight chase. */
+    void StopCameraFollow() {
+        _missions.Stop();
+        _flight.StopChase();
+    }
     CameraController _cameraController{_camera, _moduleContext, _terrain, _missions};
     Cinematics _cinematics{*this};
 
@@ -415,6 +437,8 @@ private:
     void UpdateObserveFrame();          // Observe: park the camera above Earth so loading/LOD follow it
     void ApplyObserveEnvOverride();     // SOLARSYSTEM_OBSERVE=lat,lon[,jd[,az,el,fov]] for headless captures
     void ApplyScaleEnvOverride();       // SOLARSYSTEM_SCALE=compressed|realistic: the web's scale toggle, natively
+    void
+    ApplyFlightEnvOverride(); // SOLARSYSTEM_FLIGHT=earth-mars:2026-11-01:210 | voyager2: plan, jump to launch, chase
     void ApplyCameraPoseEnvOverride();  // SOLARSYSTEM_CAMERA_POSE=x,y,z,yaw,pitch[,jd]: web setCameraPose, natively
     /** Once per frame, after everything that moves the camera: put the render origin on it. */
     void UpdateRenderOrigin();

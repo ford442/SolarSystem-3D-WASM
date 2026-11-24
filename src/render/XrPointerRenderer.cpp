@@ -39,6 +39,7 @@ void XrPointerRenderer::Draw(const glm::mat4& projection, const glm::mat4& view,
     _shader->SetMat4("view", view);
     _shader->SetVec3("cameraPos", cameraPos);
     _shader->SetFloat("ribbonWidth", 0.045f);
+    _shader->SetFloat("minDistScale", 1.0f);
     _shader->SetFloat("uBaseOpacity", 0.9f);
     _shader->SetInt("uFocused", 1);
 

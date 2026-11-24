@@ -285,6 +285,54 @@ void Renderer::FollowMissionPathOrigin(const MissionCatalog::Catalog& catalog, i
     }
 }
 
+void Renderer::PrepareFlight(const FrameContext& ctx) {
+    const FlightFrame* flight = ctx.scene.flight;
+    if (!flight || !flight->path || flight->path->size() < 2) {
+        _flightUploaded = false;
+        return;
+    }
+    if (!_flightPath) {
+        _flightPath = std::make_unique<MissionPathRenderer>();
+        _flightTrail = std::make_unique<MissionPathRenderer>();
+    }
+    // The vertices are relative to an upload origin, like the mission paths; a new plan, a
+    // scale change, a lost context (Empty) or a far-moved render origin re-uploads the path.
+    const bool rebase = glm::distance(OrbitLayout::GetRenderOrigin(), _flightPathOrigin) > kMissionPathRebaseDistance;
+    const bool pathStale = !_flightUploaded || flight->version != _flightPathVersion || rebase || _flightPath->Empty();
+    if (pathStale) {
+        _flightPathOrigin = OrbitLayout::GetRenderOrigin();
+        _flightPathVersion = flight->version;
+        std::vector<glm::vec3> local;
+        local.reserve(flight->path->size());
+        for (const glm::dvec3& p : *flight->path) {
+            local.emplace_back(p - _flightPathOrigin);
+        }
+        _flightPath->Upload(local);
+        _flightTrailSamples = static_cast<std::size_t>(-1);
+    }
+    // The trail ends on the craft, so it is re-uploaded while the craft moves (a few hundred
+    // points at most) and left alone before launch and after arrival.
+    const std::size_t flown = std::min(flight->flownSamples, flight->path->size());
+    const bool moving = flown > 0 && flown < flight->path->size();
+    if (pathStale || moving || flown != _flightTrailSamples || _flightTrail->Empty()) {
+        std::vector<glm::vec3> trail;
+        trail.reserve(flown + 1);
+        for (std::size_t i = 0; i < flown; ++i) {
+            trail.emplace_back((*flight->path)[i] - _flightPathOrigin);
+        }
+        if (moving) {
+            trail.emplace_back(flight->craftWorld - _flightPathOrigin);
+        }
+        if (trail.size() >= 2) {
+            _flightTrail->Upload(trail);
+        } else {
+            _flightTrail->Clear();
+        }
+        _flightTrailSamples = flown;
+    }
+    _flightUploaded = true;
+}
+
 void Renderer::RenderMissionPaths(rhi::CommandList& cmd, const FrameContext& ctx) const {
     // Declared once the paths are uploaded (Features::missionPaths).
     cmd.SetPipelineState(rhi::PipelineState()
@@ -300,7 +348,7 @@ void Renderer::RenderMissionPaths(rhi::CommandList& cmd, const FrameContext& ctx
         if (!_missionPathMeshes[i] || _missionPathMeshes[i]->Empty()) {
             continue;
         }
-        if (i >= ctx.scene.missions->missions.size()) {
+        if (!ctx.scene.missions || i >= ctx.scene.missions->missions.size()) {
             break;
         }
         const auto& mission = ctx.scene.missions->missions[i];
@@ -312,6 +360,29 @@ void Renderer::RenderMissionPaths(rhi::CommandList& cmd, const FrameContext& ctx
         if (probe && probe->has_value()) {
             _missionPathMeshes[i]->DrawProbe(ctx.view.projection, ctx.view.view, camPos, ctx.view.right, ctx.view.up,
                                              **probe, mission.color);
+        }
+    }
+
+    if (const FlightFrame* flight = ctx.scene.flight; flight && _flightUploaded && _flightPath) {
+        // Constant on-screen size: the chase camera rides a few radii from the craft, where
+        // the probe paths' minimum width (scene units) would fill the view.
+        const glm::vec3 flightOffset(_flightPathOrigin - ctx.view.renderOrigin);
+        MissionPathRenderer::Style planned;
+        planned.ribbonWidth = 0.16f; // ~1.5 px at 960 px across a 45 degree field
+        planned.minDistScale = 0.0f;
+        MissionPathRenderer::Style flown = planned;
+        flown.ribbonWidth = 0.3f;
+        MissionPathRenderer::Style marker = planned;
+        marker.probeAngularSize = 0.012f;
+        _flightPath->Draw(ctx.view.projection, ctx.view.view, camPos, flightOffset, flight->color, 0.35f, false,
+                          planned);
+        if (!_flightTrail->Empty()) {
+            _flightTrail->Draw(ctx.view.projection, ctx.view.view, camPos, flightOffset, flight->color, 0.95f, true,
+                               flown);
+        }
+        if (flight->craftVisible) {
+            _flightPath->DrawProbe(ctx.view.projection, ctx.view.view, camPos, ctx.view.right, ctx.view.up,
+                                   flight->craftRender, flight->color, marker);
         }
     }
 

@@ -27,6 +27,13 @@ set(SOLARSYSTEM_TEST_SOURCES
     ${CMAKE_SOURCE_DIR}/src/QualitySettings.cpp
     ${CMAKE_SOURCE_DIR}/src/assets/PlanetManifestLoader.cpp
     ${CMAKE_SOURCE_DIR}/src/astro/MissionCatalog.cpp
+    ${CMAKE_SOURCE_DIR}/src/astro/flight/FlightConstants.cpp
+    ${CMAKE_SOURCE_DIR}/src/astro/flight/StateVector.cpp
+    ${CMAKE_SOURCE_DIR}/src/astro/flight/Lambert.cpp
+    ${CMAKE_SOURCE_DIR}/src/astro/flight/Porkchop.cpp
+    ${CMAKE_SOURCE_DIR}/src/astro/flight/Propagator.cpp
+    ${CMAKE_SOURCE_DIR}/src/astro/flight/FlightPlan.cpp
+    ${CMAKE_SOURCE_DIR}/src/astro/flight/Spacecraft.cpp
     ${CMAKE_SOURCE_DIR}/src/assets/TextureLoadingQueue.cpp
     ${CMAKE_SOURCE_DIR}/src/assets/TextureLODController.cpp
     ${CMAKE_SOURCE_DIR}/src/assets/WebResourceFetcher.cpp
@@ -85,6 +92,7 @@ add_executable(SolarSystemTests
     test_satellite_orbit.cpp
     test_eclipse_caster.cpp
     test_mission_catalog.cpp
+    test_flight.cpp
     test_body_catalog.cpp
     test_star_physics.cpp
     test_star_systems.cpp

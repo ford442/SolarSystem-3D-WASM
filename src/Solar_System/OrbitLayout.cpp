@@ -331,6 +331,10 @@ float GetOrbitRadius(Body body) {
     return static_cast<float>(orbitRadius(body));
 }
 
+double GetOrbitRadiusDouble(Body body) {
+    return orbitRadius(body);
+}
+
 bool UsesTrueRadius(Body body) {
     if (!g_isSol) {
         return row(body).trueRadius;

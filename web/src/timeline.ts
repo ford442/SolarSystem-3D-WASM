@@ -78,7 +78,7 @@ export interface TimelineKeyframe {
      */
     jd?: number;
     dateEase?: DateEase;
-    /** Body id from the catalog ("earth", "moon", …), `mission:<id>`, or "sun" (default). */
+    /** Body id from the catalog ("earth", "moon", …), `mission:<id>`, "flight" (the planned craft), or "sun" (default). */
     focus?: string;
     camera: TimelineCamera;
     /** Path of the segment that starts here; `polar` needs the next key on the same focus. */

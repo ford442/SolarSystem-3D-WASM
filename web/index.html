@@ -373,6 +373,7 @@
                             Copy link to this tour step
                         </button>
                         <button id="timeline-open" class="settings-share" type="button">Cinematics and video…</button>
+                        <button id="flight-open" class="settings-share" type="button">Plan a flight…</button>
                     </div>
                     <button id="enter-vr" class="settings-vr" type="button" hidden>Enter VR</button>
                     <button id="exit-vr" class="settings-vr settings-vr-exit" type="button" hidden>Exit VR</button>
@@ -385,6 +386,76 @@
             <p id="storm-card-title" class="storm-card-title"></p>
             <ul id="storm-card-lines" class="storm-card-lines"></ul>
         </aside>
+        <section id="flight-panel" class="timeline-panel flight-panel" aria-label="Flight planner" hidden>
+            <div class="timeline-row">
+                <strong class="flight-title">Flight planner</strong>
+                <button
+                    id="flight-close"
+                    class="timeline-btn timeline-close"
+                    type="button"
+                    aria-label="Close the flight planner"
+                >
+                    ×
+                </button>
+            </div>
+            <div class="timeline-row timeline-wrap">
+                <label class="timeline-field"
+                    >From
+                    <select id="flight-from"></select
+                ></label>
+                <label class="timeline-field"
+                    >To
+                    <select id="flight-to"></select
+                ></label>
+                <label class="timeline-field">Departures from <input id="flight-dep-start" type="date" /></label>
+                <label class="timeline-field"
+                    >over (days)
+                    <input id="flight-dep-span" class="flight-number" type="number" min="10" max="3650" value="180"
+                /></label>
+                <label class="timeline-field"
+                    >Flight time (days)
+                    <input id="flight-tof-min" class="flight-number" type="number" min="5" max="20000" value="100" />
+                    –
+                    <input id="flight-tof-max" class="flight-number" type="number" min="10" max="20000" value="400"
+                /></label>
+                <label class="timeline-field"
+                    >Colour by
+                    <select id="flight-metric">
+                        <option value="total">C3 + v∞² (total)</option>
+                        <option value="c3">Departure C3</option>
+                        <option value="vinf">Arrival v∞</option>
+                    </select>
+                </label>
+                <button id="flight-compute" class="timeline-btn timeline-btn-primary" type="button">Porkchop</button>
+            </div>
+            <div class="flight-plot">
+                <canvas
+                    id="flight-porkchop"
+                    class="flight-porkchop"
+                    width="384"
+                    height="256"
+                    aria-label="Porkchop plot: departure date across, flight time up; click a cell to plan it"
+                ></canvas>
+                <p id="flight-axes" class="flight-axes"></p>
+            </div>
+            <p id="flight-hover" class="flight-readout" aria-live="polite"></p>
+            <div class="timeline-row timeline-wrap">
+                <select id="flight-preset" aria-label="Real missions">
+                    <option value="">Real missions…</option>
+                </select>
+                <button id="flight-launch" class="timeline-btn timeline-btn-primary" type="button" disabled>
+                    Launch
+                </button>
+                <label class="timeline-field flight-check"
+                    ><input id="flight-chase" type="checkbox" checked /> Chase camera</label
+                >
+                <button id="flight-video" class="timeline-btn" type="button" disabled>Video timeline…</button>
+                <button id="flight-copy-link" class="timeline-btn" type="button" disabled>Copy link</button>
+                <button id="flight-clear" class="timeline-btn" type="button" disabled>Clear</button>
+            </div>
+            <dl id="flight-report" class="flight-report"></dl>
+            <p id="flight-status" class="timeline-status" aria-live="polite"></p>
+        </section>
         <section id="timeline-panel" class="timeline-panel" aria-label="Cinematic timeline" hidden>
             <div class="timeline-row">
                 <select id="timeline-select" class="timeline-select" aria-label="Timeline"></select>

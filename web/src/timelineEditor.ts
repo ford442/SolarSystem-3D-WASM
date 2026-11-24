@@ -47,13 +47,20 @@ function writeDraft(timeline: Timeline): void {
 
 const emptyTimeline = (): Timeline => ({ id: 'my-timeline', title: 'My timeline', durationSec: 0, keyframes: [] });
 
+/** What the editor offers other panels: its player, and opening the dock on a generated timeline. */
+export interface TimelineEditorHandle {
+    player: TimelinePlayer;
+    /** Open the dock with `timeline` loaded as the working (custom) timeline, ready to play or record. */
+    edit(timeline: Timeline, status?: string): void;
+}
+
 export function initTimelineEditor(options: {
     runtime: SolarSystemRuntime;
     canvas: HTMLCanvasElement;
     deepLink: DeepLinkViewState;
     tourPlayer?: TourPlayer;
     caption: HTMLElement;
-}): TimelinePlayer {
+}): TimelineEditorHandle {
     const { runtime, canvas, deepLink, tourPlayer, caption } = options;
     const panel = queryRequired('timeline-panel');
     const openButton = queryRequired('timeline-open', HTMLButtonElement);
@@ -554,5 +561,13 @@ export function initTimelineEditor(options: {
         },
     };
 
-    return player;
+    return {
+        player,
+        edit: (timeline, text) => {
+            open();
+            use(timeline, null);
+            writeDraft(timeline);
+            setStatus(text ?? timeline.description ?? timeline.title);
+        },
+    };
 }

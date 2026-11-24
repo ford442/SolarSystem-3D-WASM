@@ -55,6 +55,7 @@ void Renderer::PrepareFrame(const FrameContext& ctx) {
     PrepareSpaceWeather(ctx);
     // Field-line traces finished by their jobs go to the GPU before anything draws them.
     CollectMagneticFieldTraces();
+    PrepareFlight(ctx);
 }
 
 void Renderer::DescribeFrame(const FrameContext& ctx, int viewCount, FramePlan::Features& f) {
@@ -83,7 +84,8 @@ void Renderer::DescribeFrame(const FrameContext& ctx, int viewCount, FramePlan::
     f.shadows = ctx.sim.shadowQuality > 0;
 
     f.orbitPaths = _orbitLinesEnabled && _orbitPathRenderer && scene.sun;
-    f.missionPaths = !_missionPathMeshes.empty() && scene.missions;
+    // The flight planner's craft draws in the same pass as the probes' paths.
+    f.missionPaths = (!_missionPathMeshes.empty() && scene.missions) || (scene.flight && _flightUploaded);
 #ifdef __EMSCRIPTEN__
     f.xrPointers = ctx.xr && _xrPointerRenderer && ctx.sim.qualityPreset > 0;
 #endif

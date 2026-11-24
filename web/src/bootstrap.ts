@@ -12,6 +12,7 @@ import { createMusicPlayer } from './music';
 import { initSettingsPanel } from './settingsPanel';
 import { initSystemPicker, loadSystemIndex, SOL_SYSTEM_ID, systemFactsUrl } from './systemPicker';
 import { initTimelineEditor } from './timelineEditor';
+import { initFlightPlanner } from './flightPlanner';
 import { initTouchControls, isMobileLikeDevice } from './touchControls';
 import { initWebXr } from './webxr';
 import { installPerfHud, perfHudRequested } from './perfHud';
@@ -544,7 +545,11 @@ void startModule()
 
             initStormCard({ runtime, card: stormCardElement, title: stormCardTitle, lines: stormCardLines });
 
-            initTimelineEditor({ runtime, canvas, deepLink, tourPlayer, caption: tourCaption });
+            const timelineEditor = initTimelineEditor({ runtime, canvas, deepLink, tourPlayer, caption: tourCaption });
+            const flightPlanner = initFlightPlanner({ runtime, editor: timelineEditor, status: settingsStatus });
+            if (deepLink.flight) {
+                flightPlanner.applyLink(deepLink.flight);
+            }
 
             if (deepLink.planet !== undefined && !deepLink.mission && !deepLink.tour && !deepLink.timeline) {
                 explorer.applyDeepLinkPlanet(deepLink.planet, { focusCamera: false });

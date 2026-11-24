@@ -2000,7 +2000,83 @@ The acceptance case is the link above. At the first Halloween CME's arrival, Ear
 reaches ~50° magnetic latitude, and the day side is compressed within an hour of the shock
 (standoff below 0.8 of quiet; `HalloweenCmeArrivesWhenObservedAndSaturatesKp`).
 
-## 14. Common pitfalls
+## 14. Flight planner
+
+The viewer doubles as an astrodynamics sandbox: pick a departure body, a target and a date
+window, read the porkchop plot, launch, and fly the transfer — or fly a real mission rebuilt
+from its encounter dates. It is patched conics on the same ephemeris the scene draws, so a
+transfer that ends on Mars ends on Mars's drawn disc on the arrival date. It is a teaching
+tool: good to a few percent against flown missions, not a navigation tool (§11).
+
+- **Physics** is GL-free and unit-tested (`tests/test_flight.cpp`), in `src/astro/flight/`:
+  - `Lambert` — Izzo's solver (Celest. Mech. Dyn. Astr. 121, 2015): Householder iterations on
+    the time-of-flight equation, Battin's series near the parabola, and every multi-revolution
+    solution the time of flight allows (a left and a right branch per revolution count).
+    Checked against Curtis Ex. 5.2 and Vallado Ex. 7-5 to 1e-3 km/s, and against the Mars 2020
+    launch (C3 = 14.49 km²/s², ULA mission brochure) to 0.1 km/s in v∞.
+  - `Porkchop` — C3 and arrival v∞ over departure × time of flight, one 0-rev prograde Lambert
+    solve per cell. The grid is cut into 8-row tiles that run as `Jobs::Submit` jobs: threaded
+    natively and on the `-mt` web build, inline on the single-threaded one, same numbers.
+    72 × 48 cells take a few milliseconds.
+  - `Propagator` — exact two-body arcs (universal variables) for the legs; an adaptive
+    Dormand–Prince 5(4) integrator against the ephemeris (Sun, Mercury … Pluto, the Moon about
+    the Standish Earth–Moon barycentre; direct and indirect terms) for an n-body sanity check;
+    sphere-of-influence crossings; and flyby geometry — the periapsis an unpowered pass needs
+    for the turn between v∞ in and out (solved for unequal speeds), the powered Δv where they
+    differ, and the B-plane (B·T in the ecliptic, B·R toward south).
+  - `FlightPlan` — a sequence of encounters (body, date) becomes one Lambert leg per pair; the
+    solution chosen for each leg (0-rev or any multi-rev branch) is the cheapest chain of launch
+    Δv + powered-flyby Δv + capture Δv, found by a dynamic programme over (leg, solution), with
+    a flyby below the body's safe altitude penalised. `CheckLegNBody` leaves the departure SOI
+    on the escape hyperbola and integrates to arrival: the Mars 2020 arc then passes Mars at
+    ~0.5 SOI radii (what TCMs null in flight).
+  - Presets rebuild Voyager 1 (EJS), Voyager 2 (EJSUN), Cassini (EVVEJS) and New Horizons (EJP)
+    from their published launch and closest-approach dates. Voyager 2's rebuilt flybys need
+    < 0.05 km/s of powered Δv and land within 5% of the flown periapsis altitudes (Uranus:
+    81 558 km vs 81 500 km). Cassini's Venus–Venus leg flew a deep-space manoeuvre, so its
+    rebuilt Venus flybys show ~0.7 and ~2 km/s of powered Δv instead. A preset with a stored
+    path in `resource/missions/catalog.json` is compared with it (`[Flight] … rms … AU`): those
+    stored paths are splines through the same encounter points, so they agree at the planets
+    and differ by ~1 AU between them.
+  - `Spacecraft` — a catalog-style row (id, name, colour) and the plan; its position is a
+    function of the date, in double heliocentric scene units like the camera's.
+- **Scene mapping.** The scene draws Mercury … Vesta on circles of their mean distance
+  (realistic) or art radius (compressed), in the ephemeris direction. A leg's position is
+  mapped with `HelioAuToSceneDouble` and then scaled radially by a factor that blends, over the
+  leg, from the departure body's drawn/true ratio to the arrival body's
+  (`Flight::SceneStretch`): the craft leaves its planet's drawn position and arrives on its
+  target's exactly, on the right date, in both scale modes
+  (`Spacecraft.ArrivesOnTheDrawnPlanetInBothScaleModes`). On realistic scale the factor stays
+  within a planet's eccentricity of 1.
+- **Application side.** `FlightController` (an `IAppModule`) owns the last porkchop, the plan
+  and its `Spacecraft`, and contributes a `FlightFrame` (the path in heliocentric scene units,
+  how much of it is flown, the craft in the render frame). It rebuilds the path when the scale
+  mode changes, and a system jump clears the flight (Sol only).
+- **Renderer side.** The `mission-paths` pass draws it: the planned path dim, the flown trail
+  bright up to the craft, and the craft's marker. `Renderer::PrepareFlight` uploads them
+  (relative to an upload origin, like the mission paths) when the plan, the scale or the
+  render origin changes, and the trail while the craft moves. Their `MissionPathStyle` keeps a
+  constant on-screen width (`minDistScale` 0) so a chase camera a few radii from the craft
+  does not see a wall.
+- **Chase camera.** `CameraController::Chase` poses the camera behind and above a target along
+  its direction of motion; `FlightController::UpdateChase` feeds it the craft once a frame
+  before input, closing in on the body ahead but never inside 8 of its radii. Like mission
+  follow it is authored motion: the anchor is dropped and nothing co-rotates. Movement keys
+  stop it.
+
+| | |
+|-|-|
+| Exports (`WasmExports.cpp`) | `GetPorkchopJson(from, to, depStartJd, depSpanDays, tofMin, tofMax, nx, ny)`, `PlanTransfer(from, to, depJd, tofDays)`, `PlanFlightPreset(id)`, `ClearFlight`, `SetFlightChase`, `GetFlightPlanJson`, `GetFlightStateJson`, `GetFlightPresetsJson`; `GetSceneStateJson` carries `flight` |
+| Page | "Plan a flight…" in the settings panel opens `web/src/flightPlanner.ts`: body pickers, the date window, the porkchop as a canvas heat-map (hover for C3 / v∞, click to plan), Launch (date to departure, a time scale that flies it in ~40 s, chase on), real-mission presets, "Video timeline…" and "Copy link". `web/src/flight.ts` is the pure half (parsers, colours, the deep link, the timeline), covered by `flight.test.ts` |
+| Video | `flightTimeline` turns a plan into a timeline: each encounter framed a few radii off on its date, the craft (`focus: "flight"`, resolved from the scene state) between them. "Video timeline…" opens it in the cinematic dock, which records it with `capture.ts` |
+| Deep link | `?flight=earth-mars&dep=2026-11-01&tof=210` plans and launches; `?flight=earth-mars` opens the porkchop; `?flight=voyager2` flies a preset |
+| Native | `SOLARSYSTEM_FLIGHT=earth-mars:2026-11-01:210` or `=voyager2`: plan, set the date to launch, chase |
+
+Patched conics draw the legs meeting at a planet's centre; the planetocentric hyperbola is
+reported (periapsis, B-plane), not flown, and on compressed scale an enlarged planet can hide
+the craft during its last hours. Dates are the ephemeris's UTC-ish Julian dates (§11).
+
+## 15. Common pitfalls
 
 1. Do not use a blocking main loop on WASM.
 2. Do not spawn `std::thread` in the web build.
@@ -2020,7 +2096,7 @@ reaches ~50° magnetic latitude, and the day side is compressed within an hour o
 
 ---
 
-## 15. Local verification (summary)
+## 16. Local verification (summary)
 
 ```bash
 ./build-web.sh
@@ -2055,7 +2131,7 @@ Full scenarios: [docs/plans/TESTING_GUIDE.md](plans/TESTING_GUIDE.md).
 
 ---
 
-## 16. Related documentation
+## 17. Related documentation
 
 | Document | Purpose |
 |----------|---------|
