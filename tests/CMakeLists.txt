@@ -38,6 +38,10 @@ set(SOLARSYSTEM_TEST_SOURCES
     ${CMAKE_SOURCE_DIR}/src/core/FrameProfile.cpp
     ${CMAKE_SOURCE_DIR}/src/render/graph/FrameGraph.cpp
     ${CMAKE_SOURCE_DIR}/src/render/graph/FramePlan.cpp
+    ${CMAKE_SOURCE_DIR}/src/gfx/rhi/Backend.cpp
+    ${CMAKE_SOURCE_DIR}/src/gfx/rhi/PipelineTracker.cpp
+    ${CMAKE_SOURCE_DIR}/src/gfx/rhi/RenderPassPlanner.cpp
+    ${CMAKE_SOURCE_DIR}/src/gfx/rhi/TimestampPairs.cpp
     ${CMAKE_SOURCE_DIR}/src/3rdparty/ktx2_reader.cpp
     ${CMAKE_SOURCE_DIR}/src/3rdparty/nv_dds.cpp
     ${CMAKE_SOURCE_DIR}/src/gfx/ShaderSource.cpp
@@ -91,6 +95,7 @@ add_executable(SolarSystemTests
     test_giant_atmospheres.cpp
     test_frame_graph.cpp
     test_frame_plan.cpp
+    test_rhi_webgpu_model.cpp
     test_frustum.cpp
     test_shadow_fit.cpp
     test_log.cpp
@@ -168,3 +173,41 @@ if(EXISTS "${CMAKE_SOURCE_DIR}/external/glm")
 endif()
 target_link_libraries(SolarSystemGlTests PRIVATE GTest::gtest_main OpenGL::GL GLEW::GLEW glfw)
 gtest_discover_tests(SolarSystemGlTests TEST_PREFIX "gl." DISCOVERY_MODE PRE_TEST)
+
+# The WebGPU backend against a real device (docs/ARCHITECTURE.md §7.9): Dawn on whatever Vulkan
+# adapter there is (CI: SwiftShader or lavapipe; set VK_ICD_FILENAMES to pick one), plus a hidden
+# GL context for the GL-vs-WebGPU parity tests. No adapter: every test skips.
+if(SOLARSYSTEM_WEBGPU)
+    add_executable(SolarSystemWgpuTests
+        wgpu/test_wgpu.cpp
+        ${CMAKE_SOURCE_DIR}/src/gfx/rhi/PipelineTracker.cpp
+        ${CMAKE_SOURCE_DIR}/src/gfx/rhi/RenderPassPlanner.cpp
+        ${CMAKE_SOURCE_DIR}/src/gfx/rhi/TimestampPairs.cpp
+        ${CMAKE_SOURCE_DIR}/src/gfx/rhi/wgpu/WgpuDevice.cpp
+        ${CMAKE_SOURCE_DIR}/src/gfx/rhi/wgpu/WgpuProgram.cpp
+        ${CMAKE_SOURCE_DIR}/src/gfx/rhi/wgpu/WgpuCommandList.cpp
+        ${CMAKE_SOURCE_DIR}/src/gfx/rhi/wgpu/WgpuSelfTest.cpp
+        ${CMAKE_SOURCE_DIR}/src/gfx/Shader.cpp
+        ${CMAKE_SOURCE_DIR}/src/gfx/ShaderSource.cpp
+        ${CMAKE_SOURCE_DIR}/src/gfx/GlCapabilities.cpp
+        ${CMAKE_SOURCE_DIR}/src/assets/TextureFormatSupport.cpp
+        ${CMAKE_SOURCE_DIR}/src/gfx/GpuResourceRegistry.cpp
+        ${CMAKE_SOURCE_DIR}/src/core/FrameProfile.cpp
+        ${CMAKE_SOURCE_DIR}/src/core/Json.cpp
+        ${CMAKE_SOURCE_DIR}/src/core/Log.cpp
+    )
+    target_compile_definitions(SolarSystemWgpuTests PRIVATE SOLARSYSTEM_SOURCE_DIR="${CMAKE_SOURCE_DIR}")
+    target_include_directories(SolarSystemWgpuTests PRIVATE ${CMAKE_SOURCE_DIR}/src)
+    if(EXISTS "${CMAKE_SOURCE_DIR}/external/glm")
+        target_include_directories(SolarSystemWgpuTests PRIVATE ${CMAKE_SOURCE_DIR}/external/glm)
+    endif()
+    target_link_libraries(SolarSystemWgpuTests PRIVATE GTest::gtest_main dawn::webgpu_dawn OpenGL::GL GLEW::GLEW glfw)
+    add_dependencies(SolarSystemWgpuTests wgsl_shaders)
+    gtest_discover_tests(SolarSystemWgpuTests TEST_PREFIX "wgpu." DISCOVERY_MODE PRE_TEST)
+
+    # The toolchain itself, over the whole corpus: any stage permutation that stops translating fails.
+    add_test(NAME ShaderWgsl
+             COMMAND wgsl_shader_compiler --shaders resource/shaders --out ${CMAKE_BINARY_DIR}/wgsl-check
+                     --glslang ${SOLARSYSTEM_GLSLANG} --tint ${SOLARSYSTEM_TINT} --quiet
+             WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
+endif()

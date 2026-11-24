@@ -71,7 +71,9 @@ jobs:
           # Older files still have ~1500 include-cleaner findings, so the check is held to the
           # lines this PR touches (clang-tidy-diff) rather than the whole tree. build/ has
           # compile_commands.json from the step above.
-          git diff -U0 HEAD^1 -- 'src/*.cpp' ':!src/3rdparty' \
+          # src/gfx/rhi/wgpu is only compiled with SOLARSYSTEM_WEBGPU: the build-webgpu-backend
+          # job checks it against that build's compile_commands.json.
+          git diff -U0 HEAD^1 -- 'src/*.cpp' ':!src/3rdparty' ':!src/gfx/rhi/wgpu' \
             | clang-tidy-diff -p1 -path build -quiet
 
       - name: Build and run unit tests (CMake preset native-tests)
@@ -132,3 +134,79 @@ jobs:
             echo "A shader failed to compile or link"
             exit 1
           fi
+
+  # The WebGPU backend (docs/plans/WEBGPU_BACKEND_PLAN.md): Dawn, Tint and glslang at the
+  # release emsdk's emdawnwebgpu pins (scripts/setup-webgpu-toolchain.sh, cached: building Dawn
+  # is the slow part), then the native-wgpu preset and its tests on Mesa's lavapipe (Vulkan) with
+  # llvmpipe GL under Xvfb for the GL-vs-WebGPU parity cases.
+  build-webgpu-backend:
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 2
+
+      - name: Install native dependencies (+ lavapipe, clang for Dawn)
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            build-essential cmake ninja-build clang python3 git \
+            libglew-dev libglfw3-dev libgl1-mesa-dev \
+            libsdl2-dev libsdl2-image-dev libsdl2-mixer-dev \
+            libfreetype-dev libassimp-dev libglm-dev \
+            mesa-vulkan-drivers libvulkan1 xvfb ccache clang-tidy
+
+      - name: Restore the WebGPU toolchain
+        uses: actions/cache@v4
+        with:
+          path: external/webgpu
+          key: webgpu-toolchain-${{ runner.os }}-${{ hashFiles('scripts/setup-webgpu-toolchain.sh') }}
+
+      - name: Build Dawn, Tint and glslang (cache miss only)
+        run: scripts/setup-webgpu-toolchain.sh
+
+      - name: Build (CMake preset native-wgpu, warnings as errors)
+        run: |
+          cmake --preset native-wgpu -DSOLARSYSTEM_WERROR=ON
+          cmake --build --preset native-wgpu --target SolarSystem SolarSystemTests SolarSystemWgpuTests
+
+      - name: clang-tidy on the WebGPU backend (lines changed by this PR)
+        if: github.event_name == 'pull_request'
+        run: |
+          git diff -U0 HEAD^1 -- 'src/gfx/rhi/wgpu/*.cpp' \
+            | clang-tidy-diff -p1 -path build-wgpu -quiet
+
+      - name: Unit tests and the WGSL toolchain over every shader
+        run: |
+          ./build-wgpu/tests/SolarSystemTests
+          ctest --test-dir build-wgpu --output-on-failure -R '^ShaderWgsl$'
+
+      - name: WebGPU tests on lavapipe (parity against llvmpipe GL)
+        env:
+          LIBGL_ALWAYS_SOFTWARE: "1"
+          MESA_GL_VERSION_OVERRIDE: "4.6"
+          MESA_GLSL_VERSION_OVERRIDE: "460"
+        run: |
+          export VK_ICD_FILENAMES="$(ls /usr/share/vulkan/icd.d/lvp_icd*.json | head -1)"
+          timeout 600s xvfb-run -a ./build-wgpu/tests/SolarSystemWgpuTests 2>&1 | tee /tmp/solar-wgpu-tests.log
+          grep -q "\[  PASSED  \]" /tmp/solar-wgpu-tests.log
+          # A skip means no adapter (or no GL for the parity case): that is a failure here.
+          if grep -q "\[  SKIPPED \]" /tmp/solar-wgpu-tests.log; then
+            echo "WebGPU tests were skipped: no Vulkan adapter or no GL context"
+            exit 1
+          fi
+
+      - name: Shader self-test with the WGSL leg
+        env:
+          LIBGL_ALWAYS_SOFTWARE: "1"
+          MESA_GL_VERSION_OVERRIDE: "4.6"
+          MESA_GLSL_VERSION_OVERRIDE: "460"
+          SDL_AUDIODRIVER: dummy
+          SOLARSYSTEM_SHADER_SELFTEST: "1"
+        run: |
+          export VK_ICD_FILENAMES="$(ls /usr/share/vulkan/icd.d/lvp_icd*.json | head -1)"
+          timeout 300s xvfb-run -a ./build-wgpu/SolarSystem 2>&1 | tee /tmp/solar-wgsl.log
+          grep -q "\[ShaderSelfTest\] .* WGSL programs compiled and linked .* OK" /tmp/solar-wgsl.log

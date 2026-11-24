@@ -16,6 +16,13 @@ option(SOLARSYSTEM_WERROR "Treat compiler warnings as errors (CI)" OFF)
 # loads it only when `crossOriginIsolated` is true (core/JobSystem.h, docs/CROSS_ORIGIN_HEADERS.md).
 option(SOLARSYSTEM_WEB_THREADS "Emscripten: build the pthread variant SolarSystem-mt" OFF)
 
+# The WebGPU backend (gfx/rhi/wgpu/, docs/ARCHITECTURE.md §7.9, docs/plans/WEBGPU_BACKEND_PLAN.md):
+# emdawnwebgpu (--use-port) on the web, Dawn natively (find_package(Dawn); point CMAKE_PREFIX_PATH
+# at a Dawn install). Off by default: the WebGL 2 / GL 4.6 builds are byte-for-byte what they were.
+# On the web it is a third binary (SolarSystem-wgpu[-mt]), which web/src/wasmVariant.ts loads only
+# for ?gpu=webgpu on a deployment that publishes it.
+option(SOLARSYSTEM_WEBGPU "Build the WebGPU backend (emdawnwebgpu on the web, Dawn natively)" OFF)
+
 # ccache when it is installed. Emscripten is left out on purpose: emcc is a wrapper script,
 # so build-web.sh hands ccache to it through EM_COMPILER_WRAPPER instead.
 if(NOT EMSCRIPTEN)
@@ -90,6 +97,7 @@ set(SOLARSYSTEM_SOURCES_CORE
     src/render/graph/FrameGraph.cpp
     src/render/graph/FramePlan.cpp
     src/gfx/rhi/GlCommandList.cpp
+    src/gfx/rhi/Backend.cpp
     src/StarSystemFactory.cpp
     src/PlatformWindow.cpp
     src/InputHandler.cpp
@@ -208,6 +216,19 @@ set(SOLARSYSTEM_SOURCES
 
 if(WIN32)
     list(APPEND SOLARSYSTEM_SOURCES resource/resource.rc)
+endif()
+
+if(SOLARSYSTEM_WEBGPU)
+    list(APPEND SOLARSYSTEM_SOURCES
+        src/gfx/rhi/PipelineTracker.cpp
+        src/gfx/rhi/RenderPassPlanner.cpp
+        src/gfx/rhi/TimestampPairs.cpp
+        src/gfx/rhi/wgpu/WgpuDevice.cpp
+        src/gfx/rhi/wgpu/WgpuProgram.cpp
+        src/gfx/rhi/wgpu/WgpuCommandList.cpp
+        src/gfx/rhi/wgpu/WgpuSelfTest.cpp
+        src/gfx/rhi/wgpu/WgpuBringUp.cpp
+    )
 endif()
 
 add_executable(${PROJECT_NAME} ${SOLARSYSTEM_SOURCES})
@@ -335,6 +356,19 @@ if(EMSCRIPTEN)
         set(SOLAR_EM_LINK_OPT_FLAGS -O3 -flto "SHELL:--closure 1" "SHELL:--emit-symbol-map")
     endif()
 
+    if(SOLARSYSTEM_WEBGPU)
+        # webgpu.h / webgpu_cpp.h and the JS bindings (compile and link). The port is downloaded
+        # from Dawn's GitHub release the first time; its version is the one this emsdk pins.
+        list(APPEND SOLAR_EM_PORT_FLAGS "SHELL:--use-port=emdawnwebgpu")
+        # The page creates the GPUDevice (web/src/webgpuContext.ts) and hands it over as
+        # Module['preinitializedWebGPUDevice'], as it does preinitializedWebGLContext.
+        list(TRANSFORM SOLAR_EM_LINK_FLAGS REPLACE "'preinitializedWebGLContext'\\]"
+             "'preinitializedWebGLContext','preinitializedWebGPUDevice']")
+        # The WGSL the toolchain generated (scripts/build-wgsl-shaders.sh, run by build-web.sh).
+        list(APPEND SOLAR_EM_LINK_FLAGS
+            "SHELL:--preload-file ${CMAKE_SOURCE_DIR}/resource/shaders-wgsl@/resource/shaders-wgsl")
+    endif()
+
     if(SOLARSYSTEM_WEB_THREADS)
         # Compile and link: -pthread turns on atomics/bulk memory and shared memory.
         list(APPEND SOLAR_EM_PORT_FLAGS -pthread)
@@ -356,6 +390,13 @@ if(EMSCRIPTEN)
         )
         list(REMOVE_ITEM SOLAR_EM_LINK_FLAGS "SHELL:-sENVIRONMENT=web")
         set_target_properties(${PROJECT_NAME} PROPERTIES OUTPUT_NAME "SolarSystem-mt")
+    endif()
+    if(SOLARSYSTEM_WEBGPU)
+        if(SOLARSYSTEM_WEB_THREADS)
+            set_target_properties(${PROJECT_NAME} PROPERTIES OUTPUT_NAME "SolarSystem-wgpu-mt")
+        else()
+            set_target_properties(${PROJECT_NAME} PROPERTIES OUTPUT_NAME "SolarSystem-wgpu")
+        endif()
     endif()
 
     target_compile_options(${PROJECT_NAME} PRIVATE
@@ -379,6 +420,9 @@ if(EMSCRIPTEN)
     # CONFIGURE_DEPENDS re-globs at build time, so a file added to a preloaded directory
     # is picked up too.
     set(SOLAR_EM_PRELOAD_DIRS shaders missions sky fonts textures_low atmosphere systems/generated)
+    if(SOLARSYSTEM_WEBGPU)
+        list(APPEND SOLAR_EM_PRELOAD_DIRS shaders-wgsl)
+    endif()
     set(SOLAR_EM_LINK_INPUTS
         ${CMAKE_SOURCE_DIR}/scripts/wasm-exports.json
         ${CMAKE_SOURCE_DIR}/resource/planet_manifest.json
@@ -430,6 +474,40 @@ else()
         assimp::assimp
         Threads::Threads
     )
+endif()
+
+if(SOLARSYSTEM_WEBGPU)
+    target_compile_definitions(${PROJECT_NAME} PRIVATE SOLARSYSTEM_WEBGPU=1)
+    if(NOT EMSCRIPTEN)
+        find_package(Dawn REQUIRED)
+        target_link_libraries(${PROJECT_NAME} dawn::webgpu_dawn)
+    endif()
+endif()
+
+# GLSL -> SPIR-V -> WGSL (tools/wgsl_shader_compiler): native builds generate
+# resource/shaders-wgsl/ (gitignored) as part of the build; the web build cannot run a host tool
+# from an Emscripten tree, so build-web.sh runs scripts/build-wgsl-shaders.sh first.
+if(NOT EMSCRIPTEN AND (SOLARSYSTEM_WEBGPU OR SOLARSYSTEM_BUILD_TOOLS))
+    add_subdirectory(tools/wgsl_shader_compiler)
+endif()
+if(SOLARSYSTEM_WEBGPU AND NOT EMSCRIPTEN)
+    if(NOT SOLARSYSTEM_GLSLANG OR NOT SOLARSYSTEM_TINT)
+        message(FATAL_ERROR "SOLARSYSTEM_WEBGPU needs glslang and tint (set SOLARSYSTEM_GLSLANG / SOLARSYSTEM_TINT, "
+                            "or put them on PATH; Tint is built with Dawn, glslang is in Dawn's third_party)")
+    endif()
+    file(GLOB SOLAR_WGSL_INPUTS CONFIGURE_DEPENDS
+         ${CMAKE_SOURCE_DIR}/resource/shaders/*.vs ${CMAKE_SOURCE_DIR}/resource/shaders/*.fs
+         ${CMAKE_SOURCE_DIR}/resource/shaders/common/*.glsl)
+    add_custom_command(
+        OUTPUT ${CMAKE_SOURCE_DIR}/resource/shaders-wgsl/manifest.json
+        COMMAND wgsl_shader_compiler --shaders resource/shaders --out resource/shaders-wgsl
+                --glslang ${SOLARSYSTEM_GLSLANG} --tint ${SOLARSYSTEM_TINT} --quiet
+        WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
+        DEPENDS wgsl_shader_compiler ${SOLAR_WGSL_INPUTS}
+        COMMENT "GLSL -> SPIR-V -> WGSL (resource/shaders-wgsl)"
+        VERBATIM)
+    add_custom_target(wgsl_shaders DEPENDS ${CMAKE_SOURCE_DIR}/resource/shaders-wgsl/manifest.json)
+    add_dependencies(${PROJECT_NAME} wgsl_shaders)
 endif()
 
 if(NOT EMSCRIPTEN AND NOT MSVC)

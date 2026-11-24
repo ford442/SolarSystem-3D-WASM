@@ -1,4 +1,5 @@
 #version 300 es
+// vertex: atmosphere.vs (WebGPU links stages by location: tools/wgsl_shader_compiler pairs them)
 // NEAR_SURFACE (atmosphere.vs) writes depth per fragment.
 // permutations: NEAR_SURFACE
 #ifdef NEAR_SURFACE

@@ -29,3 +29,8 @@ public/SolarSystem.wasm
 public/SolarSystem.data
 public/SolarSystem-mt.js
 public/SolarSystem-mt.wasm
+public/SolarSystem-wgpu.js
+public/SolarSystem-wgpu.wasm
+public/SolarSystem-wgpu.data
+public/SolarSystem-wgpu-mt.js
+public/SolarSystem-wgpu-mt.wasm

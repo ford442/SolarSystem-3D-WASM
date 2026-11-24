@@ -2,18 +2,20 @@ import type { QualityPreset } from './SolarSystem.js';
 import type { SolarSystemInitConfig } from './initialSettings';
 
 /**
- * Single owner of GPU-cost tiering shared by WebGL context creation and backing-store
- * (device-pixel-ratio) sizing. Mirrors GetQualitySettings()'s mobile-forces-cheapest-tier
- * rule in QualitySettings.cpp so TS and C++ agree without duplicating the whole quality table.
+ * Single owner of GPU-cost tiering shared by GPU context creation (the WebGL 2 context, or the
+ * WebGPU adapter request in webgpuContext.ts) and backing-store (device-pixel-ratio) sizing.
+ * Mirrors GetQualitySettings()'s mobile-forces-cheapest-tier rule in QualitySettings.cpp so TS
+ * and C++ agree without duplicating the whole quality table. Was webglContext.ts until the
+ * WebGPU backend arrived (docs/plans/WEBGPU_BACKEND_PLAN.md).
  */
-export type WebGlCostTier = 'lowMobile' | 'medium' | 'full';
+export type GpuCostTier = 'lowMobile' | 'medium' | 'full';
 
 /** lib.dom.d.ts's WebGLContextAttributes predates the WebXR spec's xrCompatible flag. */
 export interface WebGlContextOptions extends WebGLContextAttributes {
     xrCompatible?: boolean;
 }
 
-export function computeWebGlCostTier(qualityPreset: QualityPreset, isMobileWeb: boolean): WebGlCostTier {
+export function computeGpuCostTier(qualityPreset: QualityPreset, isMobileWeb: boolean): GpuCostTier {
     if (isMobileWeb || qualityPreset === 0) return 'lowMobile';
     return qualityPreset === 1 ? 'medium' : 'full';
 }
@@ -28,7 +30,7 @@ export function computeWebGlCostTier(qualityPreset: QualityPreset, isMobileWeb: 
  * Module.contextAttributes entirely. The supported hook is Module.preinitializedWebGLContext:
  * create the context ourselves with the exact attributes we want, and GLFW reuses it as-is.
  */
-export function computeWebGlContextOptions(tier: WebGlCostTier): WebGlContextOptions {
+export function computeWebGlContextOptions(tier: GpuCostTier): WebGlContextOptions {
     return {
         alpha: false,
         // Never multisampled while HDR is on, and every tier that asks for MSAA also has HDR
@@ -51,16 +53,26 @@ export function computeWebGlContextOptions(tier: WebGlCostTier): WebGlContextOpt
 }
 
 /** Backing-store scale (canvas pixel buffer size vs. its CSS layout size), capped per tier. */
-export function computeBackingStoreScale(tier: WebGlCostTier, devicePixelRatio: number): number {
+export function computeBackingStoreScale(tier: GpuCostTier, devicePixelRatio: number): number {
     const cap = tier === 'lowMobile' ? 1 : tier === 'medium' ? 1.5 : 2;
     return Math.min(devicePixelRatio, cap);
 }
 
-export function computeWebGlSizing(config: SolarSystemInitConfig, devicePixelRatio = window.devicePixelRatio || 1) {
-    const tier = computeWebGlCostTier(config.qualityPreset, config.isMobileWeb);
+/**
+ * What the WebGPU adapter request asks for on a tier: the same power preference the WebGL
+ * context gets. MSAA, depth and alpha are not adapter properties in WebGPU; C++ configures the
+ * canvas and its targets itself (gfx/rhi/wgpu).
+ */
+export function computeWebGpuAdapterOptions(tier: GpuCostTier): { powerPreference: 'low-power' | 'high-performance' } {
+    return { powerPreference: tier === 'lowMobile' ? 'low-power' : 'high-performance' };
+}
+
+export function computeGpuSizing(config: SolarSystemInitConfig, devicePixelRatio = window.devicePixelRatio || 1) {
+    const tier = computeGpuCostTier(config.qualityPreset, config.isMobileWeb);
     return {
         tier,
         contextOptions: computeWebGlContextOptions(tier),
+        adapterOptions: computeWebGpuAdapterOptions(tier),
         backingStoreScale: computeBackingStoreScale(tier, devicePixelRatio),
     };
 }

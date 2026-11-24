@@ -223,6 +223,22 @@ VITE_ASSET_BASE=https://assets.example.com/solar-system/2026.07.0/ npm run dev
 
 See [docs/ARCHITECTURE.md § Runtime asset hosting](docs/ARCHITECTURE.md#6-runtime-asset-hosting) for resolution details.
 
+### WebGPU backend (opt-in)
+
+WebGL 2 is the default and needs none of this. The WebGPU backend of the renderer's RHI
+(`src/gfx/rhi/wgpu/`, [docs/plans/WEBGPU_BACKEND_PLAN.md](docs/plans/WEBGPU_BACKEND_PLAN.md))
+is built only on request:
+
+```bash
+scripts/setup-webgpu-toolchain.sh   # Dawn + Tint + glslang into external/webgpu (once; takes a while)
+cmake --workflow --preset native-wgpu
+./build-web.sh --webgpu             # adds SolarSystem-wgpu.{js,wasm,data} to web/public
+cd web && VITE_WEBGPU_BUILD=1 npm run dev   # open /solar-system/?gpu=webgpu&perf=1
+```
+
+`?gpu=webgpu` loads the WebGPU binary when the browser has `navigator.gpu` and the deployment
+publishes it; `?gpu=webgl` forces WebGL 2. Anything else stays on WebGL 2 for now.
+
 ### Web simulation controls
 
 The **Simulation** panel in the upper-right corner controls the running C++/WASM scene without

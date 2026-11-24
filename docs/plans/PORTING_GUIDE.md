@@ -294,8 +294,8 @@ attribute (including ones GLFW hints can't express) takes effect. This key must 
 `-sINCOMING_MODULE_JS_API` (see `CMakeLists.txt`) or Emscripten strips the code path that
 reads it at build time.
 
-`web/src/webglContext.ts` is the single owner of this decision, keyed off one three-way
-`WebGlCostTier` (`lowMobile` / `medium` / `full`) mirroring `GetQualitySettings()`'s existing
+`web/src/gpuContext.ts` is the single owner of this decision, keyed off one three-way
+`GpuCostTier` (`lowMobile` / `medium` / `full`) mirroring `GetQualitySettings()`'s existing
 mobile-forces-cheapest-tier rule. `antialias` is `false` for every tier: the default
 framebuffer is only multisampled when HDR is off *and* the tier asks for samples
 (`ContextMsaaSamples()` in `QualitySettings.cpp`), and no tier is both today. With HDR on the

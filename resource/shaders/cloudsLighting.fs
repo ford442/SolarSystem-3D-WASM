@@ -1,4 +1,5 @@
 #version 300 es
+// vertex: planetLighting.vs (WebGPU links stages by location: tools/wgsl_shader_compiler pairs them)
 // NEAR_SURFACE (planetLighting.vs) writes depth per fragment.
 // permutations: NEAR_SURFACE
 #ifdef NEAR_SURFACE

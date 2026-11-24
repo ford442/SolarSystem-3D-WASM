@@ -59,7 +59,7 @@ struct QualityTierSettings {
  * the colour pass draws into HDR's single-sampled texture, so default-framebuffer MSAA would
  * only resolve an image that is already resolved. Those tiers antialias in the tone-map
  * pass instead (hdr.fs). Native applies this with GLFW_SAMPLES; web mirrors it in
- * web/src/webglContext.ts, which owns the context attributes.
+ * web/src/gpuContext.ts, which owns the context attributes.
  */
 int ContextMsaaSamples(const QualityTierSettings& settings);
 

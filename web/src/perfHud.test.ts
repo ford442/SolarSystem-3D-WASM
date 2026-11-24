@@ -3,6 +3,9 @@ import { formatFrameStats, parseFrameStats, perfHudRequested } from './perfHud';
 
 // The shape FrameProfile::ToJson writes (tests/test_frame_profile.cpp pins the C++ side).
 const SAMPLE = JSON.stringify({
+    backend: 'webgl2',
+    backendName: 'WebGL 2',
+    webgpu: null,
     frameMs: 18.25,
     worstFrameMs: 41.5,
     frames: 300,
@@ -108,6 +111,42 @@ describe('formatFrameStats', () => {
         expect(withGpu.split('\n').find((line) => line.startsWith('skybox'))).toMatch(/0\.25\s+9\.00$/);
         const order = withGpu.split('\n').filter((line) => /×\d/.test(line));
         expect(order[0]).toMatch(/^skybox/); // sorted by GPU time once there is one
+    });
+});
+
+describe('the backend line', () => {
+    it('names the backend, and the WebGPU device with its WGSL count in the WebGPU binary', () => {
+        const stats = parseFrameStats(SAMPLE);
+        if (!stats) {
+            throw new Error('sample did not parse');
+        }
+        expect(stats.backend).toBe('webgl2');
+        expect(formatFrameStats(stats).split('\n')[0]).toBe('backend WebGL 2');
+        expect(formatFrameStats(stats)).not.toContain('webgpu ');
+
+        const wgpu = parseFrameStats(
+            JSON.stringify({
+                ...(JSON.parse(SAMPLE) as Record<string, unknown>),
+                webgpu: {
+                    device: 'browser WebGPU',
+                    timestamps: true,
+                    wgslTotal: 164,
+                    wgslCompiled: 100,
+                    wgslFailed: 0,
+                },
+            }),
+        );
+        if (!wgpu) {
+            throw new Error('webgpu sample did not parse');
+        }
+        expect(wgpu.webgpu?.timestamps).toBe(true);
+        expect(formatFrameStats(wgpu).split('\n')[1]).toBe('webgpu browser WebGPU: WGSL 100/164 …');
+        const done = formatFrameStats({ ...wgpu, webgpu: { ...wgpu.webgpu!, wgslCompiled: 162, wgslFailed: 2 } });
+        expect(done).toContain('WGSL 162/164 (2 failed)');
+        // Older C++ without the fields: no backend line, nothing breaks.
+        const old = parseFrameStats('{"cpu":{}}');
+        expect(old?.backendName).toBe('');
+        expect(old?.webgpu).toBeNull();
     });
 });
 

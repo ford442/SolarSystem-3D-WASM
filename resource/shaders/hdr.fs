@@ -1,4 +1,5 @@
 #version 300 es
+// vertex: passThrough.vs (WebGPU links stages by location: tools/wgsl_shader_compiler pairs them)
 precision highp float;
 precision highp int;
 

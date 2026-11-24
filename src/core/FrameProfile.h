@@ -46,6 +46,15 @@ struct PassSample {
 };
 
 struct Sample {
+    /** The GPU API the frame was recorded against: rhi::BackendId / BackendName ("webgl2", "WebGL 2"). */
+    const char* backend = "opengl";
+    const char* backendName = "OpenGL 4.6";
+    /**
+     * The "webgpu" member as a JSON object: the device beside the GL frame and how its WGSL
+     * modules compiled (gfx/rhi/wgpu/WgpuBringUp::StatusJson). Empty is null, which is all a
+     * build without the WebGPU backend ever writes, so it carries no code for it.
+     */
+    std::string webgpuJson;
     double frameMs = 0.0; // wall time since the previous frame started
     std::array<double, kStageCount> cpuMs{};
     bool gpuSupported = false; // a timer query is available on this context
@@ -70,7 +79,7 @@ struct Totals {
     void ResetWorst() { worstFrameMs = 0.0; }
 };
 
-/** {"frameMs":…,"cpu":{"update":…},"gpu":{…}|null,"jobs":{…},"uploads":{…},"passes":[…],…} */
+/** {"backend":…,"backendName":…,"frameMs":…,"cpu":{"update":…},"gpu":{…}|null,"jobs":{…},"uploads":{…},"passes":[…],…} */
 std::string ToJson(const Sample& sample, const Totals& totals);
 
 /** Sums CPU time per stage over one frame (a stage may run many times, e.g. per component). */

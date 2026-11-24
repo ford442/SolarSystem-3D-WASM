@@ -614,8 +614,8 @@ GL calls used to, and leaves the rest as the pass before left it, which some pas
 (the aurora bloom's composite leaves depth testing and depth writes off, and the star glow
 after it has always drawn that way). Moving a pass
 onto the RHI therefore issues the same GL state, and the native golden images below are
-pixel-identical across the change. A WebGPU backend would fold the deltas into the state it
-tracks per pipeline.
+pixel-identical across the change. The WebGPU backend (§7.9) folds the same deltas into the
+state it tracks per pipeline (`rhi::PipelineTracker`).
 
 **Debugging.** `?graph=1` on the web, `SOLARSYSTEM_GRAPH=1` natively, logs the compiled graph
 as `[FrameGraph]` lines — pass and culled counts, JSON (`passes` with reads/writes, culled,
@@ -845,6 +845,94 @@ keep whatever CPU state the build reads, and implement `RestoreGpu()` as "build,
 reset" (every handle is already empty). An owner holding only handles that nobody rebuilds
 is left empty after a loss: it draws nothing, but it no longer crashes.
 
+### 7.9 The WebGPU backend
+
+WebGPU is a second implementation of `rhi::CommandList`, beside the GL one (`gfx/rhi/wgpu/`,
+CMake `SOLARSYSTEM_WEBGPU`; emdawnwebgpu on the web, Dawn natively). WebGL 2 stays the default
+and its binary is unchanged. What runs on WebGPU so far, and the phases to parity, are in
+[plans/WEBGPU_BACKEND_PLAN.md](plans/WEBGPU_BACKEND_PLAN.md): in this phase every pass still
+records through `GlCommandList`; the WebGPU command list is exercised by its tests and the
+GL-vs-WebGPU parity harness, and the WebGPU binary compiles every WGSL module on the page's
+device.
+
+**GL-free model** (`gfx/rhi/`, `tests/test_rhi_webgpu_model.cpp`). Two things GL leaves implicit
+become explicit:
+
+- *State.* `PipelineTracker` folds `PipelineState` deltas exactly as `GlCommandList` changes the
+  context (polygon-offset values survive turning it off, blend factors survive blending off),
+  starting from `ApplicationBaseline()` (depth test and back-face culling on, as
+  `ApplyGlobalGlState`). `ToWebGpuFixedFunction` applies GL's rules WebGPU does not have: depth
+  test off means no depth writes; `glPolygonOffset(f, u)` is depth bias `u`, slope `f`; the
+  y-flip below swaps the front face. `PipelineKey` (program, vertex layout, topology, target
+  formats, that fixed function) keys the pipeline cache, so states that draw alike share one.
+- *Passes.* `RenderPassPlanner` turns bind/viewport/clear/draw in GL order into render passes:
+  a pass opens at the first draw, earlier clears become its load ops, a clear after draws ends
+  the pass and starts the next with it, a clear nothing draws after still runs as an empty
+  pass, depth clears need depth writes (as `glClear` honours `glDepthMask`), the viewport is
+  context state across targets, and frame-graph passes never share a render pass (WebGPU
+  timestamps pass boundaries only, so each graph pass's GPU time is its own:
+  `TimestampPairs`).
+
+**Shaders: GLSL is the source** (`tools/wgsl_shader_compiler`). For every top-level stage and
+every subset of its `// permutations:`, `ShaderSource` assembles the `SpirvWebGpu` dialect —
+the GL text plus: `#version 460 core`, `SS_GLSL_DESKTOP` and `SS_WEBGPU` defined, explicit
+Vulkan bindings, varying locations, and a wrapped vertex `main` — then glslang (`-V -R`: loose
+uniforms packed into one std140 block per stage) writes SPIR-V and Tint writes WGSL
+(`--sampler-mapping` splits each combined sampler deterministically; non-uniform derivatives
+are allowed, as GLSL samples in divergent flow everywhere). Out come
+`resource/shaders-wgsl/<stage>[@<vertex stage>][.<DEFINE>…].wgsl` and `manifest.json` (each
+stage's bindings, attributes, colour outputs, and every loose uniform's offset from glslang's
+reflection), generated and gitignored: the `wgsl_shaders` target natively,
+`scripts/build-wgsl-shaders.sh` before a web build. The fixed numbers (`gfx/rhi/WgslBindings.h`):
+
+```
+@group(0)  per-view uniform blocks at their GL binding point (FrameUBO 0, MagnetosphereUBO 1)
+@group(1)  TextureUnit u: texture at binding 2u, sampler at 2u + 1
+@group(2)  loose uniforms: the vertex stage's block at 0, the fragment stage's at 1
+```
+
+WebGPU links stages by location: a vertex stage numbers its outputs in declaration order
+(every `#ifdef` branch counted, so the numbers do not depend on the defines) and a fragment
+stage takes its partner's numbers. A fragment stage drawn behind a vertex stage of another name
+lists it on a `// vertex: x.vs` line and gets a `<fs>@<vs>` file per partner. A stage WebGPU
+replaces rather than translates says `// webgpu: <why>` (the solar wind's point sprites).
+`SOLARSYSTEM_SHADER_SELFTEST=1` in a WebGPU build adds a WGSL leg: every program links into a
+pipeline on a real device (`rhi::webgpu::SelfTestWgsl`).
+
+**Y-flipped rendering.** The vertex epilogue negates `gl_Position.y` and maps z from GL's
+[-w, w] to [0, w]. Every WebGPU target then holds GL's row order, so GL's bottom-left viewport
+origin applies as is, `gl_FragCoord` and sampling a render target agree with GL, and
+`CommandList::ReadColor` returns rows as `glReadPixels` does (what golden captures compare).
+FramebufferId 0 is therefore an offscreen RGBA8 + Depth24 backbuffer, and `Present` flips it
+into the canvas once per frame.
+
+**The command list** (`rhi::webgpu::CommandList`): resources are its own ids (`CreateTexture`,
+`CreateFramebuffer`, `CreateUniformBuffer`, `CreateVertexBuffer`), so `BindGroup` and
+`RenderTarget` mean the same on both backends. A draw finds or builds its pipeline, copies the
+program's dirty uniform blocks into a per-frame ring (dynamic offsets, one `writeBuffer` before
+submit) and binds groups 0–2. Each render pass takes a timestamp pair billed to its graph
+pass's timer slot (`FrameProfile::kStageCount + timerSlot`, the GpuTimer numbering), read back a
+frame or more late. `rhi::webgpu::Program` is a `ShaderSpec` on WebGPU: two modules, explicit
+bind group layouts, and `Set*` that writes std140 values at the manifest's offsets (a matrix
+column per vec4 slot, like GL).
+
+**The page.** `web/src/gpuContext.ts` owns the cost tier both context kinds use;
+`web/src/webgpuContext.ts` requests the adapter (same power preference as the WebGL context)
+and the device (timestamp-query and the texture-compression features when present), which C++
+imports as `Module['preinitializedWebGPUDevice']`. `wasmVariant.ts` picks among
+`{webgl2, webgpu} × {single, threaded}`: WebGPU only for `?gpu=webgpu`, with `navigator.gpu`,
+on a deployment built with `VITE_WEBGPU_BUILD=1`; each failure falls back to WebGL 2
+(`WEBGPU_AUTO_SELECT` turns `auto` over once the backend reaches parity). The perf HUD's first
+line is the backend; the WebGPU binary adds its device and how many WGSL modules the browser's
+compiler accepted.
+
+**Tests.** `SolarSystemWgpuTests` (preset `native-wgpu`, a Vulkan adapter: SwiftShader or
+lavapipe; GL 4.6 under Xvfb for the parity cases): every program links; blending over a clear;
+the viewport origin and a clear-only pass; the present flip; timestamps; and
+`WgpuParity.TheToneMapPassMatchesGlWithinDeltaE2`, which runs `passThrough.vs` + `hdr.fs` on
+both backends and compares in CIE76 ΔE (0.000 today). `ShaderWgsl` (ctest) runs the toolchain
+over the corpus.
+
 ## 8. Web frontend (`web/`)
 
 | File | Role |
@@ -858,6 +946,9 @@ is left empty after a loss: it draws nothing, but it no longer crashes.
 | `src/capture.ts` | Deterministic video capture (WebCodecs + mp4-muxer; MediaRecorder fallback) |
 | `src/educationalLayer.ts` | Mission list + tour controls |
 | `src/contextLoss.ts` | `webglcontextlost` / `webglcontextrestored`: pause, `OnContextRestored`, resume; the `?losecontext=` test cycle (§7.8) |
+| `src/gpuContext.ts` | The GPU cost tier: WebGL 2 context attributes, the WebGPU adapter's power preference, the backing-store scale (§9.6) |
+| `src/webgpuContext.ts` | WebGPU adapter + device for the `SolarSystem-wgpu` binary (`preinitializedWebGPUDevice`, §7.9) |
+| `src/wasmVariant.ts` | Which binary: `{webgl2, webgpu} × {single, threaded}`, `?gpu=webgl\|webgpu`, `?jobs=0` (§7.7, §7.9) |
 | `src/observe.ts` | Explore/Observe switch, site + UTC time + rate controls, 2017 eclipse preset, telescope eyepieces + overlay, `ObserveState` parsing |
 | `vite.config.ts` | Base path `/solar-system/` |
 | `public/SolarSystem.{wasm,data}` | Generated by `./build-web.sh` |
@@ -1138,7 +1229,7 @@ std::string GetTexturePath(const std::string& lowRes, const std::string& highRes
 ### 9.6 Antialiasing and the context attributes
 
 Context attributes are fixed for the life of the page and chosen once from the initial quality
-tier: native with `GLFW_SAMPLES` (`PlatformWindow.cpp`), web in `web/src/webglContext.ts`
+tier: native with `GLFW_SAMPLES` (`PlatformWindow.cpp`), web in `web/src/gpuContext.ts`
 (`Module.contextAttributes` and GLFW hints are ignored by the Emscripten port; the context is
 created in TypeScript and handed in as `preinitializedWebGLContext`). Everything else about them
 (`alpha: false`, `stencil: false`, `preserveDrawingBuffer: false` because capture reads the canvas
@@ -1172,7 +1263,7 @@ specular) texture set, an orbit, and catalog tilt, skip the list below — add a
 ### 9.6 Antialiasing and the context attributes
 
 Context attributes are fixed for the life of the page and chosen once from the initial quality
-tier: native with `GLFW_SAMPLES` (`PlatformWindow.cpp`), web in `web/src/webglContext.ts`
+tier: native with `GLFW_SAMPLES` (`PlatformWindow.cpp`), web in `web/src/gpuContext.ts`
 (`Module.contextAttributes` and GLFW hints are ignored by the Emscripten port; the context is
 created in TypeScript and handed in as `preinitializedWebGLContext`). Everything else about them
 (`alpha: false`, `stencil: false`, `preserveDrawingBuffer: false` because capture reads the canvas
@@ -1971,7 +2062,8 @@ Full scenarios: [docs/plans/TESTING_GUIDE.md](plans/TESTING_GUIDE.md).
 | [README.md](../README.md) | Build, features, asset hosting, deployment |
 | [docs/plans/TESTING_GUIDE.md](plans/TESTING_GUIDE.md) | Step-by-step LOD/staged testing |
 | [docs/plans/PORTING_GUIDE.md](plans/PORTING_GUIDE.md) | Emscripten port history and CMake flags |
-| [docs/plans/WEBGPU_COMPANION_PLAN.md](plans/WEBGPU_COMPANION_PLAN.md) | Future Three.js/WebGPU companion (opt-in) |
+| [docs/plans/WEBGPU_BACKEND_PLAN.md](plans/WEBGPU_BACKEND_PLAN.md) | The WebGPU backend of the RHI: status, phases to golden parity (§7.9) |
+| [docs/plans/WEBGPU_COMPANION_PLAN.md](plans/WEBGPU_COMPANION_PLAN.md) | The Three.js/WebGPU companion (opt-in, separate app) |
 | [docs/CROSS_ORIGIN_HEADERS.md](CROSS_ORIGIN_HEADERS.md) | COEP/CORS/CORP matrix, CDN vs app headers, local verification |
 | [AGENTS.md](../AGENTS.md) | AI agent environment notes (Cursor Cloud VM) |
 | [docs/plans/archive/](plans/archive/) | Completed implementation plans and PR notes |

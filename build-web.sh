@@ -43,6 +43,14 @@ for arg in "$@"; do
             export SOLARSYSTEM_WEB_THREADS=0
             shift
             ;;
+        --webgpu)
+            # Also build the WebGPU binary (SolarSystem-wgpu[-mt], CMake SOLARSYSTEM_WEBGPU):
+            # GLSL -> WGSL first (scripts/build-wgsl-shaders.sh needs glslang and tint, see
+            # scripts/setup-webgpu-toolchain.sh). The page loads it only for ?gpu=webgpu on a
+            # deployment built with VITE_WEBGPU_BUILD=1 (docs/plans/WEBGPU_BACKEND_PLAN.md).
+            export SOLARSYSTEM_WEB_WEBGPU=1
+            shift
+            ;;
     esac
 done
 echo "CMake build type: $BUILD_TYPE"
@@ -140,6 +148,22 @@ if [ "${SOLARSYSTEM_WEB_THREADS:-1}" != "0" ] && [ "$BUILD_TYPE" = "Release" ]; 
         cmake --build "$MT_BUILD_DIR" -j"$BUILD_JOBS"
     fi
 fi
+# The WebGPU binaries (Release only, opt-in): SolarSystem-wgpu.*, plus -wgpu-mt with threads.
+BUILD_WEBGPU=false
+if [ "${SOLARSYSTEM_WEB_WEBGPU:-0}" = "1" ] && [ "$BUILD_TYPE" = "Release" ]; then
+    BUILD_WEBGPU=true
+    echo "Generating WGSL (scripts/build-wgsl-shaders.sh)..."
+    "$PROJECT_ROOT/scripts/build-wgsl-shaders.sh"
+    WGPU_PRESETS=(web-release-wgpu)
+    if [ "$BUILD_THREADS" = true ]; then
+        WGPU_PRESETS+=(web-release-wgpu-mt)
+    fi
+    for preset in "${WGPU_PRESETS[@]}"; do
+        echo "Running CMake preset $preset..."
+        (cd "$PROJECT_ROOT" && cmake --preset "$preset" "${CMAKE_ARGS[@]}")
+        (cd "$PROJECT_ROOT" && cmake --build --preset "$preset" -j"$BUILD_JOBS")
+    done
+fi
 cd "$BUILD_DIR"
 
 # 5. Deploy to Web Frontend
@@ -206,12 +230,32 @@ if [ "$BUILD_THREADS" = true ]; then
     echo "Copied SolarSystem-mt.js and SolarSystem-mt.wasm to web/public/"
 fi
 
+# The WebGPU glue goes to public/ as well (imported by URL, wasmVariant.ts). Its .data adds
+# resource/shaders-wgsl, so it is a package of its own, shared by its two threading variants.
+rm -f "$PROJECT_ROOT"/web/public/SolarSystem-wgpu*.{js,wasm,data}
+if [ "$BUILD_WEBGPU" = true ]; then
+    WGPU_DIR="$PROJECT_ROOT/build-web-wgpu"
+    cp "$WGPU_DIR/SolarSystem-wgpu.js" "$WGPU_DIR/SolarSystem-wgpu.wasm" "$WGPU_DIR/SolarSystem-wgpu.data" \
+        "$PROJECT_ROOT/web/public/"
+    echo "Copied SolarSystem-wgpu.{js,wasm,data} to web/public/"
+    if [ "$BUILD_THREADS" = true ]; then
+        WGPU_MT_DIR="$PROJECT_ROOT/build-web-wgpu-mt"
+        if ! cmp -s "$WGPU_MT_DIR/SolarSystem-wgpu-mt.data" "$WGPU_DIR/SolarSystem-wgpu.data"; then
+            echo "Error: SolarSystem-wgpu-mt.data differs from SolarSystem-wgpu.data; the variants must share one package."
+            exit 1
+        fi
+        cp "$WGPU_MT_DIR/SolarSystem-wgpu-mt.js" "$WGPU_MT_DIR/SolarSystem-wgpu-mt.wasm" "$PROJECT_ROOT/web/public/"
+        echo "Copied SolarSystem-wgpu-mt.{js,wasm} to web/public/"
+    fi
+fi
+
 echo ""
 echo "Artifact sizes ($BUILD_TYPE):"
 if [ -f "$PROJECT_ROOT/web/public/SolarSystem.wasm" ]; then
     wc -c "$PROJECT_ROOT/web/public/SolarSystem.wasm" "$PROJECT_ROOT/web/public/SolarSystem.data" \
         "$PROJECT_ROOT/web/src/SolarSystem.js" "$PROJECT_ROOT/web/public/SolarSystem-mt.wasm" \
-        "$PROJECT_ROOT/web/public/SolarSystem-mt.js" 2>/dev/null || true
+        "$PROJECT_ROOT/web/public/SolarSystem-mt.js" "$PROJECT_ROOT"/web/public/SolarSystem-wgpu*.{wasm,js,data} \
+        2>/dev/null || true
 fi
 # Release only: minified name -> original name, for reading Closure-renamed stacks.
 if [ -f "SolarSystem.js.symbols" ]; then
